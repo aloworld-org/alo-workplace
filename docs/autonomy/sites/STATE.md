@@ -1064,3 +1064,41 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     global, so parallel test scenarios could claim each other's rows.
   - CHANGELOG: user-voice entry added.
 - **Next:** S1.16c2 (form auto-create on section add + the full wire arc).
+
+## S1.16c2 — contact section auto-creates its form (2026-08-08)
+
+- **Shipped:** `POST /sites/:site/pages/:page/sections` now turns a new
+  `contact_form` section into a working form in one action. When the editor
+  sends no `form_id`, the authenticated owner door creates a tenant-scoped
+  form (the section heading is its owner-facing name, with `Contact form` as
+  the blank-heading fallback, shortened by Unicode characters to the form
+  name cap when needed), writes the generated id into the canonical
+  section envelope, and returns that envelope to the editor. A supplied id
+  must resolve through the same tenant + site door or the route answers the
+  same clean 404 as an unknown form. If the page write fails after creation,
+  the just-created form is removed so the failed action leaves no orphan.
+- **Verified:** touched Rust files are rustfmt-clean; `SQLX_OFFLINE=true cargo
+  clippy -p alo-jmap --all-targets -- -D warnings` clean; focused real-Postgres
+  tests green for auto-create/link + foreign-form refusal and for the complete
+  notification arc; full `cargo test -p alo-jmap` green with exit code 0 on a
+  dedicated local database (the shared `alo` DB was concurrently advanced to
+  migration 132 by the other build track during the first run). The mandatory
+  wrong-tenant coverage proves a foreign section POST creates no form, a valid
+  foreign form id cannot be linked, the outsider cannot read the submission,
+  and no notification enters a foreign inbox.
+- **Wire transcript:** after killing every stale `alo-jmap.exe`, freshly built
+  `alo-jmap` (8080) and `alo-sites` (8081) ran against docker `alo-pg` / database
+  `alo`. Real PKCE login: authorize 303, token 200. Authenticated editor arc:
+  create site 200 → create home page 200 → add contact section 200 (returned
+  linked form `Yo_Qll_UM6mTNpI9-ot5Cg`) → publish 200. Public urlencoded
+  `POST /f/{form_id}`: 200. Corrected form-scoped SQL evidence after the
+  background sweep: submissions=1, notified=1; messages for the form's tenant=1,
+  messages for every other tenant=0. (The first observation query named a
+  nonexistent submissions `site_id` column; no write depended on it, and the
+  corrected schema-accurate query produced these counts.) No outbound email and
+  no external AI call occurred.
+- **Cuts/flags:** auto-creation is deliberately on the editor's add-section
+  route named by this item; atomic full-envelope imports keep their existing
+  contract. Server-generated notification copy remains English-only, as
+  already recorded in S1.16c1.
+- **Next:** the first unchecked item in `QUEUE.md`.

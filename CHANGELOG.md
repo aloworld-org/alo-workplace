@@ -52,6 +52,12 @@ contracts.
   ever sent on your behalf: the notification is internal delivery only, and
   the submission also stays listed with the site either way.
 
+- **A contact form is ready the moment you add it to a page.** There is no
+  second setup step and no hidden form record to create: add the section,
+  publish, and a visitor can write to you. The section keeps its real form
+  link when the editor saves it, and a form from another site or workspace
+  can never be attached by mistake.
+
 - **Start the next project from the last one.** Any shared project board can be
   marked a **template**, and starting a project from one copies the shape of the
   work: the cards with their columns, order, priorities, labels and checklists,
