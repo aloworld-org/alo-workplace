@@ -90,7 +90,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.04a Auto-posting, invoices: issued invoice → AR/revenue/VAT postings; golden test vs hand-written entries.
 - [x] B4.04b Auto-posting, payments: payment → bank/AR postings incl. partials; goldens.
 - [x] B4.04c Auto-posting, credit notes: full reversal postings; goldens; ledger of original+credit sums to zero.
-- [ ] B4.05a Expenses model: migration + store CRUD (category→account map, project link, method, receipt file ref) + wrong-tenant tests.
+- [x] B4.05a Expenses model: migration + store CRUD (category→account map, project link, method, receipt file ref) + wrong-tenant tests.
 - [ ] B4.05b Expense approval flow: submit/approve/reimburse transitions + routes + wire transcript.
 - [ ] B4.06a ★ Receipt parsing core: deterministic extractor (vendor/date/amounts/VAT) behind a pluggable trait; fixture receipts prove it; AI backend seam flagged for human wiring.
 - [ ] B4.06b Receipt confirm path: upload route + parsed-fields-for-confirmation response + confirmed→expense creation; wire transcript.

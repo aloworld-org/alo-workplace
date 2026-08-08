@@ -10578,3 +10578,101 @@ lands; no `/finance` route exists yet.
 Next item: B4.05a (the expenses model — migration, tenant-scoped CRUD, the
 category→account map that the B4.04 rules will read, and the wrong-tenant
 test).
+
+## 2026-08-08 — B4.05a the claim: what a person spent, and the word that says where it books
+
+The first B4 slice a *person* appears in. Everything before it moved a
+company's own documents; an expense claim is a record of an employee's Tuesday
+— a restaurant, a pharmacy, a city on a date — so the interesting decisions
+here are about doors, not about arithmetic.
+
+- `platform/alo-store/migrations/0134_fin_expenses.sql` — `fin_categories`
+  (name, `account_id` → the chart, optional default rate, active) and
+  `fin_expenses` (claimant, `spent_on`, category, merchant, description, gross
+  / VAT cents + rate, currency, method, project, receipt node, status and the
+  decision columns B4.05b will fill).
+- `platform/alo-store/src/fin_categories.rs` — tenant-wide configuration on
+  the account door, the chart's own shape: list / read / create / update /
+  deactivate / delete.
+- `platform/alo-store/src/fin_expenses.rs` — the claim itself on the **personal**
+  door: `log_expense`, `expense`, `expenses(from, to, status)`, `edit_expense`,
+  `delete_expense`, plus `ExpenseMethod` / `ExpenseStatus` and the pure
+  normaliser every write goes through.
+
+**Decision 1 — a colleague is as blind as a stranger.** Every statement in
+`fin_expenses` binds `user_id = self.user`; no function here takes a user id,
+so reaching somebody else's claim is unrepresentable rather than refused. This
+is B3's rule for hours, applied to a worse case, and the tenancy suite tests it
+by making a **co-tenant** user try every path — read, list, edit, delete — and
+get exactly what another tenant gets: absent. Never `Forbidden`, which would
+confirm that somebody claimed something that day. The approver's cross-user
+read is tenant-door work and lands with the transitions (B4.05b).
+
+**Decision 2 — VAT is stated, never derived.** `gross_cents` is what the
+receipt totals and `vat_cents` is the tax it *shows*; nothing computes one from
+the other, and a category's `default_vat_rate_bp` is a value the form offers,
+never one this module applies. Two rules follow and are enforced in the store
+and in the schema: the VAT cannot exceed the gross, and **a VAT amount carries
+the rate it was charged at** (a return line is a rate and a figure). Net is
+`gross − vat`, a method rather than a column, so no third number can drift.
+
+*Rejected: deriving the VAT from the gross and the category default.*
+Reclaiming input VAT a receipt does not evidence is a false statement on a
+return, and the difference between "the receipt does not show it" and "the
+receipt shows zero" is exactly what an inspector asks about.
+
+**Decision 3 — what a claim points at, and what happens when that goes away.**
+The category is a real foreign key (a category that has classified a cost
+cannot be deleted — 409, deactivate instead), and both new FKs are `NO ACTION`
+rather than `RESTRICT` for 0106's reason, proven by a test that deletes a
+tenant holding categories and claims. The project and the receipt carry **no**
+key: deleting a board or purging a file must not delete money a person is
+owed, so a dangling id resolves to nothing — but both are checked *on write*
+through the doors that already exist (`writable_project`, `drive_require_read`),
+so a claim can never be attached to a board or a file the claimant cannot
+reach.
+
+Small in-scope repair: `fin_accounts::map_chart_conflict` mapped **every**
+23503 to "an account that carries postings cannot be deleted", which is now a
+lie for an account an expense category books to. It reads the constraint name
+and names the real reason; the suite asserts the new message.
+
+**Verified.** 13 unit tests across the two modules (the pure normalisers: the
+€119/19 % receipt, the total-only receipt, the VAT-without-a-rate refusal, the
+bounds, the currency, both enums' round trips) and a new 4-test integration
+suite `tests/fin_expenses_tenancy.rs` against the local Postgres — the CRUD
+arcs, the case-insensitive duplicate-name conflict, the expense-account and
+active-account rules for a category, the retired-category rule (cannot be
+picked afresh; a claim already carrying it is untouched), the delete refusals,
+the window ends, and the mandatory wrong-tenant work described above.
+
+Mutation-checked: replacing `user_id = $2` with a tautology in `expense()`
+fails exactly one assertion — the colleague's read — and nothing else;
+re-verified green after reverting.
+
+Gates: `rustfmt --edition 2024` on the touched files (the whole-crate `cargo
+fmt` trap on this machine is unchanged); `SQLX_OFFLINE=true cargo clippy -p
+alo-store --all-targets` clean, zero warnings; `cargo test -p alo-store` green
+end to end (612 lib tests and every integration binary, no failures).
+
+Cut, named: **no transitions and no posting.** `submit`/`approve`/`reject`/
+`reimburse`, the approver's inbox and the rule that books an approved claim
+(`employee_payable` for a personal payment, `bank` for a card) are B4.05b's, as
+the queue splits them. What this slice fixes for them is the vocabulary and the
+freeze: `ExpenseStatus::is_editable` is draft-only, `edit_expense` re-tests the
+status *inside* the UPDATE so a submit landing mid-edit wins the race, and
+`delete_expense` allows draft and rejected only — rejected because otherwise a
+refused claim would be stuck in its claimant's list with no verb that clears
+it. The freeze itself is untestable until B4.05b can set a status; its test
+belongs to that item.
+
+No CHANGELOG line: still nothing a person can see — no route, no screen. The
+wave's first user-voice line lands with the first visible slice (B4.05b or
+B4.13a).
+
+**HUMAN ACTION (unchanged):** `/finance` still needs the production Caddyfile
+prefix and the `API_PATHS` line in `web/vite.config.ts` when the first route
+lands; no `/finance` route exists yet.
+
+Next item: B4.05b (the approval flow — the four transitions, the approver door
+behind a role gate, the routes and the wire transcript).
