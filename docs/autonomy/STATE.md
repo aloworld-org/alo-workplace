@@ -10858,3 +10858,101 @@ carries it in `API_PATHS` from this commit, so the dev proxy is right.
 
 Next item: B4.06a (the receipt extractor — a deterministic implementation behind
 a pluggable trait, fixtures only, the AI backend a seam a human wires).
+
+## 2026-08-09 — B4.06a reading a receipt: candidates with evidence, and the seam an AI plugs into
+
+**Shipped.** `platform/alo-store/src/fin_receipt.rs` — the `ReceiptExtractor`
+trait, its one deterministic implementation `PatternExtractor`, and
+`default_extractor()` as the single call site a human changes on the day a
+second implementation exists. It is a pure function from characters to
+candidates: no row, no database, no tenant, no model, no network. Given the
+text layer (as `extract::extract_text` already returns it for PDFs and Office
+files), the file's name and the day, it reads **merchant, date, gross, VAT
+amount, VAT rate and currency**, each as an `Option<Found<T>>` carrying a
+`Confidence` and the `Evidence` it came from — a character span into the
+normalised lines the struct returns, or "the file's name". 20 unit tests beside
+the module and `tests/fin_receipt_fixtures.rs` (9 tests over 7 fixture
+receipts) prove it.
+
+**The fixtures are documents, not strings.** `tests/fixtures/receipts/`: a
+Munich REWE till roll (7% MwSt table, `SUMME EUR`), a Leipzig hotel folio with
+**two** rates, an Amsterdam supermarket (`SUBTOTAAL` then `TOTAAL`, BTW 9%), a
+Paris bistro (`Total HT` then `Montant TTC`, TVA 10%, `€`), a Leeds taxi (`£`,
+VAT 20%, and a VAT **registration** number full of digit groups), a parking
+ticket with nothing on it but `4,50`, and the text layer of a German supplier
+invoice (`Rechnungsdatum: 2026-03-02`, `Zwischensumme netto`, `zzgl. 19,00%
+USt`, `Rechnungsbetrag EUR`). Every expected value is a field *of the document*
+— which is what makes the file the contract an AI backend has to meet, rather
+than a description of how the patterns happen to work.
+
+**Decision 1 — nothing is computed, and the fixtures prove the negative.** A
+receipt that prints `Total 11,90` and `inkl. 19% MwSt` yields a rate and **no
+VAT amount**: `gross × 19 / 119` is one line of arithmetic and it would put a
+number a tax inspector asks about onto a form a human then confirms, after
+which a guess is indistinguishable from a read fact. Three tests hold that
+line, including one that walks every fixture and asserts each tax read is a
+substring the paper actually printed. The one computation in the module
+*selects* between printed amounts (which of `19% 10,00 1,90 11,90` is the tax)
+and is documented as such.
+
+**Decision 2 — two readings the paper forced, neither of them in the note.**
+(a) **Several rates means no single rate.** The hotel folio prints 7% on the
+room and 19% on dinner; the claim gets the sum of the two printed taxes
+(19,28) and `vat_rate_bp = None`. Reporting either rate would be a statement
+the document does not make, and the expense model has one rate field.
+(b) **A tax amount is always printed with its cents.** Without that rule, `VAT
+Registration No. GB 123 4567 89` is a "VAT line" with three digit groups on it
+and the smallest becomes an £89 tax. A named exclusion list for registration
+lines (`ust-id`, `vat reg`, `partita iva`, …) is the second half of the same
+guard. Both were found by writing the fixtures, not by reasoning.
+
+**Decision 3 — one amount grammar, extracted rather than copied.** `1.234,56`
+is a thousand in Berlin and one and a bit in London, and the CRM lead import
+had already settled every case (and settled that `1.234` is *refused*, never
+guessed). Writing a second European money parser for receipts is the
+duplication CLAUDE.md forbids and a bug waiting for the day the two disagree,
+so the grammar moved to `platform/alo-store/src/money_text.rs`, returning a
+**reason** (`AmountText::{Empty,Negative,Ambiguous,Grouping,NotANumber,
+TooLarge}`) rather than a sentence: a message naming a CSV column is wrong on a
+till roll. `crm_lead_import::parse_value_cents` keeps its own wording, its
+empty-cell-is-zero rule and the deal ceiling, and every one of its existing
+tests passes unchanged — which is what makes the refactor safe to have done
+inside this item.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+--all-targets` clean; the full `cargo test -p alo-store` suite green against
+the local docker postgres — 641 lib tests (20 new in `fin_receipt`, 4 in
+`money_text`) plus every integration binary, including the 9 new fixture tests
+and the untouched CRM import suite.
+
+**Cuts, named.**
+
+- **No IBAN reading.** The design note lists IBANs among the patterns, but
+  `fin_expenses` has no field for one and B4.06b confirms fields *into an
+  expense*: it would have been a reading nothing could receive. `iban.rs`
+  already exists for the day a bill or a bank line needs it.
+- **No OCR.** A photograph with no text layer yields an empty `ParsedReceipt`
+  and the person types the claim — the pre-B4.06 experience, unchanged. Reading
+  pixels is exactly what the AI seam is for, and the loop may not call a model.
+- **No routes, no UI, no CHANGELOG line.** B4.06b is the upload route and the
+  confirm response; until then nothing a person can see changed, so a
+  user-voice line would announce a feature nobody can reach (the call B4.05a
+  and B4.05b both made). The wave's first CHANGELOG line still lands with
+  B4.13a.
+- **No wrong-tenant test, and the reason is structural.** This module has no
+  tenant surface at all: no handle, no statement, no id. The mandatory
+  isolation test attaches to B4.06b's `POST /finance/receipts`, where a
+  receipt's Drive node is read through the claimant's own door.
+
+**HUMAN FLAG (carried, unchanged from B4.05b):** no queue item wires
+`post_invoice_issue` / `post_payment_settle` / `post_credit_note_issue` into
+the document verbs. Every posting rule is written, golden-tested and
+unreachable from a route, so B4.11's reports will read an empty journal for
+tenants who have been invoicing since B1.
+
+**HUMAN ACTION (carried):** `/finance` needs adding to the production Caddyfile
+at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
+`/projects`. `web/vite.config.ts` already carries it.
+
+Next item: B4.06b (the upload route: `POST /finance/receipts` returning these
+parsed fields for confirmation, and the confirmed→expense create path).

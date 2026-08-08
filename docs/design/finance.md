@@ -701,6 +701,25 @@ show why. An AI backend is a second implementation of the same trait, wired
 by a human (ADR 0029, EU-only inference); **the loop never calls a model**,
 and the fixture suite is what proves the seam.
 
+*As built (B4.06a),* `fin_receipt.rs` is `ReceiptExtractor` +
+`PatternExtractor`, `default_extractor()` being the one call site to change on
+the day a second implementation exists. Every field of `ParsedReceipt` is an
+`Option<Found<T>>` — value, `Confidence` (high/medium/low, deliberately coarse
+so no threshold can grow into an auto-approval), and `Evidence`, either a
+character span into the normalised lines the struct carries or "the file's
+name". `today` is an argument, not a clock read, and it buys one rule: a date
+in the future or more than ten years old is not when the money was spent. Three
+readings the paper forced and the note had not written down: a **line naming
+several rates yields the sum of the printed taxes and no single rate** (a hotel
+folio at 7% and 19% states no one rate); a **tax amount is only ever an amount
+printed with its cents**, which is what keeps `VAT Registration No. GB 123 4567
+89` from becoming a tax; and the **amount grammar is shared**, not copied —
+`money_text.rs` now holds the one answer to "is `1.234,56` a thousand or one
+and a bit", used by both this extractor and the CRM lead import. Cut from the
+slice: **IBAN detection** (the expense model has no field for one, so it would
+have been an unreachable reading) and the OCR of a receipt with no text layer,
+which is the AI seam's whole reason for existing.
+
 **VAT on an expense is stated, never derived.** A receipt showing €119 with
 19% is entered as gross 119 / VAT 19; a receipt showing only a total is
 entered with VAT 0 and books nothing to `vat_input`. *Rejected: computing the
