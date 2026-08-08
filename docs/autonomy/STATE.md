@@ -10676,3 +10676,185 @@ lands; no `/finance` route exists yet.
 
 Next item: B4.05b (the approval flow — the four transitions, the approver door
 behind a role gate, the routes and the wire transcript).
+
+## 2026-08-09 — B4.05b the flow: handed in, decided, paid back — and the first `/finance` route
+
+**Shipped.** The five transitions an expense claim has, on both doors, and the
+HTTP surface that reaches them: `platform/alo-store/src/fin_expenses.rs` gains
+`submit_expense`/`withdraw_expense` on the personal door and
+`pending_expenses`/`expense_by_id`/`decide_expense`/`reimburse_expense` on the
+tenant door, plus `ExpenseDecision` and `PendingExpense`;
+`products/mail/alo-jmap/src/finance_expenses.rs` (the claimant's own claims,
+CRUD + submit/withdraw) and `finance_approvals.rs` (the queue and the three
+decisions, admin-gated) are the routes. No migration: 0134 already carried every
+column this flow writes, which is what that slice's schema work was for.
+
+**Decision 1 — a refusal hands the claim back.** B4.05a shipped
+`ExpenseStatus::is_editable` as draft-only and deferred its test here, because
+nothing could yet set another status. Built out, that reading is wrong: the
+point of refusing a claim is that the person fixes it and hands it in again, and
+a rejection that could only be *deleted and retyped* would lose the receipt link
+and the note explaining it. `is_editable` is now draft-or-rejected — the same
+call `time_weeks` made for a refused week — and the delete rule it already had
+(draft or rejected) becomes the same predicate rather than a second list.
+Nothing anybody approved becomes editable by it. `CLAIMANTS_STATUSES` spells the
+pair once for the statements, and a unit test asserts the SQL list and the
+predicate cannot drift apart.
+
+**Decision 2 — the queue is a view of the claims, not a second collection.**
+`GET /finance/expenses/pending` rather than `/finance/approvals`, because the
+design note puts the decisions on the claim itself
+(`/finance/expenses/{id}/approve`); a separate collection would have made the
+audit derivation read `finance.approval.expenses.approve` with **no record id**
+(the derivation takes the id only when it follows the collection directly).
+As registered, every mutating route derives cleanly:
+`finance.expense.{create,update,delete,submit,withdraw,approve,reject,reimburse}`.
+`finance` joined `audit_action::AUDITED_MODULES` and `/finance/` joined
+`tests/audit_routes.rs`' prefixes, so the "every mutating route is audited"
+promise now covers this module by reading the router's own source — the eight
+lines are in the expected vocabulary.
+
+**Decision 3 — only money the employee actually laid out is reimbursed.**
+`reimburse_expense` refuses a claim the company's own card or petty cash paid
+(`owes_the_employee`), naming that rule rather than the status one: a card claim
+left nobody owed anything, and recording a repayment against it would book money
+out of the bank twice. The day is required from the caller and never the
+server's clock — it is the date the reimbursement books on, and a day chosen by
+whichever zone a container runs in is a posting in the wrong period.
+
+**Decision 4 — two route files, for the reason `/projects` has two.**
+`finance_expenses.rs` has no `userId` anywhere: everything it answers is the
+caller's own. `finance_approvals.rs` is entirely cross-user and every handler
+opens with `require_admin`. Putting the module's one privileged read among
+ordinary ones is how such a read stops being noticed. Both render a claim
+through the *same* `expense_json`, so the two surfaces cannot drift; the inbox
+adds exactly three fields (`userId`, `userEmail`, `categoryName`) and nothing
+else about the person.
+
+**Verified.**
+
+- Store: 5 new unit tests (the claimant's states, the transition predicates, the
+  decision→status map, the SQL-list/predicate agreement, the joined read's
+  qualification) and a new 4-test integration suite
+  `tests/fin_expense_flow.rs` against the real Postgres — the whole arc
+  (draft → submit → freeze → withdraw → edit → submit → reject → edit →
+  resubmit → approve → reimburse), the card claim nobody is owed for, the queue
+  ordering across two people, and the mandatory isolation: tenant B's handle
+  reads, decides and reimburses **nothing** of tenant A's, and a colleague's
+  personal door is as blind as an outsider's.
+- Mutation-checked: replacing `tenant_id = $1` with a tautology in
+  `decide_expense` fails exactly one assertion — the cross-tenant approval —
+  and nothing else; green again after reverting.
+- Gates: `rustfmt --edition 2024` on the touched files only (running it on a
+  crate root formats every module it can reach — six unrelated `alo-jmap` files
+  were reformatted and reverted; the `cargo fmt` trap on this machine, again);
+  `cargo clippy -p alo-store -p alo-jmap --all-targets` clean, zero warnings;
+  `cargo test -p alo-store` green (62 suites) and `cargo test -p alo-jmap` green
+  (434 unit + 50 suites). Web: `npx tsc --noEmit`, `npx eslint vite.config.ts`,
+  `npm run build` all clean.
+- **Wire-verified** against the local backend (docker `alo-pg`, debug `alo-jmap`
+  on `127.0.0.1:8080`, two fresh tenants `wireb405a`/`wireb405b`, three real
+  password tokens: tenant A's admin, tenant A's non-admin traveller, tenant B's
+  admin):
+
+```
+GET    /finance/expenses                (no token) → 401 missing or invalid bearer token
+POST   /finance/expenses                (no token) → 401
+GET    /finance/expenses/pending        (traveller)→ 403 admin only
+POST   /finance/expenses {}                        → 422 spentOn is required
+POST   … spentOn "14/03/2026"                      → 422 …must be a day of the form YYYY-MM-DD
+POST   … no grossCents                             → 422 grossCents is required: a claim is an
+                                                          amount somebody spent
+POST   … no method                                 → 422 method is required: whose money paid
+                                                          decides what the approval books
+POST   … method "credit"                           → 422 payment method must be personal, card or cash
+POST   … vatCents 1900, no rate                    → 422 state the VAT rate the receipt shows
+                                                          beside the VAT amount
+POST   … gross 1000 / vat 1001                     → 422 the VAT amount must not exceed the total
+POST   … categoryId "nosuchcategory"               → 404 (never an existence oracle)
+GET    /finance/expenses?from=…                    → 422 to is required
+GET    …?from=2020-01-01&to=2026-12-31             → 422 the period must be shorter than 366 days
+GET    …&status=pending                            → 422 expense status must be draft, submitted,
+                                                          approved, rejected or reimbursed
+POST   /finance/expenses  €119.00, VAT €19.00 @19% → 200 draft, net 10000, editable true
+GET    /finance/expenses/{id}   (tenant A admin)   → 404   a colleague is as blind as a stranger
+GET    /finance/expenses/{id}   (tenant B admin)   → 404
+POST   …/{id}/submit            (tenant A admin)   → 404
+POST   …/{id}/approve           (tenant B admin)   → 404
+PATCH  …/{id} {"merchant":"DB Fernverkehr"}        → 200 the rest of the claim unchanged
+PATCH  …/{id} {"vatCents":0,"vatRateBp":null}      → 200 net 11900   (an explicit null clears)
+PATCH  …/{id} {"vatCents":1900,"vatRateBp":1900}   → 200 net 10000
+POST   …/{id}/approve   (before it is handed in)   → 409 this claim is draft and cannot be decided
+POST   …/{id}/withdraw  (before it is handed in)   → 409 this claim is draft and cannot be withdrawn
+POST   …/{id}/submit                               → 200 submitted, editable false
+PATCH  …/{id} {"grossCents":99900}                 → 409 a claim that has been handed in cannot be
+                                                          changed; withdraw it first
+DELETE …/{id}                                      → 409 …cannot be deleted; withdraw it first
+POST   …/{id}/submit                               → 409 this claim is submitted and cannot be
+                                                          handed in
+GET    /finance/expenses/pending  (A admin)        → 200 1 claim   (B admin: 0)
+POST   …/{id}/reject {"note":"the receipt is missing"}
+                                                   → 200 rejected, editable TRUE, note kept
+PATCH  …/{id} (the fix)                            → 200
+POST   …/{id}/approve   (a decided claim)          → 409 this claim is rejected and cannot be decided
+POST   …/{id}/submit                               → 200 submitted, decisionNote CLEARED
+POST   …/{id}/reimburse (not yet approved)         → 409 this claim is submitted and cannot be
+                                                          marked reimbursed
+POST   …/{id}/approve {"note":"Beleg vollständig"} → 200 approved
+POST   …/{id}/withdraw                             → 409 this claim is approved and cannot be withdrawn
+POST   …/{id}/reimburse {}                         → 422 reimbursedOn is required: the day the money
+                                                          moved is the day it books on
+POST   …/{id}/reimburse "31.03.2026"               → 422 …must be a day of the form YYYY-MM-DD
+POST   …/{id}/reimburse  (traveller)               → 403 admin only
+POST   …/{id}/reimburse {"reimbursedOn":"2026-03-31"}
+                                                   → 200 reimbursed, reimbursedOn 2026-03-31,
+                                                          approval note still on the record
+POST   …/{id}/reimburse  (again)                   → 409 this claim is reimbursed and cannot be
+                                                          marked reimbursed
+POST   card claim → submit → approve → reimburse   → 409 the company's own money paid this claim,
+                                                          so there is nobody to reimburse
+POST   cash claim → submit → reject → DELETE       → 204, then GET → 404
+GET    /finance/expenses?from&to                   → 200 the claimant's own list, status filter agrees
+GET    /audit?entity=finance.expense:{id}          → create, update×3, submit, reject, submit,
+                                                     update, approve, reimburse — each with the
+                                                     address of whoever did it, claimant and
+                                                     approver distinguishable
+```
+
+  The row was read back in psql: `status=reimbursed, gross 11900, vat 1900,
+  submitted_at set, decided_by set, decision_note "Beleg vollständig",
+  reimbursed_on 2026-03-31`.
+
+**Cuts, named.**
+
+- **No posting.** An approved claim writes no journal entry yet
+  (`employee_payable` for the employee's money, `bank` for the company's card,
+  and the reimbursement's `employee_payable → bank`). B4.04's rules are pure
+  functions **not yet wired into any document verb** — an issued invoice does
+  not post either — and an expense that booked at approval while an invoice did
+  not would make the ledger read half-live. It lands when they all do; there is
+  no queue item that names that wiring, which is the one thing a human should
+  decide (see the flag below).
+- **No `/finance/categories` routes.** The store CRUD has existed since B4.05a
+  and the design note's table lists the routes, but they were not needed by this
+  item's arc (an unclassified claim is legitimate and books to
+  `expense_default`), and a claim carrying a category is covered by the store
+  suite. **They are the immediate prerequisite for B4.13a**: an expense form
+  with no category picker is not the screen the note describes.
+- **No CHANGELOG line.** Still nothing a person can see — routes, no screen. The
+  wave's first user-voice line lands with B4.13a, as B4.05a predicted; writing
+  one now would announce a feature nobody can reach.
+
+**HUMAN FLAG (new):** the queue has no item that wires `post_invoice_issue` /
+`post_payment_settle` / `post_credit_note_issue` — nor an expense equivalent —
+into the document verbs that make those documents real. Every rule is written,
+golden-tested and unreachable from a route. Until that item exists, B4.11's
+reports will read an empty journal for tenants who have been invoicing since B1.
+
+**HUMAN ACTION (unchanged, now due):** `/finance` is live as a route prefix. The
+production Caddyfile needs it added at the next deploy, beside `/billing`,
+`/crm`, `/audit`, `/insights` and `/projects`. `web/vite.config.ts` already
+carries it in `API_PATHS` from this commit, so the dev proxy is right.
+
+Next item: B4.06a (the receipt extractor — a deterministic implementation behind
+a pluggable trait, fixtures only, the AI backend a seam a human wires).

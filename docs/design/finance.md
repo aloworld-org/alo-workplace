@@ -93,8 +93,9 @@ read (the rename B3.11 paid for; it is not paid twice).
 | `POST /finance/entries/{id}/reverse` | the only correction: a mirror entry dated today or later. There is no `PATCH` and no `DELETE` on this collection, deliberately |
 | `GET /finance/entries.csv?from&to` | the journal as a file for the accountant's own tooling |
 | `GET/POST /finance/categories` · `PATCH/DELETE /finance/categories/{id}` | expense categories and the account each books to (B4.05a) |
-| `GET/POST /finance/expenses` · `GET/PATCH/DELETE /finance/expenses/{id}` | expense claims — the caller's own through the account door (B4.05a) |
-| `POST /finance/expenses/{id}/submit` · `/approve` · `/reject` · `/reimburse` | the four transitions; the last three are approver-only (B4.05b) |
+| `GET/POST /finance/expenses` · `GET/PATCH/DELETE /finance/expenses/{id}` | expense claims — the caller's own through the account door (shipped B4.05b, with the flow that needed them) |
+| `GET /finance/expenses/pending` | **approver-only**: the claims of this tenant awaiting a decision, oldest purchase first, each with its claimant's address and its category's name. A view of the same collection rather than a second one, because the decisions are on the claim itself (B4.05b) |
+| `POST /finance/expenses/{id}/submit` · `/withdraw` · `/approve` · `/reject` · `/reimburse` | the transitions; `submit`/`withdraw` are the claimant's, the last three approver-only (B4.05b) |
 | `POST /finance/receipts` | upload a receipt, get the **parsed fields back for confirmation**. Writes no expense (B4.06b) |
 | `GET/POST /finance/mileage` · `DELETE /finance/mileage/{id}` | mileage claims; each becomes an expense at the tenant's per-km rate (B4.07) |
 | `GET/PUT /finance/mileage/rates` | the per-km rate table, effective-dated (B4.07) |
@@ -115,7 +116,8 @@ Twelve path segments are reserved words under `/finance` — `accounts`,
 `bank`, `rules`, `periods`, `reports`, `settings`. Ids are base64url'd
 16-byte random tokens (`id.rs`), so a record can never *be* one of them, and
 matchit prefers a static segment to a capture — the shape `/tasks/labels`
-beside `/tasks/{id}` has had since ADR 0021.
+beside `/tasks/{id}` has had since ADR 0021. `pending` is reserved the same way
+one level down, under `/finance/expenses`.
 
 **There is no `POST /finance/entries/{id}` and no route that posts a
 document.** Posting is not a verb a client may use: an entry exists because
@@ -666,6 +668,21 @@ so a colleague's claim is unrepresentable rather than merely forbidden); an
 approver reads and decides through `TenantStore` behind a role gate. B3's
 note wrote the rule for hours; a receipt is worse — it names a restaurant, a
 pharmacy, a city on a date — and the same door answers it.
+
+**A refusal hands the claim back; an approval keeps it** (as built, B4.05b).
+The flow is `draft → submitted → approved → reimbursed`, with `rejected` beside
+`draft` as the other state in which the claim is still its claimant's own —
+editable, deletable and submittable. Refusing a claim is only useful if the
+person can fix it and hand it in again, and a refused claim that could only be
+deleted and retyped would lose the receipt link and the note explaining it (the
+call `time_weeks` made for a refused week). Handing a rejected claim in again
+**clears the decision**: a refusal that no longer stands must not still be
+displayed on the record, and its history is in the audit log. Two more rules,
+both refusals rather than silent no-ops: only a **submitted** claim is decidable
+(a decided one is resubmitted by its claimant, not re-decided), and only an
+**approved claim the employee's own money paid** can be marked reimbursed — a
+company card left nobody owed anything, and recording a repayment against one
+would book money out of the bank twice.
 
 **Every field a machine extracted is confirmed by a human before it books.**
 `POST /finance/receipts` returns parsed fields and **writes no expense**; the

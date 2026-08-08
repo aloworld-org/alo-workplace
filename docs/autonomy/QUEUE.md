@@ -91,7 +91,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.04b Auto-posting, payments: payment → bank/AR postings incl. partials; goldens.
 - [x] B4.04c Auto-posting, credit notes: full reversal postings; goldens; ledger of original+credit sums to zero.
 - [x] B4.05a Expenses model: migration + store CRUD (category→account map, project link, method, receipt file ref) + wrong-tenant tests.
-- [ ] B4.05b Expense approval flow: submit/approve/reimburse transitions + routes + wire transcript.
+- [x] B4.05b Expense approval flow: submit/approve/reimburse transitions + routes + wire transcript.
 - [ ] B4.06a ★ Receipt parsing core: deterministic extractor (vendor/date/amounts/VAT) behind a pluggable trait; fixture receipts prove it; AI backend seam flagged for human wiring.
 - [ ] B4.06b Receipt confirm path: upload route + parsed-fields-for-confirmation response + confirmed→expense creation; wire transcript.
 - [ ] B4.07 Mileage claims (per-km rate table per tenant, entry → expense).
