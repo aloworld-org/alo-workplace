@@ -6,6 +6,12 @@ contracts.
 
 ## Unreleased
 
+- **Take website enquiries into any spreadsheet in one click.** The visible
+  Export CSV button in a site's Submissions inbox downloads every visitor
+  message with its form, sender, received time and handled state. Commas and
+  multiline messages stay intact, and text is made safe before Excel or
+  another spreadsheet opens it.
+
 - **Read and resolve website enquiries without leaving your site.** Every
   website now has a visible Submissions inbox beside its pages. Open a visitor
   message, see which contact form it came through, reply from the sender's

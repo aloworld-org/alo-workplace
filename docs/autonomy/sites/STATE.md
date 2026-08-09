@@ -1142,3 +1142,48 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   host disappeared; after stopping the orphan, the warm foreground rerun
   completed green.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.17b — submissions CSV export (2026-08-09)
+
+- **Shipped:** the per-site Submissions inbox now keeps a visible Export CSV
+  action on its header surface. One click fetches the authenticated export,
+  shows an immediate preparing state, and saves a recognisable
+  `submissions-<site-address>.csv` without navigating away. The file contains
+  received time, form, sender name and email, message, and handled state in the
+  same newest-first order as the inbox. Download and failure copy ships in
+  English, French and Dutch.
+- **Boundary and file safety:** authenticated
+  `GET /sites/:site/submissions.csv` shares the exact tenant-scoped reader used
+  by the JSON inbox; copied foreign or invented site ids answer the same 404.
+  User-authored cells that a spreadsheet could execute as a formula are
+  neutralised before RFC 4180 quoting. The response is an attachment with a
+  validated-address filename, stated UTF-8 CSV type, `nosniff`, and `no-store`.
+- **Verified:** rustfmt clean; `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo
+  clippy -p alo-jmap --all-targets --jobs 1 -- -D warnings` clean; focused CSV
+  contract and mandatory wrong-tenant tests green; authoritative full
+  `cargo test -p alo-jmap --jobs 1` green (439 unit tests plus every integration
+  binary, including 14 Sites HTTP tests, and doc tests). Web: SitesModule
+  17/17, `npx tsc --noEmit`, focused ESLint, and production build clean
+  (existing chunk and circular-chunk warnings only).
+- **Wire transcript:** after killing the stale `alo-jmap.exe`, a freshly built
+  local server ran on 127.0.0.1:8080 against docker `alo-pg` / database `alo`.
+  Real PKCE authorize returned 303 and token exchange 200. Authenticated CSV
+  export returned 200, the six-column contract header, the seeded visitor
+  address, UTF-8 CSV content type, attachment filename, and `no-store`; an
+  invented site returned 404. The first PKCE script used an unavailable static
+  RNG helper but still completed; the clean rerun used the platform-supported
+  RNG instance and produced the recorded result. No production host, external
+  AI, outbound email, or secret was used.
+- **Design references:** Wix/Squarespace form-submission exports for the Sites
+  expectation and Mail/Gmail's visible inbox actions for placement. Export is
+  one click, stays visible rather than living in a menu, responds immediately,
+  and is disabled with an empty inbox instead of downloading a confusing blank
+  file (UX laws 1, 2, 3, 6, 8 and 12).
+- **Cuts/flags:** the export intentionally carries stable English column/status
+  values as a machine-readable contract while the surrounding UI is localised.
+  An initial full-suite process was stopped after buffered output made a healthy
+  run look idle; its reported tests were green, and the complete untouched warm
+  rerun is the authoritative green gate. The first Vitest command was launched
+  from the repository root and selected an unconfigured package; the correct
+  web-workspace run is the recorded 17/17 result.
+- **Next:** the first unchecked item in `QUEUE.md`.
