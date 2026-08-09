@@ -94,6 +94,8 @@ product besides.
 |---|---|
 | `GET /chat/agents` | The tenant's agents — for the composer's `@` list and the member sheet |
 | `POST /chat/channels/{id}/agents` · `DELETE …/agents/{agent}` | Add or remove an agent from a room (owner only, like any member) |
+| `GET /chat/channels/{id}/turns` | Agent turns running in this room right now, so a room does not look idle while a model thinks |
+| `POST /chat/channels/{id}/turns/{turn}/stop` | Stop a running turn — **only the person who asked**, for the same reason only they may approve what it proposes. Answers 204 even when nothing was found: the turn may have just finished, and what the caller wanted is true either way |
 | `POST /chat/proposals/{id}` `{approve}` | Decide a pending proposal. **403 for anyone but the asker**, with the reason said plainly. Approving **runs the action in the same request**, through the one executor the command palette already uses — recording a decision the client must then follow up on would let the record and the effect drift, which is what this table exists to prevent |
 
 An agent turn is not a route. Mentioning an agent in an ordinary
@@ -127,10 +129,13 @@ an agent has no account door of its own to widen.
   an agent's coat, and belongs with the schedulers.
 - **Per-agent custom tool sets.** The chat agent gets the workspace tool set
   ADR 0034 already defines. A tool that only exists in chat can come later.
-- **A Stop control**, which ADR 0034 requires for multi-step runs. A chat turn
-  is a single call today, so there is nothing to stop mid-flight; when a
-  multi-step turn arrives, so must the control. **Recorded here as owed, not
-  as done.**
+- **Aborting the model call itself.** Stop is now built (below), but it
+  declines to post a result rather than cancelling the request in flight —
+  which is what someone pressing it wants, and costs no new dependency. A true
+  abort belongs with the multi-step turns that do not exist yet.
+- **Stop across processes.** The registry is in memory, so a Stop only reaches
+  turns on the process that receives it. Acceptable while a turn is a single
+  call of a few seconds; the thing to revisit before turns run long.
 
 ## Alternatives rejected
 
