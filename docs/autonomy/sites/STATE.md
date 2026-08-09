@@ -1424,3 +1424,36 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   and status-chip polish remain deliberately in S1.21b. The placeholder slug
   is private and is replaced by the explicit public metadata flow there.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.21b — blog publishing controls in Sites (2026-08-09)
+
+- **Shipped:** the blog desk now distinguishes Draft and Published articles
+  with the shared neutral/success status chips. Every draft carries a visible
+  Publish action; every live article carries visible Edit details and Take
+  offline actions, while Edit in alo Docs remains present for the source body.
+- **Publish flow:** one focused dialog collects the public article title, URL
+  path, RSS/blog summary and optional cover image. Covers upload through the
+  existing tenant-bound Drive image path, can be replaced or removed, and the
+  complete metadata write must succeed before the publish route runs. An
+  already-live article saves metadata in place. Taking an article offline is
+  reversible and therefore acts in one click, with immediate busy feedback.
+- **Errors and boundaries:** a rejected metadata write or publish keeps the
+  dialog and the user's inputs intact and shows the server's exact safe reason.
+  This slice consumes the update/publish/unpublish and image-upload contracts
+  completed and wrong-tenant tested in S1.18; it changes no store query, HTTP
+  route, migration or public renderer, so no new Rust or wire gate applied.
+- **Verified:** strict `npx tsc --noEmit --pretty false` clean; focused ESLint
+  clean across every changed TS/TSX and additive en/fr/nl catalog; all 23 Sites
+  integration tests green, including exact cover upload, metadata body,
+  publish order, refusal persistence and one-click unpublish; `npm run build`
+  green over 6,068 modules with only the repository's existing Rollup
+  chunk-size/circular-re-export warnings.
+- **Design references:** Ghost and WordPress establish the post status desk
+  and public-metadata step; Google Docs establishes the separate source-body
+  edit action. Publish, edit, unpublish and body editing stay visible without a
+  menu, feedback is immediate, and irreversible ceremony is avoided (UX laws
+  1, 2, 6, 7 and 12).
+- **Cuts/flags:** deleting blog metadata is intentionally not surfaced in the
+  publishing flow: it is a distinct destructive record-lifecycle action and
+  was not part of this item. Taking offline covers the reversible daily need.
+- **Next:** the first unchecked item in `QUEUE.md`.
