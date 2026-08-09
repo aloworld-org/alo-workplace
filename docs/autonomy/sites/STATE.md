@@ -1733,3 +1733,32 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   not edit forbidden deployment/Caddy configuration. IDNA display conversion
   and automated ingress-record inspection remain outside this item.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.26a AI full-site draft envelope
+
+- **Shipped:** added `alo_ai::sites`, a pure description-to-conversation
+  builder and strict v1 full-site draft parser. The envelope carries the site
+  name, proposed subdomain, validated shipped theme, and 1-20 fully typed
+  pages with exactly one home page and unique valid slugs. Parsing delegates
+  themes and page sections to alo-store's authoritative write gates, so model
+  output cannot introduce an unknown section, prop, unsafe link, or schema
+  variant the editor/publisher would reject.
+- **Safety boundary:** generated drafts are proposals only. They cannot claim
+  tenant blob ids, logos, favicons, or form ids, and the prompt forbids
+  invented people, testimonials, prices, addresses, statistics and URLs. No
+  site is created or published by this slice.
+- **Prompt/fixtures:** the prompt documents the complete twelve-section v1
+  vocabulary, every field, link rules, all shipped theme presets, page/home
+  rules, and the asset-backed sections that generation must leave for the
+  user. A deterministic two-page bakery fixture exercises the valid path;
+  tests refuse unknown top-level fields and section types, duplicate/missing
+  homes, future versions, non-objects, and fabricated asset/form references.
+- **Verified:** `cargo fmt -p alo-ai`; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-ai --all-targets --jobs 1 -- -D
+  warnings` clean; full `CARGO_INCREMENTAL=0 cargo test -p alo-ai --jobs 1`
+  green (49 unit tests plus doc tests). All generation tests are fixtures and
+  pure functions; no backend or external AI API was called.
+- **Cuts/flags:** S1.26b owns the single repair retry; S1.28 owns inference,
+  persistence, subdomain availability handling, and the guarantee that the
+  accepted proposal is stored only as a draft.
+- **Next:** the first unchecked item in `QUEUE.md`.
