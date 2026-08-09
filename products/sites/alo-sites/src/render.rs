@@ -291,7 +291,9 @@ fn push_head(
         "<meta property=\"og:url\" content=\"{}\">\n",
         esc(&canonical)
     ));
-    if let Some(blob) = first_hero_image(parsed) {
+    if let Some(blob) =
+        first_hero_image(parsed).or_else(|| site.theme.logo.as_ref().map(alo_store::BlobId::as_str))
+    {
         // og:image is crawler metadata: always the absolute public URL,
         // never an inline data URI (see `ImageSources`).
         out.push_str(&format!(
@@ -319,7 +321,9 @@ fn push_head(
     out.push_str("</head>\n");
 }
 
-/// The page's OG image source: the first hero section that carries an image.
+/// The page's first-choice OG image: its first illustrated hero. The caller
+/// falls back to the site logo so shared links still carry the brand when a
+/// page has no hero artwork.
 fn first_hero_image(sections: &[Section]) -> Option<&str> {
     sections.iter().find_map(|section| match section {
         Section::Hero(hero) => hero.image.as_ref().map(|image| image.blob_id.as_str()),

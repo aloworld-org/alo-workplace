@@ -1494,3 +1494,44 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   change-frequency guesses. Blog routes are included only when at least one
   article is actually published, avoiding discovery of an empty journal.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.22b — per-page search and sharing controls (2026-08-09)
+
+- **Shipped:** the page editor now exposes a visible Search & sharing action
+  beside Theme and Add section. Its focused dialog edits the optional search
+  title and description, shows a live result preview, explains the automatic
+  image choice, and saves both fields through the existing page update route.
+  Blank values restore automatic defaults instead of emitting empty metadata.
+- **Sharing defaults:** public rendering still prefers the first illustrated
+  hero for `og:image`, and now falls back to the site's stored logo when a page
+  has no hero art. Title continues to derive from page + site when no override
+  exists; canonical URL, site name and explicit descriptions remain unchanged.
+  A new full-document golden pins the derived title, canonical, OG title and
+  logo URL together.
+- **Feedback and errors:** the save action responds immediately with busy
+  state, refreshes the exact server-rendered preview after acceptance, and
+  closes only on success. A refusal leaves the dialog and the user's text in
+  place and displays the server's safe reason verbatim. All copy ships in
+  English, French and Dutch.
+- **Boundaries:** the tenant-safe page metadata route and store normalization
+  were already implemented and wrong-tenant tested; this slice adds no route,
+  query, schema or write boundary. It changes only the Sites UI consumer and
+  the pure public renderer's image fallback.
+- **Verified:** targeted rustfmt; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-sites --all-targets --jobs 1 -- -D
+  warnings` clean; full `cargo test -p alo-sites --jobs 1` green, including
+  four render goldens and fifteen render-rule tests. Web: `npx tsc --noEmit`
+  clean; focused ESLint clean; all 44 Sites editor/module/theme tests green;
+  production build green over 6,069 modules with only the repository's
+  existing Rollup chunk-size/circular-re-export warnings. The first build
+  invocation hit its two-minute command ceiling without a compiler error; the
+  untouched retry completed in 69 seconds.
+- **Design references:** Google Search result previews, WordPress page SEO and
+  Ghost social metadata establish this visible per-page action and automatic
+  branded fallback. The core action is surfaced, its outcome is recognizable
+  before saving, and it takes one editor click to reach (UX laws 1, 2, 6 and
+  12).
+- **Cuts/flags:** this slice deliberately does not expose arbitrary OG-image
+  uploads per page. The existing hero and theme-logo surfaces cover the common
+  one-click path without creating a second asset lifecycle.
+- **Next:** the first unchecked item in `QUEUE.md`.

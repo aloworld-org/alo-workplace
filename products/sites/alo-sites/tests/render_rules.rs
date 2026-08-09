@@ -253,6 +253,15 @@ fn theme_logo_and_favicon_reach_nav_and_head() {
     assert!(html.contains(
         "<a class=\"brand\" href=\"/\"><img class=\"logo\" src=\"/assets/img/L0g0aaaaaaaaaaaaaaaaaa\" alt=\"Nordwind Coffee Roasters\"></a>"
     ));
+    let without_hero_art = render_with(
+        &theme,
+        &json!({"schema_version": 1, "sections": []}),
+        None,
+        None,
+    );
+    assert!(without_hero_art.contains(
+        "<meta property=\"og:image\" content=\"https://nordwind.alosites.com/assets/img/L0g0aaaaaaaaaaaaaaaaaa\">"
+    ));
     // Without a logo, the brand link is the site name as text.
     let bare = render(&hero_page());
     assert!(bare.contains("<a class=\"brand\" href=\"/\">Nordwind Coffee Roasters</a>"));

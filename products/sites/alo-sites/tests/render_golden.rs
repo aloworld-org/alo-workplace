@@ -210,6 +210,32 @@ fn full_page_golden_with_theme_logo_and_seo() {
 }
 
 #[test]
+fn search_defaults_golden_uses_page_site_and_theme_logo() {
+    let theme = SiteTheme::from_value(json!({
+        "schema_version": 1,
+        "preset": "terra",
+        "logo": "L0g0aaaaaaaaaaaaaaaaaa",
+    }))
+    .unwrap();
+    let value = envelope_value(Vec::new());
+    let site = SiteRenderContext {
+        name: SITE_NAME,
+        base_url: BASE_URL,
+        theme: &theme,
+        strings: &EN,
+        images: ImageSources::PublicPaths,
+    };
+    let page = PageRenderContext {
+        path: "/about",
+        title: "About",
+        seo_title: None,
+        seo_description: None,
+        sections: &value,
+    };
+    assert_golden("seo_defaults.html", &render_page(&site, &page));
+}
+
+#[test]
 fn every_img_on_the_full_corpus_carries_alt() {
     let html = render_default(full_sections());
     let mut imgs = 0;
