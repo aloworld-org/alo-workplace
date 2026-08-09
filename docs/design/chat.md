@@ -18,7 +18,8 @@ at the next deploy; noted for the human, never edited by a builder).
 | `GET /chat/channels/{id}` | One channel with its members |
 | `PATCH /chat/channels/{id}` | Rename / retopic / archive |
 | `POST /chat/channels/{id}/members` · `DELETE …/members/{user}` | Join, invite, leave, remove |
-| `GET /chat/channels/{id}/messages?before={seq}&limit=` | A page of history, newest-first, `seq`-paginated |
+| `GET /chat/channels/{id}/messages?before={seq}&limit=` | A page of the main feed, newest-first, `seq`-paginated. **Top-level messages only**, each carrying `replyCount` and `lastReplyAt` — a reply lives in its thread and is announced here by the count, so a conversation is never read twice over. Withdrawn replies are not counted. |
+| `GET /chat/channels/{id}/threads/{seq}` | The replies under one message, oldest-first — a thread reads forwards |
 | `POST /chat/channels/{id}/messages` | Post `{body, thread_root?, attachments?:[drive_node_id]}` → the stored message with its `seq` |
 | `PATCH /chat/messages/{id}` · `DELETE /chat/messages/{id}` | Edit (keeps `edited_at`) · soft-delete (tombstone, never a hole in the sequence) |
 | `POST /chat/messages/{id}/reactions` | Toggle `{emoji}` for the caller |
