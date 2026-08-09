@@ -32,6 +32,7 @@
 //! fourth path — see `render::script`.
 
 pub mod blocknote;
+pub mod blog;
 pub mod render;
 pub mod serve;
 pub mod stylesheet;

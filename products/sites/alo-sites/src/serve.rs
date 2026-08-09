@@ -20,6 +20,7 @@
 //!   site's themed not-found. Both `404`, `no-cache`.
 //! - Database trouble → `503` with a static line, `Retry-After: 10`.
 
+mod blog;
 mod cache;
 pub mod config;
 mod forms;
@@ -154,7 +155,22 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     // tenant-scoped through the resolved site. Anything else — foreign,
     // unreferenced, or non-image — is the site's themed 404.
     if let Some(blob_id) = path.strip_prefix("/assets/img/") {
-        if !site.serves_image(blob_id) {
+        let referenced = if site.serves_image(blob_id) {
+            true
+        } else {
+            match state
+                .store
+                .published_post_uses_cover(&resolved, blob_id)
+                .await
+            {
+                Ok(referenced) => referenced,
+                Err(error) => {
+                    tracing::error!(subdomain = %sub, %error, "blog cover reference read failed");
+                    return unavailable();
+                }
+            }
+        };
+        if !referenced {
             tracing::debug!(subdomain = %sub, "image not referenced by the served publish");
             return not_found(site.not_found.clone());
         }
@@ -166,6 +182,10 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
             site.not_found.clone(),
         )
         .await;
+    }
+
+    if path == "/blog" || path.starts_with("/blog/") {
+        return blog::serve(&state, &resolved, &sub, path, site.not_found.clone()).await;
     }
 
     let (content_type, body) = if path == "/assets/site.css" {
@@ -283,6 +303,28 @@ fn cacheable(status: StatusCode, content_type: &'static str, etag: &str, body: S
 fn not_found(body: String) -> Response {
     (
         StatusCode::NOT_FOUND,
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/html; charset=utf-8"),
+            ),
+            (header::CACHE_CONTROL, HeaderValue::from_static("no-cache")),
+            (
+                header::X_CONTENT_TYPE_OPTIONS,
+                HeaderValue::from_static("nosniff"),
+            ),
+        ],
+        body,
+    )
+        .into_response()
+}
+
+/// Dynamic public HTML (blog publication can change independently of the
+/// site's page-snapshot publish id): always revalidate instead of handing a
+/// stale entity tag to a browser.
+fn dynamic_html(body: String) -> Response {
+    (
+        StatusCode::OK,
         [
             (
                 header::CONTENT_TYPE,

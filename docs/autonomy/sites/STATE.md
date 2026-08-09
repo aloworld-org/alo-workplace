@@ -1297,3 +1297,52 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   verification remains the upload pipeline's responsibility; this renderer
   verifies the HTML safety boundary and declared raster transport shape.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.20a — public blog index and article pages (2026-08-09)
+
+- **Shipped:** every live alo Site now serves a themed `/blog` index with
+  responsive article cards and `/blog/<slug>` article pages carrying canonical
+  and Open Graph metadata, the optional cover, publication date and the safe
+  BlockNote body. The visible site name, Home and Blog links keep the reading
+  path understandable without a menu. Complete index and article HTML goldens
+  pin the public contract, and the shared stylesheet gives cards and long-form
+  content one responsive theme-aware surface.
+- **Publication and tenancy:** only `status = 'published'` rows can cross the
+  public store door. Every list, body and cover-reference query is scoped by
+  the private tenant/site pair produced by Host resolution; draft, trashed,
+  wrong-kind and foreign documents are clean absences. A mandatory two-tenant
+  test proves each resolved host sees only its own title, body and cover. Cover
+  bytes still pass the existing image MIME and tenant checks after the new
+  published-reference gate.
+- **Correctness:** blog publication and alo Docs changes do not flip the site's
+  immutable page-publish id, so blog HTML deliberately bypasses the page cache
+  and answers `no-cache`; ordinary pages keep their existing render cache and
+  strong entity tags. Invalid published document JSON fails closed as the
+  service's static temporary-unavailable response rather than leaking bytes or
+  emitting partial markup.
+- **Verified:** targeted rustfmt; `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo
+  clippy -p alo-store -p alo-sites --all-targets --jobs 1 -- -D warnings`
+  clean; mandatory focused wrong-tenant proof green; authoritative full
+  `cargo test -p alo-store -p alo-sites --jobs 1` green against local Postgres
+  on 5432, including the 695 alo-store unit tests, all store integrations, 2
+  blog goldens and 6 public-service HTTP tests. The first combined full-suite
+  invocation reached the terminal's five-minute linking ceiling without a
+  result; the warm untouched foreground rerun is the recorded green gate.
+- **Wire transcript:** after confirming no stale `alo-jmap.exe` or
+  `alo-sites.exe`, a freshly built `alo-sites` ran on 127.0.0.1:8081 against
+  docker `alo-pg` and `C:/dev/Ficina/.localdev/blobs`. Real Host-header curls
+  returned 200 plus `no-cache` for `/blog`, showed the published card and no
+  draft marker; `/blog/wire-public-story` returned 200 with the real local Docs
+  body and exact canonical URL; `/blog/wire-draft-story` returned 404; and its
+  referenced cover returned 200, `image/png` and the planted local bytes. The
+  test service was stopped afterwards. No production host, external AI,
+  outbound email or committed secret was used.
+- **Design references:** WordPress and Ghost establish the public journal
+  reflex; Google Docs establishes that the authored document remains the body.
+  The index exposes every core reading action directly in each card and the
+  article preserves visible Home/Blog navigation (UX laws 1, 2, 6 and 12).
+- **Cuts/flags:** pagination and RSS intentionally remain S1.20b. Publication
+  currently reads the published post's current alo Docs bytes, matching a
+  published article's normal edit-in-place behavior; it is kept out of the
+  immutable page cache so changes cannot be served under a stale validator.
+- **Next:** the first unchecked item in `QUEUE.md`.

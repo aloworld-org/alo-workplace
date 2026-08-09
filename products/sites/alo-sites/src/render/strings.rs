@@ -53,6 +53,16 @@ pub struct UiStrings {
     pub not_found_text: &'static str,
     /// Not-found page: link text back to the site's homepage.
     pub not_found_home: &'static str,
+    /// Blog index and breadcrumb: section title.
+    pub blog_title: &'static str,
+    /// Blog index: text shown when no posts have been published.
+    pub blog_empty: &'static str,
+    /// Blog card: visible link text into one article.
+    pub blog_read_article: &'static str,
+    /// Blog article: label before its publication date.
+    pub blog_published: &'static str,
+    /// Blog chrome: concise link back to the site's homepage.
+    pub blog_home: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -77,4 +87,9 @@ pub const EN: UiStrings = UiStrings {
     not_found_title: "Page not found",
     not_found_text: "The page you are looking for does not exist or has moved.",
     not_found_home: "Go to the homepage",
+    blog_title: "Blog",
+    blog_empty: "No articles have been published yet.",
+    blog_read_article: "Read article",
+    blog_published: "Published",
+    blog_home: "Home",
 };

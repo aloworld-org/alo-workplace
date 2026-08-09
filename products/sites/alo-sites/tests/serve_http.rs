@@ -15,7 +15,10 @@ use serde_json::json;
 use tower::ServiceExt;
 
 use alo_sites::serve::{AppState, app};
-use alo_store::{AccountStore, BlobStore, SiteId, SitePublicStore, Store};
+use alo_store::{
+    AccountStore, BlobStore, DriveLocation, NewDriveFile, NewSitePost, SiteId, SitePublicStore,
+    Store,
+};
 
 /// The apex the tests serve under (`SITES_DOMAIN` in production).
 const APEX: &str = "sites.test";
@@ -197,6 +200,119 @@ async fn serves_a_published_site_with_the_response_contract() {
     let refused = app(Arc::clone(&state)).oneshot(post).await.unwrap();
     assert_eq!(refused.status(), StatusCode::METHOD_NOT_ALLOWED);
     assert_eq!(header_str(&refused, &header::ALLOW), "GET, HEAD");
+}
+
+#[tokio::test]
+async fn serves_only_published_blog_cards_posts_and_covers() {
+    use axum::body::Bytes;
+
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "blog").await;
+    let sub = unique("blog");
+    let host = format!("{sub}.{APEX}");
+    let site = publish_site(&acc, "Journal Co", &sub, "JOURNAL-HOME").await;
+
+    let body_blob = acc
+        .put_blob(
+            Bytes::from_static(
+                br#"[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"PUBLIC-BODY","styles":{}}],"children":[]}]"#,
+            ),
+            Some("application/json"),
+        )
+        .await
+        .unwrap();
+    let draft_blob = acc
+        .put_blob(
+            Bytes::from_static(
+                br#"[{"type":"paragraph","content":[{"type":"text","text":"DRAFT-BODY","styles":{}}],"children":[]}]"#,
+            ),
+            Some("application/json"),
+        )
+        .await
+        .unwrap();
+    let cover = acc
+        .put_blob(Bytes::from_static(b"cover-png"), Some("image/png"))
+        .await
+        .unwrap();
+    let published_doc = acc
+        .drive_create_file(
+            &DriveLocation::Personal,
+            None,
+            &NewDriveFile {
+                name: "Public article".to_owned(),
+                blob_id: body_blob.as_str().to_owned(),
+                content_type: Some("application/json".to_owned()),
+                kind: Some("doc".to_owned()),
+                ..NewDriveFile::default()
+            },
+        )
+        .await
+        .unwrap();
+    let draft_doc = acc
+        .drive_create_file(
+            &DriveLocation::Personal,
+            None,
+            &NewDriveFile {
+                name: "Draft article".to_owned(),
+                blob_id: draft_blob.as_str().to_owned(),
+                content_type: Some("application/json".to_owned()),
+                kind: Some("doc".to_owned()),
+                ..NewDriveFile::default()
+            },
+        )
+        .await
+        .unwrap();
+    let published = acc
+        .create_site_post(
+            &site,
+            &NewSitePost {
+                doc_node_id: &published_doc,
+                slug: "public-story",
+                title: "Public story",
+                excerpt: "A public summary.",
+                cover_blob_id: Some(&cover),
+            },
+        )
+        .await
+        .unwrap();
+    acc.create_site_post(
+        &site,
+        &NewSitePost {
+            doc_node_id: &draft_doc,
+            slug: "draft-story",
+            title: "DRAFT-TITLE",
+            excerpt: "DRAFT-EXCERPT",
+            cover_blob_id: None,
+        },
+    )
+    .await
+    .unwrap();
+    acc.publish_site_post(&site, &published).await.unwrap();
+
+    let index = send(&state, &host, "/blog").await;
+    assert_eq!(index.status(), StatusCode::OK);
+    assert_eq!(header_str(&index, &header::CACHE_CONTROL), "no-cache");
+    let index_html = body_string(index).await;
+    assert!(index_html.contains("Public story"));
+    assert!(index_html.contains("A public summary."));
+    assert!(index_html.contains(&format!("/assets/img/{}", cover.as_str())));
+    assert!(!index_html.contains("DRAFT-TITLE") && !index_html.contains("DRAFT-EXCERPT"));
+
+    let article = send(&state, &host, "/blog/public-story").await;
+    assert_eq!(article.status(), StatusCode::OK);
+    assert_eq!(header_str(&article, &header::CACHE_CONTROL), "no-cache");
+    let article_html = body_string(article).await;
+    assert!(article_html.contains("<h1>Public story</h1>"));
+    assert!(article_html.contains("<h2>PUBLIC-BODY</h2>"));
+    assert!(article_html.contains("property=\"og:type\" content=\"article\""));
+
+    let draft = send(&state, &host, "/blog/draft-story").await;
+    assert_eq!(draft.status(), StatusCode::NOT_FOUND);
+    assert!(!body_string(draft).await.contains("DRAFT-BODY"));
+
+    let cover_response = send(&state, &host, &format!("/assets/img/{}", cover.as_str())).await;
+    assert_eq!(cover_response.status(), StatusCode::OK);
+    assert_eq!(body_string(cover_response).await, "cover-png");
 }
 
 /// The image path of the public contract (S1.14): a live site serves exactly

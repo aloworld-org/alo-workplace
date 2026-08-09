@@ -6,6 +6,11 @@ contracts.
 
 ## Unreleased
 
+- **Give every live website a real journal.** Visitors can now browse a clean
+  card-based Blog page, open a published article with its picture and alo Docs
+  content, and move between the journal and homepage. Draft articles remain
+  private.
+
 - **Publish richer alo Docs as safe website articles.** Pictures, code examples
   and equations now carry into a website article without loading the editor.
   Unsafe embedded markup stays readable text instead of running in a visitor's
