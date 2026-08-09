@@ -13,7 +13,7 @@ at the next deploy; noted for the human, never edited by a builder).
 
 | Route | Does |
 |---|---|
-| `GET /chat/channels` | The caller's channels and DMs, each with unread count and last message preview |
+| `GET /chat/channels` | The caller's channels and DMs, each with unread count and last message preview. **Archived rooms are included, sorted last** — their history belongs to the team, so archiving must not put it out of reach. A client renders them as archived and withholds the composer; the server refuses the post either way (422). |
 | `POST /chat/channels` | Create a channel `{name, topic?, visibility}` — or open a DM `{kind:"dm", with:[user_id]}` (idempotent: the same pair returns the existing DM) |
 | `GET /chat/channels/{id}` | One channel with its members |
 | `PATCH /chat/channels/{id}` | Rename / retopic / archive |
