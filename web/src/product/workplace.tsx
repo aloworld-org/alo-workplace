@@ -11,6 +11,7 @@ import { BarChart3, Briefcase, Building2, Code2, Globe, HardDrive, Handshake, Me
 
 import { strings } from "../i18n";
 import { BillingModule } from "../billing";
+import { ChatModule } from "../chat";
 import { CrmModule } from "../crm";
 import { InsightsModule } from "../insights";
 import { ProjectsModule, TimerWidget } from "../projects";
@@ -110,7 +111,15 @@ const suiteModules: ProductModule[] = [
     enabled: true,
     element: () => <SitesModule />,
   },
-  { id: "chat", path: "/chat", label: strings.moduleChat, Icon: MessagesSquare, enabled: false },
+  // Chat is live as of ADR 0038 — built on alo's own store, not Matrix.
+  {
+    id: "chat",
+    path: "/chat",
+    label: strings.moduleChat,
+    Icon: MessagesSquare,
+    enabled: true,
+    element: () => <ChatModule />,
+  },
   { id: "meet", path: "/meet", label: strings.moduleMeet, Icon: Video, enabled: false },
 ];
 
