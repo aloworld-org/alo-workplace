@@ -6,6 +6,16 @@ contracts.
 
 ## Unreleased
 
+- **Recognise the payer who wrote no reference at all.** Bank lines that quote
+  none of your numbers are now ranked against what your customers still owe,
+  each with the reason in plain words — "the amount is exactly what this invoice
+  owes, and it is the only one that owes it", "the name on the transfer is this
+  customer's", "half of the invoice they named". A resemblance on its own is
+  never offered: something has to identify the document, and you still confirm
+  every match yourself. When a payer's bank spells them differently from your
+  customer record, tell alo once — "money from this account is theirs" — and
+  every future statement recognises them, with the rule shown and deletable.
+
 - **Tick off a bank statement against the invoices it paid.** alo now reads the
   reference a customer wrote on their transfer, finds the invoice it names, and
   — when the money matches what that invoice still owes, to the cent, in the

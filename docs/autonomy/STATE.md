@@ -12026,3 +12026,123 @@ and `/projects`. No new route prefixes this item — no routes at all.
 Next item: B4.09b (reconciliation heuristics: windowed matching, counterparty
 similarity, and the per-tenant learned-rules table, ranked with the evidence
 shown).
+
+## 2026-08-09 — B4.09b the heuristic stage: what a line is likely to be, and the rules a tenant teaches
+
+**First, a repo-wide breakage found and fixed.** The two tracks both minted
+migration **0142** — sites' `0142_site_analytics.sql` landed first (18a7771),
+this track's `0142_bank_matches.sql` second (11244ad) — and `sqlx::migrate!`
+refuses a duplicate version. **Every DB test in the repo was failing on `main`
+with `Migrate(VersionMismatch(142))`**, not only this track's. Renaming *our*
+file to `0143_bank_matches.sql` (never the other track's) fixes it; the local
+Postgres needed its `_sqlx_migrations` row 142 deleted and `bank_matches`
+dropped so both apply cleanly. **HUMAN ACTION:** if 142 was ever applied to a
+deployed database as *bank matches*, that row must be corrected by hand before
+the next deploy; nothing here has been deployed, so this is a check, not a
+repair. The prevention worth agreeing on: pull immediately before choosing a
+number, or split the blocks per track for real (the header comment in the
+migration claims 01xx/00xx and reality no longer matches it).
+
+**What shipped.** The stage after the arithmetic. `bank_match_heuristic.rs`
+(pure) ranks the documents a line is *likely* to be; `fin_match_rules.rs` holds
+what a tenant has taught it; `bank_suggest.rs` is the read that folds both
+stages over the ledger — split out of `bank_reconcile.rs`, which had become
+suggesting *and* confirming in one file (Law 3). `bank_match.rs` gave up its
+preconditions to a shared `ensure_matchable`, so "a credit note takes no
+payment" is stated once and both stages refuse it in the same words.
+
+**A score is a sum of named evidence, and the floor is an argument.** Each
+reason carries its own points and its own sentence: number quoted but part paid
+(60), a saved rule points at this customer (45), the counterparty *is* the
+customer word for word (35) or resembles them (20), the line moves exactly what
+is owed (30), it is the only open document owing that (15), booked near the due
+date (10/5). `SCORE_MIN` is 45 — exactly what the weakest *identifying*
+combination is worth — so **no soft signal reaches the floor alone**, and a test
+states that as the invariant rather than as a vibe. A name that resembles, an
+amount that fits, a payment near its due date: none of them is a suggestion.
+
+Three readings, each a money bug taken the other way. **Uniqueness is a claim
+about the ledger**: when the read caps the open documents (`OPEN_LEDGER_MAX`,
+5 000) it stops claiming "the only invoice that owes this" and says
+`ledger_capped` — the most confident wrong suggestion on a screen would be one
+argued from a ledger we did not finish reading. **More than is owed is never
+offered**: a cent over is a split, a duplicate or a mistake, and attributing it
+would record a payment larger than the debt. **What the exact stage claims is
+never offered again as a guess**, so the screen cannot argue with itself.
+
+**The fold is base letters, not transliterations.** `Müller` folds to `muller`,
+so a bank writing `MUELLER` does *not* match it by name — undoing that would
+also turn `Bauer` into `Bar`, and a signal that manufactures resemblances is
+worse than one that misses some. The miss is what a rule is for: a person says
+once that this counterparty (or this IBAN, or this fragment of a remittance) is
+that customer. Rules are plain folded text in one named field — no globs, no
+regular expressions, because a regular expression a tenant can write is a denial
+of service they can write — stored folded, so the unique on
+`(tenant, match_on, pattern)` is the real "one rule per thing to look at".
+`learn_fin_match_rule` takes the pattern off the line in front of the person and
+**refuses the remittance**: what a payer wrote on one transfer names that
+transfer and would never match again.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+--all-targets` clean; `cargo test -p alo-store` green against the local docker
+Postgres (`alo-pg`, 5432) — including 17 new pure tests in
+`bank_match_heuristic` and 9 in `fin_match_rules`, and 6 new DB tests in
+`tests/bank_suggest.rs`:
+
+```
+a_payer_who_quotes_nothing_is_recognised_by_their_name_and_what_they_owe
+    → two documents owing the identical amount, so uniqueness proves nothing;
+      the one whose customer the bank named is the only suggestion, the
+      evidence says so, and the invoice is still owed in full afterwards
+a_part_payment_quoting_the_number_is_offered_with_what_would_be_left
+    → exact says nothing, likely says NumberQuoted + PartPayment{807.00}
+money_already_received_moves_what_the_rest_of_the_document_is_matched_against
+    → after a €300 deposit the remainder is EXACT (and not also a guess), and
+      the original gross is now more than is owed and is offered by neither
+a_rule_a_person_saved_recognises_the_payer_a_name_alone_cannot
+    → MUELLER BAU against "Müller Bau": nothing before the rule, one
+      suggestion after it, the rule's id on the match, hits still 0 after
+      reading the screen twice, 1 after a confirmation counts it, and the
+      suggestion gone when the rule is forgotten
+an_iban_rule_is_learned_from_the_line_and_a_remittance_one_is_not
+    → the IBAN is taken off the line and folded; the remittance is refused
+      ("type the part of it"); the same rule twice is a conflict; a two-letter
+      pattern and a bad checksum are refused before anything is written
+two_tenants_holding_the_same_ledger_never_rank_or_reach_each_others_rules
+    → both hold the same number for the same money and import the same
+      statement; our rule is invisible to them, and un-hittable and
+      un-deletable through their handle; they cannot point a rule at our
+      customer nor learn one from our line (NotFound, both); each sees exactly
+      one suggestion and it is their own customer's document
+```
+
+**Cuts, named.**
+
+- **`account_id` and `supplier_key` are not columns yet.** They belong with the
+  `bill` target kind B5 brings; nullable columns added additively then beat dead
+  schema now. `target_kind` itself IS there, with its CHECK, because parsing a
+  kind this build does not know must not guess.
+- **Confirming a heuristic suggestion is B4.09c.** It is the manual pick — a
+  person states the amount — and it is the caller that will write
+  `bank_matches.rule_id` and call `fin_match_rule_hit`. Both doors exist and are
+  tested through the store; `confirm_bank_match` was deliberately left untouched
+  (freshly gated money code).
+- **No splitting a line across documents**, still. The ranked list may well name
+  three invoices that sum to the transfer; choosing that combination is B4.09c's.
+- **No HTTP route and no screen** (B4.13b), so nothing to wire-verify with curl:
+  everything above is proven through the store's own doors against real Postgres.
+- **An archived customer may still be pointed at by a rule** — their old
+  invoices still have to be reconciled when the money finally arrives.
+
+**FLAG for the wave review (B4.15):** the evidence points are English tokens in
+a Rust enum, which is right (they are data, not labels), but the *sentences* a
+screen builds from them are the first B4 strings that have to exist in three
+languages. B4.13b's i18n work should start from `MatchEvidence`, not from the
+screen.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new route prefixes this item — no routes at all.
+
+Next item: B4.09c (manual matching: the unmatched-line model, match/unmatch and
+ignore, and the wire transcript that comes with the first routes of this wave).

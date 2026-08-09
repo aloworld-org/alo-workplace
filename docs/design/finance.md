@@ -1101,6 +1101,58 @@ B4.09c), **no learned rules** (B4.09b — hence a `rule_id` that is always
 route and no screen**: B4.13b is the reconciliation UI and this is what it will
 call.
 
+### As built: the heuristic stage and the rules (B4.09b)
+
+`bank_match_heuristic.rs` ranks what the exact stage cannot claim, and
+`fin_match_rules.rs` holds what a tenant has taught it. `bank_suggest.rs` is the
+read that feeds both — split out of `bank_reconcile.rs` in the same change,
+because suggesting and confirming had become two responsibilities in one file.
+
+**A score is a sum of named evidence, never a percentage.** Each
+`MatchEvidence` carries its own points and its own sentence for the screen:
+the payer quoted our number but paid part of it (60), a rule the tenant saved
+points at this customer (45), the counterparty *is* the customer word for word
+(35) or resembles them (20), the line moves exactly what is owed (30), it is the
+only open document owing exactly that (15), it was booked around the due date
+(10 within a week, 5 within a month). `SCORE_MIN` is **45**, which is precisely
+what the weakest *identifying* combination — the amount fits, and fits nothing
+else — is worth. That is the precision argument, and a test states it: **no soft
+signal reaches the floor alone.** A name that merely resembles, an amount that
+merely fits, a payment that merely arrived near its due date: none of them is a
+suggestion.
+
+**Three readings are settled here, each of which would be a money bug taken the
+other way.** *Uniqueness is a claim about the ledger*, so when the read had to
+cap the open documents it looked at (`OPEN_LEDGER_MAX`), the stage stops making
+it and the answer says `ledger_capped`. *More than is owed is never offered*: a
+line moving a cent more than the document owes is a split, a duplicate or a
+mistake, and attributing it would record a payment larger than the debt.
+*Whatever the exact stage claims is not offered again as a guess*, so the screen
+never argues with itself.
+
+**The name fold is base letters, not transliterations** — `Müller` folds to
+`muller`, and a bank writing `MUELLER` therefore does not match it. Undoing the
+German transliteration would also turn `Bauer` into `Bar`, and a signal that
+manufactures resemblances is worse than one that misses some. That miss is
+exactly what a rule is for: the tenant says once that this counterparty (or this
+IBAN, or this fragment of a remittance) is that customer, and every later
+statement recognises them. Rules are **plain folded text in one named field** —
+no globs, no regular expressions, which a tenant could otherwise use to write a
+denial of service — stored folded so the unique on `(tenant, match_on, pattern)`
+is the real "one rule per thing to look at". `learn_fin_match_rule` takes the
+pattern off the line a person is looking at; it **refuses the remittance**,
+because what a payer wrote on one transfer names that transfer and would never
+match again. Hits are counted by a confirmation, never by a read, and never
+change what a rule scores: a heuristic that quietly re-weights itself is one
+nobody can predict.
+
+Cut from this slice, and named: **`account_id` and `supplier_key`** on the rules
+table (they belong with the `bill` target kind B5 brings — nullable columns
+added additively then, rather than dead schema now); **confirming a heuristic
+suggestion**, which is B4.09c's manual pick and the caller that will write
+`rule_id` and call `fin_match_rule_hit`; and, as before, **no HTTP route and no
+screen**.
+
 ## Fiscal periods and the soft close (B4.10)
 
 ```
@@ -1322,8 +1374,13 @@ bank_read.rs         the one upload door: sniff the format, read the file,
                      stage it (added at B4.08c; bank_import.rs stays the
                      staging and the storage, with no format in it)
 bank_import.rs       staging, dedupe, the import report
-fin_match.rs         suggestions (exact, then heuristic), confirm, unmatch
-fin_rules_learn.rs   the per-tenant learned rules
+bank_match.rs        the exact rule, pure (B4.09a, as built)
+bank_match_heuristic.rs  the ranked stage and its evidence, pure (B4.09b)
+bank_suggest.rs      the read that folds both stages over the ledger (B4.09b)
+bank_reconcile.rs    confirm, and later unmatch
+fin_match_rules.rs   the per-tenant saved rules (named `fin_rules_learn.rs`
+                     when this was written; `fin_rules.rs` was already the
+                     posting rules, and the table's own name is the clearer one)
 fin_periods.rs       periods and the soft close
 fin_reports.rs       P&L, balance sheet, VAT figures
 fin_aged.rs          aged receivables/payables (the one report over documents)
