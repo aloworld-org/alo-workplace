@@ -63,6 +63,18 @@ pub struct UiStrings {
     pub blog_published: &'static str,
     /// Blog chrome: concise link back to the site's homepage.
     pub blog_home: &'static str,
+    /// Blog chrome: visible link to the RSS feed.
+    pub blog_rss: &'static str,
+    /// Blog index: accessible label for page navigation.
+    pub blog_pagination_label: &'static str,
+    /// Blog index: link to the preceding page.
+    pub blog_previous: &'static str,
+    /// Blog index: link to the following page.
+    pub blog_next: &'static str,
+    /// Blog index: current-page label.
+    pub blog_page: &'static str,
+    /// Blog index: word between current and total page counts.
+    pub blog_page_of: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -92,4 +104,10 @@ pub const EN: UiStrings = UiStrings {
     blog_read_article: "Read article",
     blog_published: "Published",
     blog_home: "Home",
+    blog_rss: "RSS",
+    blog_pagination_label: "Blog pages",
+    blog_previous: "Previous",
+    blog_next: "Next",
+    blog_page: "Page",
+    blog_page_of: "of",
 };

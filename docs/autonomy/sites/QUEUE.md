@@ -35,7 +35,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.19a BlockNote→HTML core: paragraphs, headings, lists, quotes — goldens from real doc fixtures.
 - [x] S1.19b BlockNote→HTML rich: images, code, equations-fallback + the XSS-safety tests (script content never renders live).
 - [x] S1.20a Blog pages on alo-sites: post pages + /blog index cards; goldens.
-- [ ] S1.20b Blog extras: pagination + RSS feed; goldens.
+- [x] S1.20b Blog extras: pagination + RSS feed; goldens.
 - [ ] S1.21a Blog UI, authoring: posts tab list + "write in alo Docs" creates/links the doc + edit opens the Docs editor.
 - [ ] S1.21b Blog UI, publishing: publish flow with slug/cover/excerpt + status chips.
 - [ ] S1.22a SEO, served: sitemap.xml + robots.txt on alo-sites; goldens.

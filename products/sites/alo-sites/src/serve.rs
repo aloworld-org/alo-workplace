@@ -185,7 +185,15 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     }
 
     if path == "/blog" || path.starts_with("/blog/") {
-        return blog::serve(&state, &resolved, &sub, path, site.not_found.clone()).await;
+        return blog::serve(
+            &state,
+            &resolved,
+            &sub,
+            path,
+            req.uri().query(),
+            site.not_found.clone(),
+        )
+        .await;
     }
 
     let (content_type, body) = if path == "/assets/site.css" {
@@ -323,13 +331,19 @@ fn not_found(body: String) -> Response {
 /// site's page-snapshot publish id): always revalidate instead of handing a
 /// stale entity tag to a browser.
 fn dynamic_html(body: String) -> Response {
+    dynamic(body, "text/html; charset=utf-8")
+}
+
+/// Dynamic RSS derived from independently changing published posts.
+fn dynamic_rss(body: String) -> Response {
+    dynamic(body, "application/rss+xml; charset=utf-8")
+}
+
+fn dynamic(body: String, content_type: &'static str) -> Response {
     (
         StatusCode::OK,
         [
-            (
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("text/html; charset=utf-8"),
-            ),
+            (header::CONTENT_TYPE, HeaderValue::from_static(content_type)),
             (header::CACHE_CONTROL, HeaderValue::from_static("no-cache")),
             (
                 header::X_CONTENT_TYPE_OPTIONS,

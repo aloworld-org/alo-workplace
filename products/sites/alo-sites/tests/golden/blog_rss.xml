@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+<title>Blog — North Studio</title>
+<link>https://north.sites.test/blog</link>
+<description>Blog — North Studio</description>
+<language>en</language>
+<atom:link href="https://north.sites.test/blog/rss.xml" rel="self" type="application/rss+xml"/>
+<item>
+<title>Launch notes</title>
+<link>https://north.sites.test/blog/launch-notes</link>
+<guid isPermaLink="true">https://north.sites.test/blog/launch-notes</guid>
+<description>What we learned &amp; what comes next.</description>
+<pubDate>Sun, 09 Aug 2026 10:00:00 +0000</pubDate>
+</item>
+<item>
+<title>Behind the scenes</title>
+<link>https://north.sites.test/blog/behind-the-scenes</link>
+<guid isPermaLink="true">https://north.sites.test/blog/behind-the-scenes</guid>
+<description>A look inside &lt;North Studio&gt;.</description>
+<pubDate>Sat, 01 Aug 2026 08:30:00 +0000</pubDate>
+</item>
+</channel>
+</rss>

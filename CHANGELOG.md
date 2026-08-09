@@ -6,6 +6,10 @@ contracts.
 
 ## Unreleased
 
+- **Follow busy blogs and browse their full history.** Website journals now
+  keep article lists quick with clear Previous and Next pages, and every blog
+  includes a standards-based RSS feed for readers and feed apps.
+
 - **Give every live website a real journal.** Visitors can now browse a clean
   card-based Blog page, open a published article with its picture and alo Docs
   content, and move between the journal and homepage. Draft articles remain

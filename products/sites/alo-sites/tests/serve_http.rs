@@ -289,14 +289,87 @@ async fn serves_only_published_blog_cards_posts_and_covers() {
     .unwrap();
     acc.publish_site_post(&site, &published).await.unwrap();
 
+    // Twelve newer public posts fill the first bounded page. Reusing the
+    // immutable body blob is valid, while each post still owns its own alo
+    // Docs node as required by the model.
+    for number in 1..=12 {
+        let doc = acc
+            .drive_create_file(
+                &DriveLocation::Personal,
+                None,
+                &NewDriveFile {
+                    name: format!("Paged article {number}"),
+                    blob_id: body_blob.as_str().to_owned(),
+                    content_type: Some("application/json".to_owned()),
+                    kind: Some("doc".to_owned()),
+                    ..NewDriveFile::default()
+                },
+            )
+            .await
+            .unwrap();
+        let slug = format!("paged-story-{number:02}");
+        let title = format!("Paged story {number:02}");
+        let post = acc
+            .create_site_post(
+                &site,
+                &NewSitePost {
+                    doc_node_id: &doc,
+                    slug: &slug,
+                    title: &title,
+                    excerpt: "One page-sized public fixture.",
+                    cover_blob_id: None,
+                },
+            )
+            .await
+            .unwrap();
+        acc.publish_site_post(&site, &post).await.unwrap();
+    }
+
     let index = send(&state, &host, "/blog").await;
     assert_eq!(index.status(), StatusCode::OK);
     assert_eq!(header_str(&index, &header::CACHE_CONTROL), "no-cache");
     let index_html = body_string(index).await;
-    assert!(index_html.contains("Public story"));
-    assert!(index_html.contains("A public summary."));
-    assert!(index_html.contains(&format!("/assets/img/{}", cover.as_str())));
+    assert_eq!(index_html.matches("class=\"blog-card\"").count(), 12);
+    assert!(index_html.contains("Page 1 of 2"));
+    assert!(index_html.contains("rel=\"next\" href=\"/blog?page=2\""));
     assert!(!index_html.contains("DRAFT-TITLE") && !index_html.contains("DRAFT-EXCERPT"));
+
+    let second_page = send(&state, &host, "/blog?page=2").await;
+    assert_eq!(second_page.status(), StatusCode::OK);
+    let second_html = body_string(second_page).await;
+    assert_eq!(second_html.matches("class=\"blog-card\"").count(), 1);
+    assert!(second_html.contains("Page 2 of 2"));
+    assert!(second_html.contains("rel=\"prev\" href=\"/blog\""));
+    assert!(second_html.contains("rel=\"canonical\" href=") && second_html.contains("?page=2"));
+    assert!(second_html.contains("Public story"));
+    assert!(second_html.contains("A public summary."));
+    assert!(second_html.contains(&format!("/assets/img/{}", cover.as_str())));
+
+    for invalid in [
+        "/blog?page=0",
+        "/blog?page=abc",
+        "/blog?page=3",
+        "/blog?page=1&page=2",
+    ] {
+        assert_eq!(
+            send(&state, &host, invalid).await.status(),
+            StatusCode::NOT_FOUND,
+            "invalid page {invalid}"
+        );
+    }
+
+    let feed = send(&state, &host, "/blog/rss.xml").await;
+    assert_eq!(feed.status(), StatusCode::OK);
+    assert_eq!(
+        header_str(&feed, &header::CONTENT_TYPE),
+        "application/rss+xml; charset=utf-8"
+    );
+    assert_eq!(header_str(&feed, &header::CACHE_CONTROL), "no-cache");
+    let feed_xml = body_string(feed).await;
+    assert!(feed_xml.contains("<rss version=\"2.0\""));
+    assert!(feed_xml.contains("Public story"));
+    assert!(feed_xml.contains("/blog/public-story"));
+    assert!(!feed_xml.contains("DRAFT-TITLE") && !feed_xml.contains("DRAFT-EXCERPT"));
 
     let article = send(&state, &host, "/blog/public-story").await;
     assert_eq!(article.status(), StatusCode::OK);
@@ -305,6 +378,7 @@ async fn serves_only_published_blog_cards_posts_and_covers() {
     assert!(article_html.contains("<h1>Public story</h1>"));
     assert!(article_html.contains("<h2>PUBLIC-BODY</h2>"));
     assert!(article_html.contains("property=\"og:type\" content=\"article\""));
+    assert!(article_html.contains("href=\"/blog/rss.xml\""));
 
     let draft = send(&state, &host, "/blog/draft-story").await;
     assert_eq!(draft.status(), StatusCode::NOT_FOUND);

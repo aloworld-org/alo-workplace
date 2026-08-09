@@ -23,12 +23,32 @@ pub struct BlogArticle<'a> {
     pub body_html: &'a str,
 }
 
+/// Visible page controls for a bounded blog-index result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlogPagination {
+    pub current_page: u32,
+    pub total_pages: u32,
+}
+
+/// Public RSS metadata for one item. RSS uses an RFC 2822 publication date
+/// while the HTML card keeps the compact ISO date.
+#[derive(Debug, Clone, Copy)]
+pub struct BlogFeedItem<'a> {
+    pub card: BlogCard<'a>,
+    pub published_rfc2822: &'a str,
+}
+
 /// Renders `/blog` as a complete themed document with visible article cards.
 #[must_use]
-pub fn render_blog_index(site: &SiteRenderContext<'_>, posts: &[BlogCard<'_>]) -> String {
+pub fn render_blog_index(
+    site: &SiteRenderContext<'_>,
+    posts: &[BlogCard<'_>],
+    pagination: BlogPagination,
+) -> String {
     let title = format!("{} — {}", site.strings.blog_title, site.name);
+    let path = page_href(pagination.current_page);
     let mut out = String::with_capacity(8 * 1024);
-    push_start(&mut out, site, &title, "/blog", None, None, "website");
+    push_start(&mut out, site, &title, &path, None, None, "website");
     push_blog_header(&mut out, site);
     out.push_str("<main id=\"main\" class=\"blog-main\">\n");
     out.push_str("<header class=\"blog-heading\"><h1>");
@@ -47,7 +67,47 @@ pub fn render_blog_index(site: &SiteRenderContext<'_>, posts: &[BlogCard<'_>]) -
         }
         out.push_str("</div>\n");
     }
+    push_pagination(&mut out, site, pagination);
     out.push_str("</main>\n</body>\n</html>\n");
+    out
+}
+
+/// Renders the newest published posts as a deterministic RSS 2.0 document.
+#[must_use]
+pub fn render_blog_feed(site: &SiteRenderContext<'_>, posts: &[BlogFeedItem<'_>]) -> String {
+    let title = format!("{} — {}", site.strings.blog_title, site.name);
+    let blog_url = format!("{}/blog", site.base_url);
+    let feed_url = format!("{}/blog/rss.xml", site.base_url);
+    let mut out = String::with_capacity(8 * 1024);
+    out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    out.push_str(
+        "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n<channel>\n<title>",
+    );
+    out.push_str(&esc(&title));
+    out.push_str("</title>\n<link>");
+    out.push_str(&esc(&blog_url));
+    out.push_str("</link>\n<description>");
+    out.push_str(&esc(&title));
+    out.push_str("</description>\n<language>");
+    out.push_str(&esc(site.strings.lang));
+    out.push_str("</language>\n<atom:link href=\"");
+    out.push_str(&esc(&feed_url));
+    out.push_str("\" rel=\"self\" type=\"application/rss+xml\"/>\n");
+    for item in posts {
+        let post_url = format!("{}/blog/{}", site.base_url, item.card.slug);
+        out.push_str("<item>\n<title>");
+        out.push_str(&esc(item.card.title));
+        out.push_str("</title>\n<link>");
+        out.push_str(&esc(&post_url));
+        out.push_str("</link>\n<guid isPermaLink=\"true\">");
+        out.push_str(&esc(&post_url));
+        out.push_str("</guid>\n<description>");
+        out.push_str(&esc(item.card.excerpt));
+        out.push_str("</description>\n<pubDate>");
+        out.push_str(&esc(item.published_rfc2822));
+        out.push_str("</pubDate>\n</item>\n");
+    }
+    out.push_str("</channel>\n</rss>\n");
     out
 }
 
@@ -138,7 +198,54 @@ fn push_blog_header(out: &mut String, site: &SiteRenderContext<'_>) {
     out.push_str(&esc(site.strings.blog_home));
     out.push_str("</a><a href=\"/blog\">");
     out.push_str(&esc(site.strings.blog_title));
+    out.push_str("</a><a href=\"/blog/rss.xml\">");
+    out.push_str(&esc(site.strings.blog_rss));
     out.push_str("</a></nav></header>\n");
+}
+
+fn push_pagination(out: &mut String, site: &SiteRenderContext<'_>, page: BlogPagination) {
+    if page.total_pages <= 1 {
+        return;
+    }
+    out.push_str("<nav class=\"blog-pages\" aria-label=\"");
+    out.push_str(&esc(site.strings.blog_pagination_label));
+    out.push_str("\">\n");
+    if page.current_page > 1 {
+        out.push_str("<a rel=\"prev\" href=\"");
+        out.push_str(&page_href(page.current_page - 1));
+        out.push_str("\">");
+        out.push_str(&esc(site.strings.blog_previous));
+        out.push_str("</a>");
+    } else {
+        out.push_str("<span></span>");
+    }
+    out.push_str("<span>");
+    out.push_str(&esc(site.strings.blog_page));
+    out.push(' ');
+    out.push_str(&page.current_page.to_string());
+    out.push(' ');
+    out.push_str(&esc(site.strings.blog_page_of));
+    out.push(' ');
+    out.push_str(&page.total_pages.to_string());
+    out.push_str("</span>");
+    if page.current_page < page.total_pages {
+        out.push_str("<a rel=\"next\" href=\"");
+        out.push_str(&page_href(page.current_page + 1));
+        out.push_str("\">");
+        out.push_str(&esc(site.strings.blog_next));
+        out.push_str("</a>");
+    } else {
+        out.push_str("<span></span>");
+    }
+    out.push_str("\n</nav>\n");
+}
+
+fn page_href(page: u32) -> String {
+    if page <= 1 {
+        "/blog".to_owned()
+    } else {
+        format!("/blog?page={page}")
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -185,6 +292,9 @@ fn push_start(
         out.push_str(&site.images.src(favicon.as_str()));
         out.push_str("\">\n");
     }
+    out.push_str("<link rel=\"alternate\" type=\"application/rss+xml\" title=\"");
+    out.push_str(&esc(site.strings.blog_rss));
+    out.push_str("\" href=\"/blog/rss.xml\">\n");
     out.push_str("<link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n<body>\n<a class=\"skip-link\" href=\"#main\">");
     out.push_str(&esc(site.strings.skip_to_content));
     out.push_str("</a>\n");

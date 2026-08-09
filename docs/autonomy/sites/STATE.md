@@ -1346,3 +1346,48 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   published article's normal edit-in-place behavior; it is kept out of the
   immutable page cache so changes cannot be served under a stale validator.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.20b — bounded blog pagination and RSS (2026-08-09)
+
+- **Shipped:** `/blog` now reads twelve published posts at a time and exposes
+  visible, keyboard-sized Previous and Next controls plus an honest “Page n of
+  n” position. Page one keeps the clean `/blog` address, later pages have their
+  own canonical query URL, and malformed, duplicate, zero or out-of-range page
+  numbers receive the site's themed 404. The pure renderer golden pins the
+  complete second-page document and controls.
+- **Feed:** every blog now visibly links and advertises `/blog/rss.xml`. The
+  RSS 2.0 document carries channel discovery metadata, absolute permalink
+  GUIDs, escaped titles/excerpts and RFC 2822 publication dates for the newest
+  fifty published posts. It is dynamic and `no-cache`, like the HTML journal,
+  because article publication changes independently of page snapshots. A full
+  XML golden pins the interoperable feed contract.
+- **Boundaries:** the public store door replaced its unbounded metadata read
+  with a capped offset/limit page plus a publication-only total. Both queries
+  are derived from the resolved Host's private tenant/site pair. The mandatory
+  two-tenant test exercises the new bounded door and proves totals and rows
+  never cross tenants; draft posts remain absent from HTML and RSS.
+- **Verified:** targeted rustfmt; strict `SQLX_OFFLINE=true CARGO_INCREMENTAL=0
+  cargo clippy -p alo-store -p alo-sites --all-targets --jobs 1 -- -D warnings`
+  clean; focused 3-render-golden, 6-public-HTTP, 5-stylesheet and wrong-tenant
+  suites green. The authoritative full `cargo test -p alo-store -p alo-sites
+  --jobs 1` run passed against docker Postgres on 5432, including all 695 store
+  unit tests and every integration/doc suite. The memory-throttled Windows
+  linker took about ten minutes but completed normally; no retry or cut was
+  used.
+- **Wire transcript:** after killing stale `alo-jmap.exe`/`alo-sites.exe`, the
+  exact freshly built binary ran on 127.0.0.1:8081 against local docker
+  Postgres and `C:/dev/Ficina/.localdev/blobs`. Real Host-header curls against a
+  local 13-post fixture returned: `/blog` 200, 12 cards, Page 1 of 2 and Next;
+  `/blog?page=2` 200, one card, Previous and its exact canonical; page 3 404;
+  `/blog/rss.xml` 200, `application/rss+xml; charset=utf-8`, `no-cache`, 13
+  items, self link present and the draft marker absent. The server was stopped.
+  No production host, external AI, outbound email or secret was used.
+- **Design references:** WordPress/Ghost establish direct page controls and
+  RSS auto-discovery; feed readers establish RSS 2.0's channel/item contract.
+  Pagination is visible without a menu and every safe reading transition is
+  one click (UX laws 1, 2, 6 and 12).
+- **Cuts/flags:** the feed deliberately carries metadata and excerpts rather
+  than duplicating full article HTML. Fifty feed items and twelve cards per
+  page are bounded service constants; no visitor request can trigger an
+  unbounded post scan.
+- **Next:** the first unchecked item in `QUEUE.md`.

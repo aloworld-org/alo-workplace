@@ -235,6 +235,30 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   border-radius: 0.75rem;
   color: var(--muted);
 }
+.blog-pages {
+  margin-top: 2.5rem;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+.blog-pages a {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+.blog-pages a:first-child { justify-self: start; }
+.blog-pages a:last-child { justify-self: end; }
+.blog-pages a:hover { border-color: var(--primary); color: var(--primary); }
 .blog-post { max-width: 48rem; margin: 0 auto; }
 .blog-post-header { margin-bottom: 2rem; }
 .blog-kicker { margin-bottom: 0.5rem; font-weight: 600; }
