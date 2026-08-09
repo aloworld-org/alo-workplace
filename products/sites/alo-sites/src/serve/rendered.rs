@@ -17,6 +17,9 @@ pub struct RenderedSite {
     pub publish: SitePublishId,
     /// Complete HTML documents by site-relative path (`/`, `/about`, …).
     pages: HashMap<String, String>,
+    /// Canonical page paths in navigation order. Kept separately from the
+    /// render map because sitemap order must be stable across processes.
+    page_paths: Vec<String>,
     /// The one stylesheet, served at `/assets/site.css`.
     pub css: String,
     /// The site's themed not-found document (status 404, any unknown path).
@@ -50,6 +53,7 @@ impl RenderedSite {
             images: ImageSources::PublicPaths,
         };
         let mut pages = HashMap::with_capacity(snapshots.len());
+        let mut page_paths = Vec::with_capacity(snapshots.len());
         let mut images = HashSet::new();
         images.extend(
             [theme.logo.as_ref(), theme.favicon.as_ref()]
@@ -81,10 +85,12 @@ impl RenderedSite {
                 sections: &snapshot.sections,
             };
             pages.insert(path.clone(), render::render_page(&ctx, &page));
+            page_paths.push(path);
         }
         Self {
             publish: site.publish.clone(),
             pages,
+            page_paths,
             css: stylesheet::stylesheet(&theme),
             not_found: render::render_not_found(&ctx),
             images,
@@ -95,6 +101,11 @@ impl RenderedSite {
     #[must_use]
     pub fn page(&self, path: &str) -> Option<&str> {
         self.pages.get(path).map(String::as_str)
+    }
+
+    /// Canonical page paths in the frozen publish's navigation order.
+    pub fn page_paths(&self) -> &[String] {
+        &self.page_paths
     }
 
     /// Whether this publish references `blob_id` — the gate on the public

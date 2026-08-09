@@ -371,6 +371,31 @@ async fn serves_only_published_blog_cards_posts_and_covers() {
     assert!(feed_xml.contains("/blog/public-story"));
     assert!(!feed_xml.contains("DRAFT-TITLE") && !feed_xml.contains("DRAFT-EXCERPT"));
 
+    let sitemap = send(&state, &host, "/sitemap.xml").await;
+    assert_eq!(sitemap.status(), StatusCode::OK);
+    assert_eq!(
+        header_str(&sitemap, &header::CONTENT_TYPE),
+        "application/xml; charset=utf-8"
+    );
+    assert_eq!(header_str(&sitemap, &header::CACHE_CONTROL), "no-cache");
+    let sitemap_xml = body_string(sitemap).await;
+    assert!(sitemap_xml.contains(&format!("<loc>https://{host}/</loc>")));
+    assert!(sitemap_xml.contains(&format!("<loc>https://{host}/about</loc>")));
+    assert!(sitemap_xml.contains(&format!("<loc>https://{host}/blog</loc>")));
+    assert!(sitemap_xml.contains(&format!("<loc>https://{host}/blog/public-story</loc>")));
+    assert!(!sitemap_xml.contains("draft-story") && !sitemap_xml.contains("DRAFT"));
+
+    let robots = send(&state, &host, "/robots.txt").await;
+    assert_eq!(robots.status(), StatusCode::OK);
+    assert_eq!(
+        header_str(&robots, &header::CONTENT_TYPE),
+        "text/plain; charset=utf-8"
+    );
+    assert_eq!(
+        body_string(robots).await,
+        format!("User-agent: *\nAllow: /\nSitemap: https://{host}/sitemap.xml\n")
+    );
+
     let article = send(&state, &host, "/blog/public-story").await;
     assert_eq!(article.status(), StatusCode::OK);
     assert_eq!(header_str(&article, &header::CACHE_CONTROL), "no-cache");
@@ -524,6 +549,12 @@ async fn host_isolation_one_host_never_serves_another_sites_content() {
     assert_eq!(cross.status(), StatusCode::NOT_FOUND);
     let cross_html = body_string(cross).await;
     assert!(!cross_html.contains("BETA-ONLY") && !cross_html.contains("Beta Site"));
+
+    // Discovery documents inherit the same Host-derived tenant scope.
+    let alpha_sitemap =
+        body_string(send(&state, &format!("{sub_a}.{APEX}"), "/sitemap.xml").await).await;
+    assert!(alpha_sitemap.contains(&format!("https://{sub_a}.{APEX}/")));
+    assert!(!alpha_sitemap.contains(&sub_b));
 }
 
 #[tokio::test]

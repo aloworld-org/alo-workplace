@@ -1457,3 +1457,40 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   publishing flow: it is a distinct destructive record-lifecycle action and
   was not part of this item. Taking offline covers the reversible daily need.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.22a — public sitemap and crawler policy (2026-08-09)
+
+- **Shipped:** every live alo Site now serves `/sitemap.xml` and
+  `/robots.txt`. The sitemap contains the frozen publish's canonical pages in
+  navigation order, followed by the blog index and every published article;
+  draft articles are absent. Robots permits public crawling and advertises
+  the exact Host-scoped sitemap URL.
+- **Boundaries:** both documents are generated only after the existing strict
+  Host resolver returns a live `PublishedSite`. Page routes come from that
+  publish's already tenant-scoped snapshots and article routes come through
+  the bounded public-post door. The HTTP isolation test proves one tenant's
+  sitemap never names another tenant's host, and the sitemap renderer enforces
+  the protocol's 50,000-URL ceiling. No schema or store query changed.
+- **Verified:** targeted rustfmt; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-sites --all-targets --jobs 1 -- -D
+  warnings` clean; the full `cargo test -p alo-sites --jobs 1` gate green,
+  including two new byte-for-byte SEO goldens and all six real-Postgres public
+  HTTP tests. The shared local database carried the retired loop's old
+  version-136 `site_posts` journal row; it was non-destructively renumbered to
+  the current 138 entry, preserving all six local posts, before the missing
+  main migrations applied.
+- **Wire transcript:** after confirming no stale `alo-jmap.exe` or
+  `alo-sites.exe`, a freshly built server ran on `127.0.0.1:8081` against
+  docker `alo-pg` on 5432 and `C:/dev/Ficina/.localdev/blobs`. Real Host-header
+  curls returned 200 for both routes: robots as `text/plain; charset=utf-8`
+  with the exact sitemap declaration, and sitemap as `application/xml;
+  charset=utf-8` with the local site's canonical home URL. Both returned
+  `no-cache` and `nosniff`; the server was stopped. No production host,
+  external AI, outbound email or secret was used.
+- **Design references:** the Sitemap protocol and Google Search crawler
+  guidance establish these zero-configuration discovery files. They are
+  automatic public infrastructure and introduce no editor menu or extra click.
+- **Cuts/flags:** sitemap entries intentionally omit optional priority and
+  change-frequency guesses. Blog routes are included only when at least one
+  article is actually published, avoiding discovery of an empty journal.
+- **Next:** the first unchecked item in `QUEUE.md`.

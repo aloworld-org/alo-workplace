@@ -39,6 +39,7 @@ use axum::routing::{get, post};
 use alo_store::SitePublicStore;
 
 use crate::render::EN;
+use crate::seo::{SITEMAP_URL_LIMIT, render_robots, render_sitemap};
 pub use config::{ConfigError, ServeConfig};
 use rendered::RenderedSite;
 
@@ -149,6 +150,44 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     let raw = req.uri().path();
     let trimmed = raw.trim_end_matches('/');
     let path = if trimmed.is_empty() { "/" } else { trimmed };
+
+    let base_url = format!("https://{sub}.{}", state.sites_domain);
+    if path == "/robots.txt" {
+        return dynamic_text(render_robots(&base_url));
+    }
+    if path == "/sitemap.xml" {
+        let page_count = site.page_paths().len();
+        let post_limit = SITEMAP_URL_LIMIT.saturating_sub(page_count + 1);
+        let posts = if post_limit == 0 {
+            Vec::new()
+        } else {
+            let limit = u32::try_from(post_limit).unwrap_or(u32::MAX);
+            match state.store.published_posts_page(&resolved, 0, limit).await {
+                Ok(page) => page.posts,
+                Err(error) => {
+                    tracing::error!(subdomain = %sub, %error, "sitemap post read failed");
+                    return unavailable();
+                }
+            }
+        };
+        let mut urls = Vec::with_capacity(
+            site.page_paths().len() + usize::from(!posts.is_empty()) + posts.len(),
+        );
+        urls.extend(
+            site.page_paths()
+                .iter()
+                .map(|path| format!("{base_url}{path}")),
+        );
+        if !posts.is_empty() {
+            urls.push(format!("{base_url}/blog"));
+            urls.extend(
+                posts
+                    .iter()
+                    .map(|post| format!("{base_url}/blog/{}", post.slug)),
+            );
+        }
+        return dynamic_xml(render_sitemap(urls.iter().map(String::as_str)));
+    }
 
     // The image path of the public contract: bytes for exactly the blob ids
     // this publish references (`RenderedSite::serves_image`), read
@@ -337,6 +376,14 @@ fn dynamic_html(body: String) -> Response {
 /// Dynamic RSS derived from independently changing published posts.
 fn dynamic_rss(body: String) -> Response {
     dynamic(body, "application/rss+xml; charset=utf-8")
+}
+
+fn dynamic_xml(body: String) -> Response {
+    dynamic(body, "application/xml; charset=utf-8")
+}
+
+fn dynamic_text(body: String) -> Response {
+    dynamic(body, "text/plain; charset=utf-8")
 }
 
 fn dynamic(body: String, content_type: &'static str) -> Response {

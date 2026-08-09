@@ -34,5 +34,6 @@
 pub mod blocknote;
 pub mod blog;
 pub mod render;
+pub mod seo;
 pub mod serve;
 pub mod stylesheet;

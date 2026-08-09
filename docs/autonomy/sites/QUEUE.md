@@ -38,7 +38,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.20b Blog extras: pagination + RSS feed; goldens.
 - [x] S1.21a Blog UI, authoring: posts tab list + "write in alo Docs" creates/links the doc + edit opens the Docs editor.
 - [x] S1.21b Blog UI, publishing: publish flow with slug/cover/excerpt + status chips.
-- [ ] S1.22a SEO, served: sitemap.xml + robots.txt on alo-sites; goldens.
+- [x] S1.22a SEO, served: sitemap.xml + robots.txt on alo-sites; goldens.
 - [ ] S1.22b SEO, edited: per-page meta editor UI + OG defaults from theme/logo; render goldens.
 - [ ] S1.23 Privacy analytics collection on alo-sites: daily aggregates (path hits, referrer domain, unique-ish via daily-salted hash), explicitly NO ip/ua storage — a test asserts the stored schema contains no PII columns and raw request data is dropped.
 - [ ] S1.24 Analytics UI: per-site panel (visits over time, top pages, top referrers) + the "no cookies, no banner" explainer string.
