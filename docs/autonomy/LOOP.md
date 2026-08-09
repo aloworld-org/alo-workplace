@@ -54,6 +54,20 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      (found: one survived 19 hours and poisoned a whole night). Kill it before rebuilding too
      (macOS/Linux: `pkill -f alo-jmap`; Windows locks the exe:
      `taskkill //F //IM alo-jmap.exe`). Real curl calls, real DB rows checked.
+   - **Never wait for a background command with `until ! pgrep -f "<cmd>"`.**
+     `pgrep -f` matches whole command lines, so the waiting shell matches
+     *itself*: the condition never goes false and the wait spins until the
+     tool's 600 s ceiling kills it. Retrying with a longer `sleep` does not
+     help — the poll interval was never the problem. This burned ~80 of one
+     iteration's 142 minutes on 2026-08-09 (~43 minutes of real work), and
+     it is the reason gate-heavy items looked like rate limiting.
+     Prefer the FOREGROUND with an explicit `timeout` (up to 600000 ms) — a
+     gate that fits in one call needs no polling at all. When a command must
+     run in the background, end it with a marker and poll the log for that:
+     `cargo test … > out.log 2>&1; echo "EXIT=$?" >> out.log` then
+     `until grep -q "EXIT=" out.log; do sleep 10; done`. If a process match
+     is truly unavoidable, break the self-match with a character class:
+     `pgrep -f "[c]argo test -p alo-store"`.
 6. Update what changed behaviour: a CHANGELOG.md line (user voice), rustdoc/
    TSDoc on public items, all UI strings through `i18n/en.ts` (fr/nl at wave
    reviews). New top-level route prefixes: note in STATE.md that the
