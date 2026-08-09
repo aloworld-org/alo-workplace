@@ -32,19 +32,13 @@ pub struct RenderedSite {
 }
 
 impl RenderedSite {
-    /// Renders every frozen page of `site`'s current publish. `subdomain` and
-    /// `sites_domain` form the canonical origin (`https://<sub>.<apex>`) used
-    /// for canonical/OG URLs — public sites are always addressed on HTTPS,
-    /// whatever local socket served them.
+    /// Renders every frozen page of `site`'s current publish. `public_host`
+    /// forms the canonical HTTPS origin used for canonical/OG URLs, whether
+    /// it is a built-in subdomain or a connected custom domain.
     #[must_use]
-    pub fn build(
-        subdomain: &str,
-        sites_domain: &str,
-        site: &PublishedSite,
-        snapshots: &[SitePageSnapshot],
-    ) -> Self {
+    pub fn build(public_host: &str, site: &PublishedSite, snapshots: &[SitePageSnapshot]) -> Self {
         let theme = SiteTheme::from_stored(site.theme.clone());
-        let base_url = format!("https://{subdomain}.{sites_domain}");
+        let base_url = format!("https://{public_host}");
         let ctx = SiteRenderContext {
             name: &site.name,
             base_url: &base_url,

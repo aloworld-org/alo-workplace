@@ -32,12 +32,13 @@ mod rendered;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::extract::{DefaultBodyLimit, Request, State};
+use axum::extract::{DefaultBodyLimit, Query, Request, State};
 use axum::http::{HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 
-use alo_store::SitePublicStore;
+use alo_store::{PublishedSite, SitePublicStore, StoreError};
+use serde::Deserialize;
 
 use crate::render::EN;
 use crate::seo::{SITEMAP_URL_LIMIT, render_robots, render_sitemap};
@@ -82,6 +83,7 @@ impl AppState {
 pub fn app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
+        .route("/internal/tls/ask", get(tls_ask))
         .route(
             "/f/{form_id}",
             post(forms::submit).layer(DefaultBodyLimit::max(forms::FORM_BODY_MAX_BYTES)),
@@ -96,7 +98,43 @@ async fn healthz() -> &'static str {
     "ok\n"
 }
 
-/// Serves one public request: Host → subdomain → current publish → bytes.
+#[derive(Deserialize)]
+struct TlsAsk {
+    domain: String,
+}
+
+/// Caddy on-demand-TLS authorization. A 200 means the exact hostname is
+/// already able to serve a live publish; every other outcome denies issuance.
+/// This endpoint intentionally reveals no site or tenant metadata.
+async fn tls_ask(State(state): State<Arc<AppState>>, Query(query): Query<TlsAsk>) -> Response {
+    let Some(scope) = host::scope(&query.domain, &state.sites_domain) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match resolve_scope(&state, &scope).await {
+        Ok(Some(_)) => (
+            StatusCode::OK,
+            [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],
+        )
+            .into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(error) => {
+            tracing::error!(host = scope.host(), %error, "TLS authorization read failed");
+            StatusCode::SERVICE_UNAVAILABLE.into_response()
+        }
+    }
+}
+
+async fn resolve_scope(
+    state: &AppState,
+    scope: &host::Scope,
+) -> Result<Option<PublishedSite>, StoreError> {
+    match scope {
+        host::Scope::Subdomain { label, .. } => state.store.resolve_published(label).await,
+        host::Scope::Custom { host } => state.store.resolve_custom_published(host).await,
+    }
+}
+
+/// Serves one public request: Host → current publish → bytes.
 async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Response {
     if req.method() != Method::GET && req.method() != Method::HEAD {
         return (
@@ -107,48 +145,44 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
             .into_response();
     }
 
-    let Some(sub) = req
+    let Some(scope) = req
         .headers()
         .get(header::HOST)
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| host::subdomain(value, &state.sites_domain))
+        .and_then(|value| host::scope(value, &state.sites_domain))
     else {
         return not_found(state.unknown_host.clone());
     };
+    let public_host = scope.host().to_owned();
 
-    let resolved = match state.store.resolve_published(&sub).await {
+    let resolved = match resolve_scope(&state, &scope).await {
         Ok(Some(site)) => site,
         Ok(None) => return not_found(state.unknown_host.clone()),
         Err(error) => {
-            tracing::error!(subdomain = %sub, %error, "resolver read failed");
+            tracing::error!(host = %public_host, %error, "resolver read failed");
             return unavailable();
         }
     };
 
-    let site = match state.cache.get(&sub, &resolved.publish) {
+    let site = match state.cache.get(&public_host, &resolved.publish) {
         Some(site) => site,
         None => {
             let snapshots = match state.store.published_pages(&resolved).await {
                 Ok(snapshots) => snapshots,
                 Err(error) => {
-                    tracing::error!(subdomain = %sub, %error, "snapshot read failed");
+                    tracing::error!(host = %public_host, %error, "snapshot read failed");
                     return unavailable();
                 }
             };
-            let built = Arc::new(RenderedSite::build(
-                &sub,
-                &state.sites_domain,
-                &resolved,
-                &snapshots,
-            ));
+            let built = Arc::new(RenderedSite::build(&public_host, &resolved, &snapshots));
             tracing::info!(
-                subdomain = %sub,
+                host = %public_host,
                 site = %resolved.site,
                 publish = %resolved.publish,
                 pages = snapshots.len(),
                 "rendered publish into cache"
             );
-            state.cache.put(&sub, Arc::clone(&built));
+            state.cache.put(&public_host, Arc::clone(&built));
             built
         }
     };
@@ -160,7 +194,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     let path = if trimmed.is_empty() { "/" } else { trimmed };
     let analytics_visit = analytics::capture(&state, &req);
 
-    let base_url = format!("https://{sub}.{}", state.sites_domain);
+    let base_url = format!("https://{public_host}");
     if path == "/robots.txt" {
         return dynamic_text(render_robots(&base_url));
     }
@@ -174,7 +208,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
             match state.store.published_posts_page(&resolved, 0, limit).await {
                 Ok(page) => page.posts,
                 Err(error) => {
-                    tracing::error!(subdomain = %sub, %error, "sitemap post read failed");
+                    tracing::error!(host = %public_host, %error, "sitemap post read failed");
                     return unavailable();
                 }
             }
@@ -213,13 +247,13 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
             {
                 Ok(referenced) => referenced,
                 Err(error) => {
-                    tracing::error!(subdomain = %sub, %error, "blog cover reference read failed");
+                    tracing::error!(host = %public_host, %error, "blog cover reference read failed");
                     return unavailable();
                 }
             }
         };
         if !referenced {
-            tracing::debug!(subdomain = %sub, "image not referenced by the served publish");
+            tracing::debug!(host = %public_host, "image not referenced by the served publish");
             return not_found(site.not_found.clone());
         }
         return serve_image(
@@ -236,7 +270,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
         let response = blog::serve(
             &state,
             &resolved,
-            &sub,
+            &public_host,
             path,
             req.uri().query(),
             site.not_found.clone(),
@@ -251,7 +285,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     } else if let Some(page) = site.page(path) {
         ("text/html; charset=utf-8", page.to_owned())
     } else {
-        tracing::debug!(subdomain = %sub, "no page at requested path");
+        tracing::debug!(host = %public_host, "no page at requested path");
         return not_found(site.not_found.clone());
     };
 

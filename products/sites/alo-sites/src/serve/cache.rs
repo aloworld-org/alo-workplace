@@ -1,4 +1,4 @@
-//! In-memory cache of rendered sites, keyed by subdomain and validated by
+//! In-memory cache of rendered sites, keyed by canonical public host and validated by
 //! publish id. Every request still performs the one indexed resolver read —
 //! that is what makes a republish (or unpublish) visible immediately — but
 //! rendering is done once per publish, not per request: a cache entry is a
@@ -26,24 +26,24 @@ pub struct SiteCache {
 }
 
 impl SiteCache {
-    /// The cached render of `subdomain`, only if it is exactly `publish`.
-    pub fn get(&self, subdomain: &str, publish: &SitePublishId) -> Option<Arc<RenderedSite>> {
+    /// The cached render of `host`, only if it is exactly `publish`.
+    pub fn get(&self, host: &str, publish: &SitePublishId) -> Option<Arc<RenderedSite>> {
         let map = self.inner.read().unwrap_or_else(PoisonError::into_inner);
-        map.get(subdomain)
+        map.get(host)
             .filter(|site| site.publish == *publish)
             .cloned()
     }
 
     /// Stores a fresh render, replacing any earlier publish of the same
-    /// subdomain and evicting an arbitrary entry at the bound.
-    pub fn put(&self, subdomain: &str, site: Arc<RenderedSite>) {
+    /// host and evicting an arbitrary entry at the bound.
+    pub fn put(&self, host: &str, site: Arc<RenderedSite>) {
         let mut map = self.inner.write().unwrap_or_else(PoisonError::into_inner);
-        if !map.contains_key(subdomain)
+        if !map.contains_key(host)
             && map.len() >= MAX_SITES
             && let Some(evict) = map.keys().next().cloned()
         {
             map.remove(&evict);
         }
-        map.insert(subdomain.to_owned(), site);
+        map.insert(host.to_owned(), site);
     }
 }

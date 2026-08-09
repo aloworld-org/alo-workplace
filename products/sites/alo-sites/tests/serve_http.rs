@@ -25,7 +25,7 @@ const APEX: &str = "sites.test";
 
 fn database_url() -> String {
     std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://alo:alo-dev-only@127.0.0.1:5433/alo".to_owned())
+        .unwrap_or_else(|_| "postgres://alo:alo-dev-only@127.0.0.1:5432/alo".to_owned())
 }
 
 /// A migrated store plus the service state sharing the same Postgres.
@@ -559,6 +559,96 @@ async fn host_isolation_one_host_never_serves_another_sites_content() {
         body_string(send(&state, &format!("{sub_a}.{APEX}"), "/sitemap.xml").await).await;
     assert!(alpha_sitemap.contains(&format!("https://{sub_a}.{APEX}/")));
     assert!(!alpha_sitemap.contains(&sub_b));
+}
+
+#[tokio::test]
+async fn custom_host_and_tls_ask_share_one_live_tenant_boundary() {
+    let (store, state) = harness().await;
+    let a = fresh_account(&store, "custom-a").await;
+    let b = fresh_account(&store, "custom-b").await;
+    let sub_a = unique("custom-a");
+    let sub_b = unique("custom-b");
+    let site_a = publish_site(&a, "Custom Alpha", &sub_a, "CUSTOM-ALPHA").await;
+    publish_site(&b, "Custom Beta", &sub_b, "CUSTOM-BETA").await;
+    let custom_host = format!("www.{}.example.test", unique("custom-host"));
+
+    let pending = a.create_site_domain(&site_a, &custom_host).await.unwrap();
+    assert_eq!(pending.status, alo_store::SiteDomainStatus::Pending);
+    assert_eq!(
+        send(&state, &custom_host, "/").await.status(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(
+            &state,
+            "proxy.internal",
+            &format!("/internal/tls/ask?domain={custom_host}"),
+        )
+        .await
+        .status(),
+        StatusCode::NOT_FOUND
+    );
+
+    a.verify_site_domain(&site_a, &custom_host).await.unwrap();
+    assert_eq!(
+        send(&state, &custom_host, "/").await.status(),
+        StatusCode::NOT_FOUND
+    );
+    a.activate_site_domain(&site_a, &custom_host).await.unwrap();
+
+    let home = send(&state, &custom_host.to_ascii_uppercase(), "/").await;
+    assert_eq!(home.status(), StatusCode::OK);
+    let html = body_string(home).await;
+    assert!(html.contains("CUSTOM-ALPHA"));
+    assert!(!html.contains("CUSTOM-BETA"), "custom Host crossed tenants");
+    assert!(html.contains(&format!("https://{custom_host}/")));
+
+    let allowed = send(
+        &state,
+        "proxy.internal",
+        &format!("/internal/tls/ask?domain={custom_host}"),
+    )
+    .await;
+    assert_eq!(allowed.status(), StatusCode::OK);
+    assert_eq!(header_str(&allowed, &header::CACHE_CONTROL), "no-store");
+
+    let built_in = format!("{sub_a}.{APEX}");
+    assert_eq!(
+        send(
+            &state,
+            "proxy.internal",
+            &format!("/internal/tls/ask?domain={built_in}"),
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        send(
+            &state,
+            "proxy.internal",
+            "/internal/tls/ask?domain=unknown.example.test",
+        )
+        .await
+        .status(),
+        StatusCode::NOT_FOUND
+    );
+
+    a.unpublish_site(&site_a).await.unwrap();
+    assert_eq!(
+        send(&state, &custom_host, "/").await.status(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(
+            &state,
+            "proxy.internal",
+            &format!("/internal/tls/ask?domain={custom_host}"),
+        )
+        .await
+        .status(),
+        StatusCode::NOT_FOUND
+    );
 }
 
 #[tokio::test]

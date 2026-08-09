@@ -26,13 +26,13 @@ const MAX_BLOG_PAGE: u32 = 10_000;
 pub(super) async fn serve(
     state: &Arc<AppState>,
     resolved: &PublishedSite,
-    subdomain: &str,
+    public_host: &str,
     path: &str,
     query: Option<&str>,
     themed_not_found: String,
 ) -> Response {
     let theme = SiteTheme::from_stored(resolved.theme.clone());
-    let base_url = format!("https://{subdomain}.{}", state.sites_domain);
+    let base_url = format!("https://{public_host}");
     let context = SiteRenderContext {
         name: &resolved.name,
         base_url: &base_url,

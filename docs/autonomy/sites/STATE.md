@@ -1678,3 +1678,58 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   explicitly queued S1.25b serving half. International names must arrive as
   punycode until a deliberate IDNA display/normalization policy is designed.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.25b — custom-domain serving and TLS authorization (2026-08-10)
+
+- **Shipped:** alo-sites now classifies every valid request authority as either
+  one built-in Sites subdomain or one canonical custom Host. A live custom
+  claim resolves through its owning tenant/site/publish join and serves the
+  same pages, blogs, images, discovery documents and analytics path as the
+  built-in host. Render caches and canonical/OG URLs are keyed by the exact
+  public host, so two domains never borrow one another's canonical bytes.
+- **One-click activation:** the authenticated TXT verify action now promotes
+  an exact DNS proof straight through verified to live. Pending and merely
+  verified rows still cannot serve, while a successful check needs no hidden
+  second activation step. `GET /internal/tls/ask?domain=…` answers 200 only
+  when that built-in or custom hostname can currently resolve a published
+  site; malformed, unknown, pending, verified-only and unpublished names get
+  a metadata-free non-200.
+- **Tenancy and verification:** the mandatory real-Postgres test proves a
+  pending or verified custom claim cannot resolve, a live claim resolves only
+  the claiming tenant's site, and deleting the claim removes that public
+  route. The in-process HTTP bank additionally proves custom Host pages never
+  contain another tenant's marker, custom canonical URLs use the requested
+  host, TLS authorization shares the live boundary, and unpublish revokes both
+  page serving and TLS authorization immediately.
+- **Wire transcript:** Docker `alo-pg` was running on 5432. A temporary local
+  live claim was attached to an existing local publish, then a freshly built
+  alo-sites binary ran on 127.0.0.1:8081. Real curl returned 200 and the owning
+  page marker for `Host: s125b-wire.example.test`, with the matching custom
+  canonical URL; the TLS ask endpoint returned 200 for that custom host and a
+  live built-in subdomain, 404 for unknown and malformed names; an unknown
+  Host returned 404. The fixture claim was deleted and the process stopped.
+- **Verified:** targeted rustfmt; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-store -p alo-sites -p alo-jmap
+  --all-targets --jobs 1 -- -D warnings` clean; full `cargo test -p alo-store
+  --jobs 1` green (805 unit tests plus every integration target); full `cargo
+  test -p alo-sites --jobs 1` green (all unit, golden and integration targets,
+  including seven Host HTTP tests); full `cargo test -p alo-jmap --jobs 1`
+  green (464 unit tests plus every integration target, including all 17 Sites
+  HTTP tests).
+- **Human inbox — customer DNS how-to:** the product/help follow-up should
+  show the generated `_alo-sites.<host>` TXT value first, then—after the one
+  visible Verify action succeeds—ask the customer to point a subdomain with a
+  CNAME to the deployment's Sites ingress. Apex domains need the provider's
+  ALIAS/ANAME or CNAME-flattening equivalent. The ingress target is
+  deployment-specific and must come from configuration, never be hardcoded;
+  explain that HTTPS provisioning can take a few minutes after DNS propagates.
+- **Environment note:** the first full store gate's linker became idle after
+  retired `C:/dev/Ficina-loop` banks repeatedly consumed the constrained
+  machine. Only those retired process trees and the orphaned idle attempt were
+  stopped; `target/debug/incremental` was moved aside under ignored
+  `.localdev`, and the prescribed single retry completed cleanly.
+- **Cuts/flags:** no production host was contacted and no external DNS, AI or
+  email action ran. This slice authorizes certificates but deliberately does
+  not edit forbidden deployment/Caddy configuration. IDNA display conversion
+  and automated ingress-record inspection remain outside this item.
+- **Next:** the first unchecked item in `QUEUE.md`.
