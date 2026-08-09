@@ -1582,3 +1582,51 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   data, device data or tracking cookie. S1.24 owns authenticated aggregate
   reads and the visible no-cookie explanation.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.24 — privacy-friendly per-site analytics (2026-08-09)
+
+- **Shipped:** every site now has a visible Analytics action beside Pages and
+  Submissions. The responsive panel surfaces 7, 30 and 90 day controls,
+  visits and daily visitor estimates, a complete zero-filled visits-over-time
+  chart, and ranked top pages and referrer domains. Empty reports teach the
+  next step with a direct View site action. The privacy promise is explicit on
+  the surface: "No cookies. No banner." All new copy ships in English, French
+  and Dutch; loading uses skeletons rather than a blocking spinner.
+- **Data contract and tenancy:** authenticated
+  `GET /sites/:site/analytics?days=N` accepts 1–365 days and returns totals,
+  every calendar day in the requested range, and ten-entry page/referrer
+  rankings. The store first resolves the site through the signed-in account,
+  then aggregates only that tenant/site pair. Visits are exact aggregate hits;
+  visitors are anonymous per-day estimates and are not presented as a
+  cross-day identity count. A real-Postgres wrong-tenant test proves one owner
+  cannot read another owner's report while each owner sees only their data.
+- **Verified:** targeted rustfmt; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-store -p alo-jmap --all-targets
+  --jobs 1 -- -D warnings` clean; full `cargo test -p alo-store --jobs 1`
+  green (717 unit tests plus every integration target); full `cargo test -p
+  alo-jmap --jobs 1` green, including the new route, invalid-range and
+  cross-tenant coverage. Web: `npx tsc --noEmit`, focused ESLint, 25/25 Sites
+  module tests and `npm run build` clean (existing Rollup chunk warnings only).
+- **Wire transcript:** Docker Desktop was restarted after its stale engine
+  processes stopped answering; `alo-pg` then reported ready on 5432. After
+  killing any stale `alo-jmap.exe`, the freshly rebuilt binary ran on
+  127.0.0.1:8080 with the prescribed local blob directory and issuer. Real
+  curl: programmatic login 200; analytics without a token 401; authenticated
+  seven-day report 200 with exactly seven daily buckets; `days=0` returned
+  422 with `analytics period must be between 1 and 365 days`. The server was
+  stopped. No production host, external AI, outbound email or committed
+  secret was used.
+- **Design references:** Wix and Squarespace establish the per-site dashboard
+  placement; Plausible and Fathom establish the compact privacy-first report
+  and plain-language tracking promise. The core report and period controls
+  are visible without a menu (UX laws 1, 2, 5, 6 and 12).
+- **Cuts/flags:** no event stream, geography, device fingerprinting or raw
+  referrer data is exposed. Daily anonymous visitors intentionally cannot be
+  deduplicated across days; rankings are limited to ten and ranges to one year
+  so the aggregate endpoint stays bounded.
+- **Maintenance found by the bank:** the full gate exposed two stale test
+  assumptions from earlier Sites items: the notification fixture now supplies
+  the required local analytics secret, and preview assertions distinguish the
+  public absolute OG image from the editor-visible data URI. No production
+  behavior changed in those repairs.
+- **Next:** the first unchecked item in `QUEUE.md`.

@@ -41,7 +41,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.22a SEO, served: sitemap.xml + robots.txt on alo-sites; goldens.
 - [x] S1.22b SEO, edited: per-page meta editor UI + OG defaults from theme/logo; render goldens.
 - [x] S1.23 Privacy analytics collection on alo-sites: daily aggregates (path hits, referrer domain, unique-ish via daily-salted hash), explicitly NO ip/ua storage — a test asserts the stored schema contains no PII columns and raw request data is dropped.
-- [ ] S1.24 Analytics UI: per-site panel (visits over time, top pages, top referrers) + the "no cookies, no banner" explainer string.
+- [x] S1.24 Analytics UI: per-site panel (visits over time, top pages, top referrers) + the "no cookies, no banner" explainer string.
 - [ ] S1.25a Custom domains, model half: `site_domains` migration + store (domain validation, TXT verify token generation, status pending/verified/live) + `/sites/{id}/domains` routes + the verify-check endpoint (DNS TXT lookup mockable for tests) + wrong-tenant tests + wire transcript.
 - [ ] S1.25b Custom domains, serving half: alo-sites resolves verified custom Hosts + the Caddy on-demand-TLS "ask" endpoint (200 only for live domains/subdomains) + in-process Host-header tests; human-inbox note for the customer DNS how-to.
 - [ ] S1.26a AI generation, envelope: `sites` module in alo-ai — full-site draft envelope (description → site JSON) with strict schema parse; deterministic fixture tests (NO live calls); prompt documents the section schema.
