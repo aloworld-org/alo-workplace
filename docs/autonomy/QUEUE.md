@@ -96,7 +96,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.06b Receipt confirm path: upload route + parsed-fields-for-confirmation response + confirmed→expense creation; wire transcript.
 - [x] B4.07 Mileage claims (per-km rate table per tenant, entry → expense).
 - [x] B4.08a Bank import: CAMT.053 parser (golden files from public samples) → staged `bank_lines`; malformed → typed errors.
-- [ ] B4.08b Bank import: MT940 parser, same contract + goldens.
+- [x] B4.08b Bank import: MT940 parser, same contract + goldens.
 - [ ] B4.08c Bank import: CSV mapping wizard model + staging + partial-import report; routes + wire.
 - [ ] B4.09a ★ Reconciliation, exact stage: amount+reference matcher; confirm → payment/expense postings; precision tests + no cross-tenant leakage.
 - [ ] B4.09b Reconciliation heuristics: windowed matching + per-tenant learned-rules table; fixture precision tests.

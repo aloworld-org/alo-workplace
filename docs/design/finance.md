@@ -905,6 +905,69 @@ counted in the import report and never staged.
 The slice is store-deep and has **no HTTP route and no screen** — those are
 B4.08c and B4.13. Nothing here posts to the journal, by design.
 
+### As built: the second parser (B4.08b)
+
+MT940 lands in `bank_mt940.rs` behind `import_bank_mt940`, and **nothing below
+the parser changed** — same validation, same duplicate rules, same import
+report, same tables. That is the contract's first real test, and
+`bank_import_tenancy.rs` states it as one: the German January exists as both a
+CAMT.053 and an MT940, and importing both stages **four lines and four
+duplicates**, not eight lines. A bookkeeper who downloads a month in each format
+does not book it twice.
+
+Five readings are settled here, each of which would be a money bug taken the
+other way.
+
+**The dates are in the opposite order to how a person says them.** `:61:` opens
+with the *value* date and only then, optionally, the *entry* date. The entry
+date is the day the bank posted the transaction and is therefore `booked_on`;
+the value date is `value_on`. An entry date states no year, so it takes the year
+that puts it **nearest its own value date** — `:61:2601011231…` is booked on 31
+December of the old year, not eleven months later. A two-digit year is 20xx:
+MT940 states no century and has been the SEPA-era file format throughout this
+one.
+
+**The sign.** `C` in, `D` out, and `RC`/`RD` for the reversal of either, which
+turns the direction around exactly as CAMT's `RvslInd` does.
+
+**The counterparty comes out of `:86:` or not at all**, because the standard has
+no field for one. German banks write `?`-coded subfields (`?32`/`?33` the name,
+`?31` the account, `?20`–`?29` the remittance, `?00` the posting text); other
+banks write free text, which is the whole remittance and no counterparty. A
+blank field is the honest answer, and `BankStatement.source` is what tells a
+reader which silence they are looking at — the reason that column exists.
+
+**The `?2n` chunks are one string, joined with nothing at all.** They are
+27-character slices of what the payer typed and banks split them mid-word; the
+empty join reconstructs the original, *including an invoice number split across
+two chunks* — which is precisely the string B4.09 will search for. Joining with
+a space would break that number in half for ever. Free text is the opposite
+case: there the line breaks are the bank's own width and read as spaces.
+
+**A paged statement is one statement.** `:62M:` says "more to come" and the next
+page reopens with `:60M:`; the period is the first opening balance to the last
+closing one. A file that closes `:62F:` and then opens another `:20:`, or a page
+naming a different account, is two statements and is refused whole — the same
+answer a multi-`Stmt` CAMT gets, for the same reason.
+
+Three smaller decisions: SWIFT's `{1:}{2:}{4: … -}` transport blocks are
+stripped when present and anything above the first tag is dropped (a bank's
+covering text is not a transaction); the file is read as UTF-8 and, failing
+that, as Windows-1252, sharing `csv_read`'s decoder, because MT940's own
+character set has no umlauts and German banks write them anyway; and the period
+is **widened to hold every line it stages**, since `:60F:` often carries the day
+the previous statement closed.
+
+**The one limitation, and it is a real one:** `:25:` must state an **IBAN**.
+Every `/`-separated part is offered to `crate::iban` with and without an
+appended currency code, which covers the four SEPA-era spellings, but a
+pre-SEPA domestic file (`Bankleitzahl/Kontonummer`) is refused with a message
+that says to ask the bank for the SEPA format. `bank_lines` are keyed to the
+account they moved on, so importing one under a guess would file a month against
+the wrong account. If real files force it, the fix belongs at B4.08c's upload
+route — which already has to ask a person things — as an account the uploader
+names, never as a guess in the parser.
+
 ## Fiscal periods and the soft close (B4.10)
 
 ```

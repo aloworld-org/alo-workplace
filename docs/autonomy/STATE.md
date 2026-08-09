@@ -11511,3 +11511,156 @@ this slice adds no route at all.
 Next item: B4.08b (bank import — the MT940 parser: `:61:` statement lines,
 `:86:` remittance, `:60F:`/`:62F:` balances, into the same `ParsedStatement` and
 the same `stage_bank_statement`, with its own golden files).
+
+## 2026-08-09 — B4.08b the same month in another language: MT940, read into the same lines
+
+**What shipped.** The second bank-file parser:
+`platform/alo-store/src/bank_mt940.rs` (SWIFT MT940 → the format-free
+`ParsedStatement`), the `import_bank_mt940` door beside `import_bank_camt053`
+in `bank_import.rs`, six golden files under `tests/fixtures/bank/`, the pure
+suite `platform/alo-store/tests/bank_mt940_fixtures.rs`, and three new cases in
+`platform/alo-store/tests/bank_import_tenancy.rs`. No migration: the tables
+B4.08a wrote are the tables this lands in, which was the point of them.
+
+**The claim this item had to make good.** B4.08a wrote "three parsers, one
+contract" in the module doc. This is the first item that can test it rather
+than assert it, and it does, twice over. Nothing below the parser changed — not
+a line of validation, not a duplicate rule, not the import report — and the
+German January now exists as **both** a CAMT.053 and an MT940 with the same four
+transactions. Importing both stages **four lines and four duplicates, not
+eight**: `the_same_month_in_two_formats_is_the_same_month`. A bookkeeper who
+downloads a month in each format does not book it twice, because the line hash
+is of what the bank said happened and not of how it spelled it.
+
+**Five readings, each of which would be a money bug taken the other way.**
+
+**1. The dates are in the opposite order to how a person says them.** `:61:`
+opens with the **value** date and only then, optionally, the **entry** date.
+The entry date is the day the bank posted the transaction, so it is `booked_on`
+— the day the books use — and the value date is `value_on`. Reading them the
+way they are written would put every transaction's dates the wrong way round.
+
+**2. An entry date has no year, so it takes the nearest one.** A statement
+written on 1 January states last year's bookings as four digits, `1231`. The
+year that puts the entry nearest its own value date is the only reading that is
+right on both sides of a boundary — the three candidate years are tried and the
+nearest wins. Reading it as the current year would file a payment eleven months
+late, in a period that may already be closed by B4.10. A two-digit year is
+20xx: MT940 states no century, and has been the SEPA-era format throughout this
+one.
+
+**3. The `?2n` chunks are one string, joined with nothing at all.** German
+banks state the remittance as 27-character slices and split them mid-word
+without apology. The empty join reconstructs what the payer typed — including
+`INV-` + `2026-00007`, an invoice number split across two chunks, which is
+exactly the string B4.09 will search for. Joining with a space, which is the
+obvious thing to do, would break that number in half for ever. Both golden
+months carry a deliberate mid-word split for this. Free text is the opposite
+case: there a line break is the bank's own width, and it reads as a space.
+
+**4. The counterparty comes out of `:86:` or not at all.** The standard has no
+field for one. German banks write `?`-coded subfields (`?32`/`?33` the name,
+`?31` the account, `?20`–`?29` the remittance, `?00` the posting text); other
+banks write free text, which is the whole remittance and no counterparty. A
+blank field is the honest answer, and `BankStatement.source` is what tells a
+reader which silence they are looking at — the reason B4.08a stored that column.
+
+**5. A paged statement is one statement.** `:62M:` says "more to come" and the
+next page reopens with `:60M:`; the period runs from the first opening balance
+to the last closing one. A file that closes `:62F:` and then opens another
+`:20:`, or a page naming a different account, is **two** statements and is
+refused whole — the same answer a multi-`Stmt` CAMT gets, for the same reason:
+staging the first silently would put one account's lines on screen and lose the
+other's.
+
+Three smaller ones: SWIFT's `{1:}{2:}{4: … -}` transport blocks are stripped
+when present, and anything above the first tag is dropped, because a bank's
+covering text is not a transaction (every golden file opens with a prose header
+that proves it); the bytes are read as UTF-8 and, failing that, as
+Windows-1252, sharing `csv_read`'s decoder — MT940's own character set has no
+umlauts and German banks write them anyway, and a month of lines is not lost
+over one byte; and an `:86:` standing **after** the closing balance is the
+bank's note about the statement and attaches to no transaction (the Dutch
+golden file ends on exactly that, and asserts the last line did not absorb it).
+
+**Golden files, and what they actually assert.** Six, hand-authored to the
+published shapes rather than copied from a bank's own file:
+`mt940_de_january.sta` (German style: structured `?`-subfields, a reversal
+(`RC`), a batch, two deliberate mid-word remittance splits — and the *same
+month* as `camt053_de_january.xml`, transaction for transaction, which is what
+makes the cross-format test possible), `mt940_nl_february.sta` (SWIFT envelope
+blocks, CRLF, free-text `:86:`, `NONREF`, a transaction whose only description
+is the `:61:` supplementary line, an overdrawn close, and a statement-level
+note after `:62F:`), `mt940_paged.sta` (one statement over two pages),
+`mt940_quiet_month.sta` (a month with nothing in it), `mt940_two_statements.sta`
+(refused whole) and `mt940_domestic_account.sta` (refused, with the words a
+person needs). Both full months assert **opening + every transaction =
+closing**, which is what makes them golden rather than merely parseable: it
+would catch a sign read backwards, a reversal counted the right way up, or a
+transaction dropped. All IBANs are the specifications' own test numbers.
+
+One line of `.gitattributes` came with them, using the escape hatch that file
+already documented: `tests/fixtures/bank/*.sta` is `-text`, so git never
+normalises it. MT940 is a CRLF format, and a wire fixture whose line endings
+were rewritten on checkout would stop being the thing the reader is tested
+against.
+
+**How it was verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p
+alo-store --all-targets` clean; the `alo-store` suite green against the local
+Postgres (`alo-pg`, 5432), including this item's 18 unit tests in `bank_mt940`,
+7 golden-file tests and 9 bank-import tenancy tests (3 of them new).
+
+**Tenancy, proven.** The new door is the old door one format along, so the
+suite states it on the new door rather than assuming inheritance:
+`another_tenant_holding_the_identical_mt940_sees_none_of_ours` — two companies
+banking at the same institution hold the byte-identical `.sta` file, both
+uniqueness rules are per tenant, so the second import is an ordinary first one
+and neither door reaches the other's rows (a foreign statement id reads as
+`None`, never `Forbidden`; filtering by it yields our own nothing).
+
+**Cuts, named.**
+
+- **No HTTP route, no screen**, for the sixth item running. B4.08c carries
+  `POST /finance/imports/bank` (all three formats behind one route) and B4.13
+  the reconciliation screen. `import_bank_mt940` is complete and wire-ready;
+  there is simply no button. This is the queue's own split.
+- **No audit entry**, for the same reason: every module writes its audit line
+  at the *route*. B4.08c must write `finance.bank.import` when it lands.
+- **No CHANGELOG line**: still nothing a person can see. The wave's first
+  user-voice line lands with the screen.
+- **The transaction type code (`NTRF`, `NDDT`) is skipped, not stored.** What a
+  payment *was* is decided by a human at B4.09, not by a four-letter code whose
+  meaning differs by country. If B4.09b's heuristics want it, it is one field on
+  `ParsedLine` away.
+- **A second `:86:` on one transaction replaces the first rather than appending
+  to it.** One `:86:` per `:61:` is what the format specifies and what files do;
+  the later reading wins.
+
+**HUMAN FLAG (new, B4.08b): `:25:` must state an IBAN.** Every `/`-separated
+part of the field is offered to `crate::iban` with and without an appended
+currency code, which covers the four SEPA-era spellings — but a **pre-SEPA
+domestic file** (`Bankleitzahl/Kontonummer`, still downloadable from some German
+bank portals) is refused whole, with a message telling the person to ask the
+bank for the SEPA format. That is deliberate: `bank_lines` are keyed to the
+account they moved on, and importing under a guess would file a month against
+the wrong account. If real files force the issue, the fix belongs at B4.08c's
+upload route — which already has to ask a person things — as an account the
+uploader names, **never** as a guess in the parser. `mt940_domestic_account.sta`
+pins the current answer.
+
+**HUMAN FLAG (carried, unchanged since B4.05b):** no queue item wires
+`post_invoice_issue` / `post_payment_settle` / `post_credit_note_issue` into the
+document verbs, so B4.11's reports will read an empty journal for tenants who
+have been invoicing since B1. Nothing in B4.08b posts, by design — but B4.09a
+still will, through the payment a confirmed match creates. **The gap stops
+being theoretical at B4.09a.**
+
+**HUMAN ACTION (carried):** `/finance` needs adding to the production Caddyfile
+at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
+`/projects`. `web/vite.config.ts` already carries it. No new prefix this item —
+this slice adds no route at all.
+
+Next item: B4.08c (bank import — the CSV mapping wizard: a mapping model over
+`csv_read`, staging through the same `stage_bank_statement`, a partial-import
+report, and the first `/finance/imports/bank` route, which is where the audit
+line and the three formats meet).
