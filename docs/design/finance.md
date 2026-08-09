@@ -102,8 +102,8 @@ read (the rename B3.11 paid for; it is not paid twice).
 | `POST /finance/imports/bank` | a statement file (CAMT.053, MT940, or CSV with a mapping) → a statement header and staged lines (B4.08) |
 | `POST /finance/imports/bank/preview` | the CSV mapping wizard's dry run: columns, sample rows, what would import. Writes nothing, and joins `READ_ONLY_POSTS` beside `/crm/imports/leads/preview` (B4.08c) |
 | `GET /finance/bank/statements` · `GET /finance/bank/lines?status=&statement=` | what was imported and where each line stands (B4.08) |
-| `GET /finance/bank/lines/{id}/suggestions` | the ranked match candidates for one line — a read, never a write (B4.09) |
-| `POST /finance/bank/lines/{id}/match` · `/unmatch` · `/ignore` | confirm a suggestion (which is what creates the payment and its postings), undo it, or say this line is not ours to book (B4.09c) |
+| `GET /finance/bank/suggestions?statement=` | the ranked match candidates for every unmatched line — a read, never a write (B4.09c). *As built it is the bulk read, not the per-line one first sketched here: the ranking folds the open ledger once, so asking per line would fold it once per line.* |
+| `POST /finance/bank/lines/{id}/match` · `/unmatch` · `/ignore` · `/unignore` | say what this line settled (which is what creates the payment and its postings), take that back, say it is not ours to book with the reason, or take *that* back (B4.09c) |
 | `GET/POST /finance/rules` · `DELETE /finance/rules/{id}` | the per-tenant learned matching rules, listed and editable because a rule nobody can read is a rule nobody can trust (B4.09b) |
 | `GET /finance/periods` · `POST /finance/periods/lock` · `/unlock` | the fiscal periods and the soft close (B4.10) |
 | `GET /finance/reports/pl?from&to` · `.csv` | profit and loss (B4.11a) |
@@ -811,6 +811,7 @@ bank_lines       tenant_id, id PK, statement_id, line_no,
                  counterparty_name, counterparty_iban, remittance TEXT,
                  bank_ref TEXT, line_hash TEXT,
                  status 'unmatched'|'matched'|'ignored',
+                 ignored_reason TEXT (B4.09c; '' unless status = 'ignored'),
                  UNIQUE (tenant_id, line_hash)
 bank_matches     tenant_id, id PK, line_id, target_kind 'invoice'|'bill'|'expense'|'entry',
                  target_id, amount_cents, confirmed_by, confirmed_at, rule_id nullable
@@ -1153,6 +1154,83 @@ suggestion**, which is B4.09c's manual pick and the caller that will write
 `rule_id` and call `fin_match_rule_hit`; and, as before, **no HTTP route and no
 screen**.
 
+### As built: the manual stage, the undo, and the routes (B4.09c)
+
+Three files, one verb each — `bank_manual.rs` (the pick), `bank_unmatch.rs`
+(taking it back), `bank_ignore.rs` (the line that is nobody's) — plus
+`finance_bank_match.rs`, the first HTTP surface reconciliation has had. The
+settling transaction itself moved into `bank_reconcile.rs`'s
+`settle_bank_line`: the exact stage and the manual one differ in **exactly one
+thing**, the rule re-run under the row locks, so that rule is an argument
+(a plain `fn` pointer) and everything after it — the locks, the issue booked if
+it is not in the books, the payment, the settlement, the row, the line's status
+— is stated once.
+
+**The manual stage refuses less, on purpose.** A pick is not a guess, so the
+date window does not apply to it: `ensure_matchable` (the window) split into
+`ensure_settleable` (the states, the direction, the currency) plus the window,
+and the manual rule takes the first. The exact stage's own refusal already says
+"match it by hand if it really is its payment", and a pick bound by the same
+window would take that sentence back. Money that arrived before the document was
+issued is likewise allowed — a deposit taken in advance is real, and B1.19 has
+always allowed it. What the manual stage adds is two rules of its own: **never
+more than the document owes** (the heuristic stage's reading, for the same
+reason — a payment larger than the debt is a split, a duplicate or a mistake)
+and **the whole line or nothing**, because `bank_matches` is still unique per
+line and attributing part of a transfer would mark it settled with the rest
+attributed to nobody. The amount the client sends is therefore **compared, never
+trusted**: it is what the person saw on the screen they clicked, so a stale
+screen is a `422` instead of a payment for the wrong money.
+
+**Unmatching is asymmetric, and that is the design.** The entry is *reversed*
+(`fin_journal::reversal_entry`, the first reversal alo posts: the same postings
+with both money columns negated, the same dimensions, the same date, the same
+rate snapshot, `reverses_entry_id` set) and the payment is *deleted*. The
+journal records the books, where a correction is an event with a date; the
+payment table records money received, and money that was never received has no
+event to record — the view B1.19 took when it made deletion a payment's only
+correction. The invoice's **issue entry stays**: the document is still issued
+and still owed.
+
+**Only the newest payment on a document can be taken back**, and this is the one
+place B4.09c is stricter than the design note. A settlement's receivable relief
+is cumulative (`payment_settle_entry` telescopes prefixes so a settled document
+lands on exactly zero in both columns); removing a payment from the middle of
+that sequence would leave every later entry standing on a prefix that is gone,
+and for a foreign-currency document a base-column residue no document explains.
+So a match with a later payment on the same document refuses, naming what to do.
+One extra click in the rare case, against a class of unexplainable ledger
+residue in the common one. *Rejected: applying the rule only to foreign-currency
+documents* — a rule that holds sometimes is one nobody can predict, and the
+sometimes is exactly the case a tenant meets once a year.
+
+**Ignoring costs one column.** `bank_lines.ignored_reason` (migration 0145),
+with a CHECK making the reason and the status move together, so un-ignoring
+cannot leave a stale sentence behind. A blank reason is refused: "ignored" with
+nothing beside it is the state a bookkeeper cannot audit or hand over. Who and
+when are **not** stored — the audit middleware already writes an entry naming the
+actor, the act and the line for every mutating `/finance/*` route (B2.13), and a
+second answer to a question that has one is how two answers start disagreeing.
+Saying it again with a corrected sentence is allowed; dismissing a *matched* line
+is not (take the match back first).
+
+**The routes**, all under the existing `/finance` prefix (no new prefix, so
+nothing for the Caddyfile): `GET /finance/bank/suggestions?statement=` (the read
+the screen is drawn from — the bulk read, because a per-line route would fold the
+ledger once per line), and `POST /finance/bank/lines/{id}/match` · `/unmatch` ·
+`/ignore` · `/unignore`. Four named acts rather than a settable `status`: each
+has different consequences, and the audit log records them by name. Evidence
+travels as a **token and its numbers** (`{"kind":"partPayment","remainingCents":
+80700}`), never as a sentence — the sentence is the screen's, in the reader's own
+language.
+
+Cut from this slice, and named: **no split across documents** (still the change
+that drops `UNIQUE (tenant_id, line_id)`); **no bills or expenses** as match
+targets (B5 brings the kind); **no period rule** on the reversal's date (B4.10
+locks periods, and this is where "reverse today instead" will have to be
+decided); and **no screen** — B4.13b is the reconciliation UI and these are the
+routes it calls.
+
 ## Fiscal periods and the soft close (B4.10)
 
 ```
@@ -1377,7 +1455,13 @@ bank_import.rs       staging, dedupe, the import report
 bank_match.rs        the exact rule, pure (B4.09a, as built)
 bank_match_heuristic.rs  the ranked stage and its evidence, pure (B4.09b)
 bank_suggest.rs      the read that folds both stages over the ledger (B4.09b)
-bank_reconcile.rs    confirm, and later unmatch
+bank_reconcile.rs    the settling transaction, and the exact stage's door into
+                     it (B4.09a/c)
+bank_manual.rs       the pick a person makes: the rule, pure, and the verb
+                     (B4.09c)
+bank_unmatch.rs      taking a match back: the reversal, the payment, the line
+                     (B4.09c)
+bank_ignore.rs       the line that is not ours to book, and its reason (B4.09c)
 fin_match_rules.rs   the per-tenant saved rules (named `fin_rules_learn.rs`
                      when this was written; `fin_rules.rs` was already the
                      posting rules, and the table's own name is the clearer one)

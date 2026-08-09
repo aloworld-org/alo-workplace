@@ -6,6 +6,16 @@ contracts.
 
 ## Unreleased
 
+- **Say what a bank line really was, and change your mind.** You can now tick a
+  transfer off against any invoice yourself — including one nobody could have
+  guessed, one paid years late, and one paid in part, which leaves the rest
+  still owed and still chased. Got it wrong? Undo it: the payment goes, the
+  invoice is owed again, and your books carry a visible correction rather than a
+  hole where an entry used to be. Lines that are nobody's invoice — a bank
+  charge, a transfer between your own accounts — can be set aside with a reason,
+  which stays on the line for whoever reads the statement next, and taken back
+  just as easily.
+
 - **Recognise the payer who wrote no reference at all.** Bank lines that quote
   none of your numbers are now ranked against what your customers still owe,
   each with the reason in plain words — "the amount is exactly what this invoice

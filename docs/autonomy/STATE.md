@@ -12146,3 +12146,193 @@ and `/projects`. No new route prefixes this item — no routes at all.
 
 Next item: B4.09c (manual matching: the unmatched-line model, match/unmatch and
 ignore, and the wire transcript that comes with the first routes of this wave).
+
+## 2026-08-09 — B4.09c matching by hand: the pick, the undo, and the line that is nobody's
+
+**Item:** B4.09c — manual matching: the unmatched-line model, `match`/`unmatch`
+routes, wire transcript. The last stage of reconciliation, and the first HTTP
+surface the whole of B4.09 has had.
+
+**What shipped.** Three store files, one verb each, plus one route file:
+
+- `bank_manual.rs` — the pick. A pure `ensure_manual_match` and the verb
+  `match_bank_line(line, invoice, amount, rule?)`.
+- `bank_unmatch.rs` — taking it back: reverse the settlement, delete the
+  payment, return the line to the pile, in one transaction.
+- `bank_ignore.rs` — the line that is not ours to book, with its reason, and the
+  undo of that.
+- `finance_bank_match.rs` (alo-jmap) — `GET /finance/bank/suggestions` and
+  `POST /finance/bank/lines/{id}/match` · `/unmatch` · `/ignore` · `/unignore`.
+- Migration **0145**: `bank_lines.ignored_reason`, with a CHECK tying the reason
+  to the status so un-ignoring cannot leave a stale sentence behind.
+
+**The settling transaction is now stated once.** `confirm_bank_match`'s body
+moved into `bank_reconcile::settle_bank_line`, and the two stages that settle a
+line differ in **exactly one thing** — the rule re-run under the row locks — so
+that rule is an argument (a plain `fn` pointer, not a closure: it is one
+argument, and a closure would invite capturing state the locked pass must not
+see). Everything after it (the locks, the issue booked if it is not in the
+books, the payment, the settlement, the match row, the line's status) is one
+copy. `rule_id` is written and `fin_match_rule_hit_in` called **inside** that
+transaction, which doubles as the ownership check on a rule id a client sent.
+
+**The manual stage refuses less, and that is deliberate.** `ensure_matchable`
+split into `ensure_settleable` (states, direction, currency) plus the date
+window; the manual rule takes the first only. The exact stage's own refusal
+already says "match it by hand if it really is its payment", and a pick bound by
+the same window would take that sentence back. A deposit that arrived before the
+document was issued is allowed for the same reason B1.19 allows it. What the
+pick adds is two rules of its own: **never more than the document owes** (a
+payment larger than the debt is a split, a duplicate or a mistake — the
+heuristic stage's reading) and **the whole line or nothing** (`bank_matches` is
+still unique per line; attributing part of a transfer would mark it settled with
+the rest attributed to nobody). The amount the caller states is therefore
+**compared, never trusted** — it is what the person saw on the screen they
+clicked, so a stale screen is a `422` and not a payment for the wrong money.
+
+**Unmatching is asymmetric on purpose.** The entry is *reversed*
+(`fin_journal::reversal_entry`, the first reversal alo posts: same postings with
+both money columns negated, same dimensions, same date, same rate snapshot,
+`reverses_entry_id` set, source `(payment, id, void)`); the payment is
+*deleted*. The journal records the books, where a correction is an event with a
+date; `billing_payments` records money received, and money that was never
+received has no event to record. The invoice's **issue entry stays** — the
+document is still issued and still owed.
+
+**One decision stricter than the design note, flagged for the human.** Only the
+**newest** payment on a document can be taken back. A settlement's receivable
+relief is cumulative (`payment_settle_entry` telescopes prefixes so a settled
+document lands on exactly zero in both columns); removing one from the middle
+would leave later entries standing on a prefix that is gone, and — for a
+document in a currency the books are not kept in — a base-column residue no
+document explains. A match with a later payment on its document refuses, naming
+what to do. *Rejected: applying the rule only to foreign-currency documents* — a
+rule that holds sometimes is one nobody can predict, and the sometimes is the
+case a tenant meets once a year.
+
+**Verified — the gates.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p
+alo-store --all-targets` clean; `cargo clippy -p alo-jmap --lib --bins` clean;
+`cargo test -p alo-store --no-fail-fast` green against the local docker Postgres
+(`alo-pg`, 5432) — **74 suites, 1163 tests, 0 failures** — including 7 new pure
+tests in `bank_manual`, 3 in `bank_unmatch`, 2 in `finance_bank_match`, and 8
+new DB tests in `tests/bank_manual.rs`:
+
+```
+a_person_picks_the_document_the_payer_never_named
+    → nothing quoted, nothing exact; the pick books the issue and the
+      settlement, the receivable is 0 in both columns, and the line cannot be
+      spent twice
+a_part_payment_leaves_the_document_owed_and_the_rest_visible
+    → €500 of €1 307.00: partly paid, outstanding 807.00, and the books say
+      807.00 in both columns
+more_than_is_owed_is_refused_and_so_is_an_amount_the_bank_did_not_state
+    → a cent over, a figure the bank never stated, and a debit line — three
+      refusals, and nothing written by any of them
+taking_a_match_back_reverses_the_entry_and_keeps_both_readable
+    → the payment is gone and the invoice owed again; the settlement AND its
+      mirror are both in the journal, posting for posting, dimension for
+      dimension, on the same date; matching again does not book the issue twice
+only_the_newest_payment_on_a_document_can_be_taken_back
+    → two part payments; the first refuses while the second stands on it, and
+      both come back in the other order
+a_rule_that_proposed_the_match_is_counted_by_the_confirmation
+    → hits 0 after writing the rule, still 0 after the screen reads it, 1 after
+      the confirmation; the match carries the rule id, and forgetting the rule
+      leaves the match alone
+a_line_nobody_has_to_book_leaves_the_pile_with_its_reason
+    → a blank reason refuses; the reason is trimmed and stored; the line drops
+      out of both the pile and the suggestions; matching it refuses; saying it
+      again corrects the sentence; un-ignoring clears it; a matched line cannot
+      be dismissed
+two_tenants_holding_the_same_statement_never_reach_each_others_lines
+    → the byte-identical statement in both; their handle cannot match our line,
+      match their line to our document, dismiss ours, take ours back, read our
+      match, or spend our rule (NotFound every time, and our rule's hits stay 0)
+```
+
+**Verified — on the wire.** Local `alo-jmap` (debug) against docker `alo-pg`,
+tenant bootstrapped with `identityctl bootstrap-admin`, chart seeded directly in
+SQL for the four roles the arc needs (there is still no `/finance/accounts`
+route — that is B4.13c, and `fin_accounts_or_seed` has no HTTP door yet; noted
+below as a human/next-item item):
+
+```
+POST /auth/token                                        → 200, bearer
+GET  /finance/bank/suggestions            (no token)    → 401
+POST /billing/customers → /billing/invoices → PATCH lines → POST issue
+                                                        → INV-2026-00001, €1 210.00
+POST /finance/imports/bank?…  (2-row CSV)               → 200, staged 2
+GET  /finance/bank/suggestions                          → line 1: no exact, one
+     likely INV-2026-00001, score 85, evidence customerNamed(10000) +
+     wholeAmount + onlyDocumentForTheAmount + nearDue(-30); line 2 (the −€4.50
+     bank charge): nothing
+POST /finance/bank/lines/{L1}/match  {amountCents:100000}→ 422 "not what this
+     bank line moves … splitting a transfer … not supported yet"
+POST …/match  {invoiceId:"someone-elses"}               → 404
+POST /finance/bank/lines/{L2}/match  (a debit)          → 422 "money leaving"
+POST /finance/bank/lines/{L1}/match  {121000}           → 200 invoiceBookedNow=true,
+     paymentId, entryId, invoiceEntryId
+     db: invoice paid, 1 payment, line matched, entries issue+settle both
+         balancing to 0, ledger 1000 +121000 / 1100 0 / 2100 −21000 / 4000 −100000
+POST /finance/bank/lines/{L1}/ignore                    → 409 "take that back first"
+POST /finance/bank/lines/{L1}/unmatch                   → 200 reversalEntryId
+     db: 0 payments, 0 matches, invoice issued again, THREE entries — issue,
+         settle, and a reversal with source (payment, void) — ledger back to
+         1000 0 / 1100 +121000
+POST …/unmatch (again)                                  → 404
+POST /finance/bank/lines/{L2}/ignore {reason:"  "}      → 422 "say why"
+POST …/ignore {reason:" the bank's own account fee "}   → 200, trimmed, stored
+     GET /finance/bank/lines?status=unmatched           → 1 (was 2)
+     GET /finance/bank/suggestions                      → 1 line
+POST …/unignore                                         → 200, reason cleared
+POST …/unignore (again)                                 → 409 "not marked as …"
+audit_log: exactly four entries — finance.bank.lines.{match,unmatch,ignore,
+     unignore} — each naming the line in `target` (the B2.13 middleware needed
+     no change)
+```
+
+**Cuts, named.**
+
+- **No splitting a line across documents**, still: the change that drops
+  `UNIQUE (tenant_id, line_id)`. The manual pick therefore attributes the whole
+  line or refuses.
+- **No bills or expenses** as match targets — B5 brings the kind.
+- **No period rule on the reversal's date.** It is dated the original's, which
+  is right while every period is open. B4.10 has to decide what a *locked*
+  period does here (refuse, or reverse today); `post_fin_entry_in` already
+  refuses a reversal dated before its original, so the failure mode is a
+  refusal rather than a silent backdate.
+- **Who and when are not stored on an ignore** — the audit log answers both, and
+  a second answer is how two answers start disagreeing. Only the reason is a
+  column.
+- **No screen** — B4.13b.
+
+**FLAG for the human / next items.**
+
+1. **`tests/site_notify.rs` does not compile on `main`** — the sites track's
+   commit 18a7771 added a third parameter to `alo_sites::PublicAppState::new`
+   and did not update that test, which lives under `products/mail/alo-jmap/`.
+   It is the other track's area, so this loop did not touch it; it means
+   `cargo test -p alo-jmap --all-targets` cannot build until they fix it, and
+   this item's jmap gates were run as `--lib --bins` plus the store's own
+   suites. **The sites loop should fix it in its next iteration.**
+2. **There is still no HTTP door that seeds a tenant's chart of accounts.**
+   `fin_accounts_or_seed` is only reachable from the store, so a wire arc that
+   books anything needs the chart planted by hand (this transcript did it in
+   SQL). B4.13c is the CoA screen; whichever item lands first should give
+   `GET /finance/accounts` the first-use seed, or every later finance transcript
+   pays this cost again.
+3. **i18n**, unchanged from B4.09b's flag: `MatchEvidence` now crosses the wire
+   as `{"kind":…}` tokens plus numbers, deliberately, so B4.13b's fr/nl work
+   starts from that enum and not from the screen. The four new refusal
+   sentences (`splitting a transfer`, `more than … owes`, `say why …`, `take
+   that one back first`) are store-side English and will need the same
+   treatment the rest of B4's refusals get at the wave review.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item — the four routes are under
+`/finance`, which is already on that list.
+
+Next item: B4.10 (fiscal periods and the soft close — and the place where the
+reversal's date stops being a free choice).
