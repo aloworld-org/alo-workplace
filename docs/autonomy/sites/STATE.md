@@ -1762,3 +1762,28 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   persistence, subdomain availability handling, and the guarantee that the
   accepted proposal is stored only as a draft.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.26b one-retry site generation repair
+
+- **Shipped:** `generate_site_draft` now performs the complete bounded
+  generation path: one low-temperature model turn, strict S1.26a parse, then
+  exactly one correction turn only when the schema refuses the first reply.
+  The repair conversation preserves the original description and full first
+  reply, carries the validator's own bounded reason, and asks for one complete
+  corrected object rather than an unrelated second guess.
+- **Failure contract:** a second invalid reply becomes the typed
+  `SiteDraftError::RepairFailed`; disabled, unconfigured, transport, empty and
+  backend-status inference failures pass through without a retry. The helper
+  still returns only a proposal and does not write or publish anything.
+- **Fixtures:** two deterministic near-misses cover an unknown `carousel`
+  section and an invented blob reference. Tests prove a valid correction is
+  accepted on turn two, an invalid correction never earns turn three, the
+  validator reason reaches the repair message, and inference failures consume
+  one turn only. No test opens a network connection.
+- **Verified:** `cargo fmt -p alo-ai`; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-ai --all-targets --jobs 1 -- -D
+  warnings` clean; full `CARGO_INCREMENTAL=0 cargo test -p alo-ai --jobs 1`
+  green (53 unit tests plus doc tests).
+- **Cuts/flags:** S1.28 owns the authenticated HTTP route, tenant AI config,
+  typed unconfigured response, persistence, and draft-only transaction.
+- **Next:** the first unchecked item in `QUEUE.md`.
