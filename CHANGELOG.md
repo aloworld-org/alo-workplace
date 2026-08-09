@@ -6,6 +6,13 @@ contracts.
 
 ## Unreleased
 
+- **Read and resolve website enquiries without leaving your site.** Every
+  website now has a visible Submissions inbox beside its pages. Open a visitor
+  message, see which contact form it came through, reply from the sender's
+  address, and mark it handled in one click; reopen it just as quickly if more
+  work is needed. A new inbox explains how to receive its first message instead
+  of showing an empty table.
+
 - **Projects now speaks French and Dutch, down to the letters on a duration.**
   Switch the language and the whole tab follows: the engagement list, the week
   you fill in, the plan, the approvals a manager works through, the

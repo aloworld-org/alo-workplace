@@ -1102,3 +1102,43 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   contract. Server-generated notification copy remains English-only, as
   already recorded in S1.16c1.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.17a — per-site submissions inbox (2026-08-09)
+
+- **Shipped:** each website now exposes a visible Submissions action beside
+  Pages. Its responsive split inbox lists every contact-form message newest
+  first with the sender, form and open/handled state; selecting a row shows the
+  full message in place. Mark handled and Reopen are one-click surface actions
+  with immediate optimistic feedback and rollback plus the server's reason on
+  refusal. The empty state teaches the single next step and returns directly to
+  Pages. All new copy ships in English, French and Dutch.
+- **Boundary:** authenticated `GET /sites/:site/submissions` aggregates the
+  account door's site-scoped forms and submissions, and
+  `PUT /sites/:site/forms/:form/submissions/:submission` changes only the
+  handled flag. Both verify the caller's tenant + site boundary; copied foreign
+  ids answer the same 404 as invented ids.
+- **Verified:** direct rustfmt on the three touched Rust files;
+  `SQLX_OFFLINE=true cargo clippy -p alo-jmap --all-targets --jobs 1 -- -D
+  warnings` clean; focused owner-flow and mandatory wrong-tenant tests green;
+  full `cargo test -p alo-jmap --jobs 1` green (426 unit tests plus every
+  integration binary, including 13 Sites HTTP tests) against isolated local
+  Postgres. Web: SitesModule 16/16, `npx tsc --noEmit`, focused ESLint, and
+  production build clean (existing chunk/circular-chunk warnings only).
+- **Wire transcript:** after killing stale `alo-jmap.exe`, fresh `alo-jmap`
+  (8080) and `alo-sites` (8081) ran against docker `alo-pg` / database `alo`.
+  Real PKCE authorize 303 and token 200; authenticated site/page/contact-form
+  creation and publish 200; public urlencoded form POST 200; new per-site list
+  200 returned one `Talk to us` message from `visitor@example.test`; handled
+  write 200; relist returned `handled: true`. The first public-submit command
+  split its URL at the form id and therefore created nothing; the corrected
+  single-string URL produced the recorded transcript. No production host,
+  external AI, outbound email or secret was used.
+- **Design references:** Mail/Gmail's list-and-reading-pane reflex for fast
+  triage, adapted to the Sites surface; the empty state, visible inbox entry,
+  and one-click resolution follow UX laws 1, 2, 5, 6 and 12.
+- **Cuts/flags:** aggregation intentionally uses the existing capped form list
+  (maximum 50 per site), avoiding a second storage query contract. CSV export
+  remains S1.17b. The complete crate gate initially stalled when its output
+  host disappeared; after stopping the orphan, the warm foreground rerun
+  completed green.
+- **Next:** the first unchecked item in `QUEUE.md`.

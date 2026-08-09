@@ -29,7 +29,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.16b Public submit endpoint: POST `/f/:form_id` on alo-sites — validation, size caps, honeypot field, per-IP rate limit — writing S1.16a submissions; in-process tests incl. rate-limit + a foreign form_id yielding a clean 404. NO notification yet.
 - [x] S1.16c1 Submission notification ONLY: on new submission, INTERNAL delivery of a notification message to the owner's inbox (never outbound SMTP) — build the RFC822, deliver via the existing store path, tests prove the message lands in the right tenant's inbox and a foreign tenant sees nothing. NO editor wiring in this item. (Split again 2026-08-08 03:45 after six hours of oversized attempts.)
 - [x] S1.16c2 Form auto-create on section add: adding a contact_form section in the editor creates/links the form record; wire transcript of the complete arc (add section → public POST → submission row → owner-inbox notification).
-- [ ] S1.17a Submissions UI, list: per-site list with view + mark-handled; wire-verified.
+- [x] S1.17a Submissions UI, list: per-site list with view + mark-handled; wire-verified.
 - [ ] S1.17b Submissions UI, export: CSV export; wire-verified.
 - [ ] S1.18 Blog model: `site_posts` (doc node ref, slug, title, excerpt, cover blob, published_at, status) + store + routes + tests (a post can only reference the tenant's own doc).
 - [ ] S1.19a BlockNote→HTML core: paragraphs, headings, lists, quotes — goldens from real doc fixtures.
