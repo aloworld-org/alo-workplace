@@ -11117,3 +11117,217 @@ at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
 Next item: B4.07 (mileage claims — the per-tenant per-km rate table,
 effective-dated, and the entry that becomes an ordinary expense at the rate in
 force on the travel date).
+
+## 2026-08-09 — B4.07 a journey is a distance at a published rate, and the claim it becomes
+
+**What shipped.** Mileage: the tenant's per-kilometre rate table, and the
+journeys it turns into ordinary expense claims. Migration
+`0135_fin_mileage.sql` (`fin_mileage_rates`, `fin_mileage`),
+`platform/alo-store/src/fin_mileage.rs`,
+`products/mail/alo-jmap/src/finance_mileage.rs`, four routes registered in
+`server.rs`, three new lines in the audit vocabulary, and
+`platform/alo-store/tests/fin_mileage_tenancy.rs`.
+
+**The shape of it, and the five decisions under that shape.**
+
+**1. Two facts stored apart, written in one transaction.** Nobody paid €95 for
+driving 250 km; they drove 250 km, and a rate the company published turns that
+into €95. So `fin_mileage` holds the journey — day, distance, from, to, reason —
+and an ordinary `fin_expenses` row (0134) holds the money. `log_mileage` writes
+**both in one transaction**, through the very `INSERT` the ordinary create uses:
+`log_expense` was refactored into a transaction around a new `pub(crate)
+insert_expense_in`, so there is one statement writing a claim rather than two
+that can drift. A journey whose claim did not land, and a claim with no journey
+to explain it, are now unreachable rather than states somebody cleans up.
+
+From there the claim is **an ordinary expense**: it walks submit → approve →
+reimburse on the verbs a train ticket uses, and this module has no state machine
+of its own. That is the design note's "the resulting expense is ordinary from
+there", taken literally.
+
+**2. The rate is picked in Rust, not in SQL.** The whole table (bounded at 50
+rows) is read inside the transaction and `rate_effective_on` — the latest row
+whose `effective_from` is on or before the travel day — chooses. A pure function
+with its own tests beats an `ORDER BY … LIMIT 1` nobody can exercise without a
+database, and configuration this small is cheaper to read whole than to query
+cleverly. `allowance_cents` is `km_milli × cents_per_km ÷ 1000`, **half-up,
+rounded once at the end**, `i64` throughout, `checked_mul` so the impossible case
+is a `None` and not a panic. The bounds multiply to 10¹²; the ceiling of a
+journey (100 000 km at €100/km) is exactly the ceiling of an amount, which is a
+coincidence the test asserts so it stops being one.
+
+**3. The rate table is replaced whole, and the write is admin-gated at the
+edge.** `PUT /finance/mileage/rates` takes the entire table; there is no per-row
+CRUD, because the table is read as one document ("what has this company paid per
+kilometre, and since when") and editing it a row at a time makes an intermediate
+state in which a period is missing and a journey in it is refused. Replacing is
+only safe because **the rate is snapshotted onto the journey** — the wire
+transcript below rewrites the table to 1 c/km under an existing claim and reads
+the claim back at 38 c, unchanged. `GET` is everybody's (a traveller must know
+what a kilometre is worth before deciding to drive); `PUT` is
+`require_admin`'s, because a rate table anybody could raise is a self-service pay
+rise. The gate is at the edge, as the approvals inbox's is: the store's job is
+that the write is the tenant's, the edge's is that it is the right person's.
+
+**4. Personal, VAT-free and in the accounting currency, none of them a choice.**
+A per-km allowance is money the employee is owed for using their own car — which
+is what the posting rule wants (`employee_payable`) — and an allowance is not a
+purchase, so there is no input tax on it to reclaim. Neither is a request field.
+The currency is `base_currency_in` read in the same transaction, and the claim's
+description is the traveller's own `reason`: a composed "Journey from X to Y"
+would be hardcoded English in a European product, and the places are on the
+journey row already.
+
+**5. No `PATCH`, and one delete that is really the claim's.** Correcting a
+journey is deleting it and stating the right one, which re-reads the rate table
+— an edit that kept a rate picked for a day it no longer claims would be a figure
+nobody can derive. `DELETE /finance/mileage/{id}` refuses through the *claim's*
+own rule (`is_editable`, with the claim's own "withdraw it first" wording) and
+deletes the *claim*; the journey follows by `ON DELETE CASCADE`. That cascade is
+also what makes `DELETE /finance/expenses/{id}` on a mileage claim leave nothing
+behind — proven on the wire, not assumed.
+
+**A defect caught before it shipped.** The joined read (`fin_mileage` ⋈
+`fin_expenses`) originally flattened two `sqlx::FromRow` structs over one result
+set. Both tables have `id`, `user_id` and `created_at`, and sqlx reads flattened
+fields **by name** — so the journey would have been handed the claim's id, in
+silence, on every list. Fixed by aliasing exactly those three (`m.id AS m_id` …)
+with matching `#[sqlx(rename)]`, and by a unit test that intersects the two
+select lists and fails if any name is selected twice. The `INSERT` no longer uses
+`RETURNING` for the whole row either: only `created_at` comes back, because every
+other field is what the function just bound.
+
+**How verified.**
+
+- `cargo fmt` on both crates; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-jmap --all-targets` clean; `cargo test -p alo-store` green (647 unit +
+  every integration suite, DB-backed) and `cargo test -p alo-jmap` green (441
+  unit + every integration suite).
+- New unit tests: the allowance is distance × rate rounded half-up (0.499 c → 0,
+  0.5 c → 1, 1.5 c → 2, the two ceilings meeting exactly, `i64::MAX` → `None`);
+  the rate in force is the latest that had *started*, whatever order the slice is
+  in, with December booking at last year's rate and the effective day itself
+  inside its period; a rate table is validated whole and names the failing row
+  1-based; a journey is a real distance with bounded, trimmed strings; the joined
+  read gives every column a name of its own.
+- New integration suite `fin_mileage_tenancy.rs` (4 tests, real Postgres): the
+  rate table is tenant-wide (a co-tenant reads it, another tenant's replace
+  leaves it byte-identical, a refused replace leaves it exactly as it was); **a
+  journey is reachable only by the person who drove it** — a colleague *inside
+  the same tenant* is as blind to it as another tenant, on read, list and delete;
+  the rate is history (the table rewritten under a claim, the claim unchanged);
+  the claim's freeze governs the journey, the cascade works both ways, and a
+  tenant with journeys can still be deleted (0106's lesson for two more keys).
+- Wire-verified against the local backend (docker `alo-pg`, debug `alo-jmap` on
+  `127.0.0.1:8080`, tenants `wireb407a`/`wireb407b`, a **non-admin colleague** in
+  A created through `POST /admin/users`, real password tokens):
+
+```
+GET/PUT/POST/DELETE  every /finance/mileage* route, no token → 401
+
+GET  /finance/mileage/rates            as A admin      → 200  {"rates":[]}  (ships empty)
+PUT  /finance/mileage/rates            as the colleague→ 403  "admin only"
+POST /finance/mileage  2026-03-14, no table yet        → 422  "no mileage rate was published
+                                                               for 2026-03-14; add one to the
+                                                               rate table before claiming a
+                                                               journey on that day"
+PUT  /finance/mileage/rates  2025-01-01@30, 2026-01-01@38
+                                                       → 200  newest period first
+PUT  … {"centsPerKm":30}                               → 422  "rate 1: effectiveFrom is required"
+PUT  … effectiveFrom "01/01/2026"                      → 422  "rate 1: effectiveFrom must be a
+                                                               day of the form YYYY-MM-DD"
+PUT  … {"effectiveFrom":"2026-01-01"}                  → 422  "rate 2… centsPerKm is required"
+PUT  … centsPerKm 0                                    → 422  "rate 1: the rate per kilometre
+                                                               must be between 1 and 10000 cents"
+PUT  … the same day twice                              → 422  "rate 2: two rates cannot start
+                                                               on the same day"
+GET  /finance/mileage/rates                            → 200  unchanged after all five
+
+POST /finance/mileage  no travelledOn / no kmMilli     → 422  each naming its field
+POST /finance/mileage  travelledOn "14.03.2026"        → 422  "…YYYY-MM-DD"
+POST /finance/mileage  kmMilli 0                       → 422  "the distance must be between 1
+                                                               and 100000000 thousandths"
+POST /finance/mileage  2026-03-14, 250 km,
+                       Berlin→München, "Kundentermin"  → 200  rate 38, gross 9500, vat 0,
+                                                               net 9500, EUR, personal, draft,
+                                                               editable, spentOn = travelledOn,
+                                                               description = the reason typed
+POST /finance/mileage  2025-12-31, 250 km              → 200  rate 30, gross 7500
+POST /finance/mileage  2024-12-31 (before the table)   → 422  "no mileage rate was published"
+POST /finance/mileage  13 metres at 1 c/km             → 422  "at this rate the journey is
+                                                               worth less than a cent"
+POST /finance/mileage  projectId = TENANT B's project  → 404  "not found"
+
+GET  /finance/mileage?from&to                as A      → 200  both, newest first
+GET  /finance/mileage?to=…                             → 422  "from is required"
+GET  /finance/mileage  a 2-year period                 → 422  "shorter than 366 days"
+GET  /finance/mileage  ends before it starts           → 422  "must not be before its start"
+GET  /finance/mileage?from&to     as the colleague     → 200  []   (a colleague sees none)
+GET  /finance/mileage?from&to     as tenant B          → 200  []
+DELETE /finance/mileage/{A's}     as colleague / as B  → 404  both
+
+POST /finance/expenses/{id}/submit           as A      → 200  submitted, editable false
+DELETE /finance/mileage/{id}                 as A      → 409  "a claim that has been handed in
+                                                               cannot be deleted; withdraw it
+                                                               first"
+POST /finance/expenses/{id}/withdraw                   → 200  draft
+DELETE /finance/mileage/{id}                           → 204
+GET  /finance/expenses/{that claim}                    → 404  the claim went with the journey
+
+DELETE /finance/expenses/{the other claim}             → 204
+GET  /finance/mileage?from&to                          → 200  []   (the cascade, the other way)
+
+POST /finance/mileage 100 km                           → 200  rate 38, gross 3800
+PUT  /finance/mileage/rates  the whole table → 1 c/km  → 200
+GET  /finance/mileage?from&to                          → 200  rate 38, gross 3800 — a rewritten
+                                                               table restates nothing
+GET  /audit?entity=finance.mileage:{id}                → 200  ['finance.mileage.create']
+PUT  /finance/mileage/rates  {"rates":[]}              → 200  legal: "we do not pay mileage"
+```
+
+`audit_log` for that tenant reads exactly:
+`finance.mileage.rates.update` (×3 — the three PUTs that *succeeded*; the five
+refused ones filed nothing), `finance.mileage.create` (×3),
+`finance.expense.submit`, `finance.expense.withdraw`, `finance.mileage.delete`,
+`finance.expense.delete`. The surviving row in psql:
+`travelled_on 2026-03-14, km_milli 100000, rate 38, reason 'snapshot'`, joined to
+its claim `gross 3800, vat 0, rate NULL, EUR, personal, draft`.
+
+**Cuts, named.**
+
+- **No web surface.** B4.13a is the expenses screen; this is the route it will
+  call. Nothing is half-built — there is simply no button yet.
+- **No mileage category *role*.** The posting rule speaks of "the mileage
+  category's account"; rather than seed a category (which would mean naming one
+  in English, the thing `fin_categories` exists to avoid), a journey points at
+  whichever of the tenant's own categories they mean, through the ordinary
+  `categoryId` link, and `None` books to `expense_default` like any other claim.
+- **No CHANGELOG line**, for the fourth item running: still nothing a person can
+  see. The wave's first user-voice line lands with B4.13a.
+- **Six unrelated files were reformatted by `cargo fmt` and reverted.**
+  `base.rs`, `drive.rs`, `spaces.rs`, `tasks.rs`, `wopi.rs` and
+  `workspace_search.rs` carry pre-existing formatting drift (import ordering from
+  an older rustfmt edition). Fixing them is not this item's scope and would put
+  150 lines of noise in a diff about mileage — and in files the other track may
+  be holding. Left for whoever owns them. **Note for the next iteration: run
+  `cargo fmt` and then `git checkout --` anything outside the item.**
+
+**HUMAN FLAG (carried, unchanged since B4.05b):** no queue item wires
+`post_invoice_issue` / `post_payment_settle` / `post_credit_note_issue` into the
+document verbs. Every posting rule is written, golden-tested and unreachable
+from a route, so B4.11's reports will read an empty journal for tenants who have
+been invoicing since B1. **B4.07 adds a fourth to the list:** "mileage approved"
+is a row in the posting-rules table with no `fin_rules.rs` function at all — an
+approved mileage claim books through the ordinary *expense approved* rule (the
+category's account, no VAT, credit `employee_payable`), which is the same entry
+that row describes. If that reading is wrong, the place to fix it is B4.04's
+rules, not this module.
+
+**HUMAN ACTION (carried):** `/finance` needs adding to the production Caddyfile
+at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
+`/projects`. `web/vite.config.ts` already carries it. No new prefix this item —
+`/finance/mileage` is under one that is already listed.
+
+Next item: B4.08a (bank import — the CAMT.053 parser over `billing_xml_tree`,
+golden files from public samples, staged `bank_lines`, typed errors naming the
+line).

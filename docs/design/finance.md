@@ -756,6 +756,49 @@ there. Whether a given per-km rate is tax-free in a given member state is a
 **human's statement**: the table ships empty with a note, not pre-filled with
 Germany's €0.30.
 
+*As built (B4.07),* `fin_mileage.rs` writes **both rows in one transaction** —
+the journey and the draft claim it is worth — through the same
+`insert_expense_in` the ordinary create uses, so a journey whose claim did not
+land and a claim with no journey to explain it are both unreachable states
+rather than states we clean up. Six readings the code forced and this note had
+not written down:
+
+- **The rate is picked in Rust, not in SQL.** The whole table (bounded at 50
+  rows) is read inside the transaction and `rate_effective_on` — the latest row
+  whose `effective_from` is on or before the travel day — chooses. A pure
+  function with its own tests beats an `ORDER BY … LIMIT 1` nobody can exercise
+  without a database, and the table is configuration, not a data set.
+- **The rate table is replaced whole** (`PUT`), not edited row by row: it is
+  read as one document, and per-row CRUD makes an intermediate state in which a
+  period is missing and a journey in it is refused. Replacing is only safe
+  because the journey snapshots its rate — which the suite asserts by rewriting
+  the table under an existing claim and reading the claim back unchanged.
+- **`GET` on the rates is everybody's, `PUT` is `require_admin`'s.** A traveller
+  must know what a kilometre is worth before deciding to drive; a rate table
+  anybody could raise is a self-service pay rise. The gate is at the edge, as
+  the approvals inbox's is, because the store's job is that the write is the
+  tenant's and the edge's is that it is the right person's.
+- **The claim is `personal` and VAT-free by construction**, not by the caller's
+  choice: those are what mileage *is* (the posting rule above credits
+  `employee_payable`), and an allowance is not a purchase with input tax on it.
+  Its currency is the tenant's accounting currency, read in the same
+  transaction (`base_currency_in`), and its description is the traveller's own
+  `reason` — never a sentence we composed, which would be hardcoded English.
+- **There is no `PATCH` on a journey and no delete of its own.** Correcting one
+  is deleting it and stating the right one, which re-reads the rate table;
+  `DELETE /finance/mileage/{id}` refuses through the *claim's* rule
+  (`is_editable`) and deletes the *claim*, the journey following by
+  `ON DELETE CASCADE`. That is also what makes `DELETE
+  /finance/expenses/{id}` on a mileage claim leave nothing behind.
+- **A journey worth less than half a cent is refused**, not rounded up: 13 m at
+  1 c/km is a claim of a cent that appears in every report and says nothing.
+
+Cut from the slice: **no web surface** (B4.13a is the expenses screen and this
+is the route it will call) and **no mileage category role** — a tenant points a
+journey at whichever of their own categories they mean, and the posting rule's
+"the mileage category's account" resolves through that ordinary link rather than
+through a seeded word we would have had to name in English.
+
 ## The bank (B4.08) and reconciliation (B4.09)
 
 ```
@@ -1055,7 +1098,8 @@ reservation.
 
 Routes (`products/mail/alo-jmap/src`): `finance.rs` (the module's edge
 concerns and the error map reuse), `finance_accounts.rs`, `finance_entries.rs`,
-`finance_expenses.rs`, `finance_receipts.rs`, `finance_bank.rs`,
+`finance_expenses.rs`, `finance_receipts.rs`, `finance_mileage.rs`,
+`finance_bank.rs`,
 `finance_match.rs`, `finance_periods.rs`, `finance_reports.rs`, plus
 `agent_finance.rs` (B4.14) and the additive lines in `server.rs`, `lib.rs`
 and `audit_action.rs`.
