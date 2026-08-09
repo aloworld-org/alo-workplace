@@ -1391,3 +1391,36 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   page are bounded service constants; no visitor request can trigger an
   unbounded post scan.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.21a — blog authoring desk in Sites (2026-08-09)
+
+- **Shipped:** each website now exposes a visible Blog posts action beside
+  Pages, Submissions and Theme. The new authoring desk lists every linked
+  article newest first with title, excerpt, localized status, last update and
+  a visible Edit in alo Docs action. Loading uses a stable skeleton, and the
+  empty state explains that new writing remains private until publication.
+- **One-click authoring:** Write in alo Docs creates an empty alo Doc, binds it
+  to a private draft post with a valid collision-resistant placeholder slug,
+  and opens that exact document in the existing Docs editor. No menu or setup
+  dialog gatekeeps writing. If the metadata link is refused, the server's own
+  reason stays visible and the new blank document moves to recoverable Drive
+  Trash instead of becoming an orphan.
+- **Boundaries:** this is a web-only consumer of the tenant-scoped post and
+  Drive routes already completed and wrong-tenant tested in S1.18. No HTTP
+  route, store query, migration or public rendering boundary changed in this
+  slice, so no new Rust or wire gate was required.
+- **Verified:** `npx tsc --noEmit --pretty false` clean; focused ESLint clean
+  across all changed Sites and additive en/fr/nl catalog files; all 20 real-
+  client Sites integration tests green, including exact post metadata, the
+  one-click Drive hand-off, server-reason rendering and orphan cleanup; and
+  `npm run build` green (6,067 modules). The production build retained only
+  the repository's existing Rollup chunk-size/circular-re-export warnings.
+- **Design references:** Ghost and WordPress establish a site's visible post
+  desk; Google Docs establishes the document as the article's authoring
+  source. The surface passes the menu test, gives immediate busy feedback,
+  teaches the first action when empty and keeps create/edit to one click (UX
+  laws 1, 2, 5, 6 and 12).
+- **Cuts/flags:** title/slug/excerpt/cover editing, publish/unpublish controls
+  and status-chip polish remain deliberately in S1.21b. The placeholder slug
+  is private and is replaced by the explicit public metadata flow there.
+- **Next:** the first unchecked item in `QUEUE.md`.
