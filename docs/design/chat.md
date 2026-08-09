@@ -25,6 +25,7 @@ at the next deploy; noted for the human, never edited by a builder).
 | `GET /chat/reactions` | The emoji this deployment offers, in picker order. A client asks rather than hardcoding: the set lives in the store and grows with a release |
 | `POST /chat/messages/{id}/reactions` | Toggle `{emoji}` for the caller → the message's whole tally, so chips are redrawn from one answer rather than patched locally. Requires membership, like posting. Refused (422) on a withdrawn message, an archived room, or an emoji outside the offered set |
 | `POST /chat/channels/{id}/read` | Advance read state `{seq}` |
+| `GET /chat/search?q=&channel=&limit=` | Messages the caller may read, newest first. Visibility is applied **in the query**, identical to a room's own rule — search is the likeliest place for a private room to leak, and a post-filter is something someone eventually forgets. Withdrawn messages are excluded: a hit with nothing to show is noise. A `channel` that is not the caller's yields silence, not an error |
 
 Live delivery: writes publish to the **existing RFC 8620 EventSource push
 hub** (`state.push.publish`) with new types `ChatMessage` and `ChatChannel`,
