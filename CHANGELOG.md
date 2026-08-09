@@ -6,6 +6,16 @@ contracts.
 
 ## Unreleased
 
+- **See what you own and what you owe, on any day you name.** The balance sheet
+  now stands beside the profit and loss: your bank and what customers still owe
+  you on one side, suppliers and the VAT you have collected on the other, the
+  owners' stake, and the profit or loss nobody has closed into it yet. Pick any
+  date — a year end, a month end, the day before a big payment landed — and it
+  answers as of that day, everything up to it counted. It states in plain
+  figures whether it balances, so you never have to take that on trust, and
+  every line carries what the account is for as well as what it is called. Take
+  it away as a CSV your accountant can open.
+
 - **See what you earned and what you spent, beside last time.** alo now answers
   the first of the four accounts reports: a profit and loss for any period you
   name, income and cost account by account, with the period of the same length

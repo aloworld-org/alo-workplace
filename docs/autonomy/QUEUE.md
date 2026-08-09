@@ -103,7 +103,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.09c Manual matching: unmatched-line model + match/unmatch routes; wire transcript.
 - [x] B4.10 Fiscal periods + soft close (postings before lock date → typed error; admin unlock audited).
 - [x] B4.11a Report: P&L — store query + route + CSV; golden on the seeded year.
-- [ ] B4.11b Report: balance sheet — same contract + goldens.
+- [x] B4.11b Report: balance sheet — same contract + goldens.
 - [ ] B4.11c Report: aged receivables/payables — same contract + goldens.
 - [ ] B4.11d Report: VAT-return figures — same contract + goldens.
 - [ ] B4.12 Accountant role: scoped access (finance read + journal write only, no mail/files) via Spaces/roles; tests prove the scope.

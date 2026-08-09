@@ -1321,6 +1321,38 @@ manual entry.
   that gate additively to the accountant role.
 - **Balance sheet** — asset, liability and equity balances at a date, plus
   the period's result; it must balance, and P10 says so.
+
+  **As built (B4.11b).** `fin_balance.rs` is the same shape as the P&L and holds
+  no query either: one `fin_trial_balance(None, Some(on))` — no lower bound,
+  because a balance sheet is cumulative by definition — split into the three
+  types that stand on it, with the other two folded into the result in the same
+  pass. Four decisions worth not relitigating. **One date, not a period**: `?on`
+  and no `?from`, because "what was in the bank between March and June" is a
+  ledger question and answering it here would produce a sheet that does not
+  balance. **The result sits beside equity, not inside it** — alo writes no
+  year-end closing entry (a close is a rule about *writes*), so income less
+  expense to the date is carried as its own figure; that is what makes
+  `assets = liabilities + equity + result` hold, and an accountant who wants it
+  inside equity books the entry, after which it is inside equity here too. **The
+  sheet says whether it balances**: `differenceCents` and `balances` are on the
+  wire and `difference` is a row of the file — always zero on books written
+  through `post_fin_entry`, and stated rather than assumed because the figure a
+  broken sheet prints looks exactly like a correct one. And *rejected: a
+  comparative column* — a balance sheet's comparative is the **previous
+  financial year end**, a fact about the tenant's fiscal calendar rather than
+  about the date asked for, and "the same day a year earlier" would be a guess
+  printed under a heading nobody chose; a caller who wants two dates asks twice.
+  Signs flip once, in that file's own `natural_cents` (assets and expenses
+  debit-positive, the other three credit-positive), and every line carries its
+  `role` so a screen can tell the bank from the receivables without reading
+  codes it does not own. Admin only, on the same gate as the P&L.
+
+  The **HTTP surface split** with this item: `finance_reports.rs` now holds only
+  what all four reports share (the `PeriodQuery`/`OnQuery` date parsing, the
+  `admin` gate, the spreadsheet-safe `text`), and each report is its own file
+  (`finance_report_pl.rs`, `finance_report_balance.rs`). A column added to one
+  report is not a change to another, and B4.11c/d add a file each rather than
+  growing a shared one.
 - **Aged receivables/payables** — the one report that reads **documents**
   (`billing_invoices` + `billing_payments`, `billing_bills`), bucketed
   current / 1–30 / 31–60 / 61–90 / 90+ from the due date. It reads documents
@@ -1530,7 +1562,10 @@ fin_match_rules.rs   the per-tenant saved rules (named `fin_rules_learn.rs`
                      when this was written; `fin_rules.rs` was already the
                      posting rules, and the table's own name is the clearer one)
 fin_periods.rs       periods and the soft close
-fin_reports.rs       P&L, balance sheet, VAT figures
+fin_pl.rs            the P&L (as built; `fin_reports.rs` when this was
+                     written — one file per report reads better than one
+                     file for four)
+fin_balance.rs       the balance sheet, at a date
 fin_aged.rs          aged receivables/payables (the one report over documents)
 migrations/0129…     fin_accounts + fin_seeds; fin_entries + fin_postings;
                      fin_categories + fin_expenses; fin_mileage(+rates);
@@ -1547,7 +1582,9 @@ Routes (`products/mail/alo-jmap/src`): `finance.rs` (the module's edge
 concerns and the error map reuse), `finance_accounts.rs`, `finance_entries.rs`,
 `finance_expenses.rs`, `finance_receipts.rs`, `finance_mileage.rs`,
 `finance_bank.rs`,
-`finance_match.rs`, `finance_periods.rs`, `finance_reports.rs`, plus
+`finance_match.rs`, `finance_periods.rs`, `finance_reports.rs` (what the four
+reports' doors share) with `finance_report_pl.rs` and
+`finance_report_balance.rs` beside it, plus
 `agent_finance.rs` (B4.14) and the additive lines in `server.rs`, `lib.rs`
 and `audit_action.rs`.
 

@@ -12692,3 +12692,205 @@ and `/projects`. No new top-level prefix this item.
 
 Next item: B4.11b (the balance sheet — the same fold at a date, and the first
 report that has to balance).
+
+## B4.11b — the balance sheet (2026-08-09)
+
+**Shipped.** The second of the four reports, and the first one that has to
+prove something about itself: it balances, and it says so on the wire.
+
+- **`platform/alo-store/src/fin_balance.rs`** — `fin_balance_sheet(on)`,
+  `BalanceSheet`, `BalanceLine`. Like `fin_pl.rs` it contains **no SQL**: one
+  `fin_trial_balance(None, Some(on))` — no lower bound, because a balance sheet
+  is cumulative by definition — split into the three types that stand on it,
+  with income and expense folded into the result in the same pass so an account
+  can never be counted on one page and missed on the other. The fold is a pure
+  function; every figure is unit-tested with no database in sight.
+- **`products/mail/alo-jmap/src/finance_report_balance.rs`** — `GET
+  /finance/reports/balance?on` and `GET /finance/reports/balance.csv?on`,
+  registered in `server.rs`. No new top-level prefix: `/finance` is already on
+  the list (and already in the vite dev proxy).
+- **The report surface split, one file per report.** `finance_reports.rs` had
+  become "the P&L, plus the furniture four reports will share"; it now holds
+  only the shared part — `PeriodQuery`, the new `OnQuery`, the `day` parser,
+  the `admin` gate, and `text` (the spreadsheet-safety rule) — and the P&L
+  moved out whole into `finance_report_pl.rs`. A column added to one report is
+  no longer a reason to edit another, and B4.11c/d add a file each rather than
+  growing a shared one. The HTTP contract is untouched: the P&L's routes,
+  JSON, CSV and file name are byte-for-byte what they were, re-verified on the
+  wire below.
+
+**Four decisions the design note left room for.**
+
+1. **One date, not a period.** `?on` and no `?from`. A balance sheet is
+   cumulative: everything on or before the date counts, back to the day the
+   books opened. "What was in the bank between March and June" is a ledger
+   question, and answering it here would produce a sheet that does not balance.
+2. **The result sits beside equity, not inside it.** alo writes no year-end
+   closing entry (a close is a rule about *writes* — B4.10), so income less
+   expense to the date is carried as `resultCents`. That is exactly what makes
+   `assets = liabilities + equity + result` hold, and it is honest: an
+   accountant who wants it inside equity books the entry, after which it is
+   inside equity here too, because this is the journal added up.
+3. **The sheet says whether it balances.** `differenceCents` and `balances` on
+   the JSON, a `difference` row in the file. It is arithmetic rather than luck
+   — every entry balances in the base column, so any sum of whole entries does
+   — which is precisely why it is *stated*: a non-zero difference means
+   postings were written by something other than `post_fin_entry`, and a report
+   that quietly printed it would look exactly like a correct one. A unit test
+   feeds the fold an unbalanced trial balance and asserts it refuses to hide
+   the shortfall in equity.
+4. ***Rejected: a comparative column.*** The P&L derives one because a period
+   has an obvious predecessor. A balance sheet's comparative is the **previous
+   financial year end** — a fact about the tenant's fiscal calendar, not about
+   the date asked for — and "the same day a year earlier" would be a guess
+   printed under a heading nobody chose. A caller who wants two dates asks
+   twice, which is one line and is honest.
+
+Signs flip once, in this file's own `natural_cents` (assets and expenses
+debit-positive, liabilities, equity and income credit-positive), so an
+overdrawn bank account stays a negative asset rather than being moved to the
+other side. Every line carries its `role`, so a screen can tell the bank from
+the receivables without reading account codes it does not own — the one thing
+the P&L's line shape does not need and B4.13c will.
+
+**Verified — tests.**
+
+```
+cargo test -p alo-store --lib fin_balance             10 pure tests: the sides
+    and their signs, the sheet balancing, a result account never being a line,
+    code order, a loss, an overdrawn bank account, a date before the books
+    opened, an unbalanced input showing as a difference, the sign flip
+    (i64::MIN included), and the role travelling with the line
+cargo test -p alo-store --test fin_balance_sheet      4 golden tests on the
+    SAME seeded books as fin_pl_report.rs, posted through post_fin_entry:
+    a_seeded_year_end_reports_the_figures_computed_by_hand
+      → 1000 = €1 060.00 · 1100 = €1 226.00 · assets €2 286.00; 2000 = €350.00
+        · 2100 = €336.00 · liabilities €686.00; equity absent (nobody posted
+        any) ; result €1 600.00; 686.00 + 0 + 1 600.00 = 2 286.00
+    a_sheet_is_cumulative_and_the_date_is_a_real_boundary
+      → 2025-12-31 holds only what had happened by then; 2025-11-01 is zeroes;
+        the 2027-01-05 invoice is on the 2027 sheet and on no 2026 one; a date
+        mid-month (2026-04-30) has the March payment and not the May fares
+    the_result_on_the_sheet_is_every_profit_and_loss_before_it   (P10)
+      → sheet result 160 000 == P&L 2025 (30 000) + P&L 2026 (130 000), and
+        each side equals the trial balance it summarises, sign for sign
+    one_tenants_books_are_no_part_of_anothers_sheet  (100× books next door,
+        our sheet equal line for line before and after; theirs balances too)
+cargo test -p alo-jmap --test fin_balance_http        7 tests through the real
+    router: both representations of one read (and both saying it balances),
+    403 for a member who is not an admin (200 for the same person once made
+    one, 200 on /finance/periods for contrast), 401 with no token, five
+    malformed dates incl. ?from&to with no ?on, a date before the books
+    opened, the sheet moving with the date, and another tenant's position
+    absent from both the JSON and the file
+cargo test -p alo-jmap --test fin_report_http         6 green — the P&L is
+    unmoved by the file split
+cargo test -p alo-jmap --lib                          464 passed
+cargo test -p alo-store                               the whole crate green
+    (every integration binary, exit 0) — the slow honest gate, not a subset
+cargo clippy -p alo-store --all-targets               clean
+cargo clippy -p alo-jmap --lib --bins --test fin_balance_http --test
+    fin_report_http                                   clean
+cargo fmt -p alo-store -p alo-jmap -- --check         clean
+```
+
+**Verified — on the wire.** Local debug `alo-jmap` against docker `alo-pg`,
+tenant bootstrapped with `identityctl bootstrap-admin`, chart seeded in SQL
+(the same cost a fourth time — see the flags):
+
+```
+GET  /finance/reports/balance       (no token)     → 401
+GET  /finance/reports/balance.csv   (no token)     → 401
+GET  /finance/reports/balance                      → 422 "on is required: a
+                                                          report is always for a
+                                                          stated period"
+GET  ?on=                                          → 422 (same)
+GET  ?on=today                                     → 422 "on must be a date of
+                                                          the form YYYY-MM-DD"
+GET  ?on=31/12/2026                                → 422 (same)
+GET  ?from=2026-01-01&to=2026-12-31                → 422 "on is required" — a
+                                                     period is not what a
+                                                     balance sheet takes
+GET  /finance/reports/balance.csv                  → 422 (the file route too)
+GET  ?on=2026-12-31 (empty books)                  → 200 all zeroes,
+                                                     balances true, currency EUR
+POST /billing/customers → /billing/invoices → issue → INV-2026-00002, €1 210.00
+POST /finance/imports/bank?format=csv&account=NL91ABNA0417164300&…  → staged
+POST /finance/bank/lines/{L}/match {60000}         → 200 invoiceBookedNow=true
+  db: 1000 +60000 · 1100 +61000 · 2100 −21000 · 4000 −100000
+GET  ?on=2026-12-31                                → 200 assets €1 210.00
+     (1000 Bank €600.00 role bank postings 1; 1100 Trade receivables €610.00
+     role ar postings 2), liabilities €210.00 (2100 VAT payable, role
+     vat_output), equity [] and equityCents 0, result €1 000.00,
+     liabilityEquityCents 121000 == assetCents, differenceCents 0,
+     balances true — a partly-paid invoice, on the wire, balancing
+GET  ?on=2026-08-08 (the day before both entries) → 200 zeroes, balances true
+GET  /finance/reports/balance.csv?on=2026-12-31    → content-type text/csv;
+     charset=utf-8 · content-disposition attachment;
+     filename="balance-sheet-2026-12-31.csv" · nosniff · no-store, and:
+       row,on,currency,accountCode,accountName,amount
+       asset,2026-12-31,EUR,1000,Bank,600.00
+       asset,2026-12-31,EUR,1100,Trade receivables,610.00
+       assetTotal,…,1210.00 / liability,…,2100,VAT payable,210.00 /
+       liabilityTotal,…,210.00 / equityTotal,…,0.00 / result,…,1000.00 /
+       liabilityEquityTotal,…,1210.00 / difference,…,0.00
+GET  .csv?on=2020-01-01                            → the header and the six
+     figures, all 0.00: an empty side is a zero row, not a missing one
+UPDATE fin_accounts SET name='=SUM(A1:A9)' … then GET …/balance.csv
+                                                   → asset,…,1000,'=SUM(A1:A9),
+     600.00 and the JSON keeps the name verbatim: a screen is not a spreadsheet
+POST /admin/users (a clerk) → GET /finance/reports/balance     → 403 "admin only"
+                              GET /finance/reports/balance.csv → 403
+                              GET /finance/periods             → 200 (contrast)
+GET  /finance/reports/pl?from=2026-01-01&to=2026-12-31 → 200 income €1 000.00,
+     result €1 000.00, comparative 2025-01-01 …, and the .csv still lands as
+     profit-and-loss-2026-01-01-to-2026-12-31.csv — the split moved no contract
+```
+
+**Cuts, named.**
+
+- **No comparative column** — decision 4 above. The balance sheet's comparative
+  is a fiscal-calendar fact, and guessing it is worse than asking twice.
+- **No drill-down from a line.** `fin_account_ledger` already answers it and
+  B4.13c is where a figure becomes clickable; a route with no screen is a
+  contract we would have to keep.
+- **No `?includeZeroAccounts=`**, for B4.11a's reason: an account that has never
+  been posted to is absent, and a tenant who wants the whole chart printed is
+  asking for a trial balance.
+- **No screen** — B4.13c, which is also where `fr`/`nl` for these strings land.
+
+**FLAG for the human / next items.**
+
+1. **`tests/site_notify.rs` still does not compile on `main`** — unchanged from
+   B4.09c, B4.10 and B4.11a: the sites track's commit 18a7771 added a third
+   parameter (`analytics_secret`) to `alo_sites::serve::AppState::new` and never
+   updated that test, which lives under `products/mail/alo-jmap/tests/`. It is
+   the other track's area, so this loop did not touch it. **Fourth iteration
+   degraded by it**: `cargo clippy/test -p alo-jmap --all-targets` cannot build,
+   so this item gated `--lib --bins` plus its own test targets by name, which
+   cargo builds independently of the broken sibling. The sites loop should fix
+   it, or a human should.
+2. **There is still no HTTP door that seeds a tenant's chart of accounts** —
+   unchanged from B4.09c, B4.10 and B4.11a; this item's wire arc paid the cost a
+   fourth time (sixteen `INSERT`s in SQL). Whichever of B4.11c/d or B4.13c lands
+   first should give `GET /finance/accounts` the first-use seed; the store side
+   (`fin_accounts_or_seed`) has been ready since B4.02.
+3. **Auto-posting is not on the `/billing` issue route.** Issuing an invoice
+   over HTTP writes no journal entry; the postings appear only when a bank line
+   is matched to it (`invoiceBookedNow: true`, B4.09a), which is what both wire
+   arcs have had to do. That is a real gap in "the journal is the documents" —
+   an invoice that is issued and never paid is invisible to both reports — and
+   it is not in any queue item's scope. **Worth a human's decision**: either
+   B4.11c (which needs issued-and-unpaid invoices to age) picks it up, or it
+   becomes its own item.
+4. **i18n**: nothing new is user-visible yet — the refusals here are the same
+   store-side English as the rest of B4's, and the CSV headers are a contract
+   that is deliberately never translated. The screens (B4.13c) are where the
+   wave review's `fr`/`nl` lands.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B4.11c (aged receivables/payables — the one report that reads
+documents rather than the journal, and the one P6 ties back to the ledger).
