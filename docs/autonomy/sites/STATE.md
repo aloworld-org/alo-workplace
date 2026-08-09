@@ -1630,3 +1630,51 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   public absolute OG image from the editor-visible data URI. No production
   behavior changed in those repairs.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.25a — custom-domain ownership model and verification (2026-08-10)
+
+- **Shipped:** migration 0148 adds a globally unique custom-host claim under a
+  tenant/site foreign key, with explicit `pending`, `verified` and `live`
+  states. The account door can claim, list, release, stamp a seen TXT proof and
+  activate only an already verified host. Validation canonicalizes case and
+  rejects schemes, ports, paths, wildcards, IPs, Unicode, bad labels and names
+  longer than the DNS limit with a fixable sentence. A conflict says only
+  `domain is already connected`, never who owns it.
+- **HTTP and DNS boundary:** authenticated `GET|POST /sites/:id/domains`,
+  `DELETE /sites/:id/domains/:domain` and
+  `POST /sites/:id/domains/:domain/verify` expose the claim lifecycle. Create
+  returns the exact `_alo-sites.<domain>` TXT record with an opaque
+  `alo-site-verification=` value. Missing DNS is a normal retryable 200 that
+  stays pending. The router's TXT lookup is injected: production uses the
+  system Hickory resolver, while tests return deterministic records without
+  external DNS. The exact match alone changes the state to verified; live is
+  deliberately reserved for S1.25b's serving activation.
+- **Tenancy:** every query includes tenant + site, and claim creation is an
+  `INSERT ... SELECT` through the owned-site predicate. The mandatory real
+  Postgres test proves foreign list/create/verify/activate/delete all look
+  absent, a global collision reveals no owner, the original claim survives,
+  and release permits a different tenant to claim the now-free host.
+- **Verified:** targeted rustfmt; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-store -p alo-jmap --all-targets
+  --jobs 1 -- -D warnings` clean; full `cargo test -p alo-store --jobs 1`
+  green (795 unit tests plus every integration target); full `cargo test -p
+  alo-jmap --jobs 1` green (456 unit tests plus every integration target),
+  including all 17 Sites HTTP tests. The focused storage and mocked-DNS route
+  banks also passed independently.
+- **Wire transcript:** Docker `alo-pg` was ready on 5432. After killing a stale
+  `alo-jmap.exe`, the freshly rebuilt binary ran at 127.0.0.1:8080 with the
+  prescribed local blob directory and issuer. Real curl: login 200; anonymous
+  domains list 401; scheme/path input 422 with the ASCII-host rule; claim 200
+  pending with the expected `_alo-sites` TXT name; list 200 with one row;
+  verify against an unowned `.invalid` name 200 pending; a different tenant's
+  real site id 404; delete 200. The fixture claim was removed and the server
+  stopped. Exact TXT success stayed in the no-network injected test. No
+  production host, external AI, outbound email or committed secret was used.
+- **Environment note:** the retired `C:/dev/Ficina-loop` process twice
+  restarted heavy cargo work during the full gates. Only that retired process
+  tree was stopped; the foreground banks were allowed to finish and passed.
+- **Cuts/flags:** this item does not serve the custom Host, provision TLS,
+  generate customer DNS guidance or mark a verified claim live; those are the
+  explicitly queued S1.25b serving half. International names must arrive as
+  punycode until a deliberate IDNA display/normalization policy is designed.
+- **Next:** the first unchecked item in `QUEUE.md`.
