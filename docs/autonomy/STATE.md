@@ -11872,3 +11872,157 @@ this item — the four new routes are all under `/finance`.
 Next item: B4.09a (reconciliation, the exact stage: an amount-and-reference
 matcher over the lines this item stages, confirm → the payment and its
 postings, and the precision tests that keep a suggestion a suggestion).
+
+## 2026-08-09 — B4.09a the exact stage: a payer quotes our number, and a person says yes
+
+**Shipped.** The first stage of reconciliation, store-deep: the pure rule that
+says which staged bank line is which invoice's payment, and the one verb that
+turns a person's "yes" into money in the books.
+
+- `platform/alo-store/migrations/0142_bank_matches.sql` — the confirmed match.
+  `(tenant_id, id, line_id, target_kind, target_id, amount_cents, payment_id,
+  entry_id, rule_id, confirmed_by, confirmed_at)`, `UNIQUE (tenant_id,
+  line_id)`, composite FKs to `bank_lines` (cascade), `billing_payments` and
+  `fin_entries` (both restrict), and a CHECK that makes the payment and the
+  entry required exactly for `target_kind = 'invoice'`.
+- `src/bank_match.rs` — **pure**: `document_numbers` reads `INV-YYYY-NNNNN` out
+  of a remittance however the payer's bank spelled it, and `ensure_exact_match`
+  decides four facts at once against a candidate document. Seventeen unit tests,
+  no database.
+- `src/bank_reconcile.rs` — `bank_match_suggestions` (three reads for a whole
+  statement: the lines, the documents their remittances quote, their payments),
+  `confirm_bank_match`, `bank_match`.
+- `src/bank_import.rs` — `bank_line(id)`, the single-line read a confirmation
+  makes; absent and another tenant's are both `None`.
+- Three in-transaction doors extracted from doors that already existed, each the
+  public one minus its `BEGIN` and `COMMIT`: `post_fin_entry_in`,
+  `record_billing_payment_in`, `billing_payments_on` (plus
+  `fin_entry_for_source_on`). `payment_in_sequence` moved out of `fin_booking`
+  into `billing_payments` as a pure function, so the two callers that must agree
+  about which payments precede which — the keyed-in path and the matched one —
+  agree by construction.
+- `billing_invoices::billing_invoices_by_numbers` — the batch form of the
+  by-number lookup, with totals and payments, so a 200-line statement is three
+  statements and not six hundred.
+
+**The rule, and why each half of it is there.** A line matches when: its
+remittance quotes the document's number; the money **arrives** (a debit never
+settles a receivable); the currency is the document's; and the amount equals
+**what the document still owes**, not its gross — so the second instalment of a
+part-paid invoice matches exactly and its gross no longer does. The window is
+the issue date to two years after it. There is no tolerance band: one cent short
+is not exact, because a cent is exactly what a bank charge leaves behind and a
+bookkeeper has to see it.
+
+Two readings inside the extractor would each have been a money bug taken the
+other way. **A run of digits is read whole or not at all** — `INV-2026-000078`
+is a different counter, never ours with a digit stuck on. **Letters on either
+side are not a boundary**, because MT940 joins its `?2n` chunks with nothing at
+all and the number arrives welded to the words around it (`ZAHLUNGINV-2026-00007
+VIELENDANK` with the spaces gone); what keeps that safe is not punctuation but
+the conjunction of the four facts, and a person still confirms.
+
+**Confirming is one transaction, and it is the first thing in alo that books
+anything from a request.** It re-derives the exact rule twice: once on the
+documents as read, and once **under the row locks** of the line and the invoice
+— a suggestion a client sends back is not evidence, and a colleague may have
+keyed the same money in while the screen was open. Then, in that same
+transaction: the invoice's issue is booked if it is not in the books, the
+payment is recorded (dated the day the *bank* booked it, quoting the bank's own
+reference, method `bank transfer` so it lands in `bank`), the settlement is
+posted, the match row is written and the line becomes `matched`.
+
+**The carried HUMAN FLAG is now half closed.** Nothing in alo has ever called
+`post_invoice_issue` from a request, so every tenant's journal is empty. A
+confirmation books the issue itself, at the document's own issue date — the
+entry the backfill would have written — because relieving a receivable that was
+never booked leaves the customer's ledger negative and every aged-debtors report
+wrong. `ConfirmedMatch::invoice_booked_now` says when it happened, so a screen
+can tell a bookkeeper which act opened their books. **It stays a flag** for
+every invoice nobody reconciles: B4.10's backfill is still the thing that makes
+the journal complete, and B4.11's reports still need it.
+
+The one thing a confirmation will not do is invent a chart. A tenant with no
+`ar` account is refused, naming the role and the Accounts screen — and nothing
+is written, not even the payment: the money and the books that explain it arrive
+together or not at all.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+--all-targets` clean; the crate's tests green, including 17 new pure tests in
+`bank_match.rs`, 3 in `bank_reconcile.rs` and 8 new DB tests in
+`tests/bank_reconcile.rs`:
+
+```
+a_quoted_number_and_the_exact_amount_become_a_payment_and_two_entries
+    → one suggestion on the quoted line and none on the utility bill; before
+      confirming, the invoice is unpaid and the journal empty; after, a payment
+      dated the bank's own day, status paid, line matched, the issue entry and
+      the settlement both present, and the receivable exactly 0 in BOTH money
+      columns
+an_invoice_already_in_the_books_is_not_booked_a_second_time
+    → invoice_booked_now = false, the same entry id, receivable still 0
+the_rest_of_a_partly_paid_document_is_what_an_exact_match_moves
+    → after a €300 deposit, the €1 307 line suggests nothing and refuses
+      ("exactly what"), the €1 007 line matches and settles to 0
+money_recorded_in_the_meantime_refuses_the_confirmation_and_writes_nothing
+    → the suggestion was real when made; a colleague keys the money in; the
+      confirmation refuses ("already settled"), and there is no second payment,
+      no match row, no entry, and the line is still unmatched
+a_line_is_confirmed_once_and_a_settled_invoice_takes_no_second_line
+    → the same line twice is "already matched"; a duplicate transfer is
+      "already settled" and is left for a person (a refund is not a payment)
+what_the_exact_stage_will_not_confirm
+    → one cent short, no number quoted, money leaving, dated before the invoice
+      existed, and a number one digit longer than ours: five lines, no
+      suggestions, five typed refusals, no payments, no entries
+a_chart_without_a_receivable_account_refuses_by_naming_the_role
+    → "no active account for the role 'ar' … Accounts screen", nothing written
+two_tenants_holding_the_same_statement_and_the_same_number_never_meet
+    → both tenants' first invoice carries the SAME number for the SAME amount
+      (the sequence is per tenant) and both import the byte-identical CSV; each
+      sees exactly one suggestion and it is their own document; their line is
+      NotFound through our handle and our invoice is NotFound through theirs;
+      after we settle ours, their line is unmatched, their invoice issued,
+      their journal empty
+```
+
+**Cuts, named.**
+
+- **Invoices only.** A supplier's bill number is free text (B1.24) and an
+  expense has no number at all, so neither can be matched by the rule the exact
+  stage *is*: our own number, printed by us, unambiguous since B1.08. They land
+  as new `target_kind`s, which is why the column is a kind and not a nullable
+  link per document type. The queue item's "expense postings" is therefore
+  **not** in this slice.
+- **No unmatch, no ignore, no manual pick.** All three are B4.09c's verbs, and
+  unmatch is the one with teeth: it deletes the payment and *reverses* its
+  entry. Confirming without them is still whole — a mistake is visible and is
+  corrected by the path B4.09c adds.
+- **No learned rules.** B4.09b. `rule_id` is written `NULL` and read back.
+- **No split across documents.** One line, one match, as a unique. A customer
+  paying three invoices in one transfer is a heuristic-stage question, and the
+  `amount_cents` column is already where the split would live.
+- **No HTTP route and no screen.** B4.09c carries the routes and B4.13b the
+  screen; B4.08a was store-deep for the same reason. Everything above is proven
+  through the store's own doors against the real Postgres.
+- **No audit entry.** Audit rows are written at the route edge (B2.13), and
+  there is no route yet. It belongs with B4.09c's `POST .../match`.
+- **A statement dated in the future** is refused by the payment door, mid-
+  transaction, with "a payment cannot be dated in the future" rather than by the
+  exact rule (which is pure and has no clock). True and typed, if not the
+  clearest place; a bank that has booked tomorrow is a broken file.
+
+**FLAG for the wave review (B4.15): `BANK_MATCH_METHOD` is the English token
+`"bank transfer"`.** A payment's method is free text a colleague types (B1.19),
+and this is the stored *datum* that decides the account the money lands in —
+not a label. A screen that wants to say it in French translates the token, as it
+must already for any method somebody typed. Worth revisiting when the per-tenant
+method map the design promises replaces the closed default.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new route prefixes this item — no routes at all.
+
+Next item: B4.09b (reconciliation heuristics: windowed matching, counterparty
+similarity, and the per-tenant learned-rules table, ranked with the evidence
+shown).

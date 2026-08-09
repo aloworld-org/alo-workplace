@@ -1039,6 +1039,68 @@ which repeat), **no `account` column** in the mapping (the uploader states the
 account, which is the same answer for every row), and **no screen** — B4.13b is
 the reconciliation UI and this is the route it will call.
 
+### As built: the exact stage (B4.09a)
+
+`bank_matches` exists as written above, with three differences.
+
+**It carries `payment_id` and `entry_id`.** The design's row records *what* a
+line was; those two record *what confirming it did* — the payment created and
+the settlement posted — because unmatching (B4.09c) has to remove one and
+reverse the other, and looking them up by their source keys would mean trusting
+that nothing else ever posted against the same document. Both are `NULL` for a
+kind that produces neither, and a CHECK requires them exactly for `'invoice'`.
+
+**One line, one match**, as `UNIQUE (tenant_id, line_id)`. It is the invariant
+`bank_lines.status` projects: a line is `matched` exactly when a row here names
+it. Splitting one transfer across three invoices drops this unique and keeps
+`amount_cents`, which is why the amount is stored per match rather than read off
+the line.
+
+**`target_kind` is `'invoice'` and nothing else, yet.** A supplier's number is
+free text (B1.24) and an expense has no number at all, so neither can be matched
+by the rule the exact stage *is*: "our own number, printed by us, unambiguous
+since B1.08". Bills and expenses arrive as kinds, not as columns.
+
+**The rule.** `bank_match.rs` is pure — no clock, no tenant, no query. It reads
+the document numbers out of a remittance and decides four things at once: the
+number is quoted, the money arrives (a debit never settles a receivable), the
+currency is the document's, and the amount equals **what the document still
+owes** rather than its gross — so the second instalment of a part-paid invoice
+matches exactly and its gross no longer does. The window is the issue date to
+two years after it: the year is in the number already, so the window is belt and
+braces, and it is generous because an invoice paid four hundred days late is a
+real event.
+
+Two readings inside the extractor would each be a money bug taken the other way.
+A **run of digits is read whole or not at all**, so `INV-2026-000078` is a
+different counter and never ours with a digit stuck on. **Letters on either side
+are not a boundary**, because MT940 joins its `?2n` chunks with nothing and the
+number arrives welded to the words around it; what keeps that safe is not
+punctuation but the conjunction of the four facts — and a person still confirms.
+
+**Confirming is one transaction**, and it is the first thing in alo that books
+anything from a request. It re-derives the exact rule **under the row locks** of
+the line and the invoice (a suggestion a client sends back is not evidence, and
+a colleague may have keyed the same money in meanwhile), records the payment
+dated the day the *bank* booked it, and posts the settlement. Where the invoice
+was never booked — which is every invoice today, since nothing else calls
+`post_invoice_issue` — it books the issue too, at the document's own issue date:
+relieving a receivable that was never there would leave the customer's ledger
+negative and every aged-debtors report wrong. `ConfirmedMatch.invoice_booked_now`
+says when that happened. The one thing it will not do is invent a chart: a
+tenant with no `ar` account is refused, naming the role and the screen.
+
+Making that transaction possible added in-transaction forms of three doors that
+already existed — `post_fin_entry_in`, `record_billing_payment_in`,
+`billing_payments_on` — each of which is the public door minus its `BEGIN` and
+`COMMIT`, so no rule is stated twice.
+
+Cut from the slice, and named: **no unmatch, no ignore, no manual pick** (all
+B4.09c), **no learned rules** (B4.09b — hence a `rule_id` that is always
+`NULL`), **no split across documents**, **no bills or expenses**, and **no HTTP
+route and no screen**: B4.13b is the reconciliation UI and this is what it will
+call.
+
 ## Fiscal periods and the soft close (B4.10)
 
 ```

@@ -6,6 +6,15 @@ contracts.
 
 ## Unreleased
 
+- **Tick off a bank statement against the invoices it paid.** alo now reads the
+  reference a customer wrote on their transfer, finds the invoice it names, and
+  — when the money matches what that invoice still owes, to the cent, in the
+  same currency — offers it as a match. Nothing is ever ticked off for you: you
+  confirm, and only then does alo record the payment, mark the invoice settled
+  and move your books. A transfer a cent short, one quoting no number, or one
+  paying an invoice a colleague already settled is left for you to decide about,
+  with the reason in plain words.
+
 - **Follow busy blogs and browse their full history.** Website journals now
   keep article lists quick with clear Previous and Next pages, and every blog
   includes a standards-based RSS feed for readers and feed apps.
