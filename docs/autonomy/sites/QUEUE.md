@@ -46,7 +46,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.25b Custom domains, serving half: alo-sites resolves verified custom Hosts + the Caddy on-demand-TLS "ask" endpoint (200 only for live domains/subdomains) + in-process Host-header tests; human-inbox note for the customer DNS how-to.
 - [x] S1.26a AI generation, envelope: `sites` module in alo-ai — full-site draft envelope (description → site JSON) with strict schema parse; deterministic fixture tests (NO live calls); prompt documents the section schema.
 - [x] S1.26b AI generation, repair: the one-retry repair path for near-miss outputs + its fixture tests.
-- [ ] S1.27 AI edit ops (alo-ai): typed op envelope (add/remove/reorder section, set prop, rewrite copy) + apply-to-page pure fn + tests; ambiguous op → typed error the UI can surface.
+- [x] S1.27 AI edit ops (alo-ai): typed op envelope (add/remove/reorder section, set prop, rewrite copy) + apply-to-page pure fn + tests; ambiguous op → typed error the UI can surface.
 - [ ] S1.28a Generation backend: POST `/sites/generate` (description → S1.26 envelope → draft site+pages created, never auto-published); unconfigured-AI path returns a typed "unconfigured" the UI can branch on; wire-verify fixture + unconfigured paths.
 - [ ] S1.28b Generation UI: the "describe your business" onboarding screen → calls S1.28a → opens the editor on the draft; unconfigured path lands on blank-site + a template picker instead; build/tsc/eslint clean, manual click-path journaled.
 - [ ] S1.29a Conversational editing, plumbing: per-page AI panel calling the ops endpoint; proposed ops as a human-readable change list; Approve applies / Discard; structural verify.

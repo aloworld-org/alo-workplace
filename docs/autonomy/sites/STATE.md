@@ -1787,3 +1787,33 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Cuts/flags:** S1.28 owns the authenticated HTTP route, tenant AI config,
   typed unconfigured response, persistence, and draft-only transaction.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.27 typed, atomic AI page edits
+
+- **Shipped:** added a strict v1 site-edit envelope with the complete closed
+  operation set: `add_section`, `remove_section`, `reorder_section`,
+  `set_prop`, and `rewrite_copy`. The prompt carries the exact current page in
+  the user turn and documents all five visible operations, sequential index
+  semantics, RFC 6901 property pointers, and the no-invented-facts/assets rule.
+- **Safe targeting:** every operation against an existing section includes
+  both its zero-based index and expected section type. Missing indices, stale
+  indices, type mismatches, and missing property paths return the typed,
+  human-readable `SiteEditError::Ambiguous` rather than touching a nearby
+  section. Section `type` itself can never be changed.
+- **Atomic apply:** edits run against a clone in declared order and return only
+  after the complete result passes alo-store's authoritative section write
+  gate. This supports adding/removing/reordering sections, filling absent
+  optional props, nested array/object values, and copy rewrites while leaving
+  the caller's page byte-for-byte untouched after any failure.
+- **Verified:** focused tests cover each operation, sequential structural
+  edits, strict unknown-op/field parsing, prompt isolation, nested set-prop,
+  non-text rewrite refusal, invalid pointers, stale-target ambiguity, unsafe
+  href refusal, atomic rollback, and schema-version preservation. `cargo fmt
+  -p alo-ai`; strict `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo clippy -p
+  alo-ai --all-targets --jobs 1 -- -D warnings` clean; full
+  `CARGO_INCREMENTAL=0 cargo test -p alo-ai --jobs 1` green (62 unit tests plus
+  doc tests).
+- **Cuts/flags:** this is proposal construction and pure application only;
+  S1.29 owns the authenticated endpoint, before/after preview, and explicit
+  Approve/Discard persistence flow. No AI endpoint or network was contacted.
+- **Next:** the first unchecked item in `QUEUE.md`.
