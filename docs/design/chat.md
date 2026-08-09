@@ -22,7 +22,8 @@ at the next deploy; noted for the human, never edited by a builder).
 | `GET /chat/channels/{id}/threads/{seq}` | The replies under one message, oldest-first — a thread reads forwards |
 | `POST /chat/channels/{id}/messages` | Post `{body, thread_root?, attachments?:[drive_node_id]}` → the stored message with its `seq` |
 | `PATCH /chat/messages/{id}` · `DELETE /chat/messages/{id}` | Edit (keeps `edited_at`) · soft-delete (tombstone, never a hole in the sequence) |
-| `POST /chat/messages/{id}/reactions` | Toggle `{emoji}` for the caller |
+| `GET /chat/reactions` | The emoji this deployment offers, in picker order. A client asks rather than hardcoding: the set lives in the store and grows with a release |
+| `POST /chat/messages/{id}/reactions` | Toggle `{emoji}` for the caller → the message's whole tally, so chips are redrawn from one answer rather than patched locally. Requires membership, like posting. Refused (422) on a withdrawn message, an archived room, or an emoji outside the offered set |
 | `POST /chat/channels/{id}/read` | Advance read state `{seq}` |
 
 Live delivery: writes publish to the **existing RFC 8620 EventSource push
@@ -39,8 +40,15 @@ WebSocket layer, no second pipe.
 - `chat_messages` — id, tenant_id, channel_id, **seq** (per-channel monotonic,
   allocated in the write transaction), author_id, body, kind (`text`|`system`),
   thread_root_seq (null = top level), edited_at, deleted_at, created_at.
-- `chat_reactions` — tenant_id, message_id, user_id, emoji (one row per
-  person per emoji; toggling deletes it).
+- `chat_reactions` — tenant_id, channel_id, message_id, user_id, emoji. The
+  row *is* the key: `(message, user, emoji)` is the primary key, so reacting
+  twice is a toggle rather than a second reaction, enforced by the table and
+  not by the application counting. `channel_id` is denormalised from the
+  message so a page of the feed is tallied in one pass. **No count is
+  stored** — a stored counter is a second source of truth that drifts the
+  first time a delete races an insert. The permitted emoji live in the store
+  (`REACTIONS`), not in a `CHECK`, so growing the set is a release rather
+  than a migration on every tenant's database.
 - `chat_attachments` — message_id → **Drive node id**: a pointer, never a
   copy (the Spaces precedent; one storage, per ADR 0038).
 - `chat_mentions` — message_id, user_id: written at post time so unread and
