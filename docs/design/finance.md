@@ -862,6 +862,49 @@ because a learned rule nobody can read is a rule nobody can trust.
 **reverses** its entry (a reversal, never a deletion), returning the line to
 `unmatched`. Refused once the period is locked, which is the next section.
 
+### As built: the first parser (B4.08a)
+
+`bank_statements` and `bank_lines` exist as written above, with three
+differences the CAMT reader forced and which MT940 and CSV will inherit.
+
+**The balances are nullable.** A balance the bank did not state is absent, not
+zero: a zero would be a reconciliation target that quietly disagrees with
+reality, and refusing such a file instead would throw away every line in the
+month over a figure that is a check rather than the point of the import.
+
+**`statement_ref` was added** — the bank's own name for the statement
+(`<Stmt><Id>`, and `:28C:` when MT940 lands). It is the number a person
+cross-checks against the paper, it costs one column, and both formats state it
+for free. A CSV export has none, hence the empty default.
+
+**The line hash carries an occurrence number.** Two genuinely distinct
+transactions can be identical in every field a bank states — two €3.40 coffees
+at the same shop on one day, with no reference between them — so the n-th line
+with identical content hashes with `n` in it. Without that, the second coffee
+would vanish for ever as a duplicate. Re-importing the same file re-derives the
+same numbering, and an overlapping file lists the same pair in the same order,
+so de-duplication still holds exactly. The **value date is deliberately not in
+the hash**: some banks restate it when a booking is corrected, and a line whose
+hash moves is a line that imports twice.
+
+Three CAMT-specific readings, each of which would be a money bug if taken the
+other way, are settled in `bank_camt.rs` and tested against the golden files:
+a **reversal** (`RvslInd`) turns a credit into money leaving; the
+**counterparty** is the debtor on money in and the creditor on money out (a
+file states both roles, and one of them is always the account holder — so the
+other role is read only as a fallback, only when the statement names the
+account holder, and never when the fallback *is* them: banks disagree about
+whether a reversal restates the original roles or swaps them, and the tenant's
+own name on a reconciliation screen looks like data and is not); and a
+**batched entry** (several `TxDtls` under one `Ntry`) is one line at the
+entry's total with no counterparty, because the bank moved money once and
+naming one of the several would be a false statement on the screen where a
+human decides what a payment was. Entries the file marks as not yet booked are
+counted in the import report and never staged.
+
+The slice is store-deep and has **no HTTP route and no screen** — those are
+B4.08c and B4.13. Nothing here posts to the journal, by design.
+
 ## Fiscal periods and the soft close (B4.10)
 
 ```

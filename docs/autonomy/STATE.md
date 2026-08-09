@@ -11331,3 +11331,183 @@ at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
 Next item: B4.08a (bank import — the CAMT.053 parser over `billing_xml_tree`,
 golden files from public samples, staged `bank_lines`, typed errors naming the
 line).
+
+## 2026-08-09 — B4.08a the bank speaks: a statement is read, and its lines wait for a person
+
+**What shipped.** The first of the three bank-file parsers, and the staging
+table every one of them will land in. Migration `0136_bank_statements.sql`
+(`bank_statements`, `bank_lines`), `platform/alo-store/src/bank_import.rs` (the
+format-free `ParsedStatement`, the validation, the two duplicate rules, the
+import report, the reads), `platform/alo-store/src/bank_camt.rs` (CAMT.053 over
+the hardened `billing_xml_tree`), two ids, five golden files under
+`tests/fixtures/bank/`, and two suites:
+`platform/alo-store/tests/bank_camt_fixtures.rs` (pure) and
+`platform/alo-store/tests/bank_import_tenancy.rs` (real Postgres).
+
+**The one idea this item is built on: a staged line is not an event.**
+Everything else in B4 posts the moment it becomes real — an invoice issues and
+the journal moves. A bank line is deliberately the opposite: it is what the bank
+*says* happened, held apart from the books until a person says what it *was*.
+So nothing here posts, nothing here matches, and `status` starts at
+`unmatched` for every line. Confirming a match is B4.09's verb and it is what
+creates the payment. ADR 0023's propose-then-approve is a money rule here: a
+wrong automatic match marks an invoice paid that is not, and the customer stops
+being chased.
+
+**Four decisions, each of which would be a money bug taken the other way.**
+
+**1. The sign is normalised once, at the parser.** CAMT never signs an amount —
+it states a positive figure beside a `CdtDbtInd` of `CRDT`/`DBIT`, and a
+`RvslInd` that turns either one around. `bank_lines.amount_cents` is signed
+`i64`: positive is money in. A reversed credit is money *leaving*, whatever the
+indicator says, and the German golden file carries exactly that case (a returned
+SEPA credit) because it is the one a reader gets wrong.
+
+**2. The counterparty is the debtor on money in and the creditor on money out.**
+A CAMT transaction names both roles, and one of them is always the account
+holder. Read the wrong one and the reconciliation screen fills with the tenant's
+own name. Asserted per direction in the golden suite.
+
+The awkward case is the **reversal**, and it is worth the paragraph: banks
+genuinely disagree about whether a reversed entry restates the parties in the
+original instruction's roles or swaps them to match the money's new direction.
+Reading one convention leaves the counterparty blank on exactly the lines a
+bookkeeper most needs to identify. So the other role is tried second — guarded:
+only when the statement names the account holder (`Acct/Ownr/Nm`) and the
+fallback is not them. With no owner stated there is no guard, so there is no
+fallback, because blank beats reading a tenant their own name as if it were the
+other party. Three cases in the unit suite: the fallback firing, the fallback
+refusing itself, and the unguarded file staying blank.
+
+**3. A batched entry is one line.** One `Ntry` may carry several `TxDtls` — a
+payroll run, a direct-debit collection — and the bank moved money **once**. So
+it stays one line at the entry's total, with **no** counterparty: inventing one
+of the several would be a false statement on the screen whose whole purpose is
+deciding what a payment was. Its remittance falls back to `AddtlNtryInf`, which
+is where a bank names the run.
+
+**4. What is not booked is not staged.** A `camt.053` is an end-of-day statement
+and its entries should all be `BOOK`; banks send pending items in them anyway. A
+pending item may still change or vanish, so it is counted into
+`BankImport::unbooked` and skipped — reported, never staged, never silently
+dropped.
+
+**The duplicate rules, which are the whole reason this table has two hashes.**
+Bookkeepers re-upload; a month's statement arrives again inside the quarter's.
+`file_sha256` unique per tenant: the same bytes are the same import, refused as a
+`Conflict` **naming the period already held** ("the statement of 2026-01-01 to
+2026-01-31") rather than swallowed, because a silent no-op leaves somebody
+hunting for lines under today's date. `line_hash` unique per tenant: a
+transaction already staged from another file is skipped and *counted*, so
+`camt053_de_week1.xml` (a genuinely different file whose first two entries are
+January's first two) reports `staged 1, duplicates 2`.
+
+The hash itself carries the item's one genuinely non-obvious decision: **an
+occurrence number**. Two distinct transactions can be identical in every field a
+bank states — two €3.40 coffees at the same shop on one day, no reference
+between them — so the n-th line with identical content hashes with `n` in it.
+Content alone would have silently dropped the second coffee for ever. Both
+re-import and overlap still de-duplicate exactly, because both list the pair in
+the same order. And the **value date is not in the hash**: some banks restate it
+when a booking is corrected, and a line whose hash moves is a line that imports
+twice. The remittance is whitespace-collapsed and lowercased first — the week
+file spaces its remittance differently from the month file, on purpose, and the
+test proves it is still one payment.
+
+**Reuse over a second opinion.** The counterparty account goes through
+`crate::iban::canonicalize` — the crate's one notion of what an IBAN is, check
+digits included — rather than a shape check of this module's own. What differs
+is only what a failure *means*: on an invoice the tenant is typing and is told;
+here a bank is reporting, so an unreadable counterparty account is one blank
+field, never a lost statement. The **account's own** IBAN is required, and its
+refusal quotes the validator's own words, which name the rule and never the
+number (Law 1). Amounts and dates reuse `billing_einvoice_import`'s
+`amount`/`date` — integer cents, no float anywhere near money — with a local
+`day()` that drops the time from the dateTime banks write where the schema asks
+for a date (`2026-02-28T23:59:59+01:00` is the 28th, not a timezone puzzle).
+
+**Clipped versus checked.** Descriptive fields (counterparty name, remittance,
+bank reference) are **clipped** to their bounds; money, currency and identifiers
+are **checked** and refuse. A name one character over ISO's own limit is a
+cosmetic fact about a file we did not write, and losing a month over it would be
+absurd; an amount we cannot hold exactly is not cosmetic. Every refusal names
+the entry by its position — "entry 2 of this statement …" — and never quotes the
+file.
+
+**Golden files, and what they actually assert.** Five, hand-authored to the
+published shapes rather than copied from any bank's own file (a real statement
+is somebody's money, and the loop makes no network calls):
+`camt053_de_january.xml` (German/DK style: default namespace, `<Sts>BOOK</Sts>`,
+OPBD+CLBD, a batch, a reversal, a pending item),
+`camt053_nl_february.xml` (Dutch style: prefixed elements, no `Sts` at all,
+`PRCD` for the opening balance, an `EndToEndId` of `NOTPROVIDED`, and an
+**overdrawn** close so a debit balance is exercised), `camt053_de_week1.xml`
+(the overlap), `camt053_quiet_month.xml` (a month with nothing in it — banks
+send these, and it stores as a statement with no lines) and
+`camt053_no_direction.xml` (an entry with no `CdtDbtInd`). Both full months
+assert **opening + every line = closing**, which is what makes them golden
+rather than merely parseable: it would catch a sign read backwards, an entry
+dropped, or a batch counted twice — none of which a field-by-field comparison
+written from the same misreading would notice. All IBANs in them are the
+specifications' own test numbers and pass mod-97.
+
+**How it was verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p
+alo-store --all-targets` clean; the whole `alo-store` suite green against the
+local Postgres (`alo-pg`, 5432), including this item's 25 unit tests (14 in
+`bank_camt`, 11 in `bank_import`), 5 golden-file tests and 6 tenancy tests. The
+migration ran against the real database as part of that.
+
+**Tenancy, proven.** `bank_import_tenancy.rs` ends on the case that matters:
+two tenants importing the **byte-identical file**. Both uniqueness rules are per
+tenant, so the second is an ordinary first import — not a conflict, which would
+have made our table an oracle for somebody else's bank statements. Neither door
+reaches the other's rows; another tenant's statement id reads as `None`, never
+`Forbidden`. Inside one tenant a *colleague* reads the same imports, deliberately:
+a bank account is the company's, not the uploader's, which is the opposite of
+the rule expenses and mileage follow and is why the suite states it out loud.
+`bank_lines` filtered by a foreign statement id returns our own nothing.
+
+**Cuts, named.**
+
+- **No HTTP route, no screen.** B4.08c carries `POST /finance/imports/bank`
+  (all three formats behind one route) and B4.13 the reconciliation screen. The
+  store door `import_bank_camt053` is complete and wire-ready; there is simply
+  no button. This is the queue's own split, not a shortfall.
+- **No audit entry.** Every other module writes its audit line at the *route*,
+  which does not exist yet. B4.08c must write `finance.bank.import` when it
+  lands, or the import will be the first mutating verb in the product with no
+  audit trail.
+- **No CHANGELOG line**, for the fifth item running, for the same reason: still
+  nothing a person can see. The wave's first user-voice line lands with the
+  screen.
+- **No MT940, no CSV.** B4.08b and B4.08c. `stage_bank_statement` is
+  `pub(crate)` and takes a `ParsedStatement` precisely so both land as a parser
+  and nothing else.
+- **A multi-statement file is refused, not split.** One `<Stmt>` per import.
+  Several usually means several accounts, and staging the first silently would
+  put one account's lines on screen and lose the rest. If real files turn out to
+  bundle one account's months, this becomes a loop rather than a refusal.
+
+**As-built differences from `docs/design/finance.md`** (the note is updated in
+the same commit, § "As built: the first parser"): the balances are **nullable**
+(absent is not zero — and refusing a balance-less file would throw away every
+line in it), and a `statement_ref` column was **added** (the bank's own number
+for the statement, `<Stmt><Id>` here and `:28C:` in MT940 — one column, and it
+is what a person cross-checks against the paper).
+
+**HUMAN FLAG (carried, unchanged since B4.05b):** no queue item wires
+`post_invoice_issue` / `post_payment_settle` / `post_credit_note_issue` into the
+document verbs, so B4.11's reports will read an empty journal for tenants who
+have been invoicing since B1. B4.08a adds nothing to that list — by design,
+nothing in it posts — but B4.09a will: confirming a match is specified to create
+a `billing_payments` row, and that row's posting goes through the very rule that
+is currently unreachable. **The gap stops being theoretical at B4.09a.**
+
+**HUMAN ACTION (carried):** `/finance` needs adding to the production Caddyfile
+at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
+`/projects`. `web/vite.config.ts` already carries it. No new prefix this item —
+this slice adds no route at all.
+
+Next item: B4.08b (bank import — the MT940 parser: `:61:` statement lines,
+`:86:` remittance, `:60F:`/`:62F:` balances, into the same `ParsedStatement` and
+the same `stage_bank_statement`, with its own golden files).
