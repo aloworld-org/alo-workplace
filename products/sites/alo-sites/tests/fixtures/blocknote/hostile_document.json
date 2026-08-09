@@ -1,0 +1,58 @@
+[
+  {
+    "type": "paragraph",
+    "content": [
+      { "type": "text", "text": "<script>alert('text')</script>", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "javascript:alert('image')",
+      "name": "bad",
+      "caption": "bad",
+      "showPreview": true
+    },
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+",
+      "name": "svg",
+      "caption": "svg",
+      "showPreview": true
+    },
+    "children": []
+  },
+  {
+    "type": "codeBlock",
+    "props": { "language": "rust\" data-pwn=\"yes" },
+    "content": [
+      { "type": "text", "text": "</code><script>alert('code')</script>", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "type": "equation",
+    "props": { "latex": "</code><img src=x onerror=alert('math')>" },
+    "children": []
+  },
+  {
+    "type": "rawHtml",
+    "props": { "html": "<script>alert('raw')</script>" },
+    "content": [
+      { "type": "text", "text": "<img src=x onerror=alert('inline')>", "styles": {} }
+    ],
+    "children": [
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Safe child <b>text</b>", "styles": {} }
+        ],
+        "children": []
+      }
+    ]
+  }
+]

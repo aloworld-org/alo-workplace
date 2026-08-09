@@ -113,7 +113,157 @@ fn render_block(block: &Value, out: &mut String) {
             render_text_block(&format!("h{level}"), block, out);
         }
         Some("quote") => render_text_block("blockquote", block, out),
+        Some("image") => render_image(block, out),
+        Some("codeBlock") => {
+            let language = block
+                .get("props")
+                .and_then(|props| props.get("language"))
+                .and_then(Value::as_str)
+                .unwrap_or("text");
+            let mut code = String::new();
+            collect_plain_inline(block.get("content"), &mut code);
+            render_code(language, &code, out);
+            render_children(block, out);
+        }
+        Some("aloCode") => {
+            let props = block.get("props");
+            let language = props
+                .and_then(|props| props.get("language"))
+                .and_then(Value::as_str)
+                .unwrap_or("text");
+            let code = props
+                .and_then(|props| props.get("code"))
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            render_code(language, code, out);
+            render_children(block, out);
+        }
+        Some("equation") => {
+            let latex = block
+                .get("props")
+                .and_then(|props| props.get("latex"))
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            out.push_str("<div class=\"equation\" role=\"math\"><code>");
+            out.push_str(&esc(latex));
+            out.push_str("</code></div>\n");
+            render_children(block, out);
+        }
         _ => render_children(block, out),
+    }
+}
+
+fn render_image(block: &Value, out: &mut String) {
+    let props = block.get("props");
+    let url = props
+        .and_then(|props| props.get("url"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let Some(src) = safe_image_src(url) else {
+        if !url.is_empty() {
+            tracing::warn!("stored BlockNote image failed the render-side allowlist; omitting it");
+        }
+        render_children(block, out);
+        return;
+    };
+    let name = props
+        .and_then(|props| props.get("name"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let caption = props
+        .and_then(|props| props.get("caption"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let width = props
+        .and_then(|props| props.get("previewWidth"))
+        .and_then(Value::as_u64)
+        .filter(|width| (48..=1600).contains(width));
+
+    out.push_str("<figure class=\"doc-image\"><img src=\"");
+    out.push_str(&src);
+    out.push_str("\" alt=\"");
+    out.push_str(&esc(name));
+    out.push('"');
+    if let Some(width) = width {
+        out.push_str(" width=\"");
+        out.push_str(&width.to_string());
+        out.push('"');
+    }
+    out.push_str(" loading=\"lazy\" decoding=\"async\">");
+    if !caption.is_empty() {
+        out.push_str("<figcaption>");
+        out.push_str(&esc(caption));
+        out.push_str("</figcaption>");
+    }
+    out.push_str("</figure>\n");
+    render_children(block, out);
+}
+
+fn render_code(language: &str, code: &str, out: &mut String) {
+    let language = language_token(language);
+    out.push_str("<pre><code class=\"language-");
+    out.push_str(&language);
+    out.push_str("\">");
+    out.push_str(&esc(code));
+    out.push_str("</code></pre>\n");
+}
+
+fn language_token(language: &str) -> String {
+    let token: String = language
+        .chars()
+        .filter(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '+' | '#')
+        })
+        .take(32)
+        .collect();
+    if token.is_empty() {
+        "text".to_owned()
+    } else {
+        token
+    }
+}
+
+fn safe_image_src(url: &str) -> Option<String> {
+    if url.starts_with("/assets/img/") {
+        return Some(esc(url));
+    }
+
+    const RASTER_PREFIXES: [&str; 5] = [
+        "data:image/png;base64,",
+        "data:image/jpeg;base64,",
+        "data:image/gif;base64,",
+        "data:image/webp;base64,",
+        "data:image/avif;base64,",
+    ];
+    let prefix = RASTER_PREFIXES
+        .iter()
+        .find(|prefix| url.starts_with(**prefix))?;
+    let payload = &url[prefix.len()..];
+    if payload.is_empty()
+        || !payload.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'=' | b'\r' | b'\n')
+        })
+    {
+        return None;
+    }
+    Some(esc(url))
+}
+
+fn collect_plain_inline(content: Option<&Value>, out: &mut String) {
+    let Some(content) = content.and_then(Value::as_array) else {
+        return;
+    };
+    for inline in content {
+        match inline.get("type").and_then(Value::as_str) {
+            Some("text") => out.push_str(
+                inline
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            ),
+            Some("link") => collect_plain_inline(inline.get("content"), out),
+            _ => {}
+        }
     }
 }
 

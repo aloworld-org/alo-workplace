@@ -6,6 +6,11 @@ contracts.
 
 ## Unreleased
 
+- **Publish richer alo Docs as safe website articles.** Pictures, code examples
+  and equations now carry into a website article without loading the editor.
+  Unsafe embedded markup stays readable text instead of running in a visitor's
+  browser.
+
 - **Write a website article once, in alo Docs, and keep its structure.** Blog
   rendering now turns document paragraphs, headings, quotes, links, bulleted
   and numbered lists, nested lists, and checklists into clean semantic web

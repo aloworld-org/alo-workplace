@@ -1,0 +1,44 @@
+[
+  {
+    "id": "82fafc4e-2439-4ace-a79c-e50dd312c113",
+    "type": "image",
+    "props": {
+      "textAlignment": "center",
+      "backgroundColor": "default",
+      "name": "Orange notebook <front>",
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+      "caption": "Ideas, captured & shared",
+      "showPreview": true,
+      "previewWidth": 640
+    },
+    "children": []
+  },
+  {
+    "id": "c2264693-09c1-4380-b360-5ec323a01944",
+    "type": "codeBlock",
+    "props": { "language": "typescript" },
+    "content": [
+      {
+        "type": "text",
+        "text": "const greeting = \"<hello>\";\nconsole.log(greeting);",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "id": "cd054a36-c8e9-497b-9e28-c78bab965c7b",
+    "type": "aloCode",
+    "props": {
+      "code": "fn main() {\n    println!(\"alo & sites\");\n}",
+      "language": "rust"
+    },
+    "children": []
+  },
+  {
+    "id": "8e434fdc-1cb2-4cd1-ab30-ef83f8b81333",
+    "type": "equation",
+    "props": { "latex": "E = mc^2 & x < y" },
+    "children": []
+  }
+]

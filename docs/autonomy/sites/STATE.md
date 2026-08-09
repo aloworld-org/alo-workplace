@@ -1267,3 +1267,33 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   An initial database-backed full test inherited the old 5433 fallback; the
   explicit required 5432 rerun above is the recorded green gate.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.19b — rich BlockNote document renderer (2026-08-09)
+
+- **Shipped:** alo Sites now renders the rich blocks already stored by alo
+  Docs: images become semantic figures with captions, standard and alo code
+  blocks become escaped language-labelled code, and equations get a readable
+  runtime-free math fallback. The checked-in real-shape fixture and HTML golden
+  make the public interchange contract visible and deterministic.
+- **Safety and privacy:** public article images accept only the existing
+  same-origin `/assets/img/` path or strict base64 raster data; remote URLs,
+  scriptable URLs and SVG data are omitted. Image text, code, language tokens
+  and equations are escaped or narrowed before entering HTML. A hostile corpus
+  proves scripts, injected attributes, raw HTML and scriptable image payloads
+  never render live while safe child text remains readable.
+- **Verified:** targeted rustfmt; `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo
+  clippy -p alo-sites --all-targets --jobs 1 -- -D warnings` clean; full
+  `cargo test -p alo-sites --jobs 1` green against the required local Postgres
+  on 5432: 7 unit tests, all 3 BlockNote goldens/safety tests, 6 form tests, 3
+  render goldens, 15 render safety tests, 5 Host-isolation/service tests, 5
+  stylesheet tests and doc tests. No storage or HTTP contract changed, so this
+  item introduced no tenant door or route requiring a new wire transcript.
+- **Design references:** BlockNote's persisted rich-block shapes define the
+  source contract; Google Docs and Word define the expectation that pictures,
+  code and equations survive publishing; the existing alo Sites zero
+  cross-origin-request contract defines the image allowlist.
+- **Cuts/flags:** equations intentionally ship as accessible escaped source
+  rather than adding a public-page math runtime. Image binary magic-byte
+  verification remains the upload pipeline's responsibility; this renderer
+  verifies the HTML safety boundary and declared raster transport shape.
+- **Next:** the first unchecked item in `QUEUE.md`.
