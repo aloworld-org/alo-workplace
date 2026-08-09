@@ -6,6 +6,16 @@ contracts.
 
 ## Unreleased
 
+- **Close the books on a quarter, and have them stay closed.** Define your
+  fiscal periods, and close one when it has been reported and filed: from then
+  on, nothing can be booked into it — not a late receipt, not a payment, not a
+  correction to something that was already there — so the figures you filed on
+  Monday are still the figures on Friday. When something genuinely has to be
+  changed, an admin reopens the period, says why, and closes it again; the
+  reason stays on the period and the whole round trip is in your audit trail.
+  Refusals say exactly what is in the way — which period is closed, and when
+  somebody closed it — rather than failing halfway through issuing a document.
+
 - **Say what a bank line really was, and change your mind.** You can now tick a
   transfer off against any invoice yourself — including one nobody could have
   guessed, one paid years late, and one paid in part, which leaves the rest

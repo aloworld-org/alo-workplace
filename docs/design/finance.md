@@ -105,7 +105,7 @@ read (the rename B3.11 paid for; it is not paid twice).
 | `GET /finance/bank/suggestions?statement=` | the ranked match candidates for every unmatched line — a read, never a write (B4.09c). *As built it is the bulk read, not the per-line one first sketched here: the ranking folds the open ledger once, so asking per line would fold it once per line.* |
 | `POST /finance/bank/lines/{id}/match` · `/unmatch` · `/ignore` · `/unignore` | say what this line settled (which is what creates the payment and its postings), take that back, say it is not ours to book with the reason, or take *that* back (B4.09c) |
 | `GET/POST /finance/rules` · `DELETE /finance/rules/{id}` | the per-tenant learned matching rules, listed and editable because a rule nobody can read is a rule nobody can trust (B4.09b) |
-| `GET /finance/periods` · `POST /finance/periods/lock` · `/unlock` | the fiscal periods and the soft close (B4.10) |
+| `GET /finance/periods` · `POST /finance/periods` · `POST /finance/periods/{id}/close` · `/reopen` | the fiscal periods and the soft close (B4.10). *As built the two acts are named on the period they act on, not on the collection: `/lock` and `/unlock` were first sketched here, but a close is a decision about **one** period — it is what the audit trail records, what a screen shows beside that period, and what a refusal has to name. The list carries the derived `lockDate` beside the periods.* |
 | `GET /finance/reports/pl?from&to` · `.csv` | profit and loss (B4.11a) |
 | `GET /finance/reports/balance?on` · `.csv` | balance sheet at a date (B4.11b) |
 | `GET /finance/reports/aged?on&side=receivable\|payable` · `.csv` | aged receivables and payables (B4.11c) |
@@ -1253,6 +1253,46 @@ work around by backdating the next period, which is worse.
 Named periods are what the reports offer as a period picker and what an
 accountant asks for by name ("is Q2 closed?"); a bare date answers the
 posting question and none of the others.
+
+**As built (B4.10).** Migration 0146 and `fin_periods.rs`, with four decisions
+the sketch above left open:
+
+- **Closed periods are a contiguous prefix, and that is enforced.** Because the
+  lock date is `max(to_date)`, closing Q3 while Q2 was still open would shut Q2
+  too — by arithmetic rather than by anybody's decision. So a close refuses
+  while an earlier period is open (`close the periods in order`), a reopen
+  refuses while a later one is closed (`reopen the periods newest first`), and
+  a period cannot be *defined* wholly inside shut books. Together they make
+  "the books are closed through X" literally true, which is the sentence every
+  refusal says out loud.
+- **One `note` column holds the note of the current state** — what the closer
+  said, or (after a reopen) why it was reopened. A period does not accumulate a
+  history of notes; the audit log is that history, and it already records
+  `finance.period.close` and `finance.period.reopen` with the actor. The reopen
+  reason is **required**, on the same reasoning as the bank line's dismissal
+  (B4.09c): a period that was reported and is open again is the one state an
+  accountant must be able to explain six months later.
+- **Who closed it and when are the period's own state**, unlike the ignore
+  reason where only the sentence is a column. "Is Q2 closed, and by whom?" is a
+  question about the period, answerable without reading a log.
+- **The refusal is one sentence in one place** (`ClosedThrough::refusal`),
+  raised by `post_fin_entry_in` inside the caller's transaction — so the
+  *document act* that would have posted (issuing an invoice into a closed
+  quarter, confirming a bank match against it) is refused whole. It names the
+  period, the day the books are closed through and the day they were closed. In
+  particular it is what a bank **unmatch** now meets: the reversal is dated the
+  original's date on purpose, so when that period is closed the correction is
+  refused rather than silently re-dated into an open one (the open question left
+  by B4.09c).
+
+**Not promised:** a posting already in flight when a close commits still lands.
+The journal reads the lock date inside its own transaction; serialising every
+posting against every close would make the books' hot path queue behind an act
+taken four times a year. The close is a rule about writes that start after it,
+and `created_at` tells that story honestly. **Not built here:** deleting a
+period defined by mistake — the shape of that (what happens to a closed one, to
+one that has been reported) is a decision, not an omission, and no screen needs
+it before B4.13c.
 
 ## The four reports (B4.11)
 

@@ -101,7 +101,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.09a ★ Reconciliation, exact stage: amount+reference matcher; confirm → payment/expense postings; precision tests + no cross-tenant leakage.
 - [x] B4.09b Reconciliation heuristics: windowed matching + per-tenant learned-rules table; fixture precision tests.
 - [x] B4.09c Manual matching: unmatched-line model + match/unmatch routes; wire transcript.
-- [ ] B4.10 Fiscal periods + soft close (postings before lock date → typed error; admin unlock audited).
+- [x] B4.10 Fiscal periods + soft close (postings before lock date → typed error; admin unlock audited).
 - [ ] B4.11a Report: P&L — store query + route + CSV; golden on the seeded year.
 - [ ] B4.11b Report: balance sheet — same contract + goldens.
 - [ ] B4.11c Report: aged receivables/payables — same contract + goldens.

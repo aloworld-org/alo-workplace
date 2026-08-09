@@ -12336,3 +12336,173 @@ and `/projects`. No new top-level prefix this item — the four routes are under
 
 Next item: B4.10 (fiscal periods and the soft close — and the place where the
 reversal's date stops being a free choice).
+
+---
+
+## B4.10 — fiscal periods and the soft close (2026-08-09)
+
+**Shipped.** The books can now be shut, and the shutting is enforced where it
+matters: in `post_fin_entry_in`, the one door the journal has.
+
+- **Migration 0146 `fin_periods`** — `(tenant_id, id, from_date, to_date,
+  status, closed_by, closed_at, note, created_by, created_at)`, inclusive ends,
+  `UNIQUE (tenant_id, from_date)`, a CHECK that `closed` and "closed by somebody
+  at some moment" are one fact, and an index on `(tenant_id, status, to_date
+  DESC)` because every posting reads it. **No lock-date column**: the lock date
+  is `max(to_date)` over the closed periods, derived, because a stored
+  derivation is a second answer waiting to disagree with the first.
+- **`platform/alo-store/src/fin_periods.rs`** — `create_fin_period`,
+  `close_fin_period`, `reopen_fin_period`, `fin_periods`, `fin_period`,
+  `fin_lock_date`, and the `pub(crate)` `fin_closed_through_on` the journal
+  asks inside the caller's transaction. Pure shape rules (`period_span`,
+  `note_text`, `ClosedThrough::refusal`) unit-tested with no database in sight.
+- **The journal refuses.** `post_fin_entry_in` now asks for the lock date in
+  the caller's transaction and returns `Conflict` naming the period, the day
+  the books are closed through and the day they were closed. Because it is in
+  the caller's transaction, the *document act* that would have posted is
+  refused **whole** — proven on the wire below with a bank match that leaves
+  zero entries, zero payments and zero match rows behind, even though the
+  invoice entry it also writes would have been legal on its own.
+- **`products/mail/alo-jmap/src/finance_periods.rs`** — `GET /finance/periods`
+  (any member; carries `lockDate`), `POST /finance/periods`, `POST
+  /finance/periods/{id}/close`, `POST /finance/periods/{id}/reopen` (all
+  `require_admin`). Registered in `server.rs`; the B2.13 middleware needed no
+  change and files them as `finance.period.{create,close,reopen}`.
+
+**Decisions taken here that the design note only left room for** (all written
+into `docs/design/finance.md` as-built):
+
+1. **Closed periods are a contiguous prefix, enforced.** The lock date is a
+   maximum, so closing Q3 while Q2 was open would shut Q2 by arithmetic rather
+   than by anyone's decision. A close refuses while an earlier period is open; a
+   reopen refuses while a later one is closed; a period cannot be *defined*
+   wholly inside shut books (it would show open and accept nothing).
+2. **One `note` column holds the note of the current state** — the closing
+   sentence, or the reopening reason that replaces it. The reopen reason is
+   **required** (the B4.09c precedent); the closing note is not.
+3. **Who closed it and when are the period's own state**, unlike the ignore
+   reason where only the sentence is a column: "is Q2 closed, and by whom?" is a
+   question about the period, and the audit log stays the history.
+4. **Routes are named acts on the period** (`/close`, `/reopen`), not the
+   `/finance/periods/lock` · `/unlock` the note first sketched. A close is a
+   decision about one period — which is what the audit trail records and what a
+   refusal has to name.
+
+**Gates.**
+
+- `cargo fmt` on both crates; `SQLX_OFFLINE=true cargo clippy -p alo-store
+  --all-targets` clean; `cargo clippy -p alo-jmap --lib --bins --test
+  audit_routes` clean.
+- `cargo test -p alo-store` — **782 lib tests + 44 integration binaries, 0
+  failures**, including the new `tests/fin_periods.rs`.
+- `cargo test -p alo-jmap --lib --bins --test audit_http --test audit_routes
+  --test billing_http --test billing_invoice_http --test tenant_isolation
+  --test conformance` — 447 + 44 green. (`--all-targets` still cannot build;
+  see the flag below.)
+- **Wrong-tenant, proven** (`one_tenants_close_never_reaches_another`): B cannot
+  list or read A's periods, gets `NotFound` closing or reopening one, A's period
+  is untouched by the attempts, **A's lock date does not lock B's books** (B
+  posts freely into the dates A has shut), and B may define the very same
+  quarter as its own.
+
+**Verified — on the wire.** Local debug `alo-jmap` against docker `alo-pg`,
+tenants bootstrapped with `identityctl bootstrap-admin`.
+
+The four new routes:
+
+```
+GET  /finance/periods                        (no token) → 401
+GET  /finance/periods                                   → 200 {"lockDate":null,"periods":[]}
+POST /finance/periods {}                                → 422 "fromDate is required: a fiscal
+                                                              period is two days"
+POST /finance/periods {fromDate:"2026-13-01",…}         → 422 "must be a day of the form YYYY-MM-DD"
+POST /finance/periods Q1 / Q2                           → 200 twice, status open, note ""
+POST /finance/periods {2026-03-31 … 2026-04-30}         → 409 "overlaps 2026-01-01 – 2026-03-31,
+                                                              which already exists"
+POST /finance/periods/{Q2}/close                        → 409 "close the periods in order:
+                                                              2026-01-01 – 2026-03-31 is still open,
+                                                              and closing this one would shut it too"
+POST /finance/periods/{Q1}/close {note:"filed with…"}   → 200 closed, closedBy + closedAt set
+GET  /finance/periods                                   → 200 lockDate 2026-03-31
+POST /finance/periods/{Q1}/close (again)                → 409 "is already closed"
+POST /finance/periods/{Q1}/reopen {note:"   "}          → 422 "say why this period is being reopened…"
+POST /finance/periods/{Q1}/reopen {note:"the January
+     rent invoice arrived late"}                        → 200 open, close cleared whole, note replaced
+GET  /finance/periods                                   → 200 lockDate null again
+POST /finance/periods/no-such-id/close                  → 404
+GET  /audit?entity=finance.period:{Q1}                  → three entries, newest first:
+     finance.period.reopen / .close / .create, each with the actor's address
+```
+
+The load-bearing arc — a document act meeting shut books (fresh tenant, chart
+seeded in SQL, invoice INV-2026-00001 for €1 210.00, one CSV bank line booked
+2026-07-15):
+
+```
+POST /finance/periods {2026-07-01 … 2026-07-31} → close → 200, lockDate 2026-07-31
+POST /finance/bank/lines/{L}/match {invoiceId, amountCents:121000}
+        → 409 "the books are closed through 2026-07-31: an entry dated 2026-07-15
+               falls in the period 2026-07-01 – 2026-07-31, which was closed on
+               2026-08-09. Reopen that period to post into it."
+   db: fin_entries 0, billing_payments 0, bank_matches 0 — refused WHOLE, although
+       the invoice's own entry (dated today, outside July) would have been legal
+   GET /finance/bank/lines?status=unmatched → the line is still there
+POST /finance/periods/{JUL}/reopen {note:"the payment landed after we filed"} → 200
+POST …/match (again)                            → 200, invoiceBookedNow=true
+   db: two entries — 2026-07-15 payment, 2026-08-09 invoice — and one payment
+POST /finance/periods/{JUL}/close {note:"refiled"} → 200
+POST /finance/bank/lines/{L}/unmatch             → 409, the same sentence
+   db: still two entries — the reversal is dated the original's day on purpose, so
+       a closed period refuses the correction rather than silently re-dating it
+```
+
+That last exchange **answers the open question B4.09c left**: a locked period
+does not re-date a reversal, it refuses it, and the person decides whether to
+reopen.
+
+**Cuts, named.**
+
+- **No `DELETE /finance/periods/{id}`.** What happens to a closed one, or to one
+  a report has already been run for, is a decision rather than an omission, and
+  no screen needs it before B4.13c.
+- **No period *name*.** The design's column list has none; a period is its two
+  dates, which is what a picker shows and what every refusal says.
+- **The close does not serialise against postings in flight.** A posting whose
+  transaction started before the close commits still lands; serialising the
+  books' hot path behind an act taken four times a year is the wrong trade, and
+  `created_at` shows an entry written after a close it follows. Written into the
+  module header and the design note rather than left implicit.
+- **No screen** — B4.13c, which is also where `fr`/`nl` for these strings lands.
+
+**FLAG for the human / next items.**
+
+1. **`tests/site_notify.rs` still does not compile on `main`** — unchanged from
+   B4.09c: the sites track's commit 18a7771 added a third parameter
+   (`analytics_secret`) to `alo_sites::serve::AppState::new` and did not update
+   that test, which lives under `products/mail/alo-jmap/tests/`. It is the other
+   track's area, so this loop did not touch it, and `cargo test -p alo-jmap
+   --all-targets` still cannot build. **Second iteration blocked by this; the
+   sites loop should fix it.**
+2. **The audit-vocabulary golden was already stale on `main`** and is fixed in
+   this commit: B4.09c added the four `finance.bank.lines.*` actions without
+   pasting them into `EXPECTED_VOCABULARY` in
+   `products/mail/alo-jmap/tests/audit_routes.rs`, so that test was red before
+   this item started. It now carries those four plus this item's three
+   `finance.period.*`. Worth knowing that this golden is the one test a new
+   route breaks and the `--lib --bins` shortcut above hides.
+3. **There is still no HTTP door that seeds a tenant's chart of accounts** —
+   unchanged from B4.09c, and this item's arc paid the cost again (four
+   `INSERT`s in SQL). Whichever of B4.11a–d or B4.13c lands first should give
+   `GET /finance/accounts` the first-use seed.
+4. **i18n**: the new refusals (`close the periods in order`, `reopen the periods
+   newest first`, `say why this period is being reopened`, `the books are closed
+   through …`) are store-side English, like the rest of B4's, and want the same
+   treatment at the wave review.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item — the four routes are under
+`/finance`, which is already on that list.
+
+Next item: B4.11a (the P&L over the journal — the first report that reads a
+period, and the first customer of the picker this item just built).
