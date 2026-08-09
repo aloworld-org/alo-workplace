@@ -49,8 +49,27 @@ WebSocket layer, no second pipe.
   first time a delete races an insert. The permitted emoji live in the store
   (`REACTIONS`), not in a `CHECK`, so growing the set is a release rather
   than a migration on every tenant's database.
-- `chat_attachments` — message_id → **Drive node id**: a pointer, never a
-  copy (the Spaces precedent; one storage, per ADR 0038).
+- `chat_attachments` — tenant_id, channel_id, message_id, node_id, position.
+  A **pointer to a Drive node, never a copy** (one storage, ADR 0038;
+  following alo Finance's `receipt_node_id` and alo Base's node reference).
+  No FK to `drive_nodes`, deliberately: a file may be deleted, trashed or
+  moved out of reach, and a foreign key would either block that or cascade a
+  message's history away.
+
+  Access is checked **twice**. On the way in, `drive_require_read` — you may
+  only share a file you can already open, and the check runs *before* the
+  message is written, so a refused share leaves no message behind. On the way
+  out, every pointer is re-resolved through Drive's access check and dropped
+  if it no longer resolves. The second check is what alo Base does and what
+  finance does not need: finance returns a bare node id, which discloses
+  nothing, while a chat attachment shows the file's **name**. A single
+  write-time check would leave that name on display in a room long after the
+  reader lost the right to it.
+
+  Name, size and content type are read live from Drive rather than stored, so
+  a renamed file shows its current name, and a trashed one says it is trashed
+  instead of vanishing (a colleague saying "I trashed that" is information).
+  At most 10 files per message: a conversation is not a folder.
 - `chat_mentions` — tenant_id, channel_id, message_id, **seq**, user_id.
   Written at post time so "is there something here for me?" — asked on every
   sidebar draw — is an index lookup rather than a text scan of every body.
