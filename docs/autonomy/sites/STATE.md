@@ -1187,3 +1187,49 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   from the repository root and selected an unconfigured package; the correct
   web-workspace run is the recorded 17/17 result.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.18 — tenant-safe blog post model and routes (2026-08-09)
+
+- **Shipped:** alo Sites now stores a blog post as public metadata around one
+  existing alo Docs document: slug, title, excerpt, optional cover image,
+  draft/published state and publication time. Authenticated list, create, read,
+  full-metadata update, publish, unpublish and delete routes are wired. Deleting
+  a post deliberately leaves its source document in Drive.
+- **Boundary:** the account door accepts only a readable, non-trashed Drive
+  node of kind `doc`; copied foreign-tenant and inaccessible personal-document
+  ids resolve exactly like missing ids. Composite database foreign keys keep
+  site and document references inside the row's tenant, cover images must be
+  image-typed blobs owned by that tenant, and every read/write scopes by tenant
+  plus site plus post. The dedicated store proof and the HTTP suite's complete
+  wrong-tenant barrage cover the boundary.
+- **Verified:** targeted rustfmt; `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo
+  clippy -p alo-store --all-targets --jobs 1 -- -D warnings` and the equivalent
+  `alo-jmap` gate clean; focused store tenancy, blog route lifecycle and
+  mandatory wrong-tenant tests green; authoritative full `cargo test -p
+  alo-store -p alo-jmap --jobs 1` green, including all integration and doc
+  tests (15 Sites HTTP tests). After rebasing over two new migrations, a clean
+  isolated local database was migrated through the renumbered `0138` post
+  schema and the store, route lifecycle and wrong-tenant proofs passed again.
+  The first complete-suite attempt hit Windows
+  linker `LNK1318` in an unrelated Billing test executable; per the machine
+  rule only `target/debug/incremental` was removed, and the untouched retry is
+  the recorded green gate.
+- **Wire transcript:** after confirming no stale `alo-jmap.exe`, a freshly
+  built local server ran on 127.0.0.1:8080 against docker `alo-pg` / database
+  `alo`. Real PKCE authorize returned 303 and token exchange 200; registering a
+  Drive doc, creating a site, creating its post, publishing it and reading it
+  each returned 200. The returned post was `published` and retained the exact
+  source document id; an invented site returned 404. No production host,
+  external AI, outbound email or committed secret was used.
+- **Design references:** WordPress and Ghost's post metadata reflex, with the
+  alo Docs body kept as the sole editable source. The route shape keeps the
+  future editor's core draft/publish actions direct and visible rather than
+  menu-gated (UX laws 1, 2, 6 and 12).
+- **Cuts/flags:** this slice is the model and authenticated contract only. The
+  public blog index, post renderer, RSS feed and editor surface remain their
+  own queued slices. Main introduced migrations 0136 and 0137 while this item
+  was in flight, so the post migration was moved to 0138 before landing. A
+  first focused test invocation inherited the harness's
+  historical 5433 fallback and timed out; the mandated explicit local 5432
+  URL was then used for every authoritative database gate.
+- **Next:** the first unchecked item in `QUEUE.md`.

@@ -31,7 +31,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.16c2 Form auto-create on section add: adding a contact_form section in the editor creates/links the form record; wire transcript of the complete arc (add section → public POST → submission row → owner-inbox notification).
 - [x] S1.17a Submissions UI, list: per-site list with view + mark-handled; wire-verified.
 - [x] S1.17b Submissions UI, export: CSV export; wire-verified.
-- [ ] S1.18 Blog model: `site_posts` (doc node ref, slug, title, excerpt, cover blob, published_at, status) + store + routes + tests (a post can only reference the tenant's own doc).
+- [x] S1.18 Blog model: `site_posts` (doc node ref, slug, title, excerpt, cover blob, published_at, status) + store + routes + tests (a post can only reference the tenant's own doc).
 - [ ] S1.19a BlockNote→HTML core: paragraphs, headings, lists, quotes — goldens from real doc fixtures.
 - [ ] S1.19b BlockNote→HTML rich: images, code, equations-fallback + the XSS-safety tests (script content never renders live).
 - [ ] S1.20a Blog pages on alo-sites: post pages + /blog index cards; goldens.

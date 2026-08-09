@@ -6,6 +6,12 @@ contracts.
 
 ## Unreleased
 
+- **Turn an alo document into a website article without copying its words.**
+  A website can now keep draft or published blog metadata around a document in
+  Drive: its address, title, excerpt, cover image and publication time. The
+  document remains the single source of truth, and removing an article never
+  removes the document it came from.
+
 - **Take website enquiries into any spreadsheet in one click.** The visible
   Export CSV button in a site's Submissions inbox downloads every visitor
   message with its form, sender, received time and handled state. Commas and
