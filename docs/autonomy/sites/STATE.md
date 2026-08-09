@@ -1535,3 +1535,50 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   uploads per page. The existing hero and theme-logo surfaces cover the common
   one-click path without creating a second asset lifecycle.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.23 — privacy-preserving public traffic collection (2026-08-09)
+
+- **Shipped:** successful public HTML GETs now add one hit to a daily
+  site/path/referrer-domain aggregate. A deployment-secret HMAC turns the
+  transient proxy/peer address into a 32-byte day-separated visitor token,
+  so repeat visits increment hits without incrementing daily uniques.
+  Conditional 304 page loads count; assets, feeds, crawler files, failures,
+  HEAD requests and form submissions do not.
+- **Privacy boundary:** request query strings are discarded with URI path
+  canonicalization; `Referer` is reduced to its lowercase DNS domain; user
+  agent is never read; the transient address is consumed synchronously by
+  HMAC before any async or storage boundary. The two new tables contain only
+  tenant/site/day/path/referrer-domain counters and opaque 32-byte visitor
+  tokens—no IP, UA, raw referrer, query, header or request-body columns.
+  Analytics writes are best effort and cannot turn a metrics problem into a
+  public-site outage.
+- **Tenancy:** the write accepts a private `PublishedSite` resolved from the
+  Host and has no tenant argument. Every aggregate and visitor-set key uses
+  that value's private tenant/site pair. The mandatory wrong-tenant test loads
+  the same transient visitor through two different live Hosts and proves each
+  tenant receives only its own aggregate.
+- **Verified:** targeted rustfmt; strict `SQLX_OFFLINE=true
+  CARGO_INCREMENTAL=0 cargo clippy -p alo-store -p alo-sites --all-targets
+  --jobs 1 -- -D warnings` clean; exact-tree `cargo test -p alo-store -p
+  alo-sites --jobs 1` green, including all Sites banks, the 717-test store
+  unit bank and every store integration suite. The new real-Postgres test
+  proves two same-day hits become one unique, schema columns match a strict
+  allow-list, raw request values are absent, and Host tenants stay isolated.
+- **Wire transcript:** after killing stale `alo-jmap.exe` and `alo-sites.exe`,
+  the freshly built binary ran on `127.0.0.1:8081` against docker `alo-pg` on
+  5432 and `C:/dev/Ficina/.localdev/blobs`. A real curl to a freshly published
+  fixture Host, carrying an address, private referrer path/query, user agent
+  and page query, returned `200 text/html`, the expected ETag/cache headers
+  and `nosniff`; the server was stopped. No production host, external AI,
+  outbound email or committed secret was used.
+- **Design and operations:** analytics is invisible automatic infrastructure,
+  so it adds no menu or click to the publishing task. Operators must provide
+  a unique `ALO_SITES_ANALYTICS_SECRET` of at least 32 bytes; it is validated
+  at startup and never stored. The first binary-build attempt exposed an
+  actually full C: volume after the broad store test bank; package-scoped
+  `cargo clean -p alo-sites` removed only 2.6 GiB of regenerable artifacts,
+  after which the prescribed retry and live wire check passed.
+- **Cuts/flags:** collection intentionally stores no event stream, geographic
+  data, device data or tracking cookie. S1.24 owns authenticated aggregate
+  reads and the visible no-cookie explanation.
+- **Next:** the first unchecked item in `QUEUE.md`.

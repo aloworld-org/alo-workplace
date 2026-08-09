@@ -1,5 +1,5 @@
 //! Thin binary entry point of the public alo-sites service: read config
-//! from the environment, open the read-only public store door, serve. All
+//! from the environment, open the narrow public store door, serve. All
 //! logic lives in the library (`alo_sites::serve`). This process is the
 //! anonymous, internet-facing side of alo Sites — it runs no migrations
 //! (the authenticated `alo-jmap` service owns the schema) and can be
@@ -39,7 +39,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let store = SitePublicStore::connect(&config.database_url, blobs)
         .await
         .map_err(|_| "cannot connect to the database")?;
-    let state = AppState::new(store, config.sites_domain.clone());
+    let state = AppState::new(
+        store,
+        config.sites_domain.clone(),
+        config.analytics_secret.as_bytes(),
+    );
     let listener = tokio::net::TcpListener::bind(config.addr).await?;
     tracing::info!(addr = %config.addr, sites_domain = %config.sites_domain, "alo-sites listening");
     // ConnectInfo gives the form rate limiter a per-peer fallback key when

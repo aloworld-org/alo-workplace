@@ -1,6 +1,7 @@
 //! Environment configuration of the public serving binary.
 //!
-//! - `DATABASE_URL` — the Postgres system of record (required; read-only use).
+//! - `DATABASE_URL` — the Postgres system of record (required; narrow public
+//!   reads plus privacy-reduced analytics and contact-form writes).
 //! - `SITES_DOMAIN` — the apex the service resolves subdomain hosts under,
 //!   e.g. `alosites.example` makes `acme.alosites.example` serve the site
 //!   with subdomain `acme` (required; the name is the contract used across
@@ -10,6 +11,8 @@
 //!   the name matches `alo-jmap`'s).
 //! - `ALO_SITES_ADDR` — internal bind address (default `0.0.0.0:8081`; TLS
 //!   is terminated by the front proxy).
+//! - `ALO_SITES_ANALYTICS_SECRET` — at least 32 bytes of deployment secret,
+//!   used only for daily-separated visitor HMACs (required).
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -50,6 +53,8 @@ pub struct ServeConfig {
     pub blob_dir: PathBuf,
     /// The bind address.
     pub addr: SocketAddr,
+    /// Secret for daily visitor HMACs; never written to analytics storage.
+    pub analytics_secret: String,
 }
 
 impl ServeConfig {
@@ -78,11 +83,19 @@ impl ServeConfig {
             name: "ALO_SITES_ADDR",
             reason: format!("`{addr}` is not a host:port address"),
         })?;
+        let analytics_secret = require("ALO_SITES_ANALYTICS_SECRET")?;
+        if analytics_secret.len() < 32 {
+            return Err(ConfigError::Invalid {
+                name: "ALO_SITES_ANALYTICS_SECRET",
+                reason: "must be at least 32 bytes".to_owned(),
+            });
+        }
         Ok(Self {
             database_url,
             sites_domain,
             blob_dir,
             addr,
+            analytics_secret,
         })
     }
 }

@@ -20,6 +20,7 @@
 //!   site's themed not-found. Both `404`, `no-cache`.
 //! - Database trouble → `503` with a static line, `Retry-After: 10`.
 
+mod analytics;
 mod blog;
 mod cache;
 pub mod config;
@@ -52,19 +53,26 @@ pub struct AppState {
     unknown_host: String,
     /// Per-client budget on the form-submit path (in-memory, transient).
     rate: rate::RateLimiter,
+    /// Secret-keyed visitor hashing. Raw identifiers never cross storage.
+    analytics: analytics::VisitorHasher,
 }
 
 impl AppState {
     /// Wires the service state: the public store door and the apex domain
     /// (already lowercase, from [`ServeConfig`]).
     #[must_use]
-    pub fn new(store: SitePublicStore, sites_domain: String) -> Arc<Self> {
+    pub fn new(
+        store: SitePublicStore,
+        sites_domain: String,
+        analytics_secret: impl AsRef<[u8]>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             store,
             sites_domain,
             cache: cache::SiteCache::default(),
             unknown_host: rendered::unknown_host_not_found(&EN),
             rate: rate::RateLimiter::default(),
+            analytics: analytics::VisitorHasher::new(analytics_secret),
         })
     }
 }
@@ -150,6 +158,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     let raw = req.uri().path();
     let trimmed = raw.trim_end_matches('/');
     let path = if trimmed.is_empty() { "/" } else { trimmed };
+    let analytics_visit = analytics::capture(&state, &req);
 
     let base_url = format!("https://{sub}.{}", state.sites_domain);
     if path == "/robots.txt" {
@@ -224,7 +233,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     }
 
     if path == "/blog" || path.starts_with("/blog/") {
-        return blog::serve(
+        let response = blog::serve(
             &state,
             &resolved,
             &sub,
@@ -233,6 +242,8 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
             site.not_found.clone(),
         )
         .await;
+        return analytics::record_html_view(&state, &resolved, path, analytics_visit, response)
+            .await;
     }
 
     let (content_type, body) = if path == "/assets/site.css" {
@@ -247,9 +258,12 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     // Strong ETag: bytes are a pure function of (publish, path).
     let etag = format!("\"{}:{path}\"", site.publish.as_str());
     if if_none_match_hits(req.headers().get(header::IF_NONE_MATCH), &etag) {
-        return cacheable(StatusCode::NOT_MODIFIED, content_type, &etag, String::new());
+        let response = cacheable(StatusCode::NOT_MODIFIED, content_type, &etag, String::new());
+        return analytics::record_html_view(&state, &resolved, path, analytics_visit, response)
+            .await;
     }
-    cacheable(StatusCode::OK, content_type, &etag, body)
+    let response = cacheable(StatusCode::OK, content_type, &etag, body);
+    analytics::record_html_view(&state, &resolved, path, analytics_visit, response).await
 }
 
 /// Serves one referenced image blob. Bytes are immutable per blob id

@@ -37,7 +37,11 @@ async fn harness() -> (Store, Arc<AppState>) {
     let blobs = BlobStore::in_memory(25 * 1024 * 1024);
     let store = Store::new(pool.clone(), blobs.clone());
     store.migrate().await.expect("run migrations");
-    let state = AppState::new(SitePublicStore::new(pool, blobs), APEX.to_owned());
+    let state = AppState::new(
+        SitePublicStore::new(pool, blobs),
+        APEX.to_owned(),
+        b"form-submit-tests-analytics-secret",
+    );
     (store, state)
 }
 
