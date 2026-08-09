@@ -14,7 +14,7 @@
 //! still lands in the header region — the document stays valid and navigable
 //! for assistive technology, which outranks literal ordering.
 
-mod html;
+pub(crate) mod html;
 mod script;
 mod sections;
 mod strings;

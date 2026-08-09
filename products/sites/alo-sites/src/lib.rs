@@ -31,6 +31,7 @@
 //! toggle + form submit) is a static block **inlined** in the document, not a
 //! fourth path — see `render::script`.
 
+pub mod blocknote;
 pub mod render;
 pub mod serve;
 pub mod stylesheet;

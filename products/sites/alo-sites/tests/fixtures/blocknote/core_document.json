@@ -1,0 +1,159 @@
+[
+  {
+    "id": "7c4f6871-2cc0-4b76-987a-8d40a5d767f0",
+    "type": "heading",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "level": 1
+    },
+    "content": [
+      { "type": "text", "text": "A field guide to calm work", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "id": "327bdc64-0a19-4e6f-a9ab-2f19639c99b3",
+    "type": "paragraph",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+    },
+    "content": [
+      { "type": "text", "text": "Great work is ", "styles": {} },
+      { "type": "text", "text": "clear & deliberate", "styles": { "bold": true, "italic": true } },
+      { "type": "text", "text": ", not <loud>.", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "id": "628ec779-8384-447f-952f-e69a9924e158",
+    "type": "heading",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "level": 2
+    },
+    "content": [
+      { "type": "text", "text": "Start with the essentials", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "id": "5d688921-0896-4fb4-8640-22054be69c03",
+    "type": "bulletListItem",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+    },
+    "content": [
+      { "type": "text", "text": "Choose one useful outcome", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "id": "d97c5dda-1f0b-4e5d-a6ca-45d267c69ab9",
+    "type": "bulletListItem",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+    },
+    "content": [
+      { "type": "text", "text": "Make the next step visible", "styles": {} }
+    ],
+    "children": [
+      {
+        "id": "bb61f555-3e03-4fe0-b163-3925a8500cc6",
+        "type": "bulletListItem",
+        "props": {
+          "textColor": "default",
+          "backgroundColor": "default",
+          "textAlignment": "left"
+        },
+        "content": [
+          { "type": "text", "text": "Keep supporting detail nested", "styles": {} }
+        ],
+        "children": []
+      }
+    ]
+  },
+  {
+    "id": "32e81bba-2aab-4442-b768-13f7179d8ca3",
+    "type": "numberedListItem",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "start": 3
+    },
+    "content": [
+      { "type": "text", "text": "Draft", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "id": "84b629bd-b89f-47db-9b06-a6ca29daf519",
+    "type": "numberedListItem",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+    },
+    "content": [
+      { "type": "text", "text": "Review", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "id": "90ed5343-cfec-40d1-b0c3-4ca3de40136b",
+    "type": "checkListItem",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "checked": true
+    },
+    "content": [
+      { "type": "text", "text": "Publish", "styles": { "strike": true } }
+    ],
+    "children": []
+  },
+  {
+    "id": "757229e7-476b-4e6c-8412-ebf1104b39dc",
+    "type": "quote",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default"
+    },
+    "content": [
+      { "type": "text", "text": "Good tools make the right action obvious.", "styles": {} }
+    ],
+    "children": []
+  },
+  {
+    "id": "ac9d2342-d052-455f-a6dd-c0d0be502fb9",
+    "type": "paragraph",
+    "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+    },
+    "content": [
+      { "type": "text", "text": "Read the ", "styles": {} },
+      {
+        "type": "link",
+        "href": "https://example.com/guide?from=alo&part=1",
+        "content": [
+          { "type": "text", "text": "full guide", "styles": { "underline": true } }
+        ]
+      },
+      { "type": "text", "text": ".", "styles": {} }
+    ],
+    "children": []
+  }
+]

@@ -6,6 +6,11 @@ contracts.
 
 ## Unreleased
 
+- **Write a website article once, in alo Docs, and keep its structure.** Blog
+  rendering now turns document paragraphs, headings, quotes, links, bulleted
+  and numbered lists, nested lists, and checklists into clean semantic web
+  content. Bold, italic, underline and strikethrough text carry across too.
+
 - **Turn an alo document into a website article without copying its words.**
   A website can now keep draft or published blog metadata around a document in
   Drive: its address, title, excerpt, cover image and publication time. The

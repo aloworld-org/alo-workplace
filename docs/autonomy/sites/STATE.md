@@ -1233,3 +1233,37 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   historical 5433 fallback and timed out; the mandated explicit local 5432
   URL was then used for every authoritative database gate.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## S1.19a — BlockNote core document renderer (2026-08-09)
+
+- **Shipped:** `alo-sites` now turns the exact BlockNote JSON persisted by alo
+  Docs into a semantic HTML fragment without loading a browser editor runtime.
+  Paragraphs, heading levels, quotes, adjacent and nested bullet/numbered
+  lists, checklists, links and the four core inline marks render directly. A
+  captured BlockNote 0.52 document fixture and checked-in HTML golden lock the
+  interchange contract.
+- **Safety and compatibility:** all text uses the existing Sites HTML escape
+  primitive and links reuse its protocol allowlist, so a scriptable URL becomes
+  inert. Unknown future block kinds never become trusted markup; the renderer
+  skips the unknown surface but still walks safe child blocks. Invalid JSON and
+  a non-array document root return typed errors instead of partial output.
+- **Verified:** targeted rustfmt; `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo
+  clippy -p alo-sites --all-targets --jobs 1 -- -D warnings` clean; focused
+  BlockNote golden green; authoritative full `cargo test -p alo-sites --jobs
+  1` green against the required local Postgres on 5432: 7 unit tests, the new
+  golden, all 6 form tests, 3 render goldens, 15 render safety tests, 5
+  Host-isolation/service tests, 5 stylesheet tests and doc tests. No storage or
+  HTTP contract changed in this item, so no new wire route or tenant door was
+  introduced.
+- **Design references:** BlockNote's own 0.52 JSON fixtures define the source
+  shape; Google Docs and Word define the expectation that headings and nested
+  lists retain document hierarchy; semantic HTML and the existing alo Sites
+  renderer define the public output.
+- **Cuts/flags:** rich images, code and equation fallback plus the broader XSS
+  corpus remain S1.19b. The Windows runner first had a stale `alo-sites.exe`,
+  then exhausted the PDB limit and C: drive with 54.4 GiB of reproducible Rust
+  target artifacts. The stale process was stopped, only generated `target`
+  output was cleaned, and the authoritative full test used zero debug symbols.
+  An initial database-backed full test inherited the old 5433 fallback; the
+  explicit required 5432 rerun above is the recorded green gate.
+- **Next:** the first unchecked item in `QUEUE.md`.
