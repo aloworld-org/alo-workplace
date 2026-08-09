@@ -10956,3 +10956,164 @@ at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
 
 Next item: B4.06b (the upload route: `POST /finance/receipts` returning these
 parsed fields for confirmation, and the confirmed→expense create path).
+
+## 2026-08-09 — B4.06b the confirm path: a receipt is read, and a person decides what it said
+
+**Shipped.** Two files and three additive lines, and the whole of it is one
+sentence: *a receipt in Drive can now be read into candidate fields, and the
+claim that follows is what a human confirmed.*
+
+- `platform/alo-store/src/fin_receipt_read.rs` —
+  `AccountStore::read_receipt(node, today) -> ReceiptReading`. Reads the node
+  through `drive_node` (the same door the Drive UI uses), pulls the blob, runs
+  `extract::extract_text` on the blocking pool, and hands the text to
+  `fin_receipt::default_extractor()`. Returns the file it read (name, media
+  type, size), whether there was **any** text in it, and the candidates.
+  `MAX_RECEIPT_BYTES` is Drive's own index ceiling, 12 MB.
+- `products/mail/alo-jmap/src/finance_receipts.rs` — `POST /finance/receipts`
+  `{"nodeId"}` → `{"receipt": {nodeId, filename, contentType, sizeBytes,
+  textLayer, foundAnything, lines[], fields{merchant, spentOn, grossCents,
+  vatCents, vatRateBp, currency}}}`, each field either `null` or
+  `{value, confidence: high|medium|low, evidence}` where evidence is
+  `{kind:"text", line, start, end}` into the same response's `lines`, or
+  `{kind:"filename"}`.
+- Additive: the `mod`/`pub use` lines, the route in `server.rs`, and
+  `/finance/receipts` in `audit_action::READ_ONLY_POSTS` (+ the test's
+  `DRY_RUNS`) — the second entry that list has ever had.
+
+**Decision 1 — the receipt arrives as a node id, not as bytes.** The queue said
+"upload route" and the note's routes table said "upload a receipt"; both were
+written before there was a Drive upload to reuse. What the note *also* says is
+where a receipt lives: *in Drive under the claimant's own node, referenced by
+id, never copied into a finance table*. A file posted to finance as bytes would
+have to be put somewhere by finance — a second answer to "where do a person's
+files live", with its own quota, naming, folder and permission decisions, in the
+module least entitled to make them. So the upload stays Drive's own two calls
+(`POST /jmap/upload`, `POST /drive/files` — `client.driveUpload()` in the web
+client already does exactly this for task attachments), and finance is given the
+id. Three things fall out of that and each is worth the trade: the route
+**writes nothing at all**, which is the strongest possible reading of "writes no
+expense"; the mandatory isolation test attaches to a real door rather than to a
+new one; and **a claim can only ever cite a file its claimant could already
+open**, because `log_expense`'s `require_links` checks the same node through the
+same door. The as-built paragraph in `docs/design/finance.md` records it, and the
+routes table row now reads `{nodeId}`.
+
+**Decision 2 — a media type we cannot read is a `200`, not the `422` the error
+map promised.** The map's row says "a receipt over the size cap, **or a media
+type we do not read** → 422". The size cap is implemented exactly (and twice:
+the node's declared size before a byte is fetched, the blob's real length
+after). The media type is not, deliberately: a phone photograph *is* a media
+type we cannot read, it is the **ordinary** case until an AI backend is wired,
+and `fin_receipt`'s own header already settles that an image with no text layer
+is "a valid input with an empty answer". Refusing it would make photographing a
+till roll an error. So the answer is `200` with `textLayer: false` and whatever
+the file *name* gave up — which for `REWE_2026-03-14.jpg` is a merchant and a
+date, both at `low` confidence with `evidence.kind = "filename"`. That row was
+written for an upload door this route does not have; the note now says so.
+`textLayer` and `foundAnything` are two separate facts for the same reason: "we
+read this and it says nothing" and "there was nothing here to read" are
+different sentences to show a person.
+
+**Decision 3 — one route, no new confirm verb.** "Confirmed → expense creation"
+is `POST /finance/expenses`, unchanged since B4.05a. A `POST
+/finance/receipts/confirm` would be a second create path for one record, with a
+second set of validation and a second chance to disagree with the first about
+what a claim may say. The client fills the create form from `fields` and posts
+it; if the person corrects the total, the corrected total is what is stored,
+because nothing else was ever stored.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+alo-jmap --all-targets` clean (zero warnings); `cargo test -p alo-store` and
+`cargo test -p alo-jmap` green against the local docker postgres — 677 alo-jmap
+tests including the 5 new route-shape tests, the audit-vocabulary test (which
+proves `/finance/receipts` files **no** action) and `audit_routes`' every-route
+sweep; plus `tests/fin_receipt_read.rs`, 5 new integration tests.
+
+**The isolation proof** (`tests/fin_receipt_read.rs`, and again on the wire):
+tenant B's handle reading tenant A's receipt node is a clean `NotFound`/`404`,
+and **a colleague inside the same tenant is exactly as blind** — a receipt lives
+in the claimant's personal Drive and this path reads it through the door that
+enforces that. The claimant themself still reads it, so the denial is about who
+is asking. A `NewExpense` citing a foreign node is a `404` from `require_links`
+on the wire too.
+
+The wire transcript — real curl, the debug `alo-jmap` on 127.0.0.1:8080 over
+docker `alo-pg`, two bootstrapped tenants (`b406bwire`, `b406bwireb`), tokens
+from the first-party password grant.
+
+```
+POST /finance/receipts   (no bearer)            → 401 "missing or invalid bearer token"
+POST /finance/receipts   nodeId=x (not JSON)    → 400 "malformed request body"
+POST /finance/receipts   {}                     → 422 "nodeId is required: upload the
+                                                       receipt to Drive first, then read it"
+POST /finance/receipts   {"nodeId":"  "}        → 422 (same)
+POST /finance/receipts   unknown node           → 404 "not found"
+POST /finance/receipts   {a folder}             → 422 "a receipt is a file: that Drive
+                                                       item holds no bytes to read"
+
+POST /jmap/upload/{acct} the till roll (112 B)  → 200  blobId
+POST /drive/files        REWE_2026-03-14.txt    → 200  nodeId
+POST /finance/receipts   {that node}            → 200  textLayer true, foundAnything true,
+                                                       8 lines
+    merchant    'REWE Markt GmbH'  high   lines[0][0:15]  = 'REWE Markt GmbH'
+    spentOn     '2026-03-14'       high   lines[3][6:16]  = '14.03.2026'
+    grossCents  1190               high   lines[6][10:15] = '11,90'
+    vatCents    190                high   lines[7][9:13]  = '1,90'
+    vatRateBp   1900               high   lines[7][5:7]   = '19'
+    currency    'EUR'              high   lines[6][6:9]   = 'EUR'
+
+POST /finance/receipts   {a .jpg, 21 B}         → 200  textLayer FALSE, lines [],
+                                                       merchant 'REWE' / spentOn
+                                                       '2026-03-14' both low, evidence
+                                                       kind "filename"; grossCents,
+                                                       vatCents, vatRateBp, currency null
+POST /finance/receipts   {A's node} as tenant B → 404 "not found"
+
+POST /finance/expenses   the confirmed fields   → 200  netCents 1000 (server's own
+                                                       subtraction), status draft,
+                                                       editable true, receiptNodeId = the
+                                                       node that was read
+GET  /finance/expenses/{id}                     → 200  receiptNodeId == node A
+POST /finance/receipts   {that node} a 3rd time → 200  (same answer)
+GET  /finance/expenses?from&to                  → 200  ONE claim after three readings —
+                                                       one per confirmation, none per read
+POST /finance/expenses   receiptNodeId = a
+                         foreign node, tenant B → 404 "not found"
+GET  /audit?entity=finance.expense:{id}         → 200  ['finance.expense.create'] — the
+                                                       three readings filed nothing
+```
+
+The row read back in psql: `spent_on 2026-03-14, merchant 'REWE Markt GmbH',
+gross 1190, vat 190, rate 1900, EUR, personal, draft`, joined to its
+`drive_nodes` row `REWE_2026-03-14.txt / text/plain`. `audit_log` for that
+tenant holds exactly one line: `finance.expense.create`.
+
+**Cuts, named.**
+
+- **No web surface.** B4.13a is the expenses screen; this item is the route it
+  will call. The client-side pieces it will need are already there
+  (`client.driveUpload()` returns the node id `POST /finance/receipts` wants),
+  so nothing was left half-built — there is simply no button yet.
+- **No CHANGELOG line**, for the third item running: still nothing a person can
+  see. The wave's first user-voice line lands with B4.13a, as B4.05a predicted.
+- **No `today` from the client.** The reading uses the server's own date
+  (`billing_document::today()`, the suite's convention since B1), so a browser
+  with a wrong clock cannot make a future receipt plausible. The consequence is
+  a receipt bought at 23:40 in Berlin on the 31st can be refused as "not yet
+  happened" for twenty minutes; the person then types the date, which is the
+  same escape hatch every other field has.
+
+**HUMAN FLAG (carried, unchanged since B4.05b):** no queue item wires
+`post_invoice_issue` / `post_payment_settle` / `post_credit_note_issue` into the
+document verbs. Every posting rule is written, golden-tested and unreachable
+from a route, so B4.11's reports will read an empty journal for tenants who have
+been invoicing since B1.
+
+**HUMAN ACTION (carried):** `/finance` needs adding to the production Caddyfile
+at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
+`/projects`. `web/vite.config.ts` already carries it. No new prefix this item.
+
+Next item: B4.07 (mileage claims — the per-tenant per-km rate table,
+effective-dated, and the entry that becomes an ordinary expense at the rate in
+force on the travel date).

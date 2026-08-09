@@ -93,7 +93,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.05a Expenses model: migration + store CRUD (category→account map, project link, method, receipt file ref) + wrong-tenant tests.
 - [x] B4.05b Expense approval flow: submit/approve/reimburse transitions + routes + wire transcript.
 - [x] B4.06a ★ Receipt parsing core: deterministic extractor (vendor/date/amounts/VAT) behind a pluggable trait; fixture receipts prove it; AI backend seam flagged for human wiring.
-- [ ] B4.06b Receipt confirm path: upload route + parsed-fields-for-confirmation response + confirmed→expense creation; wire transcript.
+- [x] B4.06b Receipt confirm path: upload route + parsed-fields-for-confirmation response + confirmed→expense creation; wire transcript.
 - [ ] B4.07 Mileage claims (per-km rate table per tenant, entry → expense).
 - [ ] B4.08a Bank import: CAMT.053 parser (golden files from public samples) → staged `bank_lines`; malformed → typed errors.
 - [ ] B4.08b Bank import: MT940 parser, same contract + goldens.

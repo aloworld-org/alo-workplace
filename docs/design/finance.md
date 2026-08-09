@@ -96,7 +96,7 @@ read (the rename B3.11 paid for; it is not paid twice).
 | `GET/POST /finance/expenses` · `GET/PATCH/DELETE /finance/expenses/{id}` | expense claims — the caller's own through the account door (shipped B4.05b, with the flow that needed them) |
 | `GET /finance/expenses/pending` | **approver-only**: the claims of this tenant awaiting a decision, oldest purchase first, each with its claimant's address and its category's name. A view of the same collection rather than a second one, because the decisions are on the claim itself (B4.05b) |
 | `POST /finance/expenses/{id}/submit` · `/withdraw` · `/approve` · `/reject` · `/reimburse` | the transitions; `submit`/`withdraw` are the claimant's, the last three approver-only (B4.05b) |
-| `POST /finance/receipts` | upload a receipt, get the **parsed fields back for confirmation**. Writes no expense (B4.06b) |
+| `POST /finance/receipts` | read a receipt already in the caller's Drive (`{nodeId}`), get the **parsed fields back for confirmation**. Writes nothing at all, and joins `READ_ONLY_POSTS` (as built, B4.06b) |
 | `GET/POST /finance/mileage` · `DELETE /finance/mileage/{id}` | mileage claims; each becomes an expense at the tenant's per-km rate (B4.07) |
 | `GET/PUT /finance/mileage/rates` | the per-km rate table, effective-dated (B4.07) |
 | `POST /finance/imports/bank` | a statement file (CAMT.053, MT940, or CSV with a mapping) → a statement header and staged lines (B4.08) |
@@ -720,6 +720,27 @@ slice: **IBAN detection** (the expense model has no field for one, so it would
 have been an unreachable reading) and the OCR of a receipt with no text layer,
 which is the AI seam's whole reason for existing.
 
+*As built (B4.06b),* the receipt reaches finance **as a Drive node id, not as
+bytes**: `POST /finance/receipts {"nodeId"}` → the file it read, whether there
+was any text in it, the normalised lines, and one nullable candidate per form
+field (`value`, `confidence`, `evidence`). The upload itself is Drive's own two
+calls (`POST /jmap/upload`, then `POST /drive/files`), which is what this note
+already required of the file — *in Drive under the claimant's own node,
+referenced by id* — and it keeps the module from growing a second answer to
+where a person's files live, with its own quota, naming and permissions. Three
+consequences worth stating: the route **writes nothing at all**, so it joins
+`READ_ONLY_POSTS` (an audit line saying somebody created what they only looked
+at would be a false line in the log); the mandatory isolation test attaches
+here, because the node is read through `drive_node` and a **colleague's**
+private receipt is therefore as absent as another tenant's; and a claim can only
+ever cite a file its claimant could already open. Two readings of the error map
+that the paper forced: a node holding no bytes (a folder) is the `422` its row
+promises, but **a media type we cannot read is a `200` with `textLayer: false`**
+— refusing a photographed till roll would make the ordinary case an error, and
+that row was written for an upload door this route does not have. `MAX_RECEIPT_BYTES`
+is Drive's own index ceiling (12 MB), checked against the node's declared size
+before any byte is fetched *and* against the blob's real length after.
+
 **VAT on an expense is stated, never derived.** A receipt showing €119 with
 19% is entered as gross 119 / VAT 19; a receipt showing only a total is
 entered with VAT 0 and books nothing to `vat_input`. *Rejected: computing the
@@ -1009,6 +1030,9 @@ fin_categories.rs    expense categories and their accounts
 fin_expenses.rs      claims: the account door, the approval transitions
 fin_mileage.rs       the rate table and the claim it becomes
 fin_receipt.rs       the extractor trait + the deterministic implementation
+fin_receipt_read.rs  the tenant-scoped step: a Drive node → its text → the
+                     candidates (added at B4.06b; fin_receipt.rs stays a pure
+                     function from characters to guesses, with no door on it)
 bank_camt.rs         CAMT.053 → ParsedStatement (over billing_xml_tree)
 bank_mt940.rs        MT940 → ParsedStatement
 bank_csv.rs          CSV + mapping → ParsedStatement (over csv_read)
