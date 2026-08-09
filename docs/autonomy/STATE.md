@@ -12506,3 +12506,189 @@ and `/projects`. No new top-level prefix this item — the four routes are under
 
 Next item: B4.11a (the P&L over the journal — the first report that reads a
 period, and the first customer of the picker this item just built).
+
+## B4.11a — the profit and loss (2026-08-09)
+
+**Shipped.** The first of the four reports, and it is what the design note said
+it would be: the journal added up, with no query of its own.
+
+- **`platform/alo-store/src/fin_pl.rs`** — `fin_profit_and_loss(from, to)`,
+  `ProfitAndLoss`, `PlLine`, `comparative_period`. It contains **no SQL**: it
+  calls `fin_trial_balance` twice (the period, then the comparative), reads the
+  tenant's accounting currency, and folds. The fold is a pure function, so
+  every figure it produces is unit-tested with no database in sight.
+- **`products/mail/alo-jmap/src/finance_reports.rs`** — `GET
+  /finance/reports/pl` and `GET /finance/reports/pl.csv`, both `require_admin`,
+  both over one store call so the screen and the file cannot disagree about a
+  cent. Registered in `server.rs`. No new top-level prefix: `/finance` is
+  already on the list (and already in the vite dev proxy).
+- **`products/mail/alo-jmap/src/csv.rs` grew `attachment`** — the four headers
+  every export carries (`attachment`, `nosniff`, `no-store`, a stated charset)
+  existed as **three byte-identical copies** in `billing_reports`,
+  `crm_reports` and `projects_reports`. One file, one reason: they now all
+  serve through `csv::attachment`, whose own test asserts the headers once for
+  every export in alo. The three copies and their duplicated test are gone.
+
+**Three decisions the design note left room for.**
+
+1. **The signs flip once.** The ledger keeps income negative (a credit); a P&L
+   shows revenue and cost as positive amounts and the result as one
+   subtraction. `natural_cents` is the only place that flip happens, so a
+   screen, a CSV and B4.11b cannot each invent their own convention.
+2. **The comparative is derived, not asked for** — the period of the same
+   length ending the day before. A quarter compares against the ninety-two days
+   before it, a year against the year before it, a February against the
+   twenty-eight days that preceded it (calendar length is deliberately not
+   used). *Rejected: a second pair of dates on the request*, which every caller
+   would have to compute, three of them would compute differently, and the one
+   that got it wrong would print two periods of unequal length side by side as
+   though the difference meant something.
+3. **A line appears when either period moved it**, with `postings: 0` saying a
+   zero is real. An account that earned ten thousand last quarter and nothing
+   this one is the line a comparative exists to show; dropping it would hide
+   the fall.
+
+**Admin only, and said out loud.** `/finance/periods` stays readable by any
+member (knowing the books are shut is what stops somebody typing into them),
+but a P&L is the whole tenant's result. `require_admin` now; B4.12's accountant
+role widens that gate additively, which is what the design note already says.
+
+**The first alo export that carries text a user wrote.** An account a tenant
+named `=SUM(A1:A9)` is a formula in Excel and LibreOffice. `csv.rs` deliberately
+does not neutralise every field (a negative amount begins with `-` and must stay
+a number), so the rule lives in `finance_reports::text`, where the text is
+chosen: a leading `'` on the account name only. Proven on the wire below.
+
+**Verified — tests.**
+
+```
+cargo test -p alo-store --lib fin_pl                 11 pure tests, incl. the
+    comparative for a quarter / a year / a single day / February / a leap
+    quarter, the clamp at the beginning of the calendar, the sign flip
+    (i64::MIN included), code order, a loss, and a renamed account
+cargo test -p alo-store --test fin_pl_report         7 golden tests on a seeded
+    year posted through post_fin_entry:
+    a_seeded_year_reports_the_figures_computed_by_hand
+      → 4000 = 100 000 + 50 000 − 10 000 (credit note) = €1 400.00; 4900 =
+        €200.00; income €1 600.00; 6000+6100+6200 = €300.00; result €1 300.00;
+        no balance-sheet account on either side
+    the_year_ends_where_the_period_ends_and_the_year_before_is_the_comparative
+      → the 2027-01-05 invoice is in neither column of 2026; 2027's report
+        carries 2026 as its comparative, and 6000 is a line at zero with
+        postings 0
+    a_quarter_compares_against_the_ninety_days_before_it_not_the_year
+      → Q1 2026 compares against 2025-10-03 … 2025-12-31, not against 2025;
+        Q3 shows revenue of −€100.00 because the credit note falls in it
+    the_result_is_the_trial_balance_it_summarises   (P10's P&L half)
+    one_tenants_year_is_no_part_of_anothers_report  (100× books next door,
+        our report equal line for line before and after)
+    + a backwards period refused, and a tenant that never posted
+cargo test -p alo-jmap --test fin_report_http        6 tests through the real
+    router: both representations of one read, 403 for a member who is not an
+    admin (and 200 for the same person once made one, and 200 on
+    /finance/periods for contrast), 401 with no token, five malformed periods,
+    a period nothing was booked in, and another tenant's result absent from
+    both the JSON and the file
+cargo test -p alo-store                              the whole crate green
+    (every integration binary, exit 0) — the slow honest gate, not a subset
+cargo test -p alo-jmap --lib                         456 passed
+cargo clippy -p alo-store --all-targets              clean
+cargo clippy -p alo-jmap --lib --bins --test fin_report_http   clean
+cargo fmt                                            clean
+```
+
+**Verified — on the wire.** Local debug `alo-jmap` against docker `alo-pg`,
+tenant bootstrapped with `identityctl bootstrap-admin`, chart seeded in SQL (the
+same cost as last time — see the flags):
+
+```
+GET  /finance/reports/pl            (no token)     → 401
+GET  /finance/reports/pl.csv        (no token)     → 401
+GET  ?to=2026-12-31                                → 422 "from is required: a
+                                                          report is always for a
+                                                          stated period"
+GET  ?from=2026-01-01                              → 422 "to is required: …"
+GET  ?from=01/01/2026&to=2026-12-31                → 422 "from must be a date of
+                                                          the form YYYY-MM-DD"
+GET  ?from=2026-12-31&to=2026-01-01                → 422 "the end of the period
+                                                          must not be before its
+                                                          start"   (the store's)
+GET  ?from=2026-01-01&to=2026-12-31 (empty books)  → 200 zeroes, currency EUR,
+                                                     comparative 2025-01-01 …
+                                                     2025-12-31
+POST /billing/customers → /billing/invoices → issue → INV-2026-00001, €1 210.00
+POST /finance/imports/bank?format=csv&account=NL91ABNA0417164300&…  → staged
+POST /finance/bank/lines/{L}/match {121000}        → 200 invoiceBookedNow=true
+  db: 1000 +121000 · 1100 0 · 2100 −21000 · 4000 −100000
+GET  ?from=2026-01-01&to=2026-12-31                → 200 income €1 000.00 (one
+     line, 4000, postings 1), expense 0, result €1 000.00 — the payment moved
+     the balance sheet and left the result exactly where it found it, and the
+     income is the ledger's −100 000 negated
+GET  /finance/reports/pl.csv?…                     → content-type text/csv;
+     charset=utf-8 · content-disposition attachment;
+     filename="profit-and-loss-2026-01-01-to-2026-12-31.csv" · nosniff ·
+     no-store, and the table:
+       row,periodFrom,periodTo,previousFrom,previousTo,currency,accountCode,
+         accountName,amount,previousAmount
+       income,2026-01-01,2026-12-31,2025-01-01,2025-12-31,EUR,4000,Sales,
+         1000.00,0.00
+       incomeTotal,…,1000.00,0.00 / expenseTotal,…,0.00,0.00 / result,…,1000.00
+GET  ?from=2026-07-01&to=2026-09-30                → the invoice's own quarter:
+     €1 000.00, comparative 2026-03-31 … 2026-06-30
+GET  ?from=2026-01-01&to=2026-03-31                → nothing, comparative
+     2025-10-03 … 2025-12-31 (the rolling window, on the wire)
+UPDATE fin_accounts SET name='=SUM(A1:A9)' … then GET …/pl.csv
+                                                   → …,4000,'=SUM(A1:A9),1000.00
+     and the JSON keeps the name verbatim: a screen is not a spreadsheet
+POST /admin/users (a clerk) → GET /finance/reports/pl     → 403 "admin only"
+                              GET /finance/reports/pl.csv → 403
+                              GET /finance/periods        → 200 (the contrast)
+```
+
+**Cuts, named.**
+
+- **No `?compare=` and no comparative of the caller's choosing.** Decision 2
+  above; a year-on-year comparison of a *month* is a different report, and it
+  is the one B4.13c should ask for if a screen wants it.
+- **No drill-down from a line.** `fin_account_ledger` already answers it and
+  B4.13c is where a figure becomes clickable; a route with no screen is a
+  contract we would have to keep.
+- **No `?includeZeroAccounts=`.** An account that never moved in either period
+  is absent, full stop. A hundred-line chart printed in full is a page nobody
+  reads, and the tenant who wants it is asking for a trial balance.
+- **No screen** — B4.13c, which is also where `fr`/`nl` for these strings land.
+
+**FLAG for the human / next items.**
+
+1. **`tests/site_notify.rs` still does not compile on `main`** — unchanged from
+   B4.09c and B4.10: the sites track's commit 18a7771 added a third parameter
+   (`analytics_secret`) to `alo_sites::serve::AppState::new` and never updated
+   that test, which lives under `products/mail/alo-jmap/tests/`. It is the other
+   track's area, so this loop did not touch it. **Third iteration degraded by
+   it**: `cargo clippy/test -p alo-jmap --all-targets` cannot build, so this
+   item gated `--lib --bins` plus its own test target by name (`--test
+   fin_report_http`), which cargo builds independently of the broken sibling.
+   The sites loop should fix it, or a human should.
+2. **There is still no HTTP door that seeds a tenant's chart of accounts** —
+   unchanged from B4.09c and B4.10, and this item's wire arc paid the cost a
+   third time (six `INSERT`s in SQL). Whichever of B4.11b–d or B4.13c lands
+   first should give `GET /finance/accounts` the first-use seed; the store side
+   (`fin_accounts_or_seed`) has been ready since B4.02.
+3. **The three remaining reports are folds of the same shape** and should reuse
+   this item's furniture rather than re-derive it: `PeriodQuery`/`day` for the
+   period (B4.11b wants `?on` instead — one day, not two), `csv::attachment`
+   for the file, `text` for any user-authored column, and
+   `billing_xml::amount` for the decimals. The balance sheet is
+   `fin_trial_balance(None, Some(on))` filtered to the other three types plus
+   this report's result, and P10 says it must balance.
+4. **i18n**: nothing new is user-visible yet — the refusals here are the same
+   store-side English as the rest of B4's, and the CSV headers are a contract
+   that is deliberately never translated. The screens (B4.13c) are where the
+   wave review's `fr`/`nl` lands.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B4.11b (the balance sheet — the same fold at a date, and the first
+report that has to balance).

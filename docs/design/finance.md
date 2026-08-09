@@ -1303,6 +1303,22 @@ manual entry.
 
 - **P&L** — income and expense accounts, grouped by type then code, for a
   period, with the comparative period beside it.
+
+  **As built (B4.11a).** `fin_pl.rs` holds no query at all: it asks
+  `fin_trial_balance` twice — the period, then the comparative — and folds the
+  two account types that make a result. Three decisions worth not relitigating.
+  The **signs are flipped once**, in `natural_cents`: the ledger keeps income
+  negative, a P&L shows revenue and cost as positive amounts, and the result is
+  one subtraction. The **comparative is derived, not asked for** — the period of
+  the same length ending the day before, so a quarter compares with the ninety-
+  odd days before it and a year with the year before it; *rejected: a second
+  pair of dates on the request*, which every caller would compute and three of
+  them would compute differently. And **a line appears when either period moved
+  it**, so an account that earned ten thousand last quarter and nothing this one
+  is on the page at zero rather than missing — with `postings: 0` saying the
+  zero is real. `GET /finance/reports/pl` and its `.csv` twin are **admin only**
+  (a P&L is the whole tenant's result, not the reader's own work); B4.12 widens
+  that gate additively to the accountant role.
 - **Balance sheet** — asset, liability and equity balances at a date, plus
   the period's result; it must balance, and P10 says so.
 - **Aged receivables/payables** — the one report that reads **documents**
@@ -1323,6 +1339,14 @@ CSV follows `billing_reports` exactly: ISO dates, `.` decimals, untranslated
 column headers (a file read by a spreadsheet and an accountant's tooling must
 not move with the reader's locale), amounts in units with two decimals, and
 no personal data beyond the counterparty name a document already prints.
+
+Two things B4.11a settled about that file for all four reports. The headers it
+is served under (`attachment`, `nosniff`, `no-store`, a stated charset) moved
+into `csv::attachment`, so every export in alo carries them and a header added
+for one cannot be missing from another. And **user-authored text is neutralised
+where it is chosen**, not in the CSV writer: an account a tenant named `=cmd|…`
+is written with a leading apostrophe, while a negative amount keeps its `-` and
+stays a number. The P&L is the first alo export to carry text a user wrote.
 
 **These are figures for a return, not a return.** ADR 0035's non-goal is
 unchanged: alo produces correct, exportable numbers; filing goes through the

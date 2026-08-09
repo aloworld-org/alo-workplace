@@ -6,6 +6,15 @@ contracts.
 
 ## Unreleased
 
+- **See what you earned and what you spent, beside last time.** alo now answers
+  the first of the four accounts reports: a profit and loss for any period you
+  name, income and cost account by account, with the period of the same length
+  before it in the next column — the quarter before a quarter, the year before a
+  year. Every figure is your books added up rather than a second tally kept
+  alongside them, so it agrees with the ledger by construction, and it is in the
+  currency you keep the books in whatever your customers were billed in. Take it
+  away as a CSV your accountant can open, totals and result included.
+
 - **Close the books on a quarter, and have them stay closed.** Define your
   fiscal periods, and close one when it has been reported and filed: from then
   on, nothing can be booked into it — not a late receipt, not a payment, not a
