@@ -94,7 +94,7 @@ product besides.
 |---|---|
 | `GET /chat/agents` | The tenant's agents — for the composer's `@` list and the member sheet |
 | `POST /chat/channels/{id}/agents` · `DELETE …/agents/{agent}` | Add or remove an agent from a room (owner only, like any member) |
-| `POST /chat/proposals/{id}/approve` · `POST /chat/proposals/{id}/discard` | Decide a pending proposal. **403 for anyone but the asker**, with the reason said plainly |
+| `POST /chat/proposals/{id}` `{approve}` | Decide a pending proposal. **403 for anyone but the asker**, with the reason said plainly. Approving **runs the action in the same request**, through the one executor the command palette already uses — recording a decision the client must then follow up on would let the record and the effect drift, which is what this table exists to prevent |
 
 An agent turn is not a route. Mentioning an agent in an ordinary
 `POST …/messages` triggers it, because the trigger *is* the message — a
