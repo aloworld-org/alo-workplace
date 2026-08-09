@@ -51,8 +51,16 @@ WebSocket layer, no second pipe.
   than a migration on every tenant's database.
 - `chat_attachments` — message_id → **Drive node id**: a pointer, never a
   copy (the Spaces precedent; one storage, per ADR 0038).
-- `chat_mentions` — message_id, user_id: written at post time so unread and
-  "mentions me" badges are a cheap query, not a text scan.
+- `chat_mentions` — tenant_id, channel_id, message_id, **seq**, user_id.
+  Written at post time so "is there something here for me?" — asked on every
+  sidebar draw — is an index lookup rather than a text scan of every body.
+  `seq` is denormalised from the message so an unread-mention count compares
+  against the reader's cursor without joining back. **Only members can be
+  named**: a handle matching nobody in the room stays plain text, because a
+  mention reaching someone who cannot open the room would point at a door
+  they have no key to. Re-derived on edit (adding a name reaches that person,
+  removing one stops badging them) and deleted on withdrawal (a badge must
+  not point at an empty tombstone). Authors never mention themselves.
 
 Sequence allocation reuses the pattern already proven twice in this codebase
 (mailbox UIDs, gapless invoice numbers): a per-channel counter row locked in
