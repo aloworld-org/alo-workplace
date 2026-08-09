@@ -968,6 +968,77 @@ the wrong account. If real files force it, the fix belongs at B4.08c's upload
 route — which already has to ask a person things — as an account the uploader
 names, never as a guess in the parser.
 
+### As built: the third parser, and the door (B4.08c)
+
+CAMT.053 and MT940 are specifications; a CSV export is not a format at all, so
+`bank_csv.rs` reads what a **person confirmed** rather than deciding alone. Two
+questions no export answers about itself are asked rather than guessed, and both
+would be money bugs taken the other way.
+
+**`03/04/2026` is two different days.** The order is inferred from the file as a
+whole — one row with a day past the twelfth settles it for every row, and a dot
+separator settles it outright, since no month-first locale writes `03.04.2026`.
+A file whose whole date column stays ambiguous is **refused** with the words
+that say to state the order (`?dates=dmy`), and a file that disagrees with
+itself is refused too. An ISO date in a day-first file is still read as ISO: a
+four-digit first component cannot be a day.
+
+**`1.234` is a thousand or one and a bit.** `money_text`'s refusal is inherited
+whole; `?decimal=comma|dot` makes it exact by rewriting the number in the one
+convention that cannot be misread before it is parsed. Three shapes of sign are
+taken, because all three are in the wild: one signed column (including the
+German trailing minus and the accountant's parentheses), a debit and a credit
+column, or an amount plus a `S/H`, `D/C`, `Af/Bij` indicator. What comes out is
+signed integer cents, decided once.
+
+**The mapping is guessed and then corrected, never guessed and applied.**
+`BankCsvMapping::infer` reads the header in English, German, French and Dutch;
+the preview shows what it produced; the commit carries the mapping back so a
+corrected column is never silently re-guessed. A mapping naming a column the
+file has not got is a `422` before a row is read, and so is a mapping with no
+date or no amount in it.
+
+**A CSV names no account, so the caller must.** `?account=` is required for a
+CSV — `bank_lines` are keyed to the account they moved on — and for the other
+two formats it becomes a **guard**: a file that names a different account is
+refused rather than filed under this one, which is the ordinary mistake (right
+screen, wrong download) that otherwise survives for weeks.
+
+**One door, three formats.** `POST /finance/imports/bank` sniffs which parser a
+file wants (`<` is CAMT, a `:nn:` tag or a `{1:` block is MT940, anything else
+is a CSV) unless `?format=` says. `POST /finance/imports/bank/preview` is the
+same reading with nothing after it: `read_bank_file` is a **pure function**, so
+"the preview writes nothing" is not a rule somebody keeps but a thing that has
+no way to happen. It joins `READ_ONLY_POSTS` for that reason. The commit's audit
+line is `finance.import.bank`.
+
+**Nothing is imported halfway.** A row that cannot be read is a `RowError`
+naming its line and the rule — never the row's content, which is the tenant's
+own money — and one of them means the file stages nothing at all, answered as a
+`422` carrying the whole report. The one row skipped rather than refused is the
+row blank in *every mapped column*: a running-balance footer is not a
+transaction and not a mistake either. It is still counted, because a person told
+"3 of 4 rows" must be able to find the fourth.
+
+The report also carries a **sample** of at most fifty transactions, not the
+file: the counts are exact, and a year of a busy account is read through `GET
+/finance/bank/lines`, which lands here with `GET /finance/bank/statements`.
+
+**Golden files.** `csv_de_january.csv` is the same January as
+`camt053_de_january.xml` and `mt940_de_january.sta`, transaction for
+transaction, in Windows-1252 with semicolons, dotted dates and comma decimals —
+so the store de-duplicates all three against each other, and importing the month
+twice in two formats stages four lines and four duplicates, not eight.
+`csv_uk_february.csv` is the other half of the world (ISO dates, dot decimals,
+paid-out/paid-in columns, a footer row that is skipped), and
+`csv_broken_rows.csv` is what a person actually uploads on a Tuesday.
+
+Cut from the slice, and named: **no saved mappings** (the mapping travels with
+the upload; remembering one per tenant is worth doing once real files have shown
+which repeat), **no `account` column** in the mapping (the uploader states the
+account, which is the same answer for every row), and **no screen** — B4.13b is
+the reconciliation UI and this is the route it will call.
+
 ## Fiscal periods and the soft close (B4.10)
 
 ```
@@ -1185,6 +1256,9 @@ fin_receipt_read.rs  the tenant-scoped step: a Drive node → its text → the
 bank_camt.rs         CAMT.053 → ParsedStatement (over billing_xml_tree)
 bank_mt940.rs        MT940 → ParsedStatement
 bank_csv.rs          CSV + mapping → ParsedStatement (over csv_read)
+bank_read.rs         the one upload door: sniff the format, read the file,
+                     stage it (added at B4.08c; bank_import.rs stays the
+                     staging and the storage, with no format in it)
 bank_import.rs       staging, dedupe, the import report
 fin_match.rs         suggestions (exact, then heuristic), confirm, unmatch
 fin_rules_learn.rs   the per-tenant learned rules

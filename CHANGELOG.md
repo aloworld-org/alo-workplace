@@ -24,6 +24,19 @@ contracts.
   rendering now turns document paragraphs, headings, quotes, links, bulleted
   and numbered lists, nested lists, and checklists into clean semantic web
   content. Bold, italic, underline and strikethrough text carry across too.
+- **Import a bank statement, whichever file your bank gave you.** Upload a
+  CAMT.053, an MT940 or a plain spreadsheet export and alo reads which one it
+  is. A spreadsheet's columns are matched by their headings in English, German,
+  French and Dutch, and you correct the guess before anything is imported.
+  Nothing is imported halfway: a row alo cannot read names its line and the
+  reason, and the whole file waits until it is fixed. The same month downloaded
+  twice, in two different formats, is still imported once.
+
+- **Two questions alo asks instead of guessing.** `03/04/2026` is the third of
+  April in Paris and the fourth of March in New York; `1.234` is a thousand in
+  Berlin and one and a bit in London. Where the file itself settles the answer,
+  alo reads it; where nothing in the file does, it asks you rather than being
+  wrong by a month or by a factor of a thousand.
 
 - **Turn an alo document into a website article without copying its words.**
   A website can now keep draft or published blog metadata around a document in

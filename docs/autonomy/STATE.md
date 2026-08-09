@@ -11664,3 +11664,211 @@ Next item: B4.08c (bank import — the CSV mapping wizard: a mapping model over
 `csv_read`, staging through the same `stage_bank_statement`, a partial-import
 report, and the first `/finance/imports/bank` route, which is where the audit
 line and the three formats meet).
+
+## 2026-08-09 — B4.08c the third format is not a format: a spreadsheet, a mapping, and one door
+
+**What shipped.** The bank import's last parser and its first route. `bank_csv.rs`
+turns a bank's CSV export plus a confirmed mapping into the same
+`ParsedStatement` the other two produce; `bank_read.rs` is the one door all
+three arrive through — sniff the format, read the file, stage it; and
+`finance_bank.rs` puts four routes on it: `POST /finance/imports/bank`,
+`POST /finance/imports/bank/preview`, `GET /finance/bank/statements` and
+`GET /finance/bank/lines?statement=&status=`.
+
+**Why a third reader could not be written like the first two.** CAMT.053 and
+MT940 are specifications: a file either is one or it is not, and the parser
+decides alone. A CSV export is not a format — it is whatever a portal felt like
+writing that year — so this reader reads what a **person confirmed**, and two
+questions no export answers about itself are asked rather than guessed. Both
+would be money bugs taken the other way.
+
+**`03/04/2026` is two different days.** Day-first in Paris, month-first in New
+York, and a statement three weeks out reconciles against the wrong invoices. The
+order is inferred from the file *as a whole*: one row with a day past the
+twelfth settles it for every row, and a dot separator settles it outright
+because no month-first locale writes `03.04.2026`. A column that never settles
+is **refused** with the words that name the fix (`?dates=dmy`); a file that
+disagrees with itself is refused too. An ISO date inside a day-first file is
+still read as ISO — a four-digit first component cannot be a day — and the
+mirror case (a two-digit-year row in a file of ISO dates) is refused rather than
+read one of the two ways.
+
+**`1.234` is a thousand or one and a bit.** `money_text`'s refusal is inherited
+whole rather than re-implemented; `?decimal=comma|dot` makes it exact by
+rewriting the cell in the one convention that cannot be misread before parsing
+it. `strip_decoration` was lifted out of `parse_amount_cents` and made public
+for that rewrite, because two lists of "what is decoration around a number"
+would drift and the drift would be a currency symbol read as a third decimal.
+
+**Three shapes of money, one signed integer.** One signed column (including the
+German trailing minus `120,00-` and the accountant's `(120,00)`), a debit and a
+credit column, or an amount plus an `S/H` · `D/C` · `Af/Bij` indicator — all
+three are in the wild and all three come out as signed cents, positive is money
+in, decided once so nothing downstream re-decides which way a number points.
+
+**The mapping is guessed and then corrected, never guessed and applied.**
+`BankCsvMapping::infer` reads the header in English, German, French and Dutch
+through `CsvTable::column`'s folding, so `Buchungs-Tag` and `buchungstag` are one
+word; the preview shows what the guess produced; the commit carries the mapping
+back so a corrected column is never silently re-guessed. A mapping naming a
+column the file has not got is a `422` before a row is read, and so is one with
+no date or no amount in it.
+
+**A CSV names no account, so the caller must — and for the other two that
+becomes a guard.** `?account=` is required for a CSV (`bank_lines` are keyed to
+the account they moved on). For CAMT and MT940 it is optional, and when given it
+is checked against the account the file names: the ordinary mistake — right
+screen, wrong download — is otherwise invisible for weeks, because the lines
+stage cleanly and reconcile against nothing.
+
+**The preview cannot write, by construction.** `read_bank_file` is a pure
+function: no store, no pool, no `async`. "The preview writes nothing" is
+therefore not a rule somebody keeps but a thing with no way to happen. It joins
+`READ_ONLY_POSTS` beside `/crm/imports/leads/preview` and `/finance/receipts`;
+the commit's audit line is `finance.import.bank`, derived from the route
+template like every other, so `tests/audit_routes.rs` grew one vocabulary line
+and one dry-run entry.
+
+**Nothing is imported halfway.** A row that cannot be read is a `RowError`
+naming its line and the rule — never the row's content (Law 1) — and one of them
+means the file stages nothing at all, answered as a `422` **carrying the whole
+report** so the client shows the fix rather than a sentence about a file. The
+one row skipped rather than refused is the row blank in *every mapped column*: a
+running-balance footer is not a transaction and not a mistake. It is counted and
+listed, because a person told "3 of 4 rows" must be able to find the fourth.
+
+**`RowError` moved to `csv_read`** and is re-exported from `crm_lead_import`.
+"Line 7, and here is why" is the same answer in a lead list and a bank
+statement, and two shapes for it would become two import screens.
+
+**Golden files, and what they assert.** Three. `csv_de_january.csv` is the
+**same January** as `camt053_de_january.xml` and `mt940_de_january.sta`,
+transaction for transaction, in Windows-1252 with CRLF, semicolons, dotted dates
+and comma decimals — and the suite asserts every field the line hash is built
+from is equal to the CAMT reading, which is what makes the three de-duplicate
+against each other. `csv_uk_february.csv` is the other half of the world (ISO
+dates, dot decimals, paid-out/paid-in columns, a footer row that is skipped, a
+running balance the mapping ignores). `csv_broken_rows.csv` is what a person
+actually uploads on a Tuesday: one unreadable date, one unreadable amount, and a
+readable row that is *not* staged either. One `.gitattributes` line joins the
+`.sta` one: `tests/fixtures/bank/*.csv` is `-text`, or checkout would rewrite the
+CRLF and silently delete the encoding fallback the reader is tested on.
+
+**How it was verified.** `cargo fmt` (the unrelated files it reformats on this
+machine were reverted — see the standing note); `SQLX_OFFLINE=true cargo clippy
+-p alo-store -p alo-jmap --all-targets` clean; `cargo test -p alo-store` green
+(1072 tests, DB-backed, including 18 new `bank_csv` unit tests, 5 new golden-file
+tests and 5 new bank-import tenancy tests); `cargo test -p alo-jmap` green (686,
+including the audit vocabulary suite that reads the router's own source).
+
+**Wire-verified** against the local backend (docker `alo-pg`, debug `alo-jmap` on
+`127.0.0.1:8080`, fresh tenant `wireb408c2`, a real password token):
+
+```
+POST /finance/imports/bank                 (no token)  → 401
+POST /finance/imports/bank/preview         (no token)  → 401
+GET  /finance/bank/statements              (no token)  → 401
+GET  /finance/bank/lines                   (no token)  → 401
+
+POST …/preview   a CSV, no account stated              → 422 "a CSV export does not
+                                                         say which account it is of"
+POST …/preview   ?account=GB33…  the British export    → 200 columns [Date, Description,
+                                                         Counterparty, Counterparty IBAN,
+                                                         Paid out, Paid in, Balance]
+                                                         mapping guessed (debit=Paid out,
+                                                         credit=Paid in, remittance=
+                                                         Description), dates ymd,
+                                                         encoding utf-8, delimiter ",",
+                                                         lines 3, skipped 1 (line 5),
+                                                         period 2026-02-03 … 2026-02-27
+GET  /finance/bank/statements                          → 200 [] — the preview wrote nothing
+POST /finance/imports/bank ?account=GB33…              → 200 staged 3, duplicates 0,
+                                                         skipped [5], committed true
+POST /finance/imports/bank  the same bytes             → 409 "already been imported, as the
+                                                         statement of 2026-02-03 to 2026-02-27"
+POST /finance/imports/bank  csv_broken_rows.csv        → 422 errors 2 (lines 3 and 4),
+                                                         staged null — and no statement
+                                                         header left behind
+POST /finance/imports/bank ?account=DE02…  the German
+     Windows-1252 export, no mapping stated            → 200 sniffed csv, staged 4
+POST /finance/imports/bank  camt053_de_january.xml     → 200 sniffed camt, staged 0,
+                                                         duplicates 4, unbooked 1 —
+                                                         the same month, once
+POST /finance/imports/bank  the Dutch CAMT for the
+     British account                                   → 422 "the statement of a different
+                                                         account than the one it was
+                                                         uploaded for"
+POST /finance/imports/bank  dates 03/04 and 05/06      → 422 "state the date order"
+POST …  the same file, ?dates=dmy                      → 200 staged 2, from 2026-04-03
+POST …/preview  ?amount=Montant                        → 422 "no column mapped to the amount"
+POST …/preview  ?dates=ddmmyyyy                        → 422 "dates must be auto, dmy,
+                                                         mdy or ymd" (before the file is read)
+GET  /finance/bank/lines?status=unmatched              → 200 nine lines, oldest first,
+                                                         every one unmatched
+GET  /finance/bank/lines?status=nonsense               → 422 "status must be unmatched,
+                                                         matched or ignored"
+GET  /finance/bank/lines?statement=made-up             → 200 [] — a narrowing that matches
+                                                         nothing, never an oracle
+audit_log                                              → four `finance.import.bank` rows for
+                                                         four commits; none for the three
+                                                         previews and none for the refusals
+```
+
+**Tenancy, proven.** Five new DB-backed tests: a mapped spreadsheet stages
+through the same rules (and the same bytes twice is the same `409`); one
+unreadable row writes nothing at all, and the fixed file afterwards is an
+ordinary first import — a refusal reserves nothing; the same January as a
+spreadsheet after the CAMT stages 0 and duplicates 4; **two tenants can hold the
+byte-identical spreadsheet and import it for *different accounts*** (on a CSV
+the account is the uploader's word), and neither door reaches the other's rows —
+a foreign statement id reads as `None`, never `Forbidden`, and filtering by it
+yields our own nothing; and a file the wizard cannot be told how to read stages
+nothing while a refusal leaves no statement behind.
+
+**Cuts, named.**
+
+- **No saved mappings.** The mapping travels with the upload. Remembering one
+  per tenant (and matching it to a header on the next upload) is worth doing
+  once real files have shown which mappings repeat; guessing it from four
+  languages already covers the common case with no setup.
+- **No `account` column in the mapping.** The uploader states the account, which
+  is the same answer for every row of a file. A per-row account column would be
+  a multi-account export, which is a different thing to import.
+- **No screen.** B4.13b is the reconciliation UI and this is the route it will
+  call. Everything above was exercised with curl.
+- **No paging on `GET /finance/bank/lines`.** It caps at `STATEMENT_LINES_MAX`
+  (5 000), which by construction cannot truncate a read narrowed to one import —
+  the read the screen makes. A tenant with more than 5 000 staged lines across
+  every month will need real paging, and that belongs with the screen.
+- **The report's `sample` is at most fifty transactions.** The counts are exact;
+  the rows are a sample, because a year of a busy account is thousands of lines
+  and a mapping is confirmed by seeing the columns line up. The staged lines are
+  read through `GET /finance/bank/lines`.
+- **The audit entry has no record id** (`finance.import`, empty id), like
+  `/crm/imports/leads`: an import report is not one record. `GET /audit?entity=`
+  addresses one record, so this entry is visible in the log but not through that
+  read. If a per-module audit read lands, it comes with B4.13b's screen.
+
+**HUMAN FLAG (carried, B4.08b): `:25:` must state an IBAN** in MT940, and a
+pre-SEPA domestic file is refused whole. B4.08c's route was named as the place
+to fix it if real files force the issue — the uploader could state the account
+the way a CSV's uploader does. It is **not** wired: `?account=` is a *guard* for
+MT940, not a substitute for `:25:`. Making it a substitute is a one-line change
+in `bank_read::read_bank_file` plus a decision that a person's word outranks a
+file's silence, and that decision wants a real file in front of it.
+
+**HUMAN FLAG (carried, unchanged since B4.05b):** no queue item wires
+`post_invoice_issue` / `post_payment_settle` / `post_credit_note_issue` into the
+document verbs, so B4.11's reports will read an empty journal for tenants who
+have been invoicing since B1. Nothing in B4.08c posts, by design — **but B4.09a
+does**, through the payment a confirmed match creates. The gap stops being
+theoretical at the very next item.
+
+**HUMAN ACTION (updated):** `/finance` needs adding to the production Caddyfile
+at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and
+`/projects`. `web/vite.config.ts` already carries it. No new *top-level* prefix
+this item — the four new routes are all under `/finance`.
+
+Next item: B4.09a (reconciliation, the exact stage: an amount-and-reference
+matcher over the lines this item stages, confirm → the payment and its
+postings, and the precision tests that keep a suggestion a suggestion).
