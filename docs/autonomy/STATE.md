@@ -14868,3 +14868,115 @@ lesson; the tree's highest was `0154`. Re-checked before the push.
 Next item: B5.04a (`inv_locations` + `inv_moves`: the move ledger, on-hand as a
 sum with a cached-balance consistency test, and the un-stocking guard B5.02
 deferred until there were movements to count).
+
+## B5.04a — what moved, and therefore what is there (2026-08-10)
+
+**Shipped:** the move ledger and the places it moves between — migration
+`0157_inv_locations_moves.sql`, three store modules, ten integration tests
+including the property suite, and the un-stocking guard B5.02 deferred. No
+routes (B5.04b) and no web.
+
+- **Migration `0157`** creates `inv_locations` (code, name, `kind`,
+  `archived_at`), `inv_seeds` (the `fin_seeds` ledger shape), `inv_moves`
+  (product, **both** location ends, `qty_milli`, reason, note, `ref_kind`/
+  `ref_id`, `occurred_at`) and `inv_stock` (the cached `(product, location) →
+  qty` with the last movement folded in). Every foreign key between them is
+  composite and tenant-first. `inv_moves` and `inv_stock` reference locations
+  and products with **`NO ACTION`, not `CASCADE`** — a cascade would silently
+  delete history to make a delete succeed, so the database refuses the delete
+  the same way the store does, and a whole tenant can still be dropped because
+  the check falls at the end of the statement (`fin_postings`' arrangement).
+- **`inv_locations.rs`** — the kind vocabulary (`stock`, `transit` real;
+  `supplier`, `customer`, `adjustment`, `production` virtual, at most one of
+  each per tenant by partial unique index), the first-use seed on
+  `fin_accounts`' mechanism (names from the caller in the reader's language,
+  codes minted here because a code is an identifier), and the lifecycle: only
+  real kinds are creatable, the `kind` never changes, a virtual is neither
+  archivable nor deletable, and a location that has ever carried a movement is
+  archived rather than deleted.
+- **`inv_moves.rs`** — `record_move` / `record_move_in`, the **single writer**
+  of both a movement and the cached balance, in one transaction. Direction is
+  the pair of locations and quantity is strictly positive; the table is
+  append-only with no update and no delete at any door. The negative-stock rule
+  is asked of the *departing* end and only when it is real, and its refusal
+  names product, location, available and requested.
+- **`inv_stock.rs`** — the reads (what is where, valued at purchase price by
+  `billing_totals`' rounding convention reused, not restated), the fold that
+  recomputes every balance from the movements, and `inv_stock_rebuild`, which
+  exists so the cache is disposable and which **no route calls**.
+
+**How it was verified.**
+
+```
+cargo fmt -p alo-store                       → clean (only this item's files)
+cargo clippy -p alo-store --all-targets      → zero warnings, zero errors
+cargo test -p alo-store                      → 906 unit + every integration
+                                               binary green, 0 failed
+cargo build --workspace                      → clean (alo-jmap included)
+tests/inv_locations_tenancy.rs   3 tests     → CRUD, seed-once, seed race
+tests/inv_stock_ledger.rs        7 tests     → P1–P7, wrong-tenant, concurrency
+```
+
+The property suite is the item, so it is worth naming what each one proves.
+**P1** a generated month of 120 back-dated movements over three products sums
+to zero per product across all locations. **P2** the cache equals a fresh fold
+over the movements — asserted after *every* write in *every* test, which is
+what makes the cache trustworthy rather than merely fast. **P3** the same
+movements applied in a different order land on identical balances (two
+products, one interleaved script, rather than two tenants, so the comparison is
+between rows whose location ids are literally the same). **P4** a movement and
+its reversal leave every balance where they found it, and the correction is
+itself a row. **P5** received in full then returned in full leaves both the
+supplier counterparty and the shelf at zero. **P6** no generated storm of
+shipments drives a real location below zero, and the exact-stock case and the
+one-unit-too-many case are both pinned. **P7** tenant A's month leaves every
+one of tenant B's folded balances, stock levels, values and movement count
+byte-identical — plus the three cross-tenant `record_move` attempts (their
+product, their source, their destination), each a clean `NotFound` that writes
+nothing.
+
+The concurrency proof is real rather than argued: six simultaneous
+`record_move` calls shipping the single unit on the shelf yield **exactly one
+success and five clean `Conflict`s**, and the ledger holds two rows afterwards.
+The cached row's upsert lock is what serialises them, and the two upserts are
+issued in a fixed order by location id so two transfers in opposite directions
+between the same two places cannot deadlock.
+
+**Cuts and flags.**
+
+- **No routes, no audit, no web** — B5.04b, exactly where the note placed them.
+  `inventory` therefore still does not join `audit_action::AUDITED_MODULES`;
+  it joins with the first mutating stock route, which is the abusable write.
+- **`transit` is not seeded.** A tenant with one warehouse does not need one; a
+  tenant with two creates it. Seeding it would hand everybody an empty place to
+  explain.
+- **Archiving a location that still holds stock is allowed**, deliberately: a
+  shed is archived while it is being emptied, and the movements *out* of it are
+  what must keep working. Recorded in the design note's as-built block.
+- **P5 is proven in its ledger form, not its purchase-order form** — there is
+  no `inv_po` to receive yet. It arrives in that form with B5.05b.
+- **The un-stocking guard fires only on the transition**, stocked → not, so an
+  unrelated edit to a product that has moved is untouched.
+
+**HALT-adjacent find, fixed as part of this item: two migrations both claimed
+version 155.** `0155_site_page_locales.sql` (sites, commit 380c481) and
+`0155_inv_suppliers.sql` (business, commit 80d14b5) collided, and `sqlx` keys
+migrations by version — so **every** migration run on both tracks was failing
+with `VersionMismatch(155)` and no gate that touches the database could pass.
+Fixed inside this track's own write scope: the **business** file was renumbered
+`0155 → 0156_inv_suppliers.sql` (the sites file was first and is untouched),
+and this item's migration took `0157`. Local dev databases that already applied
+the old 155 need one statement — `UPDATE _sqlx_migrations SET version = 156
+WHERE version = 155 AND description = 'inv suppliers'` — after which the
+pending sites migration applies normally; the file's bytes did not change, so
+its checksum still matches. Nothing is deployed at 155, so no production
+database is affected. **The lesson for both tracks:** "the tree's highest was
+N" is not enough — check for a *duplicate* of the number you are about to mint
+(`ls migrations | sed 's/_.*//' | sort | uniq -d` is the whole test), because
+the other track's file can arrive with the same number between your rebase and
+your push.
+
+Next item: B5.04b (stock adjustments: the manual adjustment and transfer route
+with its closed list of reason codes, `POST /inventory/moves` refusing any move
+that names a `supplier` or `customer` location, and `inventory` joining the
+audit vocabulary with its first mutating route).

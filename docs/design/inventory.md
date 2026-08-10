@@ -467,6 +467,60 @@ buys, mirroring `fin_journal`'s ten:
   B4 introduced, which a single-row read test cannot catch and a `SUM` that
   forgot its `tenant_id` fails instantly.
 
+**As built (B5.04a), where the note left a choice open.**
+
+- **The seed writes one `stock` location and the four virtuals, not five plus
+  transit.** A tenant with one warehouse does not need a transit location and
+  a tenant with two creates it themselves, so seeding one would be handing
+  everybody an empty place to explain. The seed's *names* come from the caller
+  in the reader's language, exactly as the chart of accounts' do; the *codes*
+  (`MAIN`, `SUPPLIER`, `CUSTOMER`, `ADJUST`, `PRODUCTION`) are minted in the
+  store, because a code is an identifier — `fin_accounts`' split, reused. Every
+  one of them is renameable, including the virtuals, since the virtuals are
+  found by `kind` and never by code.
+- **A location's `kind` is immutable.** Renaming is a tenant's business;
+  re-kinding retroactively rewrites the meaning of every movement already
+  recorded there, turning a shelf into a counterparty without a quantity
+  moving. Refused as `Validation`.
+- **A virtual location can be neither archived nor deleted** (`Conflict`), and
+  at most one of each exists per tenant — a partial unique index on
+  `(tenant_id, kind)` over the four virtual kinds. A receipt that could choose
+  between two supplier locations makes every balance on it a half-truth.
+- **Archiving a location that still holds stock is allowed.** A shed being
+  emptied is archived before the last pallet leaves it; archiving takes it out
+  of the pickers, and the movements *out of* it are exactly what must keep
+  working. What is refused is deleting a location that has ever carried a
+  movement — and the refusal is the database's as well as the store's, because
+  `inv_moves` and `inv_stock` reference locations with `NO ACTION` keys rather
+  than cascades. A cascade would silently delete history to make a delete
+  succeed.
+- **The negative-stock check is asked of the *departing* end only**, and only
+  when that end is real. The receiving end can only have gone up, so a second
+  check there would be dead code with a wrong message in it.
+- **The two cached rows are written in a fixed order by location id.** Each
+  upsert holds its row's lock until commit, so two concurrent transfers in
+  opposite directions between the same two places would deadlock if each took
+  its locks in its own order. The concurrency proof is in the suite: six
+  simultaneous shipments of a stock of one yield exactly one success and five
+  clean `Conflict`s.
+- **`inv_stock` rows are written only where something moved.** A stocked
+  product that has never arrived anywhere has no row and reads as zero; "we
+  have none" and "we have never had any" are the same answer to the question a
+  shortage query asks, and a row per product per location per tenant would be
+  almost entirely zeros.
+- **Stock is valued at the purchase price**, in integer cents, by
+  `billing_totals`' rounding convention reused rather than restated — a
+  warehouse valued by one rule and a document totalled by another disagree by a
+  cent exactly when somebody is reconciling them.
+- **P5 is proven in its ledger form, not its purchase-order form.** "Received
+  in full then returned in full leaves both ends at zero" is asserted over the
+  movements; the same assertion over a real `inv_po` arrives with B5.05b, which
+  is the item that can write one.
+- **Un-stocking a product that carries movements is refused** (`Conflict`), the
+  guard B5.02 deferred until there were movements to count. It is asked only
+  when the flag actually changes from stocked to not, so an unrelated edit to a
+  moved product is untouched.
+
 ### The cached balance, and its single writer
 
 On-hand is derived, but a fold over every movement since the tenant's first

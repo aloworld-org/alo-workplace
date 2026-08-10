@@ -6,6 +6,24 @@ contracts.
 
 ## Unreleased
 
+- **alo now counts stock the way it keeps books: by recording what moved.**
+  There is no quantity you can type over. A warehouse, a shop floor, a van —
+  each is a place, and every arrival, sale, transfer and correction is a
+  movement from one place to another, kept for good. What you have on hand is
+  what those movements add up to, so "we should have four" always comes with
+  "and here is where the other forty went". Nothing here is set up first: the
+  moment you open Inventory, alo gives you one place to keep things — named in
+  your own language, renameable, and yours to delete — plus the counterparts it
+  needs to say where goods came from and went to. Two refusals are deliberate.
+  Stock never goes below zero: shipping four hundred when four hundred are not
+  there is refused, naming the item, the place, what is available and what was
+  asked for, because a negative number on a shelf means the data is already
+  wrong and everything reported from it will be too. And a product that has
+  moved cannot quietly stop being a stocked item — archive it instead, and its
+  history stays readable. Two people shipping the last one at the same instant
+  get exactly one sale and one clear refusal, never two. Today this reaches you
+  through the API; the stock screens and the adjust-and-transfer flow follow.
+
 - **The people you buy from are now a list of their own.** alo keeps your
   suppliers the way it keeps your customers — name, address, VAT id, the
   account you pay into, what they charge you and how long they take — and
