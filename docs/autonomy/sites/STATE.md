@@ -2027,3 +2027,27 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   changed, so Rust gates, wrong-tenant testing, and live curl verification are
   not applicable.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.31a complete French and Dutch Sites language
+
+- **Shipped:** French and Dutch now cover every Sites-facing catalog entry:
+  website creation, address feedback, pages, the complete section builder,
+  previews, themes, publishing, blog, submissions, analytics, custom domains,
+  AI proposals, and the Websites rail label. The 155 foundational strings
+  that previously fell back to English in each locale now read natively.
+- **Regression guard:** a focused catalog test enumerates the English Sites
+  surface and fails if either locale omits a current or future `sites*` key or
+  the module label. A static usage audit also reports zero untranslated
+  `strings.*` references across `web/src/sites`.
+- **Changelog:** Unreleased now explains the complete-address/direct-editor
+  creation flow, reviewable section and whole-page copy changes, and full
+  French/Dutch Sites coverage in user language.
+- **Verified:** 53 focused Sites tests pass across routed module, page editor,
+  themes, and locale parity. `npx tsc --noEmit`, focused i18n/test ESLint, and
+  `npm run build` are clean.
+- **Cuts/flags:** server validation details remain verbatim by design, even
+  when the server emits a different language; replacing them would violate
+  the human-error rule and hide the authoritative reason. No storage or HTTP
+  route changed, so Rust gates, wrong-tenant testing, and live curl verification
+  are not applicable.
+- **Next:** the first unchecked item in `QUEUE.md`.

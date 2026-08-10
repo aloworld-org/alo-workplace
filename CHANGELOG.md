@@ -6,6 +6,24 @@ contracts.
 
 ## Unreleased
 
+- **Start a website at its real address, then get straight to the page.** Name
+  a website and alo suggests its editable address while showing the complete
+  result and availability together. Pasting a full address works too, and a
+  refusal now says exactly what the server found. Create opens the new Home
+  page in its editor instead of leaving you at a page list; its first visible
+  action starts a Hero section in one click.
+
+- **Improve website copy as a proposal you can inspect.** Rewrite, shorten,
+  expand or retone the eligible words in any saved section, compare the exact
+  current and proposed copy, then approve or discard it. Whole-page changes
+  likewise show a real Before and After preview and do not alter the stored
+  page until approval.
+
+- **Build websites throughout in French or Dutch.** The complete Sites
+  workspace — creation, pages, every section type, themes, previews and
+  publishing — now has native French and Dutch labels instead of falling back
+  to English halfway through a task.
+
 - **Give your accountant the books, and only the books.** You can now mark
   someone in your organization as your accountant. They get what the job needs:
   every finance report, the expense claims waiting to be decided, and the power
