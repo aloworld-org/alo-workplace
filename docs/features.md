@@ -438,6 +438,21 @@ EU models, suggest-only where the EU AI Act calls a use high-risk.
 
 ### [B4] Expenses & Accounting core — the books
 
+> Wave B4 is built. `docs/design/finance.md` § "What B4 promised, and what
+> B4 shipped" reconciles every `[B4]` line below against the code: each is
+> shipped, or a cut with its reason. One is load-bearing enough to repeat
+> here. **The ledger does not yet post from the billing screens**: the posting
+> rules for issue, settlement and credit note are written and golden-tested,
+> and a reconciliation confirm books the invoice and its payment — but no
+> `/billing` route calls a posting rule, and no rule posts an *expense* at
+> all. A tenant who invoices and never reconciles has an empty journal, so
+> the four reports over it are empty rather than wrong. Wiring the posting
+> into each document's own transaction is the first item of any B4 follow-up.
+> Also cut, each named there: no AI receipt backend (the extractor is
+> deterministic behind the seam a model plugs into), no manual-journal-entry
+> route or screen, no mileage screen, no expense category picker, no expense
+> rebilling, and reports export CSV but not PDF.
+
 - [B4] ★ **Finance agent** — "categorise last month's bank transactions", "anything unusual in March?", "prepare the Q2 VAT summary" — suggestions with sources, accountant approves
 - [B4] ★ Receipt capture: photo/PDF → AI extracts vendor, date, amount, VAT — human confirms every field before it books
 - [B4] Expense record: category, project link (billable → B1 rebill), payment method; approval flow (submit → approve → reimburse)

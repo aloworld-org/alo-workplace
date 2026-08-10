@@ -112,7 +112,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.13c Web finance: CoA editor + the four report pages with CSV buttons.
 - [x] B4.14a ★ Finance agent, categorise: `categorise_transactions` (draft) — allowlist + executor + structural verify.
 - [x] B4.14b ★ Finance agent, answers: `vat_summary` + `flag_anomalies` (answers with citations); structural verify.
-- [ ] B4.15 Wave review: fr/nl, CHANGELOG, design as-built, features [B4] reconciliation.
+- [x] B4.15 Wave review: fr/nl, CHANGELOG, design as-built, features [B4] reconciliation.
 
 ## Wave B5 — alo Inventory (Purchasing, Stock, Orders)
 

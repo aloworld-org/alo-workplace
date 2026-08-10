@@ -6,6 +6,39 @@ contracts.
 
 ## Unreleased
 
+- **alo Finance now speaks French and Dutch, from the receipt to the return.**
+  The whole module reads in your own language: the claim you fill in, the queue
+  an approver works through, the bank import and the screen where you say what
+  each payment settled, your chart of accounts, the four reports, and the three
+  things you can ask alo about the books. The words are the ones on the
+  documents these screens produce — *note de frais*, *plan comptable*,
+  *déclaration de TVA*; *declaratie*, *rekeningschema*, *btw-aangifte* — and
+  Dutch says **afletteren** for the bank work, because that is what a
+  bookkeeper says. A word you already know from Billing stays that word: an
+  invoice that is *Émise* on an invoice list is *Émise* on a bank screen. Two
+  deliberate exceptions: the **column headings in a downloaded CSV stay
+  English**, because your accountant's own tools read them and a spreadsheet is
+  a contract rather than a sentence; and your chart of accounts is written in
+  your language once, when it is created, and is yours to rename from then on.
+
+- **Claim what you drove, at the rate your company sets.** Finance now keeps a
+  per-kilometre rate table for your company and turns a trip into an expense
+  claim from it: the distance, the day, the rate that applied, and the amount
+  worked out for you rather than typed in. An admin sets the rates; a rate is
+  never guessed from a country. Today it is reachable from the API; the screen
+  follows.
+
+- **Hand alo a receipt and check what it read.** Put a receipt in your Drive,
+  point Finance at it, and alo comes back with what it made of it — the
+  merchant, the date, the total, the VAT and the rate — as fields **for you to
+  confirm**, never as a claim it already filed. It writes nothing: the claim is
+  created afterwards from whatever you actually agreed to. Anything it could not
+  read comes back empty rather than filled with a guess, and the VAT is what the
+  paper printed rather than the total times a rate, so a receipt showing a rate
+  and no tax gives you a rate and no tax. Today it is reachable from the API and
+  reads a receipt by its own text; the button in the claim form, and a model
+  behind the reader, both follow.
+
 - **Ask alo what VAT you owe, and to look over your books.** Two questions alo
   can now answer from the books themselves rather than from a search. Ask for
   last quarter's VAT and you get the figures your journal carries — tax charged

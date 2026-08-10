@@ -1,7 +1,12 @@
 # Design note — alo Finance (the books: expenses, the ledger, the bank, the return)
 
-Status: **design** (B4.01, written before the first migration) · ADR 0035 ·
-Business track wave B4
+Status: **as built** (B4.15, the wave review; written as a design note at
+B4.01, before the first migration) · ADR 0035 · Business track wave B4
+
+> The `## As built` sections through this note were added by the slice that
+> shipped each part. § **"What B4 promised, and what B4 shipped"** at the end
+> reconciles every `[B4]` line of `docs/features.md` against the code — each is
+> shipped, or a cut with its reason.
 
 alo Finance is the fourth Work OS module and the first one whose output is
 not a screen a colleague reads but a **statement a stranger audits**. B1
@@ -133,7 +138,7 @@ its own kind and says so in `kind = 'manual'`.
 share: one `FinanceModule.tsx` owning the tabs, one `api.ts` owning the
 fetches, one view per screen, `.module.css` for layout, `ds` tokens for
 everything else, every string through `i18n/en.ts` under a `finance*` prefix
-(fr/nl at the wave review, B4.15).
+— **en/fr/nl, complete** since B4.15 (§ Languages, below).
 
 - **Expenses** — my claims, and (for an approver) everybody's: submit,
   approve, reject, mark reimbursed. This is the screen most employees will
@@ -239,7 +244,8 @@ editor for the learned matching rules** (`/finance/rules` has no screen yet;
 the rules still fire and are still named in the evidence), **no bank-side
 posting for a line that is not an invoice payment** (an expense or a charge
 settled from the bank is B4.13c's Accounts tab, which is where a person can
-choose an account at all), and **no fr/nl** — B4.15 owns the translations.
+choose an account at all). The slice shipped English only; **B4.15 translated
+it** with the rest of the module.
 
 Cut from this slice, on purpose, and listed so the gap is a decision rather
 than an oversight: **no category picker and no receipt attachment**. Both
@@ -305,8 +311,8 @@ the chart and the manual-entry dialog** (this note's Accounts tab describes
 both; `/finance/entries` has no HTTP door yet, and a screen for a route that
 does not exist is a promise the module would not be keeping), **expense
 categories** (`/finance/categories` is still doorless, so the claim form still
-has no category picker — B4.13a's cut, unchanged), and **no fr/nl** for the new
-strings, which B4.15 owns.
+has no category picker — B4.13a's cut, unchanged). The slice shipped English
+only; **B4.15 translated it** with the rest of the module.
 
 ## The chart of accounts (B4.02)
 
@@ -1950,7 +1956,7 @@ Web (`web/src/finance`): `FinanceModule.tsx`, `api.ts`, `types.ts`,
 `format.ts`, `ExpensesView.tsx`, `ExpenseDialog.tsx`, `ReceiptDialog.tsx`,
 `BankView.tsx`, `ImportDialog.tsx`, `MatchPanel.tsx`, `AccountsView.tsx`,
 `JournalView.tsx`, `EntryDialog.tsx`, `ReportsView.tsx`, `index.ts`; the
-`finance*` block in `i18n/en.ts` (fr/nl at B4.15); the module entry in
+`finance*` block in `i18n/en.ts`, `fr.ts` and `nl.ts`; the module entry in
 `product/workplace.tsx`; `/finance` in `vite.config.ts`.
 
 ## Out of scope for B4 (cuts are decisions)
@@ -2018,3 +2024,78 @@ Web (`web/src/finance`): `FinanceModule.tsx`, `api.ts`, `types.ts`,
   conformity (which involves a documented procedure, not only a schema) is a
   legal statement for a human, exactly as the working-time-record claim was
   in B3.
+
+## Languages (B4.15)
+
+The module reads in **English, French and Dutch**, end to end: the claim form
+an employee fills in, the approver's queue, the bank import and the
+reconciliation screen, the chart of accounts, the four reports, and the three
+agent cards that read the books — 350 keys per language, pinned by
+`locale.test.ts` § "alo Finance is fully translated (B4.15)" so a key added
+later without its translations turns the suite red.
+
+Three choices worth recording, because each is a place a transliteration would
+have been wrong rather than merely clumsy:
+
+- **The words are the documents', not the English's.** French says *note de
+  frais*, *relevé bancaire*, *plan comptable*, *déclaration de TVA*; Dutch says
+  *declaratie*, *rekeningafschrift*, *rekeningschema*, *btw-aangifte*. Dutch
+  uses **afletteren** for the bank work — what a bookkeeper says, where
+  "matchen" would be a loanword on the one screen an accountant opens daily.
+- **No participle agrees with an interpolated amount.** A money value arrives
+  as a formatted string, so French "1,00 € restent dus" would be ungrammatical
+  for every singular amount and correct only by luck. Four sentences were
+  therefore re-authored as invariable ones — *restant à payer*, *un écart de
+  …*, *Nous avons reçu …*, *Retour de … à …* — and a test asserts each with a
+  singular amount. The expense **statuses** do agree (*Approuvée*, *Refusée*,
+  *Remboursée*), which is safe in the opposite direction: their subject is
+  always *la note de frais* and never another document, unlike B2.14's record
+  history, which had to drop participles entirely.
+- **A word shared with Billing stays one word.** A payment settles a *billing*
+  invoice and is read on a *finance* screen, so `issued` is *Émise* /
+  *Uitgegeven* here exactly as it is there (B1.27), pinned by its own test. The
+  same document must not appear to have two states in two modules.
+
+Untranslated on purpose, and stated so the gap is a decision:
+
+- **The CSV column headings stay English in every language** (`finance_reports`
+  says so at the top of the file). They are a contract read by scripts and by
+  an accountant's own tooling; what a *person* reads is the screen.
+- **The server's refusal sentences are English in every language** —
+  unchanged since B1.27, still the same cross-cutting item (a typed error
+  vocabulary across `StoreError`), and still a human's roadmap call rather
+  than a wave review's.
+- The **default chart of accounts** is not a catalog string at all: it is
+  seeded per tenant in the reader's own language by `finance_chart_names.rs`
+  (en/fr/nl, checked against `CHART` by a test) and is ordinary tenant data
+  from the moment it is written.
+
+## What B4 promised, and what B4 shipped (B4.15)
+
+Every `[B4]` line of `docs/features.md`, against the code. A line is shipped,
+or it is a cut with its reason — nothing is silently missing.
+
+| `[B4]` feature | Status |
+|---|---|
+| ★ Finance agent — categorise, "anything unusual?", VAT summary | **Shipped** (B4.14a/b) as `categorise_transactions`, `flag_anomalies`, `vat_summary`, propose-then-approve, answers with the entries behind them. **One narrowing**: categorise reads *expense claims*, not bank transactions — a bank line is attributed on the reconciliation screen (B4.09), which is a confirm-a-suggestion flow of its own, and two doors onto the same act would be two ways to book it. |
+| ★ Receipt capture: photo/PDF → vendor, date, amount, VAT, human confirms | **Shipped as the deterministic half** (B4.06a/b): the extractor behind a pluggable trait, fixture-proven, `POST /finance/receipts` returning parsed-fields-for-confirmation, confirmed → claim. **Cut: no AI backend and no upload screen.** The trait is the seam a model plugs into; wiring one is a human item (ADR 0034's rules, a hosted model, a cost), and the claim dialog has no file picker until the Drive picker is reusable. |
+| Expense record: category, project link (billable → B1 rebill), method; submit → approve → reimburse | **Shipped** (B4.05a/b, B4.13a) — record, project link, method, the three transitions, the approver's queue and the reimbursement list. **Two cuts**: the category has no picker (`/finance/categories` has no HTTP door, so the form cannot offer the chart it would point into), and **an expense is never rebilled to a customer** — B3.06 rebills *hours*; rebilling a cost is an invoice-line rule nobody wrote. |
+| Mileage claims at a per-km rate table | **Shipped API-only** (B4.07): per-tenant rate table, `/finance/mileage*`, entry → claim, tested. **Cut: no screen.** A claimant types kilometres through the API. |
+| Chart of accounts: EU SME default, editable, per-tenant | **Shipped** (B4.02, B4.13c), seeded in the reader's language, editable, retire-not-delete, posting rules resolving by role and never by number. |
+| Double-entry ledger: every invoice/expense/payment posts automatically | **Partially shipped, and this is the wave's largest gap.** The journal, the balanced-entry enforcement and the property tests are real (B4.03a/b); the posting rules for invoice issue, payment settlement and credit note are written and golden-tested (B4.04a/b/c); a **reconciliation confirm books the invoice and the payment** (B4.09a), which is the one path that actually opens a tenant's books. But **no `/billing` route calls a posting rule**: issuing an invoice over HTTP does not post it, and settling a payment over HTTP does not post it. And **there is no expense posting rule at all** — `SourceKind::Expense` exists in the model with nothing writing it. So a tenant who issues invoices and never reconciles a bank statement has an empty journal, and every report over it is empty rather than wrong. **Flagged for a human as the first item of any B4 follow-up**: post on issue/settle/credit, idempotently, inside the document's own transaction. |
+| Manual journal entries with description + attachment | **Not shipped.** `AccountStore::post_fin_entry` exists, is tested and is the escape hatch the design note leans on for depreciation and accruals — but it has **no HTTP route and no screen**, so today it is reachable only from Rust. It was never a queue item; the queue went from the posting rules straight to the reports. |
+| Bank statement import: CAMT.053, MT940, CSV mapping wizard | **Shipped** (B4.08a/b/c) — three parsers against public goldens, staged lines, a mapping wizard, partial-import reports, duplicate detection, and the import screen (B4.13b). |
+| ★ Reconciliation with AI matching, one-click confirm, rules learned per tenant | **Shipped** (B4.09a/b/c, B4.13b) — exact matching, windowed heuristics, per-tenant learned rules, manual pick, set-aside, and an undo on each. **Named honestly: no model is involved.** The matching is deterministic code and the "learning" is a per-tenant rules table, which is why every suggestion can state its own evidence. |
+| Fiscal periods with soft close | **Shipped** (B4.10) — postings before the lock date refused typed, admin unlock audited. |
+| Reports: P&L, balance sheet, aged receivables/payables, VAT — exportable CSV/PDF | **Shipped, CSV only** (B4.11a–d, B4.13c). Four reports, goldens on a seeded year, a CSV per report. **Cut: no PDF.** Billing's PDF pipeline (B1.17) renders a *document*; a report is a table an accountant re-sorts, which is what the CSV is for. A PDF is one print view away if a human asks. |
+| Accountant access role: read + journal-only, no mail/files | **Shipped** (B4.12) — the first scoped role in alo, proven by tests that a finance reader reaches finance and nothing else. **The open question is unchanged**: an accountant is still a user with a mailbox, because the identity model gives everybody one; "no mail" today means an empty mailbox and no shares. |
+| `[B+]` PSD2 live feeds, DATEV export | **Out of scope by the ADR**, unchanged: PSD2 needs a licensed aggregator and a contract (ADR 0009), DATEV is a handshake with one German product. |
+
+Two cross-cutting notes the reconciliation turned up, both belonging to a
+human rather than to this note:
+
+- **`/finance` still needs adding to the production Caddyfile** at the next
+  deploy, beside `/billing`, `/crm`, `/audit`, `/insights` and `/projects`.
+  The loop does not touch `deploy/`.
+- **Nothing in wave B4 is deployed.** Like B2, BI-1 and B3, it is code,
+  migrations and tests behind a gate a human moves.

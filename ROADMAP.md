@@ -330,7 +330,7 @@ the gate before any of this reaches a tenant.
 - [x] B2.8 Billing extensions: recurring invoices (drafts only, never auto-issued) and the SEPA `pain.001` file for paying approved bills
 - [x] B2.9 Audit trail: every mutating billing/CRM route writes one entry; a **History** panel on invoices, quotes and deals
 - [ ] B2.10 Payment links on invoices via an EU PSP — *human item: needs a contract and credentials with a payment provider. No code written toward it.*
-- [ ] B2.11 Role-based access per module (sales vs finance) — *deliberately deferred to B4.12, where the first scoped role is designed on Spaces rather than invented twice*
+- [ ] B2.11 Role-based access per module (sales vs finance) — *B4.12 shipped the first scoped role (`tenant_user_roles`, the external accountant: finance write, billing and CRM read-only, no mail or files) rather than a Spaces scoping. That is one role, not a per-module matrix: every member of a tenant still sees every deal, which `docs/design/crm.md` says out loud. A sales-vs-finance split is a second role on the same table, and still unshipped.*
 
 CRM is translated end to end in en/fr/nl — interface, agent cards, record
 history (B2.14). It renders no server-side document, so unlike B1 there was
@@ -349,13 +349,37 @@ Tasks already ships, seen as client work.
 - [x] B3.5 Profitability: hours × rates against a budget, per engagement per currency, with CSV — value, never margin
 - [x] B3.6 The plan: milestones on a date axis over the existing board, reached when a person says so; and templates — a project marked reusable, copied onto new dates with nobody's assignees, comments, hours or finished cards
 - [x] B3.7 ★ Projects agent: `log_time`, `project_status_summary`, `draft_timesheet_from_calendar` — every hour it writes is a **suggestion** in nobody's total until the person whose timesheet it is accepts it
-- [ ] B3.8 Per-project access roles (who may see an engagement at all) — *deliberately deferred to B4.12, with B2's and BI-1's, where the first scoped role is designed on Spaces rather than invented three times*
+- [ ] B3.8 Per-project access roles (who may see an engagement at all) — *B4.12 shipped the role mechanism (`tenant_user_roles`) and used it for the external accountant only; a per-engagement scope is a further role and remains unshipped*
 
 Projects is translated end to end in en/fr/nl — interface, the assistant's
 cards, and the unit label on an invoice line raised from a timesheet
 (B3.11).
 
 ### Wave B4 — Expenses & Accounting core — receipts, ledger, reconciliation, VAT
+
+Built on the same terms as B2, BI-1 and B3: code, migrations and tests, none
+of it deployed. This is the first wave whose output is not a screen a
+colleague reads but a statement a stranger audits, so every figure on it is
+the server's fold of an append-only journal, in integer cents.
+
+- [x] B4.1 The chart of accounts: a neutral EU-SME chart seeded per tenant in the reader's own language, renamed, renumbered and retired by the tenant — posting rules resolve by an account's **job** and never by its number, so an accountant's numbering breaks nothing
+- [x] B4.2 The journal: append-only entries whose debits equal their credits, enforced inside the transaction and proven by property tests over generated documents, with per-event idempotency so a document posts exactly once
+- [x] B4.3 The posting rules: invoice issue, payment settlement (including partials) and credit note, each golden-tested against hand-written entries, an original and its credit summing to zero — *written and tested; **not yet called from the billing routes**, so today the books open at reconciliation (B4.6)*
+- [x] B4.4 Expenses: a claim with its project, method and VAT, submit → approve → reject or reimburse, an approver's queue and a to-pay-back list; mileage at a per-km rate table — *mileage is API-only, the category picker and the receipt upload are named cuts, and an approved claim does not post to the journal*
+- [x] B4.5 ★ Receipts: a deterministic extractor (vendor, date, amounts, VAT) behind a pluggable trait, fixture-proven, with a parsed-fields-for-confirmation door — *the AI backend is a seam awaiting a human's model decision, not a backend*
+- [x] B4.6 ★ The bank: CAMT.053, MT940 and a CSV mapping wizard against public goldens; then reconciliation — exact matching, windowed heuristics, per-tenant learned rules, manual pick, set-aside, an undo on each, and a confirm that **books the invoice and the payment**
+- [x] B4.7 Fiscal periods with a soft close: postings before the lock date refused typed, an admin unlock audited
+- [x] B4.8 The four reports: profit and loss with the year-earlier period beside it, the balance sheet on any day, who owes what by how overdue, and the VAT-return figures — from the books, with a CSV per report; a balance sheet that does not balance says so instead of printing a figure that looks fine
+- [x] B4.9 The accountant role: alo's **first scoped role** — finance read plus journal write, no mail and no files, proven by tests that the scope holds
+- [x] B4.10 ★ The finance agent: `categorise_transactions` (a suggestion kept apart from the category you chose), `vat_summary` and `flag_anomalies` — answers with the entries behind them, no score, nothing about any person, nothing filed
+- [ ] B4.11 The ledger posting from the documents themselves (issue, settle, credit — and an expense rule, which does not exist) — *the wave's largest gap, named in `docs/design/finance.md` § "What B4 promised"; a follow-up item, not a cut*
+- [ ] B4.12 The manual journal entry with description and attachment (the accountant's escape hatch) — *the store function exists and is tested; it has no route and no screen*
+
+Finance is translated end to end in en/fr/nl — the claim form, the bank and
+reconciliation screens, the chart, the four reports and the agent's cards
+(B4.15). The CSV column headings stay English on purpose: they are a contract
+read by an accountant's own tooling, not a sentence a person reads.
+
 ### Wave B5 — Purchasing & Inventory — products, stock, PO/SO chains
 ### Wave B6 — HR — records, leave, recruitment-lite (payroll calc = permanent non-goal)
 ### Wave BI-1 — alo Insights first slice ⇄ inserted after B2 (ADR 0037: zero-setup overview dashboard, tile gallery, ask-to-chart)
@@ -368,7 +392,7 @@ migrations and tests, none of it deployed.
 - [x] BI-1.3 The Insights tab: number, bar, line, pie and table tiles under alo chrome, drawn by one embedded Apache-2.0 library, every chart also a table for a screen reader
 - [x] BI-1.4 ★ The zero-setup **Business overview**: seven live figures on a real board the first time a tenant opens Insights, with a gallery of ten ready-made questions beside it
 - [x] BI-1.5 ★ Ask-to-chart: plain language → a proposed chart you look at before it is pinned; strict parse, one repair, a refusal believed rather than repaired
-- [ ] BI-1.6 Spaces-scoped board sharing (finance sees finance, sales sees pipeline) — *deliberately deferred to B4.12, where the first scoped role is designed on Spaces rather than invented twice; boards are tenant-wide until then*
+- [ ] BI-1.6 Spaces-scoped board sharing (finance sees finance, sales sees pipeline) — *B4.12 shipped a role table rather than a Spaces scoping, and used it for the external accountant only; insight boards are still tenant-wide*
 
 The module is translated end to end in en/fr/nl — interface, chart labels,
 the seeded overview's own captions, down to the quarter and week

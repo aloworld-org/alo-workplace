@@ -14242,3 +14242,160 @@ Next item: B4.15 (wave review — fr/nl for the whole Finance module, CHANGELOG
 sweep, `docs/design/finance.md` as-built, `docs/features.md` [B4]
 reconciliation; the invoice-posting gap above is the first thing that
 reconciliation will find).
+
+## 2026-08-10 — B4.15 the wave review: the books in three languages, and B4 reconciled
+
+Wave B4 closes. The module whose output is *a statement a stranger audits* now
+reads in the language of whoever audits it, its design note describes what was
+actually built, the ROADMAP has the B4 slice list it never had, and every
+`[B4]` line of `docs/features.md` has an answer — shipped, or a cut with its
+reason. No Rust changed and nothing was deployed.
+
+**The interface — 350 keys, twice.** `fr.ts` and `nl.ts` gained the whole B4
+surface: `moduleFinance` and 307 `finance*` keys (the claim form, the
+approver's queue and the to-pay-back list, the bank import and its mapping
+wizard, the reconciliation screen with every sentence explaining *why* we think
+a payment settled a document, the chart of accounts with its five kinds and
+fourteen jobs, and the four reports) plus the 43 agent keys of B4.14a/b
+(`agentCategorise*`, `agentVat*`, `agentAnomaly*`). The words are the
+documents': *note de frais*, *relevé bancaire*, *plan comptable*, *déclaration
+de TVA*; *declaratie*, *rekeningafschrift*, *rekeningschema*, *btw-aangifte*.
+
+Three decisions worth recording:
+
+- **No French participle agrees with an interpolated amount.** Money arrives as
+  a formatted string, so `1,00 € restent dus` is ungrammatical for every
+  singular amount and right only by luck. Four sentences were re-authored as
+  invariable ones — *restant à payer*, *un écart de … n'est pas expliqué*,
+  *Nous avons reçu …*, *Retour de … à …* — and a test asserts each with a
+  singular amount. The expense **statuses** do agree (*Approuvée*, *Refusée*,
+  *Remboursée*): their subject is always *la note de frais* and never another
+  document, which is the opposite of B2.14's record history, where the subject
+  was the page you were on and participles had to go entirely.
+- **Dutch says *afletteren*, not *matchen*.** The bank tab, the counts, the
+  undo and the empty state all use the bookkeeper's verb. A loanword on the one
+  screen an accountant opens daily is the tell that a product was translated
+  rather than written.
+- **A word shared with Billing stays one word.** A payment settles a *billing*
+  invoice and is read on a *finance* screen, so `issued` is *Émise* /
+  *Uitgegeven* here exactly as B1.27 made it there — pinned by its own test,
+  because the same document appearing to have two states in two modules is a
+  bug a translator introduces and nobody else can see.
+
+**A fifth completeness test** (`locale.test.ts`, "alo Finance is fully
+translated (B4.15)"), mirroring billing's, CRM's, Insights' and Projects': the
+B4 key set must exist in both catalogs, every interpolation must keep its
+arity, the agent cards' `reason` and `kind` **default** branches must have
+words in each language, the four invariable sentences are asserted with a
+singular amount, and the Billing↔Finance shared words are asserted equal. A B4
+key added later without fr/nl turns the suite red.
+
+**Docs, as-built.** `docs/design/finance.md` is now `Status: as built`; its
+three "fr/nl at B4.15" promises are closed as shipped; a new § **Languages**
+records the three decisions above and the three things deliberately *not*
+translated (CSV column headings, the server's refusal sentences, and the
+seeded chart — which is not a catalog string at all but per-tenant data written
+once in the reader's language); and a new § **"What B4 promised, and what B4
+shipped"** answers every `[B4]` feature in a table. `docs/features.md` gains
+the pointer blockquote B1/B2/B3 have, carrying the one finding load-bearing
+enough to repeat. `ROADMAP.md` gains the B4 slice list (B4.1–B4.10 ticked,
+B4.11–B4.12 left open with their reason inline) and the Languages line.
+
+**The reconciliation's findings — what B4 did NOT ship:**
+
+- **★ The ledger does not post from the documents.** `post_invoice_issue`,
+  `post_payment_settle` and `post_credit_note_issue` are written, golden-tested
+  and called by **nothing outside the test suite and `bank_reconcile`**. The
+  reconciliation confirm books an invoice lazily (B4.09a chose that on purpose,
+  and says so in its own module doc), so the books open the first time somebody
+  ticks off a bank statement — and a tenant who invoices and never reconciles
+  has an empty journal. Worse, **no rule posts an expense at all**:
+  `SourceKind::Expense` exists in the model with nothing writing it, so an
+  approved claim never reaches the P&L. Now written down in three places
+  (design note table, features blockquote, ROADMAP B4.11) instead of only in
+  this journal. It is a follow-up item, not a cut.
+- **No manual journal entry over HTTP.** `post_fin_entry` exists and is tested;
+  it has no route and no screen, so the escape hatch the design note leans on
+  for depreciation and accruals is reachable only from Rust. Never a queue item
+  — the queue went from the posting rules straight to the reports (ROADMAP
+  B4.12).
+- **No AI receipt backend** (the extractor is deterministic behind the trait a
+  model plugs into), **no receipt button in the claim form**, **no mileage
+  screen**, **no expense category picker** (`/finance/categories` still has no
+  door), **no expense rebilling to a customer** (B3.06 rebills hours; rebilling
+  a cost is an invoice-line rule nobody wrote), and **reports export CSV but
+  not PDF**.
+- **"Categorise last month's bank transactions"** is narrower than features.md
+  reads: the tool categorises *expense claims*, because a bank line is
+  attributed on the reconciliation screen and two doors onto the same act would
+  be two ways to book it.
+- **"Reconciliation with AI matching"** involves no model: deterministic
+  matching plus a per-tenant learned-rules table, which is exactly why every
+  suggestion can state its own evidence. Named as such rather than left to
+  imply a model.
+
+**The CHANGELOG sweep found two shipped slices with no line**, and both were
+written in the house voice for an API-only feature: **B4.07 mileage** (the
+per-km rate table, effective-dated, snapshotted onto the journey) and **B4.06
+receipt reading** (a Drive node in, candidate fields out, nothing written).
+Plus this item's own line. Every other B4 slice already had one.
+
+**The three stale ROADMAP deferrals are fixed.** B2.11, B3.8 and BI-1.6 each
+said the first scoped role would be "designed on Spaces" at B4.12. B4.12
+shipped a `tenant_user_roles` table instead, and used it for exactly one role
+(the external accountant). All three now say what actually happened and that
+their own scope — sales-vs-finance, per-engagement, per-board — remains
+unshipped.
+
+**How verified.**
+
+```
+npx tsc --noEmit                                   → clean
+npx eslint src/i18n/{fr,nl}.ts src/i18n/locale.test.ts → clean
+npx vitest run src/i18n/locale.test.ts             → 41 tests, green
+npx vitest run                                     → 40 files, 394 tests, green
+npm run build                                      → clean
+key counts, per catalog: fr 307 finance + 43 agent · nl 307 + 43
+```
+
+  the suite before and after, so the 12 stray unhandled rejections are not
+  mistaken for this item's:
+```
+at HEAD (changes stashed):  385 passed (385)   ·  12 errors
+with this item:             394 passed (394)   ·  12 errors
+```
+  the errors are the pre-existing `signupDomains()` promise resolving into a
+  torn-down environment in `App.test.tsx` — identical in both runs, unrelated
+  to i18n, and not this item's to fix (same finding as B2.14).
+
+**Cuts, named.**
+
+- **No fr/nl for the Mail agent's own 26 card strings**, unchanged from B2.14:
+  they are ADR 0034's mail wave, and the five *shared* chrome keys the finance
+  cards need were already translated there.
+- **No Rust string table was added**, because Finance emits no customer-facing
+  document: the CSV headings are a machine contract (stated at the top of
+  `finance_reports.rs`), and the one place Rust does write words a person reads
+  — the seeded chart of accounts — already had en/fr/nl at B4.13c
+  (`finance_chart_names.rs`, checked against `CHART` by a test).
+- **No sweep of the untranslated keys outside B1–B4** (Tasks, Drive, Base,
+  Home, Agenda). Those are other waves' surfaces; a review item translates its
+  own wave.
+
+**Flags for the human.**
+
+- **★ The invoice-posting gap above is the largest open thing in Finance** and
+  is now on the ROADMAP as B4.11 rather than only in this journal.
+- The **module-navigation defect** (relative `NavLink`s building a growing
+  address in Billing, CRM, Projects and Insights) is unchanged.
+- The server's refusal sentences are still English in every language — the same
+  cross-cutting `StoreError` vocabulary item flagged at B1.27 and B2.14.
+- **B4 was built ahead of its own gate**, like B2, BI-1 and B3. Nothing is
+  deployed; the ROADMAP section says so.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B5.01 (the alo Inventory design note — the moves-only stock model,
+locations, and the PO/SO state machines; same four-block bar as B1.01).
