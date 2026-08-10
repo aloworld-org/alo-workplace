@@ -6,6 +6,20 @@ contracts.
 
 ## Unreleased
 
+- **Purchase orders: what you asked a supplier for, written down.** You can now
+  draft an order — who it is with, what you want from them, at the price they
+  quote, in their currency, with your own reference and the day you expect it —
+  and alo adds it up for you: net, VAT per rate and gross, computed on the
+  server so the figure on the screen is the figure in the record. A line can
+  point at something in your catalog, which is how the goods will find their
+  way onto the shelf when they arrive; a line that points at nothing is a
+  charge in words — freight, packaging, the discount they gave you — and that
+  one may be negative. While it is a draft it is yours to change or throw away.
+  If you stop expecting the goods you cancel it instead of deleting it, and the
+  decision is kept with the day you made it. Everything a purchase order does
+  is in your audit trail, and none of it can reach another company's suppliers,
+  products or orders.
+
 - **You can now correct the shelf — and alo makes you say why.** Two things a
   warehouse does by hand have doors of their own: moving goods between your own
   places, and admitting the shelf disagrees with the system. A correction picks

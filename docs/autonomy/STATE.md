@@ -15179,3 +15179,140 @@ directions is what turns one collision into two.
 Next item: B5.05a (purchase orders: the record, the draft→sent state machine
 over the `billing_sequences` counter with a new `purchase_order` kind, the
 covering mail draft, and the routes).
+
+## B5.05a — the order we place, and everything up to sending it (2026-08-10)
+
+**Shipped.** The purchase order as a record with a life: a draft you compose
+(supplier, their currency, your reference, the day you expect the goods, a note)
+with lines that may point at the catalog, the money derived from those lines on
+every read, and the transitions it may make stated once as a table. Six routes:
+`GET/POST /inventory/purchase-orders`, `GET/PATCH/DELETE
+/inventory/purchase-orders/{id}`, `POST /inventory/purchase-orders/{id}/cancel`.
+
+**Where the code went.** Migration `0160_inv_purchase_orders.sql`
+(`inv_purchase_orders` + `inv_purchase_order_lines`); store `inv_po.rs` (the
+record, `PoStatus`, the CRUD and the cancellation) and `inv_po_lines.rs` (the
+line model over `billing_line`'s rules, plus the product link); routes
+`inventory_po.rs`; `server.rs`, both `lib.rs` files, `id.rs`
+(`InvPurchaseOrderId`) and `tests/audit_routes.rs` additively.
+
+**The cut, stated plainly: sending is now B5.05a2, and it is a split, not a
+deferral of depth.** The queue item read "model + draft→sent (PDF via alo Mail
+draft) + state tests + routes". The design note is emphatic that sending a
+purchase order is **one act** — draw the number, stamp the date, render the
+order, write the covering mail draft, move the state, in one transaction —
+because a route that moves an order to *sent* without writing the mail lets a
+tenant hold an order marked sent that nobody sent, "which is the state that
+makes a shortage report lie". Rendering the order needs the print/PDF machinery
+(B1.16/B1.17) to accept a party that is not a `billing_customers::Customer`:
+`PrintDocument.customer` is used at ~20 construction sites across
+`billing_print`, `billing_pdf`, `billing_ubl`, `billing_cii`, `billing_einvoice`,
+`billing_reminder` and the e-invoice goldens, and generalising it is its own
+piece of work with its own review. Two half-things — a `send` that does not mail,
+or a party generalisation rushed against the e-invoice goldens — were both
+worse than one whole thing now and one whole thing next. So: **no `send` route
+and no `send_*` store call exist**, the three states beyond `draft` are in the
+vocabulary, the transition table and the database's CHECKs, and `PO-YYYY-NNNNN`
+/ `purchase_order` are *not* yet added to `billing_sequence.rs` — the number is
+drawn where it is used, in B5.05a2, so nothing unused ships. QUEUE gained
+B5.05a2 immediately after B5.05a.
+
+**Six decisions, all recorded as-built in `docs/design/inventory.md` § "As
+built (B5.05a…)".** The line is a `billing_line` plus a nullable product (goods
+lines must be positive, charges in words may be negative); the product link is a
+reference and everything else on the line is a snapshot; a cancelled order may
+be unnumbered, so the "placed ⇒ numbered" CHECK is written over the three placed
+states; `closed_date` covers both terminal states so B5.05b cannot complete an
+order without a date; `late` is derived, never stored, and the expected date is
+never invented from the supplier's lead time; an archived supplier cannot be
+ordered from and an archived product cannot be ordered.
+
+**Verified — gates.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+-p alo-jmap --all-targets` **zero warnings** (this also removed a duplicated
+`#![allow]` in `platform/alo-store/tests/meet.rs` that had been warning since
+the meet commit — one line, and the gate is honest again); `cargo test -p
+alo-store` 929 lib + every integration suite green, `cargo test -p alo-jmap`
+green. New tests: 17 pure (`inv_po.rs`: all 25 ordered pairs, the terminal
+states, the editability guard, the short-close guard, the lateness predicate;
+`inv_po_lines.rs`: the two kinds of line and the shared rules) and 5 database
+tests in `platform/alo-store/tests/inv_po_lifecycle.rs` — the draft round trip
+with its totals, every refusal writing nothing, a placed order refusing all
+three writes and cancelling cleanly, the number lookup, and the wrong-tenant
+denial on read, list, update, lines, delete, cancel, another tenant's supplier
+and another tenant's product. No web change, so no tsc/eslint/build.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8099` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+tokens through the real PKCE flow, rows read back in psql.
+
+```
+GET/POST /inventory/purchase-orders  (no token)      → 401 ×2
+POST   …/purchase-orders {}                          → 422 supplierId is required…
+POST   …/purchase-orders (B naming A's supplier)     → 404
+POST   …/purchase-orders expectedDate "15/10/2026"   → 422 …must be a date as YYYY-MM-DD…
+POST   …/purchase-orders 2 lines (goods + freight)   → 200 draft, currency CHF (the
+                                                       supplier's), number null,
+                                                       orderedDate null, late false,
+                                                       net 19700 / VAT 3743 / gross 23443
+GET    …/purchase-orders/{id}                        → the same figures, lines in order
+GET    …/purchase-orders                             → 1, with supplierName + totals
+GET    …/purchase-orders?status=sent                 → []
+GET    …/purchase-orders?status=open                 → 422 status must be one of draft,
+                                                       sent, partially_received, …
+PATCH  …/{id} {lines:[…]}                            → 200, header untouched (reference,
+                                                       currency, expectedDate all kept)
+PATCH  …/{id} {note, expectedDate:null}              → 200, expectation cleared
+PATCH  …/{id} as the other tenant                    → 404
+PATCH  …/{id} line naming a foreign product          → 404
+PATCH  …/{id} goods line qtyMilli 0                  → 422 line 1: a line that orders a
+                                                       product must ask for more than nothing
+GET    …/{id} after both refusals                    → unchanged (nothing half-written)
+psql: UPDATE … status='sent', number='PO-2026-00001' (the state B5.05a2 will write)
+PATCH/PATCH lines/DELETE on it                       → 409 ×3 …only while it is a draft;
+                                                       this one is sent
+POST   …/{id}/cancel {}                              → 200 cancelled, closedDate today,
+                                                       number kept
+POST   …/{id}/cancel again                           → 409 …it is closed and cannot change
+psql: a second order to 'partially_received'
+POST   …/cancel {}                                   → 409 part of this order has already
+                                                       arrived; …asked for explicitly
+POST   …/cancel {"shortClose":true}                  → 200 cancelled, closedDate today
+DELETE a draft → 200; GET it → 404; GET an unknown id → 404
+other tenant: GET list → []; GET/DELETE/cancel ours → 404 ×3
+psql inv_purchase_orders → cancelled/PO-2026-00001 and cancelled/PO-2026-00002, both
+                           closed today, both CHF
+psql inv_purchase_order_lines → the surviving order's one line, order 0, product set
+psql audit_log → inventory.purchase_order.create ×3, .update ×2, .cancel ×2, .delete ×1
+                 (and not one entry for any of the ~12 refusals)
+```
+
+**Cuts and flags.**
+
+- **No `GET …/{id}/print` or `/pdf`.** They are the paper, and the paper is
+  B5.05a2's; shipping a print route before the party generalisation would mean
+  writing the generalisation anyway, at the worst moment.
+- **No web at all** (B5.09b), so no i18n strings were added. `/inventory` was
+  already in the vite proxy list from B5.03, and the production Caddyfile
+  already carries the `/inventory` prefix from B5.04b — this item adds no new
+  top-level prefix.
+- **No CSV twin and no `?supplierId=` filter on the list.** The route table
+  promises neither; the status filter is the one the note lists, and a
+  by-supplier list arrives with the screen that needs it.
+- **`inventory` is still not role-gated beyond the accountant's read-only
+  scope** — any authenticated member of the tenant may raise and cancel an
+  order. Unchanged from B5.04b, named again here rather than assumed: buyer
+  roles are a wave-review question.
+- **Nothing prevents two drafts for the same supplier and product.** Real
+  purchasing does exactly that, and the shortage report (B5.07) is what will
+  make double-ordering visible.
+
+**Migration numbering.** `0160` was minted after checking the tree for
+duplicates, and the check was re-run after the pre-push rebase — the rule
+B5.04a and B5.05a's predecessor each paid for. The sequence to trust: `0157`
+inv locations/moves, `0158` site page locales, `0159` inv move reason code,
+`0160` inv purchase orders.
+
+Next item: B5.05a2 (sending: generalise the printed document's party so a
+supplier can stand where a customer does, draw `PO-YYYY-NNNNN` from
+`billing_sequences`, render the order, write the covering mail draft to the
+supplier's stored address, and move the order to `sent` — all in one act).

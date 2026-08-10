@@ -733,6 +733,59 @@ mail draft is a fact about the user's mailbox; if writing it fails, the
 transaction rolls back and the order is still a draft, which is the honest
 state.
 
+### As built (B5.05a — the record; B5.05a2 — the sending)
+
+**B5.05a shipped the order and its life up to the point of sending**, and the
+send was split into its own item rather than half-built. The reason is the rule
+two paragraphs above: sending is one act — the number, the date, the paper and
+the covering mail draft together — and the paper needs a generalisation of the
+print/PDF machinery (B1.16/B1.17 render a `PrintDocument` whose counterparty is
+a `billing_customers::Customer`; a purchase order's is a supplier). Doing that
+generalisation badly, or in a hurry alongside the record, is how a route
+appears that moves an order to *sent* without writing the mail — precisely the
+state this note says makes a shortage report lie. So the states beyond `draft`
+exist here in the vocabulary, in the transition table and in the database's
+CHECKs, and the doors that write them arrive with what they owe: B5.05a2 the
+sending, B5.05b the receiving.
+
+Migration `0160_inv_purchase_orders.sql`; store `inv_po.rs` (the record and
+`PoStatus`) and `inv_po_lines.rs` (the line); routes `inventory_po.rs`
+(`GET/POST /inventory/purchase-orders`, `GET/PATCH/DELETE
+/inventory/purchase-orders/{id}`, `POST /inventory/purchase-orders/{id}/cancel`).
+Six things the note had not settled, decided here:
+
+- **The line is a `billing_line` plus a product.** The same five fields, the
+  same rules, the same validator — and a nullable `product_id` beside them. A
+  line that names a product is goods, so its quantity must be **positive** (it
+  becomes a movement into stock); a line that names none is a charge in words —
+  freight, packaging, a discount — and may be negative, the latitude a billing
+  line has. `ON DELETE SET NULL` on the product link: deleting a catalog item
+  must never delete the record of having ordered it.
+- **The product link is a reference; everything else on the line is a
+  snapshot.** Receiving has to name a product the stock ledger knows, so that
+  one field cannot be a copy; the description, unit, price and rate are copied
+  at the moment the line is drafted, so re-negotiating never rewrites an order
+  already placed.
+- **A cancelled order may be unnumbered.** Cancelling is legal from `draft`, so
+  the "a placed order has a number" CHECK is written over the three placed
+  states rather than as `status <> 'draft'`. A draft is cancelled rather than
+  deleted when the tenant wants the decision on the record; `DELETE` is still
+  there for one nobody ever meant.
+- **`closed_date` is stamped for both terminal states** — received and
+  cancelled — and the CHECK ties it to them, so B5.05b's completion cannot land
+  without a date and no later touch of `updated_at` can be mistaken for one.
+- **`late` is derived on every read** (`PurchaseOrder::is_late`), like an
+  invoice's overdue flag: an order still open whose expected day has passed. An
+  unplaced or finished order is never late, whatever the dates say. The
+  expected date itself is **not** derived from the supplier's lead time — an
+  arrival date for an order that has not been placed would be a date about
+  nothing — and a date in the past is accepted, because typing up a paper order
+  from last week is ordinary.
+- **An archived supplier cannot be ordered from, and an archived product cannot
+  be ordered** (`422` naming the line, never the product's name). Both are the
+  archived-customer rule of B1.11 applied where it belongs: archiving means "we
+  have stopped", and the refusal says what to do instead.
+
 ### Receiving, and the three-way-lite match (B5.05b)
 
 `POST /inventory/purchase-orders/{id}/receipts` takes a location and a
