@@ -123,7 +123,7 @@ small, or a `[!]` note for the human if large.
 - [x] B5.04b Stock adjustments: manual adjustment moves with reason codes + routes + wire.
 - [x] B5.05a Purchase orders, the record: model + lines + the full state table + draft CRUD/cancel routes.
 - [x] B5.05a2 Purchase orders, sending: number draw + the printed order (party generalisation of B1.16/B1.17) + covering mail draft; `POST /{id}/send` moves draft→sent in one act.
-- [ ] B5.05b Purchase orders, receiving: received → stock moves + bill draft created (three-way-lite link); arc wire-verified.
+- [x] B5.05b Purchase orders, receiving: received → stock moves + bill draft created (three-way-lite link); arc wire-verified.
 - [ ] B5.06a Sales orders: model + order→delivery note (stock moves out) + routes + tests.
 - [ ] B5.06b Sales orders → invoice: delivery→invoice draft (B1 bridge); full arc wire-verified.
 - [ ] B5.07 Reorder rules (min/target per product/location) + shortage query feeding agent proposals.

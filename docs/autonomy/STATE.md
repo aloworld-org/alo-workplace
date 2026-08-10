@@ -15455,3 +15455,152 @@ psql messages + blob     → subject as above, To: "Hoffmann Möbel GmbH
 Next item: B5.05b (receiving: `received` → stock moves into the ordered
 products' locations, plus the supplier-bill draft linked to the order — the
 three-way-lite match — with the arc wire-verified).
+
+## B5.05b — receiving: what arrived, where it went, and the bill for it (2026-08-10)
+
+**Shipped.** `POST /inventory/purchase-orders/{id}/receipts` — one act with
+three consequences, in one transaction: the **movements into stock** (from the
+tenant's virtual `supplier` location to the place named, reason `purchase`,
+referencing the order), the **order's new state** (`partially_received`, or
+`received` with `closed_date` when every line of goods is complete), and a
+**draft bill** in `billing_bills` for exactly what arrived. Plus
+`GET …/{id}/receipts` — what has come, newest delivery first, each with its
+lines and the movement each one wrote.
+
+**The three-way match, lite** — and *lite* is the honest word. The receipt is
+matched against the order (over-receipt refused, below) and the bill states what
+we *ordered and received*, not what the supplier billed. Their real invoice
+arrives later through B1.24's import as a **second** bill; reconciling the two is
+the third leg, still a named cut.
+
+**Seven decisions, all now in `docs/design/inventory.md` § As built (B5.05b).**
+The two with teeth:
+
+- **The received quantity is a column on the ordered line, not a fold over the
+  ledger.** Two lines of one order may name the same product, so a movement
+  cannot say which line it belongs to. `received_qty_milli` is written only by
+  the receiving transaction, and the database's CHECK
+  (`≤ GREATEST(qty_milli, 0)`) makes an over-receipt impossible rather than
+  merely refused — phrased over `GREATEST` and not over `product_id`, because a
+  `product_id`-shaped CHECK re-evaluates on the `ON DELETE SET NULL` that
+  deleting a catalog item performs and would block that deletion.
+- **An unstated delivery is the whole outstanding order.** `lines` absent means
+  "what was ordered arrived" — the ordinary case a warehouse should not type
+  out. `lines: []` is *not* that: it states that nothing arrived and is refused,
+  rather than widened into "everything".
+
+**A found defect, fixed on the wire, not in review.** The first run answered
+tenant B's delivery against tenant A's order with a `422` about B's *own*
+missing supplier location — the locations were resolved before the order's
+ownership was checked, so the refusal admitted the order was worth looking at.
+The order of refusals is itself a tenancy rule now: `purchase_order_status` runs
+first (`pub(crate)` for exactly this), and the answer is a bare `404`. A test
+was added for a tenant that has never opened Inventory at all.
+
+**`billing_bills` learned one thing** (B1.24's module, extended additively): a
+bill read from **no file** carries no syntax and no checksum, instead of being
+handed a hash of our own bytes that would claim a provenance the record does not
+have. `create_billing_bill_in` is the new transactional door (the public
+`create_billing_bill` is now a `BEGIN`/`COMMIT` around it), and migration 0161
+widens the two CHECKs — `source_syntax IN ('', 'cii', 'ubl')`, and the hash
+required unless both are empty. Every imported bill is held to exactly the rule
+it was before.
+
+**Verified — the gate.** `cargo fmt` (only the item's own files; `main` is not
+rustfmt-clean here, so unrelated churn was reverted), `SQLX_OFFLINE=true cargo
+clippy -p alo-store -p alo-jmap --all-targets` clean, `cargo test -p alo-store`
+(946 unit + every suite green, including the new 6-test `tests/inv_po_receive.rs`)
+and `cargo test -p alo-jmap` (560 unit + 59 suites, `tests/audit_routes.rs`
+updated with the one new action). The wrong-tenant test is in the suite: another
+tenant cannot receive, read the receipts, read the receipt, or read the bill —
+and a tenant with no locations at all gets the same bare denial.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real password-grant tokens, rows read back in psql.
+
+```
+GET/POST …/{id}/receipts  (no token)                → 401 ×2
+POST  …/{draft order}/receipts                      → 409 goods cannot be received
+                                                      against a purchase order that is
+                                                      draft: it has not been sent…
+POST  …/{id}/send                                   → sent, PO-2026-00002, 2026-08-10
+GET   …/{id}/receipts                               → 200 {"receipts":[]}
+POST  …/{id}/receipts {}                            → 422 locationId is required: a
+                                                      receipt says where the goods were put
+POST  …/{id}/receipts {lines:[]}                    → 422 a receipt must say what
+                                                      arrived; it books at least one line
+POST  …/{id}/receipts into the customer location    → 422 …CUSTOMER: it is not a place
+                                                      anybody can walk into
+POST  …/{id}/receipts 4001 of 4000                  → 409 line 1 (Blue chair): 4000
+                                                      milli-units were ordered and 0 have
+                                                      already arrived, so 4001 more would
+                                                      make 4001; …record the rest as an
+                                                      adjustment with a reason
+POST  …/{id}/receipts on the freight line           → 422 line 2 is a charge in words,
+                                                      not goods; nothing arrives against it
+POST  …/{id}/receipts lineId "nope"                 → 404
+POST  …/{id}/receipts as the other tenant           → 404  (was 422 — see above)
+GET   …/{id}/receipts as the other tenant           → 404
+POST  …/nope/receipts                               → 404
+GET   …/{id} after nine refusals                    → sent, received 0, outstanding 4000;
+                                                      0 new moves, 0 new bills
+POST  …/{id}/receipts {location, line 2500, note}   → 200 partially_received,
+                                                      closedDate null, line received 2500 /
+                                                      outstanding 1500, freight 0/0,
+                                                      receipt 1 MAIN 2026-08-10 "one crate
+                                                      damaged", billId …
+GET   /billing/bills/{billId}                       → PO-2026-00002/R1 received CHF,
+                                                      sourceSyntax null, sourceSha256 "",
+                                                      supplier Hoffmann Möbel GmbH CH,
+                                                      buyerReference "Project Falkenstein",
+                                                      issue 2026-08-10 due 2026-09-09 (30d),
+                                                      net 10750 / VAT 2043 / payable 12793,
+                                                      one line 2500 @ 4300
+GET   /inventory/stock?productId                    → MAIN 2500
+GET   /inventory/moves                              → SUPPLIER → MAIN 2500 purchase
+                                                      purchase_order {the order}
+POST  …/{id}/receipts {location} (no lines)         → 200 received, closedDate 2026-08-10,
+                                                      line 4000/0, receipt 2 qty 1500,
+                                                      bill PO-2026-00002/R2 payable 7676
+POST  …/{id}/receipts again                         → 409 …that is received: everything on
+                                                      it has already arrived
+GET   …/{id}/receipts                               → 2 then 1, newest first, each with its
+                                                      bill and its lines
+GET   /inventory/stock?productId                    → MAIN 4000
+psql inv_po_receipts / _lines → 2 receipts, 1 line each, each with a bill, notes as typed
+psql inv_purchase_order_lines → Blue chair 4000/4000, Freight 1000/0
+psql billing_bills            → /R1 and /R2, received, source_syntax '' and sha '',
+                                CHF, 12793 + 7676, type 380
+psql inv_moves ⋈ receipt lines→ every receipt line's move: qty equal, reason purchase,
+                                ref_kind purchase_order, ref_id = the order, SUPPLIER→MAIN
+psql inv_purchase_orders      → PO-2026-00002 received, closed_date 2026-08-10
+psql audit_log                → inventory.purchase_order.receipt.create ×2 per run, and
+                                not one entry for any of the nine refusals
+```
+
+**Cuts and flags.**
+
+- **The receipt date is today.** A delivery typed up on Monday for goods that
+  came on Friday is dated Monday. Back-dating needs a field, a bound and a rule
+  about movements that precede it; the ledger's `occurred_at` already carries
+  the same question, and answering it in two places is how they disagree.
+- **A receipt cannot be corrected or reversed** — no `PATCH`, no `DELETE`. Goods
+  received in error are corrected by an adjustment or a return movement, the
+  module's standing answer, which leaves a person's note explaining it. A
+  reversal that unwound the accumulator, the movements *and* a bill somebody may
+  have approved is a document of its own.
+- **No web** (B5.09b), so no i18n catalogue strings; the receipt sheet is the
+  next screen item's.
+- **One bill per delivery, always** — including a delivery of goods priced at
+  zero. A supplier who sends a free replacement gets a €0 draft bill rather than
+  a special case in the transaction.
+- **No shortage arithmetic yet.** `outstandingQtyMilli` is on the line and
+  `is_open()` already means "goods may still arrive"; B5.07 folds them.
+- **`inventory` is still not role-gated** beyond the accountant's read-only
+  scope — any authenticated member may book a delivery, which is also the write
+  that creates a liability. Named again rather than assumed; a receiving role is
+  a wave-review question.
+
+Next item: B5.06a (sales orders: the record, the state machine, order → delivery
+note with stock moves out, routes and tests).

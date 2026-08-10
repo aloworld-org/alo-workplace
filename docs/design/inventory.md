@@ -885,6 +885,77 @@ pallet.
 stays open, and the shortage report knows the difference between ordered and
 received (below).
 
+### As built (B5.05b)
+
+Migration `0161_inv_po_receipts.sql`; store `inv_po_receive.rs` (the receiving
+transaction, the receipt record and its reads); route
+`inventory_po_receipts.rs` (`GET/POST /inventory/purchase-orders/{id}/receipts`)
+over the existing `record_move_in` and a new transactional door onto
+`billing_bills`. Seven decisions the note had not settled, decided here:
+
+- **The received quantity is a column on the ordered line, not a fold over the
+  ledger.** Two lines of one order may name the same product — two deliveries at
+  two prices is an ordinary way to buy — so a movement cannot say which line it
+  belongs to, and "ordered 40, received 25" would be a question with no answer.
+  `inv_purchase_order_lines.received_qty_milli` is written only by the receiving
+  transaction, which writes the movements in the same breath, and the database's
+  own CHECK (`≤ GREATEST(qty_milli, 0)`) is what makes an over-receipt
+  impossible rather than merely refused. That bound is deliberately **not**
+  written in terms of `product_id`: phrasing it that way would re-evaluate on the
+  `ON DELETE SET NULL` that deleting a catalog item performs, and a received line
+  would then block the deletion.
+- **A receipt is a document.** It has an ordinal within its order
+  (`sequence_no`, drawn under the order's row lock), a location, a date from the
+  database's clock, the note the person unpacking wrote, and a line per ordered
+  line that arrived — each carrying the id of the movement it wrote. Without the
+  document, "what came on the second lorry" is a question only a ledger scan can
+  answer, and the drafted bill has no number to be built from.
+- **An unstated delivery is the whole outstanding order.** `lines` absent means
+  "what was ordered arrived", the ordinary case a warehouse should not have to
+  type out; `lines: []` is not that and is refused, because an empty set states
+  that nothing arrived and guessing between the two would book stock nobody
+  claimed. A line that names a charge in words is refused by name — freight does
+  not arrive on a pallet — and such a line never holds an order open either.
+- **The drafted bill is numbered `PO-2026-00001/R1`, and says so.** A bill is
+  keyed by `(supplier, number)`, so a number of our own shape can never collide
+  with the supplier's real invoice when it arrives, and a person reading the list
+  sees at a glance which document is theirs and which is our record of a
+  delivery. It carries **no syntax and no checksum** — `billing_bills` learned
+  that a bill read from no file records none, rather than being handed a hash of
+  our own bytes that would claim a provenance it does not have — and its note is
+  deliberately empty: a stored English sentence about the receipt would be
+  untranslatable prose in a French tenant's ledger, and the number already says
+  everything it would have.
+- **The bill copies the supplier from our master record, not from the order.** A
+  bill has to read as a document about a company — their address, their VAT id,
+  the account we pay into — and the order carries none of that. The terms are
+  theirs too, counted from the day the goods arrived; a supplier with no stated
+  terms is due on receipt.
+- **Whose order it is, first.** The refusal order is itself a tenancy rule: the
+  order's ownership is checked before the locations are resolved, so a delivery
+  booked against another tenant's order is a bare `404` and never a complaint
+  about the caller's own warehouse — which would say the order was at least worth
+  looking at. Found on the wire, not in review.
+- **`inv_po_receipt_lines.move_id` cascades.** Not a licence to delete history —
+  no door removes a movement — but this table reaches `tenants` only through its
+  receipt, and without the cascade dropping a whole tenant fails on a movement
+  that is still referenced.
+
+The audit trail needed no change: `POST …/{id}/receipts` is a sub-resource, so
+it derives as `inventory.purchase_order.receipt.create` and files against the
+order it happened to. `/inventory` is already in the vite dev proxy and the
+production Caddyfile, so no deploy change.
+
+Two cuts, both stated rather than hidden. **The receipt date is today**: a
+delivery typed up on Monday for goods that came on Friday is dated Monday, since
+back-dating needs a field, a bound and a rule about movements that precede it,
+and the ledger's own `occurred_at` already carries the same question. **A
+receipt cannot be corrected or reversed** — no `PATCH`, no `DELETE`. Goods
+received in error are corrected by an adjustment or a return movement, which is
+the module's standing answer and leaves a person's note explaining it; a
+reversal that unwound the accumulator, the movements and a bill somebody may
+already have approved is a document of its own, and not this item's.
+
 ## Sales orders (B5.06)
 
 ### The state machine

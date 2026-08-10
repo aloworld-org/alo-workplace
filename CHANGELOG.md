@@ -6,6 +6,20 @@ contracts.
 
 ## Unreleased
 
+- **Booking a delivery does the paperwork with it.** When goods arrive against a
+  purchase order, say where you put them — and, if only part of the lorry turned
+  up, how much of each line came. In one act the stock goes onto the shelf, the
+  order becomes partly or fully received, and a **draft bill** for exactly what
+  arrived is waiting in Bills, with your supplier's address and payment terms
+  and the prices you agreed. Nothing is approved and nothing is paid: the bill
+  sits undecided until a person says so, and when the supplier's own invoice
+  arrives it comes in beside it as their document. If the whole order arrived,
+  you say nothing about lines at all. More than you ordered is refused, saying
+  which line, what was ordered and what has already come, so an over-delivery is
+  recorded deliberately as an adjustment with a reason instead of quietly
+  inflating the shelf. An order that has not been sent, or that has been
+  cancelled or already completed, takes no delivery — and every arrival is on
+  the record, with who booked it and the movement it wrote.
 - **Sending a purchase order is now one act.** Placing an order gives it its
   number — `PO-2026-00001`, drawn the same unbreakable way an invoice number is
   — stamps it with today, freezes it, and writes the covering email to your
