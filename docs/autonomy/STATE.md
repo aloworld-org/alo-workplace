@@ -14958,23 +14958,36 @@ between the same two places cannot deadlock.
 - **The un-stocking guard fires only on the transition**, stocked → not, so an
   unrelated edit to a product that has moved is untouched.
 
-**HALT-adjacent find, fixed as part of this item: two migrations both claimed
-version 155.** `0155_site_page_locales.sql` (sites, commit 380c481) and
-`0155_inv_suppliers.sql` (business, commit 80d14b5) collided, and `sqlx` keys
-migrations by version — so **every** migration run on both tracks was failing
-with `VersionMismatch(155)` and no gate that touches the database could pass.
-Fixed inside this track's own write scope: the **business** file was renumbered
-`0155 → 0156_inv_suppliers.sql` (the sites file was first and is untouched),
-and this item's migration took `0157`. Local dev databases that already applied
-the old 155 need one statement — `UPDATE _sqlx_migrations SET version = 156
-WHERE version = 155 AND description = 'inv suppliers'` — after which the
-pending sites migration applies normally; the file's bytes did not change, so
-its checksum still matches. Nothing is deployed at 155, so no production
-database is affected. **The lesson for both tracks:** "the tree's highest was
-N" is not enough — check for a *duplicate* of the number you are about to mint
-(`ls migrations | sed 's/_.*//' | sort | uniq -d` is the whole test), because
+**HALT-adjacent find: two migrations both claimed version 155 — and both
+tracks then fixed it at the same time, in opposite directions.**
+`0155_site_page_locales.sql` (sites, 380c481) and `0155_inv_suppliers.sql`
+(business, 80d14b5) collided, and `sqlx` keys migrations by version — so
+**every** migration run on both tracks was failing with `VersionMismatch(155)`
+and no gate that touches the database could pass. This iteration renumbered the
+*business* file to `0156` and took `0157` for its own; the sites track, working
+the same minute, renumbered *their* file to `0156` (1d6cc05) and left `0155` to
+inventory. The rebase before the push therefore produced a fresh duplicate at
+`0156`, which is exactly the failure that had just been fixed.
+
+**Resolved as it now stands, and this is the sequence to trust:** `0155`
+inv suppliers, `0156` site page locales, `0157` inv locations moves. Inventory
+went back to `0155` because the sites track had already published its move away
+from it — deferring to the fix that was already on `main` is cheaper than a
+second round of renaming, and the two tracks now agree. No file's bytes ever
+changed, so every checksum still matches. Nothing is deployed at any of these
+numbers, so no production database is affected; a local dev database that
+applied the intermediate numbering is repaired by swapping the two rows'
+`version` values in `_sqlx_migrations` (via a temporary value, since `version`
+is the primary key), after which `cargo test -p alo-store` is green from cold.
+
+**Two lessons, both for both tracks.** First, "the tree's highest was N" is not
+enough — check for a *duplicate* of the number you are about to mint, because
 the other track's file can arrive with the same number between your rebase and
-your push.
+your push (`ls migrations | sed 's/_.*//' | sort | uniq -d` is the whole test).
+Second, **re-run that check after the pre-push rebase, not only before the
+work** — a renumbering pushed by the other track is an additive-looking change
+that can silently recreate the collision it was fixing, and the only moment
+that catches it is the one right before `git push`.
 
 Next item: B5.04b (stock adjustments: the manual adjustment and transfer route
 with its closed list of reason codes, `POST /inventory/moves` refusing any move
