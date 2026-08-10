@@ -1878,3 +1878,39 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   multi-write manual API creates site, optional theme, then Home page; S1.28a's
   generated path remains the atomic option.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.29a reviewable conversational page edits
+
+- **Shipped:** added authenticated per-page `POST` and `PUT`
+  `/sites/{site}/pages/{page}/ai-edits` doors. `POST` loads only the caller's
+  current page and tenant AI provider, returns the strict S1.27 operation
+  envelope, and writes nothing. `PUT` reloads the current page, reapplies the
+  guarded operations against that canonical version, passes the result through
+  the store's section gate, and only then persists it.
+- **Surface:** the page editor now keeps conversational editing visible beside
+  the section stack. An owner states the change, receives an ordered,
+  human-readable change list, and can Approve or Discard without navigating
+  away. Discard is client-only; Approve sends the exact reviewed envelope and
+  replaces the editor with the canonical stored page. Server explanations are
+  shown verbatim and the action gives immediate working feedback.
+- **Tenancy and safety:** the real Postgres route test proves another tenant
+  receives `404` from both proposal and approval doors. It also proves a
+  proposal leaves the page unchanged, approval persists the rewrite, malformed
+  or stale operations remain bounded by S1.27, and unconfigured/unreachable
+  inference has typed machine-readable failures.
+- **Verified:** `cargo fmt -p alo-ai -p alo-jmap`; strict
+  `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo clippy -p alo-ai -p alo-jmap
+  --all-targets --jobs 1 -- -D warnings` clean; full `cargo test -p alo-ai
+  --jobs 1` green (62 unit tests plus doc tests); full `cargo test -p alo-jmap
+  --jobs 1` green (477 library tests plus every integration/doc test). The
+  routed Sites UI passed 16 focused Vitest tests; `npx tsc --noEmit`, focused
+  ESLint, and `npm run build` are clean. Fresh-binary curl against local docker
+  `alo-pg` and a localhost-only fixture returned `200` for proposal and
+  approval, proved the heading stayed `Old wire heading` before approval, and
+  then stored `A clearer wire-tested welcome`. No external service was called.
+- **Cuts/flags:** Windows hit the PDB linker ceiling twice in unrelated
+  `alo-jmap` integration binaries. The crate's generated build artifacts were
+  cleaned (48.2 GiB), and the complete suite passed with test debug metadata
+  disabled. S1.29b owns before/after visual preview and approval-card polish;
+  this slice deliberately shows the reviewed operation list only.
+- **Next:** the first unchecked item in `QUEUE.md`.
