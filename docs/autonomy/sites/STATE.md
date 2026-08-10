@@ -2190,3 +2190,37 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   no executable source, storage, or route, so Rust, web, wrong-tenant, and curl
   gates are not applicable.
 - **Next:** S2.01a, the locale foundation.
+
+## 2026-08-10 — S2.01a locale foundation
+
+- **Shipped:** sites now store a validated default language and an ordered set
+  of enabled languages. Existing and newly-created sites default to English;
+  create/read/update routes expose `defaultLocale` and `enabledLocales`, accept
+  useful lowercase BCP-47-style tags, reject duplicates and malformed tags,
+  cap the visible language set at twelve, and require the default language to
+  remain enabled. Existing callers remain source-compatible through the
+  English-default `create_site` path.
+- **Tenant proof:** the storage regression proves an owner can change locale
+  settings, an invalid request cannot partially write, and another tenant gets
+  `NotFound` while the original site's settings remain unchanged. The HTTP
+  regression repeats create/read/update/validation and outsider-404 behavior
+  through the real router.
+- **Real curl transcript:** after killing the stale local JMAP process, a fresh
+  local binary on `127.0.0.1:8080` and PKCE-authenticated admin created a site
+  with `pt-BR`, `en`, and `nl` (`200`, canonicalized to lowercase), changed it
+  to default `fr` with `fr`, `de`, and `en-GB` (`200`), rejected a default not
+  present in its enabled set (`422 default language it must also be enabled`),
+  and deleted the fixture. No production, external AI, DNS, or email system was
+  contacted.
+- **Verified:** `cargo fmt -p alo-store -p alo-jmap`; strict offline clippy for
+  both crates; locale unit, storage wrong-tenant, and HTTP route regressions;
+  full `alo-store` tests (841 unit tests plus all integration/doc targets); full
+  unfiltered `alo-jmap` tests (499 unit tests plus every integration/doc target,
+  including all 19 Sites HTTP tests); fresh `alo-jmap`/`alo-identity` binary
+  build; `npx tsc --noEmit`; and `npm run build`. No web source changed, so
+  focused ESLint is not applicable. Main's pre-existing audit-vocabulary drift
+  was repaired and independently pushed as `c14e9af` before this Sites slice.
+- **Cuts/flags:** this foundation stores the language registry only. Localized
+  page content and visitor switching intentionally follow in S2.01b–d. The
+  local wire script and fixture were removed after the transcript.
+- **Next:** S2.01b, localized page drafts and fallback rules.
