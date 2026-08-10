@@ -152,11 +152,12 @@ a screen for it would rank it above the four things people do daily.
 
 #### As built: the expenses slice (B4.13a)
 
-`web/src/finance` exists with **one** of the four tabs drawn — Expenses —
-plus an Approvals tab that only an approver sees. Bank arrived with B4.13b (as
-two tabs, below); Accounts and Reports are B4.13c and are deliberately not in
-the nav yet: a tab that opens an empty screen is a promise the module has not
-kept.
+`web/src/finance` exists with **all** of the four tabs drawn — Expenses
+(B4.13a) plus an Approvals tab that only an approver sees, Bank and Match
+(B4.13b, two tabs rather than one screen with a mode), and Accounts and Reports
+(B4.13c, below). What Accounts does *not* yet carry is the journal behind the
+chart and the manual-entry dialog: `/finance/entries` has no HTTP door, and a
+tab that opens an empty screen is a promise the module has not kept.
 
 Five decisions this slice took, none of which move anything above:
 
@@ -246,6 +247,65 @@ points into arrive with the Accounts tab (B4.13c), and the receipt path is
 `POST /finance/receipts` over a Drive file, which wants the Drive picker.
 A picker that is always empty is worse than no picker. An approver already
 sees a claim's category name, because the queue read carries it.
+
+#### As built: the chart and the reports (B4.13c)
+
+The module's fourth and fifth tabs, both behind the same admin-or-accountant
+gate — including the chart's **reads**, because the chart says what the company
+owes, is owed and earns, and because the list is also what seeds it, so a read
+here writes.
+
+The doors this slice added are the ones the routes table above has always
+promised: `GET/POST /finance/accounts` and `GET/PATCH/DELETE
+/finance/accounts/{id}` (`finance_chart.rs`), with the default chart's *names*
+in a table of their own (`finance_chart_names.rs`, en/fr/nl, checked against
+`alo_store::CHART` by its own tests). Six decisions, none of which move anything
+above:
+
+- **The chart seeds itself on first read, in the caller's language**, and the
+  answer carries `seeded` so the screen can say where twenty accounts nobody
+  typed came from. `?lang=` is the mechanism Insights' Business overview already
+  uses; the store holds no English at all.
+- **Retiring is a field of the `PATCH`, deleting is its own door.** The routes
+  table said `deactivate` and this is it. A `PATCH` is *merged* onto the stored
+  record here, because the store's update is a full replace — so a rename that
+  says nothing about the role cannot silently unhook a posting rule, which on
+  this table means the next invoice stops booking.
+- **`includeInactive` is `camelCase` on the wire.** Stated because serde's
+  default snake case had quietly made it a parameter the server ignored: the
+  screen that exists to bring a retired account back could not see one. The wire
+  check found it; a unit test could not have.
+- **Balances are optional and are the journal's.** `?from&to` folds
+  `fin_trial_balance` once for the whole chart and states the accounting
+  currency beside it; an account the period never moved carries a zero, and
+  without the two days every movement field is `null` rather than `0` — a zero
+  nobody read would be a claim about the books.
+- **Reports are a second row of tabs**, one route each (`/finance/reports/pl`,
+  `…/balance`, `…/aged`, `…/vat`), each a table with the period picker the VAT
+  summary (B1.20) already uses and a CSV button that fetches the server's own
+  `.csv` twin through the authenticated client. Nothing on these screens is
+  arithmetic: the vitest fixtures deliberately state totals that differ from the
+  sum of their own lines, so a browser that re-derived one would fail the suite.
+  The balance sheet renders `balances`/`differenceCents` as a **failure banner**
+  when they disagree, rather than printing a figure that looks exactly like a
+  correct one.
+- **Every link in the module is absolute** (`FINANCE_ROOT`). React-router
+  resolves a relative `to` inside a splat route against the *current location*,
+  so `to="reports"` clicked from `/finance/expenses` went to
+  `/finance/expenses/reports`, which matched the catch-all, which redirected
+  relatively again — a path that grew a segment per render. `Reports.test.tsx`
+  is the regression. **The same defect is still present in Billing, CRM,
+  Projects and Insights**, whose tabs are relative in exactly this way; it is
+  flagged for the human in `docs/autonomy/STATE.md` rather than fixed here,
+  because four other modules are not this item.
+
+Cut from this slice, and listed so the gap is a decision: **the journal behind
+the chart and the manual-entry dialog** (this note's Accounts tab describes
+both; `/finance/entries` has no HTTP door yet, and a screen for a route that
+does not exist is a promise the module would not be keeping), **expense
+categories** (`/finance/categories` is still doorless, so the claim form still
+has no category picker — B4.13a's cut, unchanged), and **no fr/nl** for the new
+strings, which B4.15 owns.
 
 ## The chart of accounts (B4.02)
 

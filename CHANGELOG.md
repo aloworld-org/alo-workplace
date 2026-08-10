@@ -6,6 +6,28 @@ contracts.
 
 ## Unreleased
 
+- **See where your money actually stands, and keep the chart of accounts
+  yourself.** Finance has two new tabs. **Accounts** is your chart of accounts,
+  grouped by what each account holds and showing what it moved over any period
+  you choose. You do not have to build it: the first time you open it, alo
+  writes a neutral chart in your own language and says so — and every line of it
+  is yours to rename, renumber, retire or replace. Renumbering is safe at any
+  time, because invoices, payments and expense claims find their account by the
+  job it does ("what customers owe us") and never by its number, so your
+  accountant's numbering breaks nothing. An account we created cannot be deleted
+  and says why; one that carries entries is history rather than a preference, and
+  is retired instead. **Reports** draws the four folds of the books a business is
+  actually asked for — profit and loss with the same period a year earlier beside
+  it, the balance sheet on any day, who owes what by how overdue it is (both
+  directions), and the VAT-return figures from your books rather than from your
+  invoices. Each one is a table with the period picker and the CSV button your
+  accountant will ask for, and every figure on screen is the one the server
+  computed: nothing here is added up in your browser. A balance sheet that does
+  not balance says so out loud instead of printing a figure that looks fine.
+
+- **Fixed: a tab in Finance now goes where it says it goes.** Clicking through
+  the module's tabs could build up an address that never arrived anywhere.
+
 - **Start a website at its real address, then get straight to the page.** Name
   a website and alo suggests its editable address while showing the complete
   result and availability together. Pasting a full address works too, and a

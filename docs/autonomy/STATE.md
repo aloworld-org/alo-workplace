@@ -13827,3 +13827,168 @@ and `/projects`. No new top-level prefix this item.
 
 Next item: B4.13c (web finance — the CoA editor and the four report pages with
 CSV buttons; it owns the missing `/finance/categories` and chart doors).
+
+## B4.13c — the chart a tenant owns, and the four folds of the books (2026-08-10)
+
+**Shipped.** Finance's last two tabs, and the HTTP doors under them.
+
+**The chart of accounts, over HTTP** — `finance_chart.rs`: `GET/POST
+/finance/accounts`, `GET/PATCH/DELETE /finance/accounts/{id}`, every one of them
+behind `require_finance` (admin or B4.12's accountant), the **reads included**,
+because the chart says what the company owes, is owed and earns — and because
+the list is what SEEDS it, so a read here writes. The store had all of this
+since B4.02 (`fin_accounts.rs`) and no door onto it; that is what this item was
+for.
+
+`finance_chart_names.rs` is the twenty default accounts' *names*, in en/fr/nl,
+against `alo_store::CHART`'s codes. The store deliberately holds no name at all
+— a hardcoded English account name would be a bug in a European product — so the
+words live at the edge and the chart a tenant is seeded with is written in the
+language of whoever opened it first (`?lang=`, Insights' Business-overview
+mechanism reused whole). Its own tests assert every language names every `CHART`
+code, none twice, none blank, so an account added to the default chart cannot
+ship with a language missing its word.
+
+Four route-layer decisions the store does not make: a `PATCH` is **merged** onto
+the stored record (absent means unchanged, so a rename cannot silently clear the
+role and unhook a posting rule); retiring is a field of that `PATCH` while
+deleting is its own door (the routes table always said `deactivate`); `?from&to`
+folds `fin_trial_balance` **once** for the whole chart and states the accounting
+currency beside it, with a zero for an account the period never moved and `null`
+everywhere when no period was asked for; and half a period is a `422` naming the
+missing end rather than an open-ended fold.
+
+**The web** — `AccountsView` + `AccountDialog` (the chart, grouped by kind, with
+movements over the period in the toolbar, retired accounts on request, and an
+editor that offers each posting-rule role as the *sentence it means* rather than
+as `ar`), and `ReportsView` + `PlReportView`, `BalanceSheetView`,
+`AgedReportView`, `VatReturnView` over the B4.11 routes, each with the period
+picker B1.20 established and a CSV button that fetches the server's own `.csv`
+twin through the authenticated client. `reportParts.tsx` holds the two toolbars
+and the download hook once, so four screens cannot drift into four spellings of
+"apply on submit, never on a keystroke". `billing/period.ts` gained `yearOf` /
+`previousYearOf` beside `quarterOf` — a P&L and a chart are read for a year, and
+a second definition of "this year" would disagree at a boundary.
+
+**Two defects found, both by doing the work rather than by reading it.**
+
+1. **`includeInactive` was a parameter the server ignored.** `ChartQuery` had
+   serde's default snake case, so the camelCase name the client sends never
+   bound: the screen that exists to bring a retired account back could not see
+   one. Found by the curl walk, fixed with `rename_all = "camelCase"`, and now
+   asserted on the wire by `fin_chart_http.rs`. No unit test would have caught
+   it.
+2. **Every module tab in this product navigates to the wrong place.**
+   React-router resolves a relative `to` inside a splat route against the
+   *current location*, so `to="reports"` clicked from `/finance/expenses` goes
+   to `/finance/expenses/reports`, which matches the module's catch-all, which
+   redirects relatively again — an address that grows a segment per render and a
+   tab that never arrives (a `MemoryRouter` reproduction ran until it was
+   killed). Finance is fixed: `FINANCE_ROOT` / `REPORTS_ROOT`, every link and
+   redirect absolute, with `Reports.test.tsx`'s "a tab lands where it says it
+   lands" as the regression. **See the flag below for the four modules that are
+   still wrong.**
+
+**Verified.**
+
+- `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-jmap --all-targets` —
+  clean, zero warnings (4m21s).
+- `cargo test -p alo-jmap --lib` — 493 passed (14 of them new:
+  `finance_chart` 10, `finance_chart_names` 4).
+- `--test fin_chart_http` (5, new), `--test accountant_role_http` (9, one new),
+  `--test audit_routes` (3; its golden vocabulary gained
+  `finance.account.create|update|delete`, which the router derives on its own —
+  no handler was asked to record anything).
+- **Wrong-tenant, on the real router over real Postgres**
+  (`another_tenants_account_is_not_there_and_is_not_changed`): tenant A reads,
+  patches and deletes two of tenant B's account ids — a seeded one and a custom
+  one — and gets `404` on all six; B's rows are byte-identical afterwards, and
+  A's own chart never held either id. The gate itself is
+  `accountant_role_http.rs`'s new
+  `the_chart_is_the_bookkeepers_and_editing_it_is_shut_before_it_is_looked_up`:
+  an ordinary member is refused all three writes with **403 and not 404** (a 404
+  would say which accounts a company keeps), the same person handed the
+  accountant role reaches the store's own 404 on a made-up id and is seeded a
+  chart of their own, and revoking shuts the doors again.
+- `npx tsc --noEmit`, `npx eslint`, `npm run build` — clean. The whole web suite
+  is green: 377 tests over 39 files, 26 of them new (`Chart.test.tsx` 12,
+  `Reports.test.tsx` 14). The run reports 12 unhandled rejections; they are
+  **pre-existing** — the same 12 appear on a stashed working tree at HEAD, out
+  of `chat/ChatModule.tsx` and friends — and are noted here rather than fixed,
+  because they are not this item's.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8099` against
+docker `alo-pg`, a tenant bootstrapped with `identityctl bootstrap-admin`, rows
+read back in psql.
+
+```
+GET    /finance/accounts                (no token)   → 401
+GET    /finance/accounts?lang=fr                     → 200 seeded=true, 20 accounts,
+                                                       1000 "Banque" role bank,
+                                                       currency null (no period asked)
+GET    /finance/accounts?from&to&lang=fr             → 200 seeded=false, currency EUR,
+                                                       every balance 0, postings 0
+GET    /finance/accounts?from=2026-01-01             → 422 "to is required…"
+POST   /finance/accounts {no type}                   → 422 "type is required: an account
+                                                       is an asset, a liability, …"
+POST   /finance/accounts {type:"profit"}             → 422 "account type must be …"
+POST   /finance/accounts {role:"boss"}               → 422 "account role must be empty or
+                                                       one of: bank, cash, ar, …"
+POST   /finance/accounts {code:"61 10"}              → 422 "account code must not contain spaces"
+POST   /finance/accounts {code:"1000"}               → 409 "an account with this code already exists"
+POST   /finance/accounts {role:"bank"}               → 409 "another account already holds this role"
+POST   /finance/accounts {6110 Hosting expense}      → 200
+PATCH  /finance/accounts/{ar} {code 1400, name}      → 200 code 1400, role STILL "ar"
+PATCH  /finance/accounts/{6110} {active:false}       → 200
+GET    /finance/accounts                             → 20 (the retired one is out)
+GET    /finance/accounts?includeInactive=true        → 21 (…and in, after the fix)
+PATCH  /finance/accounts/AAAA…                       → 404
+DELETE /finance/accounts/{ar}                        → 409 "a system account cannot be
+                                                       deleted; deactivate it instead"
+DELETE /finance/accounts/{6110}                      → 204, then 404
+GET    /finance/reports/{pl,balance,aged,vat} + .csv  → 200 ×8
+psql fin_accounts   → 21 rows, French names, 1400/ar, 6120 active=f system=f
+psql audit_log      → finance.account.create|update|update|delete|create|update
+```
+
+**Cuts, named.**
+
+- **No journal screen and no manual-entry dialog** on the Accounts tab. Both
+  need `/finance/entries`, which has no HTTP door; a tab that opens a screen for
+  a route that does not exist is the promise this module does not make. The
+  design note's Accounts paragraph is updated to say so.
+- **No `/finance/categories` door and no category picker.** B4.13a's cut,
+  unchanged: the store has had the CRUD since B4.05a, and the claim form still
+  cannot classify a cost. It is the last doorless store module in Finance.
+- **No fr/nl** for the ~120 new strings — the wave-review rule, B4.15. (The
+  twenty *account names* are French and Dutch already, because they are written
+  into a tenant's database once and cannot be retranslated later.)
+- **No aged-listing drill-down.** A party's row says how many documents are
+  behind it and names the oldest; the per-document table is in the CSV. Adding
+  it is a disclosure row, not a door.
+
+**FLAG for the human — the one that matters.**
+
+**Billing, CRM, Projects and Insights all navigate the way Finance did before
+this item.** Every one of them mounts on `<Route path="/x/*">` and uses relative
+`NavLink to="tab"` plus a relative `<Navigate>` catch-all, which is exactly the
+combination that produced the growing address above (reproduced directly against
+`BillingModule`: clicking Customers from `/billing/invoices` lands on
+`/billing/invoices/customers`). The fix is the one applied here — a module-root
+constant and absolute `to`s — about ten lines per module plus a test. It is four
+other modules and therefore not this item, but it is a product-wide defect in
+shipped code and should be the next thing somebody does.
+
+Other flags, unchanged from B4.13b: `ROADMAP.md` still says "designed on Spaces"
+in three places where B4.12 delivered roles instead; an accountant is still a
+user and a user still gets a mailbox; the `alo-jmap` integration suite still has
+no fast lane, so this iteration again ran the binaries the change can reach
+rather than the whole suite.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B4.14a (★ Finance agent — `categorise_transactions` as a draft:
+allowlist entry, executor over the B4.09 matcher and the chart this item opened,
+structural wire-verify with no model calls).
