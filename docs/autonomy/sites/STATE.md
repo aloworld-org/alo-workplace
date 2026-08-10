@@ -2005,3 +2005,25 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   server-owned. This slice changes no storage or HTTP route, so Rust gates,
   wrong-tenant testing, and live curl verification are not applicable.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.30c Create straight into the Home editor
+
+- **Shipped:** both generated and manually templated websites create a Home
+  page and navigate directly into its editor. A newly empty Home page now
+  presents “Add your first section” as its primary onboarding action and opens
+  a Hero form in one click; the visible Add section control remains the direct
+  route to every other block. The Pages list remains available for later page
+  management but no longer interrupts the creation flow.
+- **Reflex and laws:** this follows the Wix/Squarespace builder reflex of
+  landing in the editable result, removes a needless navigation decision, and
+  keeps the core first-content action visible without a menu.
+- **Verified:** all 28 routed Sites module tests pass. The creation test proves
+  Create lands at the exact new Home editor URL, renders the empty-page
+  onboarding, and opens the Hero form with one click. `npx tsc --noEmit`,
+  focused Sites/i18n ESLint, and `npm run build` are clean.
+- **Cuts/flags:** the existing create and page routes already supplied the
+  required end-to-end behavior; this slice closes the remaining onboarding
+  gap and strengthens its routed regression proof. No storage or HTTP route
+  changed, so Rust gates, wrong-tenant testing, and live curl verification are
+  not applicable.
+- **Next:** the first unchecked item in `QUEUE.md`.
