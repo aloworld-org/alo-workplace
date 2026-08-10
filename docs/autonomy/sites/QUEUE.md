@@ -65,7 +65,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.01a Locale foundation: site default locale + enabled locales + locale validation in storage/routes; migration, wrong-tenant tests, and wire transcript.
 - [x] S2.01b Localized pages: one stable page identity with per-locale title, slug, SEO, and section drafts; fallback rules and wrong-tenant tests.
 - [x] S2.01c Localized publishing: immutable locale snapshots, alternate/canonical links, locale-aware sitemap/RSS, language switcher, and public Host goldens.
-- [ ] S2.01d Translation editor: visible language controls, missing-translation states, manual copy/create path, and publish readiness without requiring AI.
+- [x] S2.01d Translation editor: visible language controls, missing-translation states, manual copy/create path, and publish readiness without requiring AI.
 - [ ] S2.01e Whole-site AI translation: deterministic proposal envelope across pages/posts, before/after review, approve-only writes, and fixture tests with no external calls.
 - [ ] S2.02a Collections model: tenant-owned site collection binding to an alo Base table plus validated field mapping; wrong-tenant and missing-table tests.
 - [ ] S2.02b Collection publishing: resolve Base rows into immutable publish snapshots with deterministic empty/error behavior; public render goldens.

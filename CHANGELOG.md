@@ -78,6 +78,13 @@ contracts.
   inflating the shelf. An order that has not been sent, or that has been
   cancelled or already completed, takes no delivery — and every arrival is on
   the record, with who booked it and the movement it wrote.
+- **Translating a site is now a visible, manual workflow.** Each site's
+  languages, progress, and missing pages are shown together; opening a missing
+  translation clearly shows the source language and offers one click to copy
+  it before editing. Titles, addresses, search descriptions, and page sections
+  are then edited and previewed in the chosen language, while publish readiness
+  shows exactly what remains. Nothing requires AI and fallback text can no
+  longer be mistaken for a finished translation.
 - **Sending a purchase order is now one act.** Placing an order gives it its
   number — `PO-2026-00001`, drawn the same unbreakable way an invoice number is
   — stamps it with today, freezes it, and writes the covering email to your

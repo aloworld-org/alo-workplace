@@ -2312,3 +2312,44 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   Google Search's multilingual canonical/alternate contract and keeps language
   choices directly visible rather than gatekeeping them in a menu.
 - **Next:** S2.01d, the visible translation editor and publish readiness.
+
+## 2026-08-10 — S2.01d visible translation editor
+
+- **Shipped:** each site now has a visible language workspace modelled on Wix
+  and Squarespace: the default language, every enabled language, translated
+  page counts, readiness, add/remove controls, and the next missing page are
+  on the surface. A page opened in another language shows that language in the
+  editor and URL. Missing translations remain visibly read-only fallback copy
+  until the editor explicitly copies the source in one click; after that,
+  title, slug, SEO fields, sections, ordering, and preview all read and write
+  only the selected language. AI is absent from this path and is not required
+  to finish or publish a translation.
+- **Tenant proof:** the storage regression calculates readiness only from exact
+  localized drafts and returns `None` for another tenant. The HTTP regression
+  repeats `404` isolation for readiness, localized read, localized preview,
+  and localized write, then proves the owner's French draft is unchanged. UI
+  regressions prove fallback is read-only until copied and that subsequent
+  section changes write only the chosen language.
+- **Real curl transcript:** after killing the stale process, a fresh local
+  `alo-jmap` binary used a disposable migrated database and filesystem blobs.
+  Two real PKCE logins succeeded. The owner created a three-language site and
+  page, wrote French, read readiness, and rendered the localized preview (all
+  `200`); the HTML carried `lang="fr"`, the French heading, and `no-store`.
+  The other tenant received `404` for the same readiness route. The fixture
+  was deleted and no production, email, DNS, or external AI service was used.
+- **Verified:** strict offline all-target clippy for `alo-store` and
+  `alo-jmap`; full `alo-store` (978 unit tests plus every integration/doc
+  target) and full unfiltered `alo-jmap` (571 unit tests plus every
+  integration/doc target, including all 20 Sites HTTP tests) against the
+  disposable database; `npx tsc --noEmit`; focused ESLint; 48 focused Sites
+  UI tests; and `npm run build`. `git diff --check` is clean. Main contains
+  pre-existing rustfmt drift in untouched identity and inventory tests, so the
+  final formatting proof is restricted to the touched Rust files. After the
+  final clean rebase over Inventory's `0164`, the exact storage tenant test and
+  localized Sites HTTP isolation/readiness/preview test were rerun green.
+- **Cuts/flags:** readiness counts pages, not blog posts, because localized
+  posts are not yet modelled. Whole-site AI translation remains a separate,
+  review-only optional path. The disposable database and local test process
+  are removed after the slice lands.
+- **Next:** S2.01e, deterministic whole-site translation proposals with
+  before/after review and approve-only writes.
