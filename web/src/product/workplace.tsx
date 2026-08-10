@@ -7,12 +7,13 @@
 // `../authoring`). alomails ships the `mail` surface instead and deletes this
 // file together with those areas — nothing else in the web app references them.
 import { Suspense, lazy } from "react";
-import { BarChart3, Briefcase, Building2, Code2, Globe, HardDrive, Handshake, MessagesSquare, Receipt, Sigma, Video } from "lucide-react";
+import { BarChart3, Briefcase, Building2, Code2, Globe, HardDrive, Handshake, Landmark, MessagesSquare, Receipt, Sigma, Video } from "lucide-react";
 
 import { strings } from "../i18n";
 import { BillingModule } from "../billing";
 import { ChatModule } from "../chat";
 import { CrmModule } from "../crm";
+import { FinanceModule } from "../finance";
 import { InsightsModule } from "../insights";
 import { ProjectsModule, TimerWidget } from "../projects";
 import { SitesModule } from "../sites";
@@ -89,6 +90,23 @@ const suiteModules: ProductModule[] = [
     Icon: Briefcase,
     enabled: true,
     element: () => <ProjectsModule />,
+  },
+  // Finance is a workspace module only (ADR 0035, wave B4): the books behind
+  // the documents Billing raises. It sits after Projects and before Insights,
+  // in the order money moves — a claim, an invoice, the hours behind it, then
+  // the ledger they all post to.
+  //
+  // Its expenses tab is the screen most employees will ever open here; the
+  // approver's queues are a tab of the same module rather than a console,
+  // because deciding a claim is bookkeeping and not administration
+  // (`docs/design/finance.md` § The accountant role).
+  {
+    id: "finance",
+    path: "/finance",
+    label: strings.moduleFinance,
+    Icon: Landmark,
+    enabled: true,
+    element: () => <FinanceModule />,
   },
   // Insights is a workspace module only (ADR 0037), and it sits after the
   // modules whose records it reads: a chart here is billing's and CRM's own

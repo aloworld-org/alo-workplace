@@ -13534,3 +13534,161 @@ and `/projects`. No new top-level prefix this item — `/admin/users/roles` sits
 under the `/admin` prefix that is already proxied.
 
 Next item: B4.13a (web finance — the module skeleton and the expenses flow).
+
+## B4.13a — Finance becomes a place: the claim, and the two queues that settle it (2026-08-10)
+
+**Shipped.** `web/src/finance` — the module the whole of B4 has been writing an
+API for. One tab for a person's own claims, one for the people who decide them,
+and the payer's queue the module was missing.
+
+*The web (the item's own scope).*
+
+| File | What it is |
+|---|---|
+| `FinanceModule.tsx` | the tabs, the role check, the shared revision counter |
+| `ExpensesView.tsx` | my claims: period + status filter, the rows, hand in / take back |
+| `ExpenseDialog.tsx` | one form for recording and correcting a claim |
+| `ApprovalsView.tsx` | the approver's screen: waiting, and to-pay-back |
+| `ReimburseDialog.tsx` | the day the money moved |
+| `api.ts` · `types.ts` · `format.ts` · `parts.tsx` · `.module.css` | the client, the shapes the server sends, the labels, the shared chrome |
+| `Expenses.test.tsx` | ten tests over the real router and the real client |
+
+Registered in `product/workplace.tsx` between Projects and Insights (a claim, an
+invoice, the hours, then the ledger they post to). 63 new `finance*` strings in
+`i18n/en.ts`. `/finance` was already in the vite proxy list — B4.05b put it
+there, and this is the commit that needed it.
+
+*The one server change, and why the item grew it.* The screens had nowhere to
+read "what have we approved and not yet paid back": `pending_expenses` is
+`status = submitted` and stops there, so an accountant could approve a
+colleague's claim and then never see it again. Approved claims live on the
+claimant's own door, which by design carries no `userId` and never will.
+
+- `TenantStore::reimbursable_expenses()` — approved **and** `method = personal`,
+  oldest decision first. Both conditions, because an approved claim a company
+  card paid is approved and owes nobody anything: a status filter alone would
+  have put a line in the payer's queue that `reimburse_expense` refuses with a
+  `409` every time, forever.
+- The two queues now share one joined statement (`expense_queue`) and differ
+  only in a code-authored predicate — the claimant's email and the category name
+  cannot drift between the two lists.
+- `GET /finance/expenses/reimbursable`, gated by `require_finance` like its
+  neighbour. A static segment beside `pending`, registered before
+  `/finance/expenses/{id}`. It is a `GET`, so `audit_routes.rs` is unmoved.
+
+*Five interface decisions, all in `docs/design/finance.md` § As built.*
+
+1. **Two tabs, not one screen with a mode.** "My claims" and "claims I decide"
+   are different data behind different doors; one screen that changed meaning
+   depending on who opened it is where a cross-user read eventually leaks.
+2. **Approvals is hidden, never disabled.** `JmapClient.canWorkTheBooks()` reads
+   the session's `alo:isAdmin` / `alo:roles` (B4.12 shipped `alo:roles`; nothing
+   in the web app had read it until now). The route stays mounted, so a
+   bookmark works and everybody else gets the server's own `403` — a client is
+   never an access decision.
+3. **What a row offers is the server's `editable`**, not this file's reading of
+   `status`. An Edit button that always fails teaches the freeze by refusal.
+4. **No money is computed and no currency invented.** Amounts parse through
+   Billing's own parser (one comma rule for the suite) and go as integer cents;
+   an empty currency box is *omitted* from the request, so the workspace default
+   stays the server's decision. A test asserts the field is absent.
+5. **The hint is not part of the label.** Finance's `Field` puts the hint and
+   the error outside the `<label>`, so a control's accessible name is "VAT" and
+   not "VAT the VAT shown on the receipt…". Projects' own `Field` is untouched.
+
+**Verified.**
+
+- `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap
+  --all-targets` — clean, no warnings (33 min; it also reformatted one
+  pre-existing `use` line in `chat_agent.rs`, which is in the diff).
+- **The Rust tests, and one honest cut.** `cargo test -p alo-store -p alo-jmap`
+  was started and ran 20 binaries — including `alo-jmap`'s whole unit suite
+  (479 tests) — with **zero failures**, then was stopped at 40 minutes because
+  it was pacing at roughly six binaries per ten minutes (the billing PDF/CII
+  suites dominate) and would not have finished inside this iteration. In its
+  place, every binary this change can reach was run explicitly and is green:
+  `alo-store` `fin_expense_flow` (5), `fin_expenses_tenancy` (4),
+  `fin_mileage_tenancy` (4), `audit_trail_tenancy` (3); `alo-jmap`
+  `accountant_role_http` (7), `audit_http` (8), `audit_routes` (3), plus the 479
+  unit tests from the abandoned run. The change is one refactored store
+  statement, one new store fn, one `GET` route and web files; clippy
+  `--all-targets` had already compiled every other test target.
+- `fin_expense_flow.rs` + the new
+  `the_payers_queue_holds_only_what_the_company_still_owes_a_person`: four
+  claims — out of pocket, on the card, still waiting, already paid back — and
+  only the first is in the queue; paying it empties the queue.
+  **Wrong-tenant:** tenant B's payer queue is empty while A owes A's employee,
+  and B's `reimburse` of A's claim is `NotFound`.
+- `npx tsc --noEmit`, `npx eslint src/finance …`, `npm run build`, and the whole
+  web suite (338 tests, 35 files) — all clean.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8099` against
+docker `alo-pg`, a tenant bootstrapped with `identityctl bootstrap-admin`, a
+colleague added through `POST /admin/users`, rows checked in psql.
+
+```
+GET  /finance/expenses/reimbursable (no token)          → 401
+GET  /finance/expenses/pending      (the colleague)     → 403 "admin or accountant only"
+GET  /finance/expenses/reimbursable (the colleague)     → 403
+
+three claims by the colleague: €119.00 own money, €24.99 card, €4.50 left a draft
+POST /finance/expenses ×3                               → 200, 200, 200
+POST /finance/expenses/{own}/submit · {card}/submit     → 200, 200 (editable → false)
+
+GET  /finance/expenses/pending      (the boss)          → 200, both claims, with
+                                                          userEmail + categoryName
+GET  /finance/expenses/reimbursable                     → 200 []   ← nothing decided yet
+
+POST /finance/expenses/{card}/approve                   → 200
+POST /finance/expenses/{own}/approve {note}             → 200
+GET  /finance/expenses/reimbursable                     → 200 [the €119.00 one ONLY]
+GET  /finance/expenses/pending                          → 200 []
+
+POST /finance/expenses/{card}/reimburse                 → 409 "the company's own money
+                                                          paid this claim, so there is
+                                                          nobody to reimburse"
+POST /finance/expenses/{own}/reimburse {}               → 422 "reimbursedOn is required"
+POST /finance/expenses/{own}/reimburse (the colleague)  → 403
+POST /finance/expenses/{own}/reimburse {2026-08-09}     → 200
+GET  /finance/expenses/reimbursable                     → 200 []
+GET  /finance/expenses/notarealid                       → 404
+POST /finance/expenses/notarealid/reimburse             → 404 (no oracle)
+GET  /finance/expenses?from&to (the colleague's own)    → 200, all three, the draft
+                                                          still editable
+psql fin_expenses  → reimbursed|personal|2026-08-09 · approved|card|– · draft|personal|–
+```
+
+**Cuts, named.**
+
+- **No category picker.** There is still **no HTTP door for
+  `/finance/categories`** (nor for the chart it points into) — the store has had
+  both since B4.02/B4.05a, nothing exposes them. A picker that is always empty
+  is worse than none, so the claim form has no category field and the claim goes
+  in unclassified. The approver's queue *does* show `categoryName`, because that
+  read carries it. **This is B4.13c's prerequisite**: the CoA editor cannot be
+  built without those routes either, so that item now owns both.
+- **No receipt attachment.** `POST /finance/receipts` reads a file already in the
+  caller's Drive; wiring it needs the Drive picker, and this item is the claim
+  flow. Named here as the natural next slice.
+- **No mileage screen** (B4.07 is a route with no UI) and **no fr/nl** — the
+  wave-review rule, B4.15 owns the translations.
+- **The claimant's list has no paging.** The server caps a read at a year and
+  refuses longer; the screen opens on the current quarter and the person moves
+  the two dates. A list that ends silently would be worse than a refusal.
+
+**FLAG for the human.** Unchanged from B4.11d/B4.12, and one addition:
+
+1. Nothing in the product seeds a chart of accounts over HTTP; the expense
+   posting rule therefore still has nothing to book an approved claim *to* from
+   a screen. This is now the largest gap in front of B4.13c.
+2. `ROADMAP.md` still says "designed on Spaces" in three places where B4.12
+   delivered roles instead (lines for B2.11, B3.8, BI-1.6).
+3. An accountant is still a user, and a user still gets a mailbox.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects` — and it is now a **user-visible** rail entry, so a deploy
+without it gives a 404 on a tab people can see. No new top-level prefix this
+item.
+
+Next item: B4.13b (web finance — bank import and the reconciliation screen).

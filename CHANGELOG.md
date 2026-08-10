@@ -24,6 +24,20 @@ contracts.
   publishing — now has native French and Dutch labels instead of falling back
   to English halfway through a task.
 
+- **Claim what you spent, in a screen you did not have to be taught.** Finance
+  is now a place in alo rather than an API: a tab of your own claims — the day,
+  the merchant, the total on the receipt and whose money paid — with a form that
+  asks for those and nothing else. Type the amount the way you write numbers,
+  comma or point; leave the currency empty and it is your workspace's own. A
+  claim is yours to correct until you hand it in, and handing it in freezes it;
+  if you need it back, take it back. If it comes back refused, the sentence the
+  approver wrote is on the row, and the claim is yours to fix and hand in again.
+  Whoever decides claims — an owner, or the accountant you appointed — gets a
+  second tab with two queues: what is waiting for a decision, and what the
+  company has approved and still owes somebody out of their own pocket, cleared
+  one payment at a time with the day the money actually moved. Nobody else sees
+  that tab, and nobody else's claims: yours are yours.
+
 - **Give your accountant the books, and only the books.** You can now mark
   someone in your organization as your accountant. They get what the job needs:
   every finance report, the expense claims waiting to be decided, and the power

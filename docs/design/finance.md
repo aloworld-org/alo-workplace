@@ -95,6 +95,7 @@ read (the rename B3.11 paid for; it is not paid twice).
 | `GET/POST /finance/categories` · `PATCH/DELETE /finance/categories/{id}` | expense categories and the account each books to (B4.05a) |
 | `GET/POST /finance/expenses` · `GET/PATCH/DELETE /finance/expenses/{id}` | expense claims — the caller's own through the account door (shipped B4.05b, with the flow that needed them) |
 | `GET /finance/expenses/pending` | **approver-only**: the claims of this tenant awaiting a decision, oldest purchase first, each with its claimant's address and its category's name. A view of the same collection rather than a second one, because the decisions are on the claim itself (B4.05b) |
+| `GET /finance/expenses/reimbursable` | **approver-only**: the claims this tenant has approved and **still owes an employee** for, oldest decision first, same three facts beside each. Added by B4.13a, when the payer's screen needed a list it could work through: `pending?status=approved` would have been the wrong list, because an approved claim a company card paid is approved and owes nobody anything — it would sit in a payer's queue forever, refused by `reimburse` every time. The two reads share one joined statement in the store and differ only in their predicate |
 | `POST /finance/expenses/{id}/submit` · `/withdraw` · `/approve` · `/reject` · `/reimburse` | the transitions; `submit`/`withdraw` are the claimant's, the last three approver-only (B4.05b) |
 | `POST /finance/receipts` | read a receipt already in the caller's Drive (`{nodeId}`), get the **parsed fields back for confirmation**. Writes nothing at all, and joins `READ_ONLY_POSTS` (as built, B4.06b) |
 | `GET/POST /finance/mileage` · `DELETE /finance/mileage/{id}` | mileage claims; each becomes an expense at the tenant's per-km rate (B4.07) |
@@ -116,8 +117,8 @@ Twelve path segments are reserved words under `/finance` — `accounts`,
 `bank`, `rules`, `periods`, `reports`, `settings`. Ids are base64url'd
 16-byte random tokens (`id.rs`), so a record can never *be* one of them, and
 matchit prefers a static segment to a capture — the shape `/tasks/labels`
-beside `/tasks/{id}` has had since ADR 0021. `pending` is reserved the same way
-one level down, under `/finance/expenses`.
+beside `/tasks/{id}` has had since ADR 0021. `pending` and `reimbursable` are
+reserved the same way one level down, under `/finance/expenses`.
 
 **There is no `POST /finance/entries/{id}` and no route that posts a
 document.** Posting is not a verb a client may use: an entry exists because
@@ -148,6 +149,44 @@ everything else, every string through `i18n/en.ts` under a `finance*` prefix
 Four tabs, not five: the manual journal entry is a dialog on the Accounts
 tab rather than a screen, because it is the rarest action in the module and
 a screen for it would rank it above the four things people do daily.
+
+#### As built: the expenses slice (B4.13a)
+
+`web/src/finance` exists with **one** of the four tabs drawn — Expenses —
+plus an Approvals tab that only an approver sees. Bank, Accounts and Reports
+are B4.13b and B4.13c and are deliberately not in the nav yet: a tab that
+opens an empty screen is a promise the module has not kept.
+
+Five decisions this slice took, none of which move anything above:
+
+- **Two tabs, not one screen with a mode.** "My claims" and "claims I
+  decide" are different data behind different doors, and one screen that
+  changed meaning depending on who opened it would be the place a
+  cross-user read eventually leaks. The Approvals tab is **hidden** for
+  anybody who is not admin-or-accountant (the session's `alo:isAdmin` /
+  `alo:roles`, read through `JmapClient.canWorkTheBooks`), while its route
+  stays mounted — a bookmark works for the people who have it, and the
+  server refuses everybody else regardless, because a client is never an
+  access decision.
+- **The approver's tab holds two lists, not two tabs.** Waiting for a
+  decision, and approved-but-owed. One inbox, worked top to bottom.
+- **What a row offers is the server's `editable`, never this file's reading
+  of `status`.** An Edit button that always fails would teach the freeze by
+  refusal, which is the one way a rule must never be taught.
+- **The client computes no money and invents no currency.** Amounts are
+  parsed at the edge with Billing's own parser (one comma rule for the whole
+  suite) and sent as integer cents; an empty currency box is *omitted* from
+  the request, so the workspace default is the server's decision.
+- **The claim form is the same form for recording and correcting**, because
+  the server takes the same shape for both.
+
+Cut from this slice, on purpose, and listed so the gap is a decision rather
+than an oversight: **no category picker and no receipt attachment**. Both
+need doors that do not exist yet — `/finance/categories` and the chart it
+points into arrive with the Accounts tab (B4.13c), and the receipt path is
+`POST /finance/receipts` over a Drive file, which wants the Drive picker.
+A picker that is always empty is worse than no picker. An approver already
+sees a claim's category name, because the queue read carries it.
 
 ## The chart of accounts (B4.02)
 
