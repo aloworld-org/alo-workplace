@@ -6,6 +6,25 @@ contracts.
 
 ## Unreleased
 
+- **You can now correct the shelf — and alo makes you say why.** Two things a
+  warehouse does by hand have doors of their own: moving goods between your own
+  places, and admitting the shelf disagrees with the system. A correction picks
+  from a short list of real answers — damaged, lost, expired, internal use,
+  sample, found, corrected — and you may add a sentence. Neither is an edit:
+  both are movements, kept for good, next to who made them and when, so the
+  question "who took forty out of stock, and why" has an answer instead of a
+  guess. Every one of these acts also lands in the audit trail. What alo
+  refuses is as deliberate: you cannot book goods as arriving from a supplier
+  or leaving to a customer by hand — those follow a purchase or a sales order,
+  which is what keeps a delivery note, a bill and a payment able to agree. A
+  correction that names no place to correct against, a transfer wearing the
+  word "adjustment", and a place you have archived being filled up again are
+  all refused in words that say what to do instead. You can also add your own
+  warehouses, vans and shop floors, rename the ones alo gave you, and archive a
+  place that is being emptied — movements *out* of it keep working, which is
+  the whole point of emptying it. An accountant can read all of it and change
+  none of it.
+
 - **alo now counts stock the way it keeps books: by recording what moved.**
   There is no quantity you can type over. A warehouse, a shop floor, a van —
   each is a place, and every arrival, sale, transfer and correction is a

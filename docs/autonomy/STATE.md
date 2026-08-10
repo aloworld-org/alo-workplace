@@ -14993,3 +14993,189 @@ Next item: B5.04b (stock adjustments: the manual adjustment and transfer route
 with its closed list of reason codes, `POST /inventory/moves` refusing any move
 that names a `supplier` or `customer` location, and `inventory` joining the
 audit vocabulary with its first mutating route).
+
+## B5.04b — the correction a person signs for (2026-08-10)
+
+**Shipped.** The one door onto the ledger that has no document behind it, and
+the words a person must use to open it. `POST /inventory/moves` writes a
+**transfer** between two of the tenant's own places or an **adjustment**
+against the adjustment location, and nothing else; a reason code from a closed
+list of seven — damaged, lost, expired, internal_use, sample, found,
+correction — is required for an adjustment and refused on anything else. With
+it come the reads and the pickers a movement cannot be written without:
+`GET/POST /inventory/locations`, `GET/PATCH/DELETE /inventory/locations/{id}`,
+`POST /inventory/locations/{id}/archive`, `GET /inventory/stock` and
+`GET /inventory/moves`.
+
+**Where the code went.** Migration `0159_inv_move_reason_code.sql` (one
+expand-only column plus a `CHECK … NOT VALID`); store `inv_adjust.rs` (the
+vocabulary, the `NewManualMove` shape, `record_manual_move`, and the pure
+kind-checking rule) with `inv_moves.rs` gaining the column and the pairing
+rule; routes `inventory_locations.rs`, `inventory_location_names.rs`,
+`inventory_stock.rs`, `inventory_moves.rs`; `audit_action.rs`,
+`scoped_roles.rs`, `server.rs` and both `lib.rs` files additively.
+
+**The five decisions worth reading, all recorded as-built in
+`docs/design/inventory.md` § "Adjustments and transfers".**
+
+1. **The pairing rule lives in `inv_moves::normalize`, not at the door.** A
+   code is present exactly when the reason is `adjustment` — enforced at the
+   moment of writing, so the receipt B5.05b will write cannot carry one and no
+   future door can write an unexplained adjustment.
+2. **The database carries the same rule as `NOT VALID`.** It binds every row
+   written from here on and does not re-read history. Validating instead would
+   have failed the migration on every developer's database — B5.04a's property
+   suite has already written `adjustment` rows with no code — and rewriting
+   those rows to please a constraint is exactly the destructive DDL this
+   module's whole design refuses. The ledger is append-only, so "from here on"
+   is every row that can still be wrong.
+3. **Coherence between the reason and the two places is enforced**, beyond the
+   supplier/customer refusal the note already required: a transfer has two real
+   ends, an adjustment touches the adjustment location at exactly one end.
+   Without it, "why did stock disappear" could be filed against a movement
+   where nothing left the building.
+4. **Moving into an archived location is refused; moving out of one is not.**
+   The other half of B5.04a's decision to allow archiving a place that still
+   holds stock — archiving means "being emptied", and the movements that empty
+   it are the ones that must keep working.
+5. **`record_manual_move` writes nothing itself.** It resolves both locations,
+   applies its rules, and hands the movement to `record_move_in`, which stays
+   the single writer of the ledger and of the cached balance. `NewManualMove`
+   cannot express a document reference at all, so the human door can never
+   claim an order stands behind a movement no order produced.
+
+**Two cross-cutting joins, both the design note's and both now real.**
+
+- **`inventory` joined `audit_action::AUDITED_MODULES`.** Ten mutating
+  `/inventory/*` routes now resolve to an action (the five new ones plus the
+  five supplier routes B5.03 shipped un-audited), and `tests/audit_routes.rs`
+  holds every route added after them to the same promise.
+- **`inventory` joined `scoped_roles::READ_ONLY_FOR_ACCOUNTANT`**, which the
+  note had not settled. An accountant values stock on a balance sheet and must
+  see the shelves and the ledger; the adjustment is the write that can make
+  theft look like paperwork, and it is not a books-only role's to make. Proven
+  on the wire in `accountant_role_http.rs`.
+
+**A found gap, fixed in passing.** `PUT /inventory/suppliers/{id}/products/
+{product_id}` was registered as `axum::routing::put(…)`, and the audit suite
+reads `server.rs`' source with a parser that (correctly) ignores a verb
+preceded by `::` — so that mutating route was invisible to the "every one is
+audited" promise. Spelled `put(…)` now. **The lesson generalises: a
+fully-qualified method constructor hides a route from `tests/audit_routes.rs`,
+so inside an audited module the verbs must be spelled bare.**
+
+**Verified — gates.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+-p alo-jmap --all-targets` clean, zero warnings; `cargo test -p alo-store -p
+alo-jmap` green — 149 suites, 0 failures, including the new
+`platform/alo-store/tests/inv_adjust.rs` (6 database tests: the loss and its
+row, surplus-and-loss summing to zero with both movements kept, the transfer
+that moves goods and not the total, every refusal writing nothing at all, the
+archived place that can be emptied and not filled, and the wrong-tenant denial
+on the destination, the source and the product). No web change, so no
+tsc/eslint/build.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8099` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+tokens taken through the real PKCE flow, rows read back in psql.
+
+```
+GET  /inventory/{locations,stock,moves}  (no token) → 401 ×3
+GET    /inventory/locations?lang=fr                 → 200, seeded 5: MAIN
+                                                      "Entrepôt principal",
+                                                      ADJUST "Corrections de stock", …
+POST   /inventory/locations {kind:"supplier"}       → 422 only stock and transit…
+POST   /inventory/locations {kind:"shelf"}          → 422
+POST   /inventory/locations {code:"WH 2"}           → 422 (code shape)
+POST   /inventory/locations {code:"wh2"}            → 200, stored code WH2
+POST   /inventory/locations {code:"WH2"} again      → 409
+PATCH  /inventory/locations/{wh2} {name}            → 200, kind still stock
+GET    /inventory/locations/AAAA…                   → 404
+DELETE a seeded virtual                             → 409 a system location cannot be deleted
+POST   /inventory/moves supplier→main               → 422 …only through a purchase order or a sales order
+POST   /inventory/moves main→customer               → 422
+POST   /inventory/moves reason=purchase             → 422 …every other reason comes from a document
+POST   /inventory/moves reason=shrinkage            → 422
+POST   /inventory/moves adjustment, no code         → 422 an adjustment needs a reason code: damaged, lost, …
+POST   /inventory/moves code=stolen                 → 422 reason code must be …
+POST   /inventory/moves transfer + code             → 422
+POST   /inventory/moves adjustment between two real → 422 …out of stock for a loss, into stock for a surplus
+POST   /inventory/moves of a service product        → 422 Installation is not a stocked product
+POST   /inventory/moves qty 0 / same place / bare-day occurredAt → 422 ×3
+POST   /inventory/moves missing qtyMilli            → 400
+POST   /inventory/moves foreign location            → 404
+POST   /inventory/moves ADJUST→MAIN 10, found       → 200 (surplus, note kept)
+POST   /inventory/moves MAIN→WH2 4, transfer        → 200
+POST   /inventory/moves MAIN→ADJUST 2, damaged,
+       occurredAt 2026-08-07T14:05+02:00            → 200, stored 12:05Z
+POST   /inventory/moves MAIN→ADJUST 9               → 409 Blue chair at MAIN has 4000
+                                                      milli-units available, and 9000 were asked for
+GET    /inventory/stock                             → MAIN 4000 (8600c), WH2 4000 (8600c), total 17200
+GET    /inventory/stock?includeVirtual=1            → …plus ADJUST −8000
+GET    /inventory/moves                             → 3 rows with reason, code and both codes
+GET    /inventory/moves?from=2026-08-09T00:00:00Z   → 2 (the back-dated loss is out)
+GET    /inventory/moves?from=last%20tuesday         → 422
+GET    /inventory/moves?limit=9999                  → limit echoed 500
+other tenant: GET stock/moves → 0 rows; GET our location → 404; move into it → 404
+POST   /inventory/locations/{wh2}/archive           → 200
+POST   /inventory/moves INTO the archived place     → 409 WH2 is archived and cannot receive stock
+POST   /inventory/moves OUT of it                   → 200
+DELETE the archived place (it has moved)            → 409 archive it instead
+GET    /inventory/locations                         → 5, ?includeArchived=1 → 6
+psql inv_moves  → adjustment/found, transfer/'', adjustment/damaged, transfer/''
+psql audit_log  → inventory.location.create|update|update, billing.product.create ×2,
+                  inventory.move.create ×4, inventory.location.archive
+                  (and not one entry for any of the ~15 refusals)
+```
+
+**Cuts and flags.**
+
+- **No CSV twin for `/inventory/stock`.** The route table promises one; it is
+  a screen's button and it arrives with the screen (B5.09a), where the column
+  headings are also a translation question. Recorded here so it is not lost.
+- **No web at all**, as B5.09a expects — no i18n strings were added, and
+  `/inventory` was already in the vite proxy list from B5.03.
+- **No `GET /inventory/moves/{id}`**: the route table does not list one, a
+  movement is always read in a feed, and the write answers with the row it
+  wrote.
+- **The reason-code vocabulary is not exposed over HTTP.** A `GET
+  /inventory/moves/reasons` was written and then deleted: the route table does
+  not contain it, and the seven words will be a typed union in the web module
+  with its own labels. Contracts outlive code — an unlisted route is a promise
+  nobody asked for.
+- **A fresh tenant still has no way to receive goods**, because the document
+  doors do not exist yet: the only route into stock today is an
+  `adjustment`/`found` movement, which is the honest opening-balance path
+  anyway. Receiving arrives with B5.05b.
+- **`inventory` is still absent from `Account::require_finance`-style gating**
+  for ordinary members: any authenticated member of the tenant may adjust
+  stock. That matches every other business module today (roles beyond
+  admin/accountant are a wave-review question), and it is named here rather
+  than assumed.
+
+**The migration number collided again, and again with the sites track — the
+same shape as B5.04a's, one iteration later.** This item minted `0158` after
+checking the tree had no duplicate; the sites track, working the same hour,
+renumbered `0156_site_page_locales.sql` up to `0158` (9e574d6) to sit above the
+inventory migrations, and pushed first. The pre-push rebase therefore recreated
+the exact duplicate the check before the work had ruled out. Resolved the way
+B5.04a settled it: **defer to what is already on `main`** — inventory moved to
+`0159`. `0156` is now a hole and cannot be reused here, because this migration
+`ALTER`s the `inv_moves` that `0157` creates and must run after it.
+
+**The sequence to trust:** `0155` inv suppliers, `0157` inv locations moves,
+`0158` site page locales, `0159` inv move reason code. No file's bytes changed,
+so every checksum still matches; a local database that applied the intermediate
+numbering is repaired by swapping the two rows' `version` values in
+`_sqlx_migrations`. A **cold** database was then built from scratch to prove
+the sequence rather than argue it: 115 migrations applied, `max(version)` 159,
+`inv_adjust` green from empty.
+
+**The lesson, third time paid for and now stated as a rule:** the duplicate
+check belongs immediately before `git push`, after the rebase — not only before
+the work — and when it fires, the file that moves is **ours**, because the
+other track's number is already published. Both tracks renumbering in opposite
+directions is what turns one collision into two.
+
+Next item: B5.05a (purchase orders: the record, the draft→sent state machine
+over the `billing_sequences` counter with a new `purchase_order` kind, the
+covering mail draft, and the routes).

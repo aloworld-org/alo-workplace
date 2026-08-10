@@ -351,7 +351,8 @@ uniqueness rule on a supplier's name** (two branches of one group are two rows,
 and a name is not an identifier), and **no `/inventory` audit trail yet** —
 `inventory` joins `audit_action::AUDITED_MODULES` with the first stock write
 (B5.04b), which is where the note already placed it and where the abusable
-write actually is.
+write actually is. It joined there, and the supplier routes above joined with
+it.
 
 ## Locations and the move ledger (B5.04)
 
@@ -602,6 +603,68 @@ The route refuses any move that names a `supplier` or `customer` virtual
 location: those two are reachable only through a receipt or a delivery, so a
 purchase can never be booked without an order behind it. That refusal is what
 keeps the three-way match meaningful.
+
+**As built (B5.04b), where the note left a choice open.**
+
+- **The reason code is a column of its own** (`inv_moves.reason_code`,
+  migration `0158`), not a word inside the note: a closed vocabulary that a
+  screen filters and a report groups by cannot live in free text.
+  `alo_store::inv_adjust::AdjustReason` spells the seven, and the pairing rule —
+  **a code is present exactly when `reason` is `adjustment`** — is enforced in
+  `inv_moves`' `normalize`, at the moment of writing, so a receipt written by
+  B5.05b cannot carry one and an adjustment cannot arrive without one. The
+  database carries the same rule as a `CHECK … NOT VALID`: it binds every row
+  written from here on, and does not re-read a ledger that is append-only and
+  already correct by construction (validating history instead would fail the
+  migration on any database that ran B5.04a's property suite, and rewriting
+  those rows to please a constraint is the destructive DDL this module refuses).
+- **The manual door is its own store function and its own input type.**
+  `record_manual_move(NewManualMove)` cannot express a document reference at
+  all, so the one door a human reaches can never claim a purchase order stands
+  behind a movement no order produced. It writes nothing itself:
+  `record_move_in` stays the single writer of the ledger and the cached
+  balance, and the door's own rules are one pure function over the two
+  locations' kinds.
+- **Coherence between the reason and the places is enforced**, beyond the
+  supplier/customer refusal the note already stated: a `transfer` has two real
+  ends, and an `adjustment` touches the `adjustment` location at exactly one
+  end (out of stock for a loss, into it for a surplus). Without it, "why did
+  stock disappear" could be filed against a movement where nothing left the
+  building. `production` is therefore unreachable through this door, which is
+  correct while assembly is a cut.
+- **Moving *into* an archived location is refused** (`Conflict`, naming the
+  place); moving *out of* one is not. Archiving means "being emptied", and the
+  movements that empty it are exactly what must keep working — the other half
+  of B5.04a's decision to allow archiving a location that still holds stock.
+- **Locations get their HTTP surface in this item**, since a movement cannot be
+  written without one: `GET/POST /inventory/locations`,
+  `GET/PATCH/DELETE /inventory/locations/{id}` and — an addition to the route
+  table above — `POST /inventory/locations/{id}/archive`. Archiving is its own
+  door for the reason `/billing/customers/{id}/archive` is: an ordinary rename
+  must never be able to drop a warehouse out of every picker because a stale
+  form carried the flag. `DELETE` stays strict rather than silently archiving,
+  because answering a different request than the one made is worse than a `409`
+  that says what to do instead. The seed's names arrive in the caller's
+  language through `inventory_location_names.rs`, `finance_chart_names.rs`'
+  mechanism reused whole.
+- **Query parameters are camelCase** (`productId`, `locationId`,
+  `includeVirtual`, `includeZero`, `includeArchived`), as every other route on
+  this service spells them; the snake_case in the table above was shorthand.
+  `from`/`to` on the ledger read are RFC 3339 instants and unreadable text is a
+  `422` — a history page that quietly answers "everything" when it was asked
+  for "since Monday" is worse than one that says the date was unreadable.
+- **`inventory` joined `audit_action::AUDITED_MODULES`** here, as planned, and
+  with it the existing supplier routes: nine mutating `/inventory/*` routes now
+  resolve to an action, and `tests/audit_routes.rs` holds every one added after
+  them to the same promise. Registering `PUT /inventory/suppliers/{id}/products/
+  {product_id}` as `axum::routing::put(…)` had hidden it from that test's
+  source reader; it is spelled `put(…)` now, and the tenth line is in the
+  vocabulary.
+- **`inventory` also joined `scoped_roles::READ_ONLY_FOR_ACCOUNTANT`**, which
+  the note had not settled. An accountant values the stock on a balance sheet,
+  so they must see the shelves and the ledger; a stock adjustment is the write
+  that can make theft look like paperwork, and it is not a books-only role's to
+  make.
 
 ## Purchase orders (B5.05)
 
@@ -945,6 +1008,8 @@ Store (`platform/alo-store/src`), one file one reason:
 inv_locations.rs      locations, the seeded virtuals, the kind vocabulary
 inv_moves.rs          record_move(): the one writer of a movement and of the
                       cached balance; the negative-stock rule
+inv_adjust.rs         the manual door: the reason-code vocabulary, and which
+                      movements a person may make without a document
 inv_stock.rs          the reads: on-hand per product/location, the value, the
                       rebuild-from-movements fold
 inv_suppliers.rs      the supplier master record
@@ -970,7 +1035,9 @@ a starting point, not a reservation.
 
 Routes (`products/mail/alo-jmap/src`): `inventory.rs` (the module's edge
 concerns and the error-map reuse), `inventory_suppliers.rs`,
-`inventory_locations.rs`, `inventory_stock.rs`, `inventory_po.rs`,
+`inventory_locations.rs`, `inventory_location_names.rs` (the seed's words, one
+table per language), `inventory_stock.rs`, `inventory_moves.rs`,
+`inventory_po.rs`,
 `inventory_po_send.rs`, `inventory_po_receipt.rs`, `inventory_so.rs`,
 `inventory_so_delivery.rs`, `inventory_reorder.rs`, `inventory_counts.rs`,
 plus `agent_inventory.rs` (B5.10) and the additive lines in `server.rs`,
