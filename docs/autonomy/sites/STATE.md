@@ -2167,3 +2167,26 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   used.
 - **Next:** `LOOP COMPLETE` — every Sites queue item is checked and the S1 arc
   is fully reconciled, exercised, and journaled.
+
+## 2026-08-10 — S2.00 wave contract
+
+- **Shipped:** expanded the Sites queue into small end-to-end slices for every
+  requested S2 and later capability: multilingual publishing, Base-backed CMS
+  collections, restricted collaborators, history/rollback, scheduling,
+  passwords, responsive images, richer aggregate analytics, heatmaps,
+  conversion attribution, templates, catalogs/orders, Agenda booking,
+  sandboxed custom code, and in-product domains. Each UI item follows its
+  storage/service foundation so the queue never ships a dead control.
+- **Boundaries:** Sites owns its models, public service, editor surfaces, and
+  integration adapters. Base and Agenda are consumed through tenant-scoped
+  seams. Billing/CRM remain owned by their active track; Sites will join only
+  through their existing or explicitly published interfaces and will not edit
+  those modules. Registrar and AI work use deterministic fixtures only.
+- **UX contract:** Wix/Squarespace are the domain references. Every core flow
+  has a visible manual path, AI is optional, empty states teach one next step,
+  safe actions target one click, and publish/payment/domain actions retain
+  explicit review because they are outward or irreversible.
+- **Verified:** `git diff --check` is clean. This planning-only slice changes
+  no executable source, storage, or route, so Rust, web, wrong-tenant, and curl
+  gates are not applicable.
+- **Next:** S2.01a, the locale foundation.

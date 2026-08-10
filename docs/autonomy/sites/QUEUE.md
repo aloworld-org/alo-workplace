@@ -58,3 +58,47 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.31b Wave review, reconciliation: docs/design/sites.md as-built; features [S1] reconciliation incl. the S1.30b/c dialog fixes; human-inbox summary (production compose+Caddy additions, AI key).
 - [x] S1.32a FINAL arc, forms+publish: fixture-generate → edit sections → theme → publish → serve on subdomain Host → form submission → owner-inbox notification + submissions UI; transcript.
 - [x] S1.32b FINAL arc, blog+domains+privacy: blog post from a real doc → custom-domain verify+serve → analytics counted with zero PII; transcript; then `LOOP COMPLETE`.
+
+## S2 — multilingual publishing, CMS, collaboration, and growth
+
+- [x] S2.00 Wave contract: split every requested S2/S+ capability into tenant-safe, independently shippable slices; name cross-product seams and no-AI/manual siblings; preserve the one-item-per-commit rule.
+- [ ] S2.01a Locale foundation: site default locale + enabled locales + locale validation in storage/routes; migration, wrong-tenant tests, and wire transcript.
+- [ ] S2.01b Localized pages: one stable page identity with per-locale title, slug, SEO, and section drafts; fallback rules and wrong-tenant tests.
+- [ ] S2.01c Localized publishing: immutable locale snapshots, alternate/canonical links, locale-aware sitemap/RSS, language switcher, and public Host goldens.
+- [ ] S2.01d Translation editor: visible language controls, missing-translation states, manual copy/create path, and publish readiness without requiring AI.
+- [ ] S2.01e Whole-site AI translation: deterministic proposal envelope across pages/posts, before/after review, approve-only writes, and fixture tests with no external calls.
+- [ ] S2.02a Collections model: tenant-owned site collection binding to an alo Base table plus validated field mapping; wrong-tenant and missing-table tests.
+- [ ] S2.02b Collection publishing: resolve Base rows into immutable publish snapshots with deterministic empty/error behavior; public render goldens.
+- [ ] S2.02c Collections UI: visible connect-table, field mapping, preview, disconnect, and empty-state controls; AI remains optional.
+- [ ] S2.03a Site-editor grants: per-site editor role that cannot read Mail, Drive, CRM, Billing, or unrelated sites; storage and wrong-tenant authorization matrix.
+- [ ] S2.03b Site-editor UI: invite/revoke collaborators and exercise edit/publish access end to end without exposing workspace administration.
+- [ ] S2.04a Version history API: list immutable publishes, compare metadata, and atomically republish a chosen version without mutating history; tenant tests and wire transcript.
+- [ ] S2.04b Version history UI: visible history surface, preview, and one-click rollback with undo/result feedback.
+- [ ] S2.05a Scheduled publishing model: tenant-scoped schedule/cancel/claim semantics with concurrency and wrong-tenant tests.
+- [ ] S2.05b Scheduled publishing service/UI: visible schedule control, local-time explanation, cancel/reschedule, worker execution, and wire transcript.
+- [ ] S2.06a Password-protected pages: strong password hashing, anonymous challenge/session gate, cache-safe responses, rate limiting, and security tests.
+- [ ] S2.06b Password UI: visible protect/remove controls, clear public-preview state, and accessible visitor unlock screen.
+- [ ] S2.07a Image presentation model: crop rectangle, focal point, and alt text on image-bearing sections with backwards-compatible validation.
+- [ ] S2.07b Responsive images: safe derivative pipeline and published `srcset`/`sizes`; byte/cache/XSS tests and public goldens.
+- [ ] S2.07c Image editor: crop/focal controls, manual alt text, and optional propose-then-approve AI alt text using fixtures only.
+- [ ] S2.08a Analytics dimensions: aggregate UTM campaign, coarse country, device class, entry/exit, read-time buckets, and outbound clicks while discarding raw IP/UA/query.
+- [ ] S2.08b Analytics UI: calm overview and drill-down surfaces for the new aggregates, with privacy explanation and useful empty states.
+- [ ] S2.09a Aggregate heatmap collection: bounded click coordinates and scroll-depth buckets with no visitor/session identity; schema privacy proof and abuse caps.
+- [ ] S2.09b Aggregate heatmap UI: page/viewport overlays, minimum-sample suppression, keyboard-accessible summaries, and empty states.
+- [ ] S2.10a Conversion events: aggregate form-view/start/submit attribution with stable site-owned source IDs and no individual journey storage.
+- [ ] S2.10b CRM/Billing attribution seam: tenant-safe handoff/read model joining site conversion totals to existing lead, deal, and invoice identities without editing the Billing/CRM-owned modules.
+- [ ] S2.10c Funnel UI: site → form → lead → deal → invoice aggregate funnel with clear unavailable/dependency states and no re-entry of known data.
+- [ ] S2.11a Template catalog: curated, versioned templates covering common site types with preview and deterministic instantiate tests.
+- [ ] S2.11b Template gallery UI: visual, keyboard-accessible manual creation path beside AI generation; one-click preview and create.
+- [ ] S2.12a Catalog sections: tenant-owned catalog/category/item model, Base import seam, publish snapshots, and public render goldens.
+- [ ] S2.12b Order forms: public order submission with validation, abuse controls, owner inbox/review/export flow, and no checkout dependency.
+- [ ] S2.12c Catalog/order UI: visible item management, section mapping, order inbox, and useful empty states.
+- [ ] S2.13a Booking section model: availability source binding and booking-field schema that references Agenda through a Sites-owned seam.
+- [ ] S2.13b Public booking flow: availability read, race-safe reservation, internal notification, privacy/security tests, and real-process transcript.
+- [ ] S2.13c Booking UI: visible Agenda connection, preview, booking management link, and dependency/error states.
+- [ ] S2.14a Sandboxed custom-code model: explicit HTML/CSS/JS capabilities, size caps, CSP contract, and validation that rejects unsafe host-page escape.
+- [ ] S2.14b Sandboxed custom-code rendering/UI: isolated iframe output, preview, visible risk boundary, and security goldens without hidden core actions.
+- [ ] S2.15a Domain commerce adapter: EU registrar interface, fixture provider, availability/pricing model, and no external calls in tests.
+- [ ] S2.15b Domain purchase state machine: quote → explicit approval → payment reference → register/configure/renew states with idempotency and tenant tests; Billing remains behind its owned public seam.
+- [ ] S2.15c Domain purchase UI: search, honest renewal pricing, checkout handoff, progress/recovery, and automatic Sites DNS/domain attachment where configured.
+- [ ] S2.16 Wave review: complete browser arcs, accessibility/responsiveness/performance, language parity, privacy/security reconciliation, changelog, as-built docs, and final cross-service transcripts.
