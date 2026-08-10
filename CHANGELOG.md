@@ -6,6 +6,24 @@ contracts.
 
 ## Unreleased
 
+- **Tell alo how much to keep, and it tells you what to buy.** Set a minimum
+  and a target for a product at a place — "keep at least four blue chairs in the
+  main warehouse, and buy back up to twenty" — and the shortage report answers
+  the question a buyer actually asks on a Monday morning: what is short, by how
+  much, how much to order, and from whom. It counts three things, and shows you
+  all three rather than one number you have to trust: what is on the shelf, what
+  is already **on order** and has not arrived, and what is **promised** to
+  customers on confirmed orders and has not gone out. So ordering thirty this
+  morning takes the item off the list this afternoon instead of nagging you
+  about it every day until the lorry comes, and promising seven to a customer
+  puts it back on. The quantity to buy closes the gap to your target and is
+  never below the smallest quantity your supplier will sell; the estimate beside
+  it is at the price **they** quote, with their lead time, so you know both what
+  it costs and when it lands. A product no one has quoted for is still listed —
+  it just has nobody named to buy it from. A rule can be parked out of season
+  without losing the numbers you worked out, and a shelf you are emptying on
+  purpose, or a product you have stopped selling, quietly drops off the list.
+  The whole report downloads as a spreadsheet.
 - **Invoice a sales order for what actually went out.** One button on the order
   raises a **draft** invoice in Billing carrying what has been delivered and not
   yet billed — each line at the quantity that shipped and the price you quoted

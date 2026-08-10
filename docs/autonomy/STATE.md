@@ -15952,3 +15952,178 @@ psql audit_log              → inventory.sales_order.invoice ×3 — the three 
 
 Next item: B5.07 (reorder rules and the shortage query — the minima per product
 per location, and the fold over open orders that feeds the agent's proposals).
+
+## B5.07 — the minima we keep, and what that means we must buy (2026-08-11)
+
+**Shipped.** The one stored input of the reorder question and the fold that
+answers it. `inv_reorder_rules` (migration 0165) holds `(product, location) →
+minimum, target, active` — per location, because "we keep ten in the shop and
+none in the warehouse" is the normal case and not a refinement — with the pair
+as a unique index, so two minima for one shelf are a `409` rather than two
+answers to one question. `alo_store::inv_reorder` owns the CRUD and the query;
+`alo_jmap::inventory_reorder` puts both on the wire at
+`/inventory/reorder-rules` (+`/{id}`) and `/inventory/shortages` (+`.csv`).
+
+The report is the item's real content, and it is arithmetic over three numbers
+per rule:
+
+```
+available = on_hand + on_order − committed
+short when available < minimum
+buy       = max(target − available, the supplier's minimum order quantity)
+```
+
+`on_order` is the open remainder of every purchase-order line on a `sent` or
+`partially_received` order; `committed` is the undelivered remainder of every
+line on a `confirmed` or `partially_delivered` sales order. Both are **computed,
+never stored** — the reservation table the design note rejected stays rejected,
+for the drift argument the whole module has held since B5.04a. `on_order` is
+what makes the report readable rather than annoying: without it, a shortage
+ordered on Tuesday is reported again every morning until the lorry arrives, and
+a report that repeats itself is a report people stop reading.
+
+Three decisions worth naming, all now in `docs/design/inventory.md` as-built:
+
+- **The supplier's minimum is a floor, not a pack size.** A need of 12 against a
+  minimum of 50 buys 50; a need of 60 buys 60, not 100. The field says the
+  smallest quantity they will sell; a multiple would be a pack size, a fact they
+  have not told us.
+- **A rule's quantities are bounded by what a purchase-order LINE can carry**
+  (`REORDER_QTY_MAX_MILLI`, a million units), not by the larger bound a
+  supplier's minimum order may state — what the rule exists to produce is a
+  proposed order line, so a target that could not fit on one would be a number
+  we can compute and never act on.
+- **The pipeline numbers are per product, tenant-wide; only `on_hand` is per
+  location.** Neither document names a location until the goods are received or
+  picked, so attributing an open order to a shelf would be a guess dressed as a
+  fact. Every row states the three numbers separately, so a reader sees which
+  part of the answer came from where. Exact with one stock location (the seeded
+  case); with rules at two shelves one open order counts toward both, which is
+  the honest reading of "we have thirty coming, somewhere". Flagged below.
+
+The client never does the arithmetic: `availableQtyMilli`, `shortByQtyMilli`,
+`buyQtyMilli` and `estimatedCostCents` are all computed server-side, so a screen
+and the agent that will propose orders from the same route (B5.10) cannot
+disagree about how short we are. The supplier on a row is the product's
+`default_supplier_id` when that supplier actually quotes for it, else the first
+who did; archived suppliers are never proposed. No grand total, on purpose: each
+row's cost is in its supplier's currency, and adding francs to euro would be a
+conversion nobody asked for.
+
+**Verified — the gate.** `cargo fmt` on the item's own new files (`main` is not
+rustfmt-clean on this machine; the one unrelated file `fmt` wanted to rewrite,
+`tests/inv_po_lifecycle.rs`, was reverted). `SQLX_OFFLINE=true cargo clippy -p
+alo-store -p alo-jmap --all-targets` clean, zero warnings. `cargo test -p
+alo-store -p alo-jmap` green: 583 store unit tests + every suite, including the
+new 5-test `tests/inv_reorder.rs` and 8 new pure-arithmetic unit tests; 10 new
+route unit tests; `tests/audit_routes.rs` updated with the three new actions
+(`inventory.reorder_rule.create|update|delete`). The wrong-tenant test is in the
+suite and is the third of the five: another tenant cannot read, list, patch or
+delete our rule, cannot create one naming our product or our location, and their
+month of stock, orders and promises never reaches one number of our report — nor
+ours theirs.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real PKCE authorization-code tokens, rows read back in psql.
+
+```
+GET  reorder-rules · shortages · shortages.csv   (no token) → 401 ×3
+POST /inventory/reorder-rules                    (no token) → 401
+POST {no productId}                                         → 422 productId is required:
+                                                              a reorder rule is about a
+                                                              product
+POST {no locationId}                                        → 422 locationId is required
+POST {the service product}                                  → 422 a reorder rule needs a
+                                                              stocked product; this one is
+                                                              a service
+POST {the SUPPLIER counterparty}                            → 422 a reorder rule needs a
+                                                              real stock location
+POST {min 20000, target 10000}                              → 422 the target quantity
+                                                              cannot be below the minimum
+POST {min −1} · {min 1000000001}                            → 422 ×2 between 0 and
+                                                              1000000000 milli-units
+POST {minQtyMilli: 1.5}                                     → 400 malformed request body
+POST {unknown product} · {unknown location}                 → 404 ×2
+POST {chair, MAIN, min 4000, target 20000}                  → 200 rule, active, carrying
+                                                              product name, SKU, unit,
+                                                              location code and name
+POST the same pair again                                    → 409 this product is already
+                                                              watched at this location
+GET  /inventory/shortages         (nothing anywhere)        → 1 row: on hand 0, on order 0,
+                                                              committed 0, available 0,
+                                                              short by 4000, buy 20000,
+                                                              Hoffmann @3150 EUR, lead 9d,
+                                                              estimate 63000 cents
+GET  /inventory/shortages.csv                               → text/csv; attachment;
+                                                              nosniff; no-store — header
+                                                              row + "Blue chair,CH-1,piece,
+                                                              MAIN — Hoofdmagazijn,4,20,0,0,
+                                                              0,0,4,20,Hoffmann GmbH,
+                                                              HM-4471,31.50,EUR,630.00"
+POST /inventory/moves {ADJUST→MAIN 5000, found}             → 200; shortages count 0
+                                                              (five is over the four)
+SO for 7000, POST …/confirm                                 → SO-2026-00001; shortages 1:
+                                                              on hand 5000, committed 7000,
+                                                              available −2000, short 6000,
+                                                              buy 22000, estimate 69300
+PO for 30000, POST …/send                                   → PO-2026-00001; shortages
+                                                              count 0 — a shortage already
+                                                              on order is not a shortage
+PATCH {min 40000, target 60000}                             → 200; shortages 1: on hand
+                                                              5000 + on order 30000 −
+                                                              committed 7000 = 28000,
+                                                              short 12000, buy 32000,
+                                                              estimate 100800 (32 × 3150)
+GET  shortages?locationId=MAIN · =SUPPLIER                  → 1 · 0
+GET  shortages?productId=chair · =service                   → 1 · 0
+GET  shortages?supplierId=Hoffmann · =nope                  → 1 · 0
+GET  shortages.csv (with a pipeline behind it)              → "…,40,60,5,30,7,28,12,32,
+                                                              Hoffmann GmbH,HM-4471,31.50,
+                                                              EUR,1008.00"
+PATCH {active:false}                                        → 200; shortages 0; rules 0;
+                                                              rules?includeInactive=1 → 1,
+                                                              min and target intact
+GET · PATCH · DELETE the rule                    as them    → 404 ×3
+GET  /inventory/shortages · /inventory/reorder-rules as them→ 200, count 0 · 0 rules
+POST a rule naming OUR product and OUR location  as them    → 404
+GET  the rule                                     as us     → 200 — their three attempts
+                                                              left it exactly as it was
+DELETE the rule                                             → {"removed":true}; GET → 404;
+                                                              DELETE again → 404;
+                                                              shortages count 0
+psql inv_reorder_rules  → 0 rows for either tenant after the delete
+psql audit_log          → inventory.reorder_rule.create ×1, .update ×3, .delete ×1, each
+                          naming its record — and not one entry for any of the twelve
+                          refusals
+```
+
+**Cuts and flags.**
+
+- **No screens.** The rules and the report are on the wire with everything a UI
+  needs (names, codes, units, the three input numbers, the derived three, the
+  supplier and their lead time); the shortage view belongs with the inventory
+  screens in B5.09a/b, and no i18n string was added this iteration because no
+  UI string exists yet.
+- **No grand total on the report**, per the currency argument above. A screen
+  that wants a total per currency has every row it needs; converting through the
+  ECB table (B1.21) to one figure is a decision for the wave review, not a
+  silent default.
+- **The pipeline is per product, not per shelf** — named above and in the design
+  note. Making it exact needs a destination on a purchase-order line and a pick
+  location on a sales-order line, which is a contract change to two documents
+  and belongs to a human's decision, not to this item.
+- **No demand forecast**, exactly as the design note said: "you will need 40 next
+  month" is a claim about the future that needs seasonality, lead-time variance
+  and a stated confidence. What the report says is what is true today.
+- **A rule survives a purchase order being cancelled or a supplier's offer being
+  withdrawn** and simply reports no supplier — correct, and worth knowing when
+  B5.10 groups proposals by supplier: a row with `supplier: null` cannot be
+  turned into a draft order and must be listed for a human rather than dropped.
+- **`inventory` is still not role-gated** beyond the accountant's read-only
+  scope — any authenticated member may set the minima the buying decisions rest
+  on. Named for the fourth item running; a shipping/buying role is a wave-review
+  question.
+
+Next item: B5.08a (stocktake, counting — the count sheet's snapshot and the
+variance list against it).

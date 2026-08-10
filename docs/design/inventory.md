@@ -1065,8 +1065,21 @@ available = on_hand
           + on_order      (ordered − received, on sent/partially_received POs)
           − committed     (confirmed − delivered, on confirmed/partially_delivered SOs)
 short when available < minimum
-buy = target − available   (rounded up to the supplier's minimum order qty)
+buy = max(target − available, the supplier's minimum order quantity)
 ```
+
+**As built, the supplier's minimum is a floor and not a pack size.**
+`inv_supplier_products.min_order_qty_milli` says the smallest quantity they will
+sell, so a need of 12 against a minimum of 50 buys 50 — and a need of 60 buys
+60, not 100. Rounding up to a *multiple* would be a pack size, which is a
+different fact the supplier has not told us and which we therefore do not
+invent.
+
+**A rule's quantities are bounded by what a purchase-order line can carry**
+(`REORDER_QTY_MAX_MILLI`, a million units) rather than by the larger bound a
+supplier's minimum order may state: what a rule exists to produce is a proposed
+order line, so a target that could not fit on one would be a number the module
+can compute and never act on.
 
 **`committed` is computed, not stored.** The rejected alternative is a
 reservation table — a row per sales-order line holding stock aside. Real
@@ -1081,6 +1094,38 @@ itself.
 `on_order` is what makes the report usable rather than annoying: without it,
 a shortage that has already been ordered is reported every day until the goods
 arrive, and a report that repeats itself is a report people stop reading.
+
+**The pipeline numbers are per product, tenant-wide; only `on_hand` is per
+location.** Neither document names a location until the goods are actually
+received or picked — a purchase order says nothing about which shelf the lorry
+will unload onto, and a sales order says nothing about which van picks it — so
+attributing an open order to one shelf would be a guess dressed as a fact. Each
+row therefore reports `onHandQtyMilli`, `onOrderQtyMilli` and
+`committedQtyMilli` as three separate numbers, and a reader can see which part
+of the answer came from where. With one stock location — the seeded case, and
+the overwhelmingly common one — the two readings coincide exactly; with rules
+on the same product at two shelves, one open order counts toward both, which is
+the honest reading of "we have thirty coming, somewhere". Naming a destination
+on a purchase-order line is the change that would make this exact, and it is a
+B5.09/B5.10 question rather than a silent guess here.
+
+A rule that watches an **archived** product or an **archived** location reports
+nothing: a shelf being emptied on purpose is not a shortage, and reporting it
+every morning is how a report loses its reader. A **parked** rule (`active`
+false) keeps its numbers and stops producing shortages — what a seasonal
+product needs out of season — which is why a rule is parked rather than
+archived, and deleted outright when nobody wants it back (no document copied
+anything from it, so nothing that happened depends on it).
+
+The supplier on a row is the tenant's `default_supplier_id` for the product when
+that supplier actually quotes for it, otherwise the first supplier who did;
+archived suppliers are never proposed. `estimated_cost_cents` is the quantity to
+buy at **their** quoted price, or at the product's own recorded purchase price
+when nobody quotes for it — the number `inv_stock` values the shelf by, so "what
+is there" and "what the gap costs" are quoted consistently. There is
+deliberately **no grand total** on the report: each row's cost is in the
+currency its supplier quotes in, and adding francs to euro to reach one number
+would be a conversion nobody asked for.
 
 ## Stocktake (B5.08)
 
