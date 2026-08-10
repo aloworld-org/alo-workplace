@@ -2263,8 +2263,8 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   publish snapshots, public alternate/canonical links, locale-aware feeds, and
   the visitor language switcher intentionally follow in S2.01c. The local wire
   fixture and disposable gate databases were deleted after verification. The
-  migration was ultimately renumbered to `0156` after rebasing over Billing's
-  `0154` and then Inventory's `0155`. A
+  migration was ultimately renumbered to `0158` after rebasing over Billing's
+  `0154` and Inventory migrations through `0157`. A
   second post-rebase full `alo-store` run exceeded the 15-minute process cap
   without an assertion failure; the already-green full run, exact rebased
   isolation test, strict clippy, and full rebased JMAP matrix are the recorded
