@@ -14399,3 +14399,175 @@ and `/projects`. No new top-level prefix this item.
 
 Next item: B5.01 (the alo Inventory design note — the moves-only stock model,
 locations, and the PO/SO state machines; same four-block bar as B1.01).
+
+## B5.01 — the shelf does not read our database (2026-08-10)
+
+**Shipped:** `docs/design/inventory.md` (950 lines), the design note that
+opens wave B5. No code, no migration — this item is the decision-making that
+precedes B5.02's first `ALTER TABLE`.
+
+**The one rule the note is built on:** *a quantity is never written; only
+movements are written.* On-hand is a fold over movements, and the rejected
+alternative is stated in the second paragraph so the rest can lean on it — a
+`qty_on_hand` column edited in place with a movement table beside it as an
+audit trail, which is what most small systems do and which fails the way two
+sources of truth always fail: they drift, silently, and the drift is found at
+a stocktake with no way to tell which was lying or since when.
+
+**The B4 parallel is deliberate and structural.** The ledger stores postings
+and derives balances; this module stores moves and derives on-hand. The
+ledger's invariant is debits == credits; this module's is that **the quantity
+of a product summed over every location, real and virtual, is always zero** —
+which is only sayable because *both* location columns are `NOT NULL` and the
+outside world is modelled as four seeded **virtual counterparties**
+(`supplier`, `customer`, `adjustment`, `production`). The rejected alternative
+there is nullable from/to columns, which is one fewer concept and makes the
+invariant unstatable: "sums to zero across all locations" is a sentence about
+a closed system, and a null is the hole in it. Seven property tests are
+planned on the back of it (P1–P7), the last being B4's wrong-aggregate test:
+tenant A's whole generated month leaves every one of tenant B's balances
+byte-identical.
+
+**Sixteen decisions carry their rejected alternative.** The load-bearing ones:
+
+- **The catalog extends `billing_products`; it does not get a sibling.** Six
+  additive columns (`sku`, `barcode`, `stocked` defaulting **false** so no
+  existing tenant acquires a stock ledger by upgrade, `purchase_price_cents`,
+  `photo_node_id`, `default_supplier_id`), and no second door onto the price
+  list: the inventory UI edits products through the existing
+  `/billing/products` routes. Rejected: `inv_items` joined by product id,
+  which immediately raises the unanswerable question of a row in one table and
+  not the other.
+- **Suppliers are their own table, not `billing_customers` with a flag.**
+  Structurally the fields diverge (lead times, their code for our products, an
+  IBAN we pay *into*); consequentially, one flagged table means a mistake in
+  the flag puts a supplier in an invoice's customer picker, and the failure
+  mode of that is invoicing a supplier. **`billing_bills` deliberately keeps
+  its copied `Supplier` and gains no FK** — the snapshot rule, and a nullable
+  link that is sometimes filled would give reports two ways to answer one
+  question.
+- **Negative stock is refused**, `409` naming product, location, available and
+  requested — against the larger systems' practice of warning and continuing.
+  The escape hatch is the manual adjustment with a required reason code, which
+  leaves a row saying a person decided this. Two consequences written down:
+  the check is against the balance **now** (back-dating is allowed, goods
+  physics is not retroactive), and it serialises per product-location on the
+  cached row's lock, so N parallel attempts to ship the last unit yield one
+  success and N−1 clean conflicts — the `billing_sequence` trade, reused.
+- **The cached `inv_stock` row has exactly one writer** (`record_move`, in the
+  movement's own transaction), is proven by a fold-and-compare in every test,
+  and is rebuildable from the movements. Rejected: a Postgres trigger (a third
+  language, invisible to `cargo test`, checking rows without intent — B4.03a's
+  argument verbatim) and no cache at all (the shortage query folds the whole
+  history for every stocked product on every page load).
+- **Quantities are milli-units and strictly positive**, direction carried by
+  the location pair — not a signed quantity with one location, which makes
+  "how much moved" a query about absolute values and reintroduces the sign
+  confusion `docs/design/finance.md` spent a section on.
+- **`POST /inventory/purchase-orders/{id}/send` both writes the mail draft and
+  moves the state**, deviating from billing's split (a quote's send is a
+  transition touching no mail; an invoice's send writes a draft and changes
+  nothing). A PO's *sent* state means precisely "we have asked them" — the
+  mail **is** the transition — and splitting it permits an order marked sent
+  that nobody sent, which is the state that makes a shortage report lie. The
+  mail still only ever reaches Drafts (ADR 0034, B1.18).
+- **PO/SO numbers draw from the existing gapless `billing_sequences`** with
+  new kinds, at *send* and at *confirm* respectively. Recorded explicitly that
+  gaplessness is **not legally required** here — we reuse it because it exists
+  and is tested to 100 parallel iterations, and a weaker second mechanism
+  would be a new thing to get wrong.
+- **Over-receipt is refused**, no tolerance percentage: the right tolerance is
+  a per-supplier commercial agreement we cannot guess. Under-receipt is
+  ordinary.
+- **A sales order invoices what was delivered, not what was ordered** —
+  invoicing before shipment asserts a VAT event on a hope — and each order
+  line tracks `invoiced_qty_milli` so a second delivery raises a second
+  invoice for the new quantity rather than a duplicate.
+- **Reservations are computed, never stored** (`committed` = confirmed −
+  delivered over open SO lines). A reservation table answers "is this unit
+  spoken for", which is not the question an SME asks; the question is "do I
+  need to buy more", and a fold over open lines answers it from data that
+  cannot disagree with itself. `on_order` is in the same arithmetic so a
+  shortage already ordered stops being reported daily.
+- **A stocktake's variance is recomputed at apply time, not taken from the
+  snapshot.** A line whose stock moved during the count is flagged and
+  **skipped**, with the response saying why — applying the frozen difference
+  would silently erase the shipment that went out at the far end of the room.
+  Rejected: locking the location for the duration of the count.
+- **Barcodes are text with a validated GTIN check digit** (an integer column
+  eats the leading zeros that are part of the code), and SKU/barcode
+  uniqueness is **partial and tenant-scoped** — a global unique index would
+  leak another tenant's catalog through a constraint violation, which the
+  Tenancy section names as this wave's third mandatory isolation test.
+
+**The four blocks are all answered:** Surface (inputs, outputs, callers, the
+route table, the web surface), Errors (a 24-row condition → store → wire
+table over the reused `billing::map_store_err`), Tenancy (composite keys,
+three mandatory isolation tests, `inventory` joining `AUDITED_MODULES` because
+a stock adjustment is the most abusable write in the business modules — the
+one that can make theft look like paperwork), and Out of scope (13 named
+cuts).
+
+**The largest cut, flagged ★ for a human: B5 posts nothing to the ledger.**
+No inventory asset account, no COGS, no purchase-price variance — because a
+valuation needs a *method* (FIFO, weighted average, standard cost), the choice
+is a per-tenant accounting policy with tax consequences, and picking one on a
+tenant's behalf is a compliance statement made by a machine, which this loop's
+own rails forbid. The stock screens show quantity plus a *reference* value at
+purchase price, labelled as such and never called a balance. Its prerequisite
+— B4.11, documents posting to the ledger at all — is itself still open.
+
+**Other cuts named:** serial/lot/expiry tracking (the move ledger's shape is
+ready for it; every screen is not), the third leg of the three-way match
+(B5 books both the receipt's draft bill and the supplier's imported
+e-invoice, and links neither), manufacturing/BOM (the `production` virtual
+location is seeded so it needs no migration later), bin locations and pick
+paths, multi-UoM conversion, landed cost, EDI/Peppol ordering and carrier
+integrations, dropship/consignment, customs and Intrastat, demand forecasting,
+barcode label *printing*, and hardware (RFID, scales, PLC).
+
+**Four open questions for a human:** whether Insights gets inventory datasets
+(BI-2 — they are folds, a new shape for that closed catalog); who may adjust
+stock (`tenant_user_roles` from B4.12 is the mechanism, a warehouse role is
+the decision); which currency stock is valued in (a valuation question, and
+valuation is cut); and whether `crm_handoff` should offer a sales order as a
+third option beside the quote and the invoice.
+
+**How verified.** Docs-only item: no Rust, no web, no migration touched, so no
+compile or test gate applies. The note was written against the code rather
+than from memory, and four claims were checked and two corrected before
+commit:
+
+```
+platform/alo-store/src/vat_id.rs        → the B1.03 validator lives here, not
+                                          in billing_field (note corrected)
+fin_accounts.rs / crm_pipelines.rs      → per-tenant defaults seed on FIRST
+                                          USE via a seeds ledger, not in a
+                                          migration (note corrected; the
+                                          locale point came with it)
+billing_sequence.rs                     → INVOICE_/QUOTE_SEQUENCE_KIND, row
+                                          lock, document_number() — reusable
+                                          for PO-/SO- as claimed
+migrations/ max = 0152                  → "0153 onward" is right
+audit_action.rs                         → AUDITED_MODULES + the
+                                          collection-in-second-segment rule
+                                          the route table is shaped for
+billing_bills.rs                        → `Supplier` copied with a comment
+                                          naming B5.03 as the master record
+```
+
+**Cuts to the item itself:** none. `ROADMAP.md`'s bare `### Wave B5` heading
+gains its slice list at the wave review (B5.11), the way B4's did — the
+design note is not the place to tick boxes.
+
+**HUMAN ACTION (new):** `/inventory` is a **new top-level route prefix** and
+will need adding to the production Caddyfile at the next deploy, beside
+`/billing`, `/crm`, `/audit`, `/insights`, `/projects` and `/finance`. It also
+joins `API_PATHS` in `web/vite.config.ts` in the item that registers the first
+route (B5.04a) — the S1.11 / BI1.04 / B3.04 / B4.05b lesson. Unchanged from
+B4.15: the wave gate ("B1 live with ≥1 real tenant") is still unmet and B5.02
+is the first item that writes a migration.
+
+Next item: B5.02 (the catalog upgrade — the six additive `billing_products`
+columns, the GTIN validator, the tenant-scoped partial unique indexes, and the
+wrong-tenant tests).
