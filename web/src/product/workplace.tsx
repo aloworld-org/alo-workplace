@@ -7,11 +7,25 @@
 // `../authoring`). alomails ships the `mail` surface instead and deletes this
 // file together with those areas — nothing else in the web app references them.
 import { Suspense, lazy } from "react";
-import { BarChart3, Briefcase, Building2, Code2, Globe, HardDrive, Handshake, Landmark, MessagesSquare, Receipt, Sigma, Video } from "lucide-react";
+import {
+  BarChart3,
+  Briefcase,
+  Building2,
+  Code2,
+  Globe,
+  HardDrive,
+  Handshake,
+  Landmark,
+  MessagesSquare,
+  Receipt,
+  Sigma,
+  Video,
+} from "lucide-react";
 
 import { strings } from "../i18n";
 import { BillingModule } from "../billing";
 import { ChatModule } from "../chat";
+import { MeetModule } from "../meet";
 import { CrmModule } from "../crm";
 import { FinanceModule } from "../finance";
 import { InsightsModule } from "../insights";
@@ -31,10 +45,17 @@ const AuthoringInsertModal = lazy(() =>
 
 /** A compose-insert Modal that reuses the shared authoring modal for `kind`. */
 function insertModal(kind: "equation" | "code"): ComposeInsert["Modal"] {
-  return function Insert(props: { onInsert: (html: string) => void; onClose: () => void }) {
+  return function Insert(props: {
+    onInsert: (html: string) => void;
+    onClose: () => void;
+  }) {
     return (
       <Suspense fallback={null}>
-        <AuthoringInsertModal kind={kind} onInsert={props.onInsert} onClose={props.onClose} />
+        <AuthoringInsertModal
+          kind={kind}
+          onInsert={props.onInsert}
+          onClose={props.onClose}
+        />
       </Suspense>
     );
   };
@@ -138,7 +159,14 @@ const suiteModules: ProductModule[] = [
     enabled: true,
     element: () => <ChatModule />,
   },
-  { id: "meet", path: "/meet", label: strings.moduleMeet, Icon: Video, enabled: false },
+  {
+    id: "meet",
+    path: "/meet",
+    label: strings.moduleMeet,
+    Icon: Video,
+    enabled: true,
+    element: () => <MeetModule />,
+  },
 ];
 
 export const surface: ProductSurface = {
@@ -148,12 +176,27 @@ export const surface: ProductSurface = {
     {
       path: "/control/*",
       element: () => <ControlConsole />,
-      menu: { to: "/control", label: strings.controlOpen, Icon: Building2, requires: "operator" },
+      menu: {
+        to: "/control",
+        label: strings.controlOpen,
+        Icon: Building2,
+        requires: "operator",
+      },
     },
   ],
   composeInserts: [
-    { id: "equation", label: strings.composeInsertEquation, Icon: Sigma, Modal: insertModal("equation") },
-    { id: "code", label: strings.composeInsertCode, Icon: Code2, Modal: insertModal("code") },
+    {
+      id: "equation",
+      label: strings.composeInsertEquation,
+      Icon: Sigma,
+      Modal: insertModal("equation"),
+    },
+    {
+      id: "code",
+      label: strings.composeInsertCode,
+      Icon: Code2,
+      Modal: insertModal("code"),
+    },
   ],
   // The running timer, visible from every module: a clock you cannot see from
   // your inbox is a clock you forget to stop. It draws nothing when none runs,
