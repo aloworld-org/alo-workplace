@@ -1159,6 +1159,41 @@ Rejected alternative: locking a location during a count (no movements
 permitted until it is applied). Correct in a system where a count takes ten
 minutes, and unusable in a shop that counts a shelf on a Tuesday afternoon.
 
+**As built (B5.08a).** Four things the shipped counting slice decided that the
+paragraphs above left open.
+
+- **One open count per location**, enforced by a partial unique index rather
+  than by the store alone. Two people counting one shelf at the same time
+  produce two truths, and applying both would write the same variance into the
+  ledger twice; a second open count for a place is a `409`. Finished counts —
+  applied or cancelled — are outside the index, so a shelf can be counted every
+  week forever, and cancelling frees the place immediately.
+- **The sheet is what is on that shelf, not the catalog.** The snapshot is one
+  line per stocked product with a **positive** balance at that location.
+  Archived products are included when they have stock (what is on the shelf is
+  on the shelf, whatever the catalog thinks of it); a product with nothing there
+  is absent, because the only finding such a row could carry is a surplus — and
+  a surplus is recorded by scanning the item, which **adds** a line whose
+  `expected` is the on-hand at that moment. A snapshot line's `expected` is
+  never rewritten afterwards.
+- **The variance the sheet shows is provisional, and says so.** Every row
+  carries `expectedQtyMilli` (the snapshot), `countedQtyMilli` (`null` while
+  uncounted), the `varianceQtyMilli` between them, `onHandQtyMilli` read **now**,
+  and `movedSince` — the flag that marks precisely the rows B5.08b will skip.
+  The client is never left to subtract its own numbers.
+- **A row is `PUT`, not `POST`ed**, because its identity is the pair (count,
+  product): a wedge scanner that fires twice on one barcode records one row, and
+  a re-count overwrites rather than accumulates. Since the `PUT` states the row
+  whole, sending no quantity clears it **back to uncounted** — the undo of a
+  mis-scan, and deliberately not the same act as counting zero, which is the
+  strongest claim a stocktake makes.
+
+Cancelling is terminal: a cancelled count is not reopened, because the shelf has
+moved on since and the honest thing is to count it again. `PATCH` carries the
+note only — the place a count is about is what the count *is*, and its state
+moves through `cancel` and `apply` rather than through a field a stale form
+could send.
+
 ## The inventory agent (B5.10)
 
 ADR 0034's shape, unchanged: a product-scoped tool set plus its description in

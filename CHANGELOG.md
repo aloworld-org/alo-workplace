@@ -6,6 +6,23 @@ contracts.
 
 ## Unreleased
 
+- **Count a shelf without stopping the warehouse.** Open a stocktake for one
+  place and alo writes down what it believes is there — every product with stock
+  on that shelf, with its SKU and barcode, ready for a phone and a scanner. Work
+  down the sheet putting in what you actually find; each row shows what was
+  expected, what you found, and the difference, worked out for you. Find
+  something the sheet did not expect and scanning it simply adds a row, expected
+  zero, which is the surplus you were counting to catch. A row nobody has got to
+  yet stays **uncounted** rather than counting as zero, so an interrupted count
+  never writes off the aisle nobody reached, and a mis-scan is undone by clearing
+  the row rather than by typing what you hope was there. Because business does
+  not stop for a count, every row also shows what is on that shelf **now**: if a
+  delivery went out at the far end of the room while you were counting, the row
+  says so and asks you to re-count those few items — nothing is silently written
+  over. One count per place at a time, so two people cannot produce two truths;
+  a count you walk away from keeps its sheet, leaves stock untouched, and frees
+  the place to be counted again. Nothing has moved yet — turning the differences
+  into stock corrections is the next step.
 - **Tell alo how much to keep, and it tells you what to buy.** Set a minimum
   and a target for a product at a place — "keep at least four blue chairs in the
   main warehouse, and buy back up to twenty" — and the shortage report answers

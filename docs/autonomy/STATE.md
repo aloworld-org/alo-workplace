@@ -16127,3 +16127,174 @@ psql audit_log          → inventory.reorder_rule.create ×1, .update ×3, .del
 
 Next item: B5.08a (stocktake, counting — the count sheet's snapshot and the
 variance list against it).
+
+## B5.08a — counting the shelf while the warehouse keeps moving (2026-08-11)
+
+**Shipped.** The stocktake, up to but not including the moment it touches the
+ledger: a count is opened for one place, alo writes down what it believes is
+there, and a person works down the sheet recording what they actually find.
+Nothing moves — turning the differences into adjustment movements is B5.08b, and
+this item deliberately stops one step short of it.
+
+- **Migration `0166_inv_counts.sql`** — `inv_counts` (location, status
+  `open`/`applied`/`cancelled`, note, who opened it, who closed it and when) and
+  `inv_count_lines`, keyed by the pair (count, product) so a sheet can never show
+  one item on two rows. Both foreign keys composite and tenant-first. A partial
+  unique index makes **one open count per location** unrepresentable rather than
+  merely refused; the closed states are outside it, so a shelf can be counted
+  every week forever. Three CHECK constraints keep the row internally honest: a
+  count is closed exactly when it is not open, a closing always has somebody's
+  name on it, and a counted line has its quantity, its time and its counter
+  together or not at all.
+- **`platform/alo-store/src/inv_count.rs`** — `open_inv_count` (snapshot + count
+  row in one transaction), `inv_count`, `inv_counts`, `inv_count_sheet`,
+  `set_inv_count_line`, `update_inv_count_note`, `cancel_inv_count`, plus the
+  pure `variance_qty_milli` and the two bounds checks.
+- **`products/mail/alo-jmap/src/inventory_counts.rs`** — six routes:
+  `GET`/`POST /inventory/counts`, `GET`/`PATCH /inventory/counts/{id}`,
+  `PUT /inventory/counts/{id}/lines/{product_id}`,
+  `POST /inventory/counts/{id}/cancel`. Four of them answer with the count **and**
+  its sheet, so a phone that opens, patches or cancels never asks twice and the
+  two halves cannot be read from different moments.
+
+**The four decisions, and why.**
+
+1. **The snapshot is a reading, not an authority.** `expected_qty_milli` is what
+   the ledger said when the sheet was opened, kept so the sheet is printable and
+   so a counter can see what they were meant to find. Every row also states
+   `on_hand_qty_milli` read *now* and `moved_since` — the flag that marks exactly
+   the rows B5.08b will refuse to apply. A warehouse does not stop while it is
+   counted, and applying a frozen difference over a delivery that went out at the
+   far end of the room is how a stocktake erases a shipment.
+2. **An uncounted line is uncounted, not zero.** `counted_qty_milli` is nullable
+   and starts null; "nobody got to this aisle" and "there are none left" are
+   opposite facts, and a count that confused them would write off everything
+   nobody reached. Counting zero is available and is the strongest claim the
+   sheet makes; clearing a row (a `PUT` with no quantity) is the undo of a
+   mis-scan, and the two are different acts on the wire.
+3. **The sheet is the shelf, not the catalog.** One line per stocked product
+   with a positive balance there — archived products included, because what is on
+   the shelf is on the shelf whatever the catalog thinks of it. A product with
+   nothing there is absent: the only finding such a row could carry is a surplus,
+   and a surplus is recorded by scanning the item, which adds a line whose
+   `expected` is the on-hand at that moment. A snapshot line's `expected` is never
+   rewritten afterwards.
+4. **One open count per place.** Two people counting one shelf produce two
+   truths and would adjust the same variance twice. Cancelling is terminal and
+   frees the place at once; a cancelled count keeps its sheet, because the sheet
+   is a record of what somebody did on a Tuesday afternoon.
+
+**Verified — the gate.** `rustfmt` on this item's own new files (`main` is not
+rustfmt-clean on this machine, so the whole-tree `cargo fmt` is deliberately not
+run). `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap --all-targets`
+clean, zero warnings. `cargo test -p alo-store -p alo-jmap` green: 80 suites,
+0 failures, including the new 7-test `tests/inv_count.rs`, 8 new store unit
+tests and 6 new route unit tests, and `tests/audit_routes.rs` updated with the
+four new actions (`inventory.count.create|update|cancel`,
+`inventory.count.line.update`). The wrong-tenant test is the last of the seven:
+another tenant cannot read our count, read its sheet, patch it, count a row on
+it — with their own product **or** ours — cancel it, or open a count naming our
+warehouse; every one is a `NotFound`, their own list stays empty, and after all
+six attempts our sheet is byte-for-byte what we left.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real PKCE authorization-code tokens, rows read back in psql.
+
+```
+GET · POST /inventory/counts, PUT …/lines/…, POST …/cancel  (no token) → 401 ×4
+POST /inventory/counts {}                                   → 422 locationId is required:
+                                                              a stocktake counts one place
+POST {the supplier counterparty} · {the adjustment one}     → 422 ×2 a stocktake counts a
+                                                              real stock location
+POST {unknown location}                                     → 404
+POST {501-character note}                                   → 422 note must be at most 500
+                                                              characters
+POST /inventory/counts {MAIN, "Tuesday, back shelves"}      → 200 open, MAIN, 1 line,
+                                                              0 counted, 0 variance;
+                                                              sheet: Blue chair CH-1
+                                                              4006381333931 expected 5000,
+                                                              counted null, variance null,
+                                                              on hand 5000, moved false
+POST the same place again                                   → 409 this location already has
+                                                              a count open; finish or
+                                                              cancel it first
+POST {SHOP}                                                 → 200, its own 1-line sheet
+PUT  lines/{chair} {countedQtyMilli: 1.5}                    → 400 malformed request body
+PUT  {-1} · {1000000001}                                    → 422 ×2 between 0 and
+                                                              1000000000 milli-units
+PUT  lines/{the service product}                            → 422 Assembly hour is not a
+                                                              stocked product, so it cannot
+                                                              be counted
+PUT  lines/{unknown product} · unknown count                → 404 ×2
+PUT  lines/{chair} {4000, "  one broken  "}                 → 200 expected 5000, counted
+                                                              4000, variance −1000, note
+                                                              trimmed, counter recorded;
+                                                              count 1 line, 1 counted,
+                                                              1 variance
+PUT  the same again (a scanner firing twice)                → 200; still 1 line, 1 counted
+PUT  lines/{desk} {3000} — not on the sheet at all          → 200 expected 0, counted 3000,
+                                                              variance +3000 (the surplus)
+PUT  lines/{chair} {} — the undo of a mis-scan              → 200 counted null, variance
+                                                              null, countedAt/By null,
+                                                              expected still 5000
+PUT  lines/{chair} {0} — "there are none"                   → 200 counted 0, variance −5000
+POST /inventory/moves 2 more chairs onto MAIN               → 200 (the shelf moves)
+GET  /inventory/counts/{id}                                 → chair: expected 5000, counted
+                                                              4000, variance −1000, ON HAND
+                                                              7000, movedSince TRUE;
+                                                              desk: 0/3000/+3000, false
+GET  /inventory/counts                                      → SHOP open 1/0/0, MAIN open
+                                                              2/2/2 (newest first)
+GET  ?status=open · =applied · ?locationId=MAIN · ?limit=1  → 2 · 0 · 1 · 1
+GET  ?status=closed                                         → 422 status must be open,
+                                                              applied, cancelled
+PATCH {note} · PATCH {} · PATCH {501 chars}                 → 200 set · 200 unchanged (an
+                                                              empty patch is not an erasure)
+                                                              · 422
+POST …/cancel                                               → 200 cancelled, closedAt and
+                                                              closedBy set, its 1 line kept
+PUT a line · PATCH · cancel, after the cancel               → 409 ×3 this count is cancelled
+POST a new count for SHOP                                   → 200 — cancelling freed it
+GET  /inventory/counts                            as them   → 200, 0 counts
+GET · PATCH · PUT line · POST cancel, our count   as them   → 404 ×4
+POST a count naming OUR warehouse                 as them   → 404
+GET  our count                                     as us    → open, note intact, 2 lines,
+                                                              2 counted, chair 5000/4000,
+                                                              desk 0/3000 — their six
+                                                              attempts left nothing
+psql audit_log → inventory.count.create ×6, .update ×4, .cancel ×2, .line.update ×12,
+                 each filed against its count — and not one entry for any refusal
+```
+
+**Cuts and flags.**
+
+- **No apply, by design.** `POST /inventory/counts/{id}/apply` is B5.08b and is
+  not registered; `applied` exists in the status vocabulary and in the migration
+  so the next item adds a transition rather than a column. The store fn it will
+  need — recompute against on-hand, skip the `moved_since` rows, write the
+  adjustment movements in one transaction — belongs in its own file
+  (`inv_count_apply.rs`), the way receiving is separate from the order.
+- **No screens and no i18n string.** The sheet is on the wire with everything a
+  UI needs — names, SKU, **barcode** (the scanner's key, B5.09c), unit, the four
+  quantities and the flag — but the stocktake screen is B5.09a/b, and no UI
+  string exists yet to translate.
+- **No printed count sheet.** The paper version is the party-document machinery
+  B5.05a2 generalised, and it belongs with the screens rather than here; the JSON
+  already carries every field it would print.
+- **The count is per location, and a product can be on two open sheets** (one per
+  shelf). That is correct — they are counts of different shelves — but B5.08b
+  must recompute each variance against *that location's* on-hand, never against
+  the product's total.
+- **Clearing a row clears its note too.** Clearing sends `{}`, which is a `PUT`
+  of the whole row, so the note goes with the quantity — the consequence of
+  `PUT` semantics rather than an oversight. Stated in the module docs and
+  exercised on the wire; a screen that wants to keep a note re-sends it with the
+  quantity.
+- **`inventory` is still not role-gated** beyond the accountant's read-only
+  scope — any authenticated member may open a count and record findings that
+  B5.08b will turn into stock corrections. Named for the fifth item running; a
+  shipping/buying role is a wave-review question.
+
+Next item: B5.08b (stocktake, applying — the variances become adjustment
+movements, recomputed against on-hand and skipping what moved).
