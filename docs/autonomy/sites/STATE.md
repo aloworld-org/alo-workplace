@@ -1946,3 +1946,39 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   fixture on the same port; that local process was removed and the clean rerun
   passed.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.30 reviewable per-field copy tools
+
+- **Shipped:** every eligible stored section copy field now keeps an
+  “Improve this copy” affordance beside the directly editable input. Owners
+  can rewrite, shorten, add detail, or name a desired tone, then compare the
+  exact current and proposed strings and Approve or Discard in place. This
+  follows Wix/Squarespace contextual-editing reflexes while preserving the
+  visible manual path required by the zero-menu law.
+- **One guarded path:** the existing page `POST .../ai-edits` proposal route
+  accepts a structured `{copy:{target,pointer,action,tone?}}` request and turns
+  all four actions into the same generic operation proposal. The server
+  resolves the selected tenant-owned string first and accepts the model result
+  only when it is exactly one `rewrite_copy` operation for that same section
+  and JSON pointer. Identifiers, links, asset ids, names, prices, and other
+  factual fields do not expose the affordance.
+- **Safety and tenancy:** proposing still writes nothing and approval still
+  replays the reviewed envelope against canonical storage. The real Postgres
+  route test proves a foreign tenant receives `404`, a schema-valid unscoped
+  operation is rejected with typed `invalid_proposal`, and the selected copy
+  remains unchanged until approval.
+- **Verified:** `cargo fmt -p alo-jmap`; strict
+  `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo clippy -p alo-jmap --all-targets
+  --jobs 1 -- -D warnings` clean; full `cargo test -p alo-jmap --jobs 1` green
+  (477 library tests plus every integration/doc target). The page editor
+  passed 17 focused Vitest tests; `npx tsc --noEmit`, focused Sites/i18n
+  ESLint, and `npm run build` are clean. A freshly built local backend and
+  localhost-only model fixture returned one scoped `rewrite_copy`, rendered
+  the exact proposed text, proved storage still contained `Wire copy before`,
+  then stored `A warm local welcome` only after the approval `PUT`. The prior
+  local AI provider was restored; no external AI service was called.
+- **Cuts/flags:** new, unsaved sections keep direct editing only because they
+  have no stable server target until first save. Array-backed plain-text
+  feature lists stay manual until their storage shape can identify one string
+  leaf without ambiguity.
+- **Next:** the first unchecked item in `QUEUE.md`.
