@@ -738,20 +738,77 @@ state.
 **B5.05a shipped the order and its life up to the point of sending**, and the
 send was split into its own item rather than half-built. The reason is the rule
 two paragraphs above: sending is one act — the number, the date, the paper and
-the covering mail draft together — and the paper needs a generalisation of the
-print/PDF machinery (B1.16/B1.17 render a `PrintDocument` whose counterparty is
-a `billing_customers::Customer`; a purchase order's is a supplier). Doing that
-generalisation badly, or in a hurry alongside the record, is how a route
+the covering mail draft together — and the paper needed a generalisation of the
+print/PDF machinery (B1.16/B1.17 rendered a `PrintDocument` whose counterparty
+was a `billing_customers::Customer`; a purchase order's is a supplier). Doing
+that generalisation badly, or in a hurry alongside the record, is how a route
 appears that moves an order to *sent* without writing the mail — precisely the
-state this note says makes a shortage report lie. So the states beyond `draft`
-exist here in the vocabulary, in the transition table and in the database's
-CHECKs, and the doors that write them arrive with what they owe: B5.05a2 the
-sending, B5.05b the receiving.
+state this note says makes a shortage report lie.
 
-Migration `0160_inv_purchase_orders.sql`; store `inv_po.rs` (the record and
-`PoStatus`) and `inv_po_lines.rs` (the line); routes `inventory_po.rs`
-(`GET/POST /inventory/purchase-orders`, `GET/PATCH/DELETE
-/inventory/purchase-orders/{id}`, `POST /inventory/purchase-orders/{id}/cancel`).
+**B5.05a2 shipped the sending, and the generalisation it needed.** Five
+decisions, recorded because each is the kind that gets re-litigated:
+
+- **The party is a struct, not a record.** `billing_print::Party<'a>` is the
+  eight facts a printed document needs about whoever it is *to* — name, four
+  address lines, country, VAT id, and the address a covering letter goes to.
+  `PrintDocument.customer: &Customer` became `PrintDocument.party: Party<'a>`,
+  and whoever holds the stored record builds the party from it
+  (`Party::customer` for billing, a literal in `inventory_po_print.rs` for a
+  supplier). The renderers no longer know which record a party came from, which
+  is what stops a second document type meaning a second renderer.
+- **What differs between document types lives on the kind.**
+  `DocumentKind::PurchaseOrder` answers the questions both renderers ask:
+  which words label the two dates (order date, expected delivery), whose
+  reference the reference is (ours, not theirs), what the party heading says,
+  what the closing block is called (Delivery, not Payment), and — the one with
+  teeth — `prints_bank_details()`, false for everything but an invoice. Our own
+  IBAN on an order we placed would be an invitation to pay ourselves. The
+  closing *sentence* moved into one shared function, since the page and the PDF
+  had been computing it twice from the same match.
+- **The covering letter is its own module.** `document_mail.rs` holds the
+  `MailStrings` tables, the recipient rule, the subject, the body and the
+  `Outgoing` builder; `billing_send.rs` and `inventory_po_send.rs` are two
+  routes over it. B1.18's file had quietly become "the machinery *and* the
+  invoice route", which is the second responsibility Law 3 says to split at the
+  moment it is discovered. The refusal wording follows the document:
+  `DocumentKind::party_noun()` makes the missing-address `422` say *supplier*
+  on an order, because "this customer has no email address" would send a buyer
+  to the wrong screen.
+- **Atomicity is a callback inside the transaction.**
+  `AccountStore::send_inv_purchase_order(id, letter)` locks the order, refuses
+  anything that is not a draft, refuses one with no lines, draws the number,
+  writes `status`/`number`/`ordered_date`, reads the order back *through the
+  same transaction*, and only then calls `letter` — the route's closure, which
+  renders the PDF and writes the draft. A letter that fails rolls the whole
+  placement back, and the row-locked counter gives the number back rather than
+  leaving a hole. The store takes the caller's error type (`E: From<StoreError>`,
+  which is why `From<StoreError> for Problem` now exists and `map_store_err` is
+  a one-line delegation to it), and the callback is handed an owned copy of the
+  order rather than a borrow into the open transaction — a borrow that has to
+  outlive nothing is one lifetime puzzle nobody needs to solve at a call site.
+  The one crack, stated rather than hidden: the draft is written on its own
+  connection, so a commit that fails *after* it was written leaves a draft
+  email for an order that is still a draft. Visible, harmless, correctable. The
+  opposite is the state this design refuses.
+- **The pre-flight is not the authority.** The route refuses a non-draft, a
+  supplier with no address and an account with no send address *before* the
+  placing transaction opens, so the ordinary mistakes never draw a number and
+  never render a PDF. Every one of those is re-decided under the row lock by
+  the store, which is what makes a send that raced another send lose cleanly.
+
+`inventory_po_receipt.rs` (B5.05b) is still the door that writes the states
+beyond `sent`, and they remain in the vocabulary, the transition table and the
+database's CHECKs until it arrives.
+
+Migration `0160_inv_purchase_orders.sql` (B5.05a2 needed none: a new numbering
+series is a row in `billing_sequences`, whose `kind` CHECK already admits
+`purchase_order`); store `inv_po.rs` (the record and `PoStatus`),
+`inv_po_lines.rs` (the line) and `inv_po_send.rs` (the placing transaction);
+routes `inventory_po.rs` (`GET/POST /inventory/purchase-orders`, `GET/PATCH/DELETE
+/inventory/purchase-orders/{id}`, `POST /inventory/purchase-orders/{id}/cancel`),
+`inventory_po_print.rs` (`GET …/{id}/print`, `GET …/{id}/pdf`) and
+`inventory_po_send.rs` (`POST …/{id}/send`), over the generalised
+`billing_print.rs`/`billing_pdf.rs` and the new `document_mail.rs`.
 Six things the note had not settled, decided here:
 
 - **The line is a `billing_line` plus a product.** The same five fields, the

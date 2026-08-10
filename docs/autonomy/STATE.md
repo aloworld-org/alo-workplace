@@ -15316,3 +15316,142 @@ Next item: B5.05a2 (sending: generalise the printed document's party so a
 supplier can stand where a customer does, draw `PO-YYYY-NNNNN` from
 `billing_sequences`, render the order, write the covering mail draft to the
 supplier's stored address, and move the order to `sent` — all in one act).
+
+## B5.05a2 — placing the order: the number, the paper and the letter (2026-08-10)
+
+**Shipped.** `POST /inventory/purchase-orders/{id}/send` — one act. It draws
+`PO-YYYY-NNNNN` from the existing row-locked `billing_sequences` counter (new
+kind `purchase_order`, beside `invoice` and `quote`), stamps today as the order
+date, freezes the order at `sent`, and writes the covering email to the
+supplier's stored address with the printed order attached as a PDF — into the
+caller's **Drafts**, never onto the wire (ADR 0034). Plus the paper on its own:
+`GET …/{id}/print` and `GET …/{id}/pdf`.
+
+**The generalisation the paper needed** (the item's real weight). B1.16/B1.17
+rendered a `PrintDocument` whose counterparty was a `billing_customers::Customer`.
+Now:
+
+- `billing_print::Party<'a>` — the eight facts a document needs about whoever it
+  is *to*. `PrintDocument.customer` → `PrintDocument.party`; billing builds it
+  with `Party::customer`, inventory writes a supplier's out itself, and neither
+  renderer knows which record it came from.
+- `DocumentKind::PurchaseOrder`, and everything that differs between document
+  types moved onto the kind: `party_label`, `primary_date_label`,
+  `secondary_date_label`, `reference_label` (ours, not theirs, on an order),
+  `closing_label`, `party_noun` (so the missing-address `422` says *supplier*),
+  and `prints_bank_details()` — false for everything but an invoice, because our
+  own IBAN on an order we placed is an invitation to pay ourselves.
+  `Banner::Cancelled` for an order we stopped expecting. The closing sentence is
+  now one shared function; the page and the PDF had been computing it twice.
+- **`document_mail.rs` is new**: the `MailStrings` tables (en/fr/nl, with the
+  order's two new sentences), the recipient rule, subject, body, the `Outgoing`
+  builder and the draft-writing. `billing_send.rs` dropped from 671 lines to 139
+  — it had become "the machinery *and* the invoice route", which is Law 3's
+  second responsibility, split in the PR that found it. `billing_reminder.rs`
+  now reads the same tables.
+- `From<StoreError> for Problem` (in `error.rs`); `map_store_err` is a one-line
+  delegation to it. The store's placing call takes the caller's error type, so
+  the route's closure can fail with a real `Problem` from inside the store's
+  transaction.
+
+**Atomicity, and its one honest crack.** `send_inv_purchase_order(id, letter)`
+locks the row, refuses a non-draft, refuses an order with no lines, draws the
+number, writes the three columns, reads the order back *inside the same
+transaction*, then calls `letter` — the route's closure, which renders the PDF
+and writes the draft. A letter that fails rolls the placement back and the
+row-locked counter **gives the number back**, so a failed send leaves no hole.
+The crack, recorded rather than hidden: the draft is a message written on its own
+connection, so a commit failing *after* it was written leaves a draft email for
+an order still in draft — visible, harmless, correctable. The opposite (an order
+marked sent that nobody was told about) is the state this refuses, and it is the
+state that would make the B5.07 shortage report lie.
+
+**Verified — gates.** `cargo clippy -p alo-store -p alo-jmap --all-targets`
+clean; `cargo test -p alo-store` and `-p alo-jmap` green (556 jmap unit tests,
+every store suite, including the six new ones in `tests/inv_po_send.rs`:
+placement numbers/dates/freezes, a failed letter leaves a draft with its number
+unspent, an empty order is refused before the counter is touched, another
+tenant's order is never placed **and its letter callback never runs**, 25
+parallel placements produce exactly 1..=25, and the invoice/quote series stay
+untouched). `audit_routes.rs`'s golden vocabulary gained
+`POST /inventory/purchase-orders/{id}/send -> inventory.purchase_order.send`.
+No web change, so no tsc/eslint/build. `cargo fmt` was run on the two crates and
+the one unrelated file it churned (`tests/inv_po_lifecycle.rs`) was reverted —
+the rustfmt-divergence trap this machine has.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8099` against
+docker `alo-pg`, two tenants bootstrapped, tokens via `/auth/token`, rows read
+back in psql and the draft's MIME parsed off disk.
+
+```
+POST …/{id}/send, GET …/print, GET …/pdf   (no token) → 401 ×3
+PATCH /billing/settings (the issuer identity)        → 200
+POST  /inventory/suppliers (CH, orders@hoffmann.test)→ 200 CHF
+POST  …/purchase-orders (2 lines, expected 08-24)    → draft, no number,
+                                                       net 19700 / VAT 3743 / gross 23443
+GET   …/{id}/print  (draft)                          → 200 banner "Draft", no PO number,
+                                                       "Order to" / "Expected delivery" /
+                                                       "Our reference" / "Please deliver",
+                                                       and NO "NL91 ABNA" anywhere;
+                                                       CSP default-src 'none', no-store
+GET   …/{id}/pdf    (draft)                          → 200 %PDF-1.7, 7817 bytes,
+                                                       filename="Purchase-order.pdf"
+POST  …/{id}/send   as the other tenant              → 404
+POST  …/nope/send                                    → 404
+POST  …/{empty order}/send                           → 422 an order with no lines asks the
+                                                       supplier for nothing…
+POST  …/{supplier with no email}/send                → 422 this supplier has no email address
+GET   the three refused orders                       → all still draft, number null,
+                                                       orderedDate null (nothing half-written)
+POST  …/{id}/send                                    → 200 sent, PO-2026-00001,
+                                                       orderedDate 2026-08-10, gross 23443 CHF
+                                                       draft → orders@hoffmann.test,
+                                                       "Purchase order PO-2026-00001 — Alo
+                                                       Werkplaats B.V.", attachment
+                                                       Purchase-order-PO-2026-00001.pdf 7636 B
+POST  …/{id}/send again                              → 409 already been sent… raise another
+PATCH …/{id} / DELETE …/{id}                         → 409 ×2 only while it is a draft
+GET   …/{id}/print?lang=fr                           → 200 <title>Bon de commande PO-2026-00001</title>,
+                                                       no banner, "Commandé à" / "Date de
+                                                       commande" / "Livraison prévue" /
+                                                       "Notre référence" / "Merci de livrer"
+GET   …/{id}/pdf                                     → 200 %PDF, filename=
+                                                       "Purchase-order-PO-2026-00001.pdf"
+other tenant: GET …/{id} · /print · /pdf             → 404 ×3
+psql inv_purchase_orders → sent / PO-2026-00001 / 2026-08-10 / CHF
+psql billing_sequences   → purchase_order 2026 next_value 2 (one number drawn, one used)
+psql audit_log           → inventory.purchase_order.send ×1 …create ×3, and not one entry
+                           for any of the four refusals
+psql messages + blob     → subject as above, To: "Hoffmann Möbel GmbH
+                           <orders@hoffmann.test>", From: the caller's own address, in the
+                           `drafts` mailbox with keyword $draft; MIME parsed off disk:
+                           body "Please find attached Purchase order PO-2026-00001 for
+                           CHF 234.43. Please confirm it, and deliver by 2026-08-24." +
+                           "Our reference: Project Falkenstein", attachment
+                           Purchase-order-PO-2026-00001.pdf 7636 bytes starting %PDF-1.7
+```
+
+**Cuts and flags.**
+
+- **No web** (B5.09b), so no i18n catalogue strings. The document's own words are
+  in the Rust tables (en/fr/nl shipped together, as B1.27 left them).
+- **The delivery address on the paper is the tenant's billing address**, printed
+  in the issuer block, and the sentence says "deliver to the address above". A
+  purchasing-specific ship-to (a warehouse from `inv_locations`) is a real thing
+  a buyer eventually wants and is deliberately not invented here — it needs a
+  field on the order and a picker, which is a queue item, not a side effect.
+- **No `?lang=` on the letter's *recipient*** — one `?lang=` still picks both the
+  document and the note, as B1.18 established. A per-supplier language
+  preference is not modelled.
+- **A PO carries no e-invoice**, deliberately: EN 16931 describes a bill from a
+  seller to a buyer. `EInvoice::from_document` returns `None` for an order, and
+  the bill that follows is the supplier's (B1.24 reads one of those).
+- **No new top-level route prefix**: `/inventory` is already in the vite dev
+  proxy and in the production Caddyfile. No deploy change needed.
+- **`inventory` is still not role-gated** beyond the accountant's read-only
+  scope — any authenticated member may place an order. Named again rather than
+  assumed; buyer roles are a wave-review question.
+
+Next item: B5.05b (receiving: `received` → stock moves into the ordered
+products' locations, plus the supplier-bill draft linked to the order — the
+three-way-lite match — with the arc wire-verified).

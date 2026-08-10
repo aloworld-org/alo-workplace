@@ -6,6 +6,22 @@ contracts.
 
 ## Unreleased
 
+- **Sending a purchase order is now one act.** Placing an order gives it its
+  number — `PO-2026-00001`, drawn the same unbreakable way an invoice number is
+  — stamps it with today, freezes it, and writes the covering email to your
+  supplier's own address with the printed order attached, all together. Nothing
+  is sent behind your back: the letter lands in your Drafts for you to read,
+  change and send yourself, and it quotes the order's own total and the day you
+  want the goods. If the letter cannot be written, nothing happens at all — the
+  order is still a draft and its number is still free, so you can never end up
+  with an order marked sent that nobody was ever told about. An order already
+  out refuses to be sent twice, in words that say to raise another one instead.
+  The order itself is now paper too: `print` gives you a clean A4 page under
+  your own letterhead and `pdf` the file, both in English, French or Dutch,
+  with your supplier where a customer stands on an invoice, the day you expect
+  delivery where a due date stands — and deliberately none of your bank
+  details, because an order is not a document anybody pays you on.
+
 - **Purchase orders: what you asked a supplier for, written down.** You can now
   draft an order — who it is with, what you want from them, at the price they
   quote, in their currency, with your own reference and the day you expect it —
