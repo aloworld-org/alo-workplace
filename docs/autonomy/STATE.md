@@ -12894,3 +12894,266 @@ and `/projects`. No new top-level prefix this item.
 
 Next item: B4.11c (aged receivables/payables — the one report that reads
 documents rather than the journal, and the one P6 ties back to the ledger).
+
+## B4.11c — aged receivables and payables (2026-08-09)
+
+**Shipped.** The third of the four reports, and the only one that does not read
+the journal: it reads the **documents**, because ageing is a property of a
+document. A receivable account holds one number; only the invoices behind it
+know which part of it has been owed since March.
+
+- **`platform/alo-store/src/fin_aged.rs`** — `fin_aged(on, side)`,
+  `AgedReport`/`AgedParty`/`AgedDocument`/`AgedBuckets`/`AgedBucket`/`AgedSide`,
+  and `AGED_BUCKETS` (the bands' order, stated once). Three statements on the
+  receivable side whatever the length of the list — the documents that stood on
+  `on`, their lines, and the money that had arrived by then — and one on the
+  payable side. Each document's gross is `billing_totals::totals`, the same code
+  the document, its PDF and its e-invoice are printed from, so an aged listing
+  and the paperwork behind it cannot disagree about a cent. The ageing itself is
+  a pure fold over an internal `OpenDocument`, identical for both sides.
+- **`products/mail/alo-jmap/src/finance_report_aged.rs`** — `GET
+  /finance/reports/aged?on&side=receivable|payable` and its `.csv` twin,
+  registered in `server.rs`. No new top-level prefix: `/finance` is already on
+  the list (and already in the vite dev proxy). `finance_reports::day` became
+  `pub` — a report that takes a date *and* something else declares its own query
+  type and must still refuse a malformed day in the same words.
+- **`platform/alo-store/src/billing_fx.rs`** — one new function,
+  `restated_open_cents(base, currency, fx, cents)`: the scalar sibling of
+  `restated_into`, because an open balance is one figure rather than a set of
+  per-rate subtotals. It differs in one deliberate way — **a document already in
+  the books' currency needs no snapshot**, since nothing is being crossed — which
+  is also the only way a bill can be added at all: a bill is written by somebody
+  else's system and carries no snapshot.
+
+**Seven decisions, taken here rather than left to a screen.**
+
+1. **The day is a boundary in both directions.** A document counts when it was
+   issued on or before `on`; money counts when it *arrived* on or before `on`
+   (`paid_on`, not the day it was keyed in). Re-running last quarter answers last
+   quarter — and a payment keyed in afterwards for a day inside the period moves
+   the old report, which is right, because it moved the debt.
+2. **Only documents that stand.** `issued` and `paid` on the receivable side (a
+   document settled today may well have been owed on the date asked for),
+   `approved` on the payable side. A draft was never raised, a void one was
+   cancelled, a received-but-undecided bill is an intention — the line the design
+   note already draws for the journal.
+3. **Nothing open is not a row; overpaid is.** Zero is the state of almost every
+   document a business has ever raised, and printing them buries the eight that
+   matter. A negative open amount is money we are holding for a customer, which
+   is a fact this exact report is for.
+4. **Credit notes subtract, inside the counterparty's own group**, and every row
+   says whether it is one.
+5. **The bands are added in the accounting currency, at each document's own
+   frozen rate.** Anything that cannot be crossed honestly is in **no** band and
+   is counted in `unconvertedCount` — the VAT summary's rule (B1.20), for the
+   same reason: a total that is part invention is worse than a total that says
+   what is missing. Every document also carries its own currency and open amount.
+6. **`side` is required and is one of two words.** Defaulting to `receivable`
+   would put what we owe under a heading saying what we are owed the first time
+   somebody mistyped it; the two are chased by different people. One route rather
+   than two because the shape is identical, and every row of both representations
+   says which side it is.
+7. **A bill that states no due date is payable on receipt** (BT-9 is optional),
+   so it ages from its issue date — the strict reading, and the one that ages it
+   soonest. Grouping is by customer id on the receivable side and by
+   `Supplier::key` on the payable one, because a bill copies its supplier rather
+   than linking to a record.
+
+The file is **one table, not three**: a `document` row per open document, a
+`party` row per counterparty, one `total` row. A band cell is blank rather than
+`0.00` on a document row that stands in another band — and blank on *every* band
+of a document nobody could restate, which is a different fact from zero and reads
+as one. Filtering the file to `party` rows gives exactly the summary the screen
+shows, and summing a band column gives the figure under it.
+
+**Verified — tests.**
+
+```
+cargo test -p alo-store --lib fin_aged                12 pure tests: every band
+    and its exact edges (0/1/30/31/60/61/90/91), a document not yet due never
+    late by a negative number, the oldest debt first inside a group and groups
+    by name, a settled document absent and an overpaid one negative, a credit
+    note subtracting inside its own group, a foreign document at its own frozen
+    rate, an unrestatable one in no band and counted, an empty day a report of
+    zeroes, the bands named once, a side read from its own word and no other,
+    and a total that saturates rather than wraps
+cargo test -p alo-store --lib billing_fx              26 green, incl. the new
+    `an_open_amount_is_crossed_only_when_there_is_something_to_cross`
+cargo test -p alo-store --test fin_aged               5 against real Postgres:
+    the hand-computed ladder (121.00 current, 242.00 at 16 days, 363.00 past
+    ninety, 210.00 of a part-paid document at 65 days — 936.00 in total, then
+    694.00 once a credit note lands), the day as a boundary for both the
+    document and the money (and a draft on no report at all), the payable side
+    reading approved bills and neither the undecided nor the rejected one (and a
+    bill with no due date ageing from its issue date), a foreign document
+    crossed at 1.10 with an unrestatable sibling counted, and one tenant's debts
+    being no part of another's on either side
+cargo test -p alo-jmap --lib finance_report_aged      8 tests: the JSON, the
+    null `baseOpenCents`, the whole CSV table row by row, an empty listing still
+    being a file with its total, a hostile customer name neutralised while a
+    negative amount stays a number, and the two `422`s
+cargo test -p alo-jmap --test fin_aged_http           6 through the real router:
+    both representations of one read, 403 for a member who is not an admin (200
+    once made one, 200 on /finance/periods for contrast), 401 with no token, ten
+    malformed queries incl. both parameters wrong at once, the payable side as
+    its own report over its own table, and another tenant's debts absent from
+    both sides and both representations
+cargo test -p alo-store                               whole crate green
+cargo clippy -p alo-store --all-targets               clean
+cargo clippy -p alo-jmap --lib --bins --test fin_aged_http --test
+    fin_balance_http                                  clean
+cargo fmt -p alo-store -p alo-jmap -- --check         clean
+```
+
+**Verified — on the wire.** Local debug `alo-jmap` against docker `alo-pg`,
+tenant bootstrapped with `identityctl bootstrap-admin`. Four invoices raised on
+different **terms** (14, 60, 95, 120 days) and read a hundred days out, so each
+stands in a different band without any date being edited behind the API's back:
+
+```
+GET  /finance/reports/aged      (no token)          → 401
+GET  /finance/reports/aged.csv  (no token)          → 401
+GET  /finance/reports/aged                          → 422 "on is required: a
+                                                          report is always for a
+                                                          stated period"
+GET  ?side=receivable                               → 422 (same — the day first)
+GET  ?on=&side=payable                              → 422 (same)
+GET  ?on=today&side=payable                         → 422 "on must be a date of
+                                                          the form YYYY-MM-DD"
+GET  ?on=2026-11-17                                 → 422 "side is required: an
+                                                          ageing is of receivables
+                                                          or of payables, and they
+                                                          are different reports"
+GET  ?on=2026-11-17&side=                           → 422 (same)
+GET  ?on=2026-11-17&side=debtors                    → 422 "side must be
+                                                          'receivable' or 'payable'"
+GET  ?on=2026-11-17&side=Receivable                 → 422 (same — the words are
+                                                          the store's, lower case)
+GET  /finance/reports/aged.csv  (no parameters)     → 422 (the file route too)
+POST /billing/customers ×2 → 4× /billing/invoices (terms 14/120/60/95) → issue
+                                                    → INV-2026-00001…4, due
+                                                      2026-08-23, 12-07, 10-08,
+                                                      11-12
+POST /billing/invoices/{3}/payments {100000}        → 200
+GET  ?on=2026-11-17&side=receivable                 → 200 current €242.00,
+     1–30 €121.00, 31–60 €210.00, 61–90 €121.00, 90+ €0.00, total €694.00,
+     documentCount 4, unconvertedCount 0; Anchor BV €363.00 (86 days late and
+     one not yet due), Zephyr NV €331.00 (the part-paid document open for
+     €210.00 of €1 210.00, 40 days late, bucket d31_60)
+GET  ?on=2026-08-08&side=receivable                 → 200 zeroes, no parties,
+     currency EUR — a day before anything was raised is a report, not an absence
+GET  ?on=2026-08-09&side=receivable                 → 200 €694.00, all of it
+     current: the day they were issued, nothing was due yet
+GET  /finance/reports/aged.csv?on=2026-11-17&side=receivable
+                                                    → content-type text/csv;
+     charset=utf-8 · content-disposition attachment;
+     filename="aged-receivable-2026-11-17.csv" · nosniff · no-store, and seven
+     rows: four documents, two party rows (242.00/0.00/0.00/121.00/0.00/363.00
+     and 0.00/121.00/210.00/0.00/0.00/331.00) and one total row
+     (242.00/121.00/210.00/121.00/0.00/694.00)
+PATCH /billing/settings (seller details) → GET /billing/invoices/{5}/xrechnung.xml
+     → POST /billing/bills/import                   → 200 a real EN 16931 UBL
+     document imported as a bill, status received, payable €121.00
+GET  ?on=2026-11-17&side=payable  (before approval) → 200 documentCount 0 — an
+     undecided bill is an intention, not a liability
+POST /billing/bills/{id}/approve                    → 200
+GET  ?on=2026-11-17&side=payable                    → 200 61–90 €121.00, total
+     €121.00, party keyed by the supplier's VAT id, 86 days overdue
+GET  .csv?on=2026-11-17&side=payable                → filename
+     "aged-payable-2026-11-17.csv", and every row says `payable`
+POST /admin/users (a clerk) → GET ?…&side=receivable       → 403
+                              GET .csv?…&side=payable      → 403
+                              GET /finance/periods         → 200 (contrast)
+POST /billing/customers {"name":"=cmd|(/c calc)!A1"} → invoice → issue → .csv
+     → 'document,…,'=cmd|(/c calc)!A1,INV-2026-00006,…' and the JSON keeps the
+     name verbatim: a screen is not a spreadsheet
+```
+
+**Cuts, named.**
+
+- **P6 is not asserted.** The tie between these totals and the ledger's `ar`/`ap`
+  balances needs issuing a document to book it, which is still not wired (flag 3
+  below, unchanged since B4.11a) — and nothing posts to `ap` at all, so the
+  payable side has no ledger counterpart yet. A test written today would assert
+  that both sides are empty. Recorded in `docs/design/finance.md` as-built.
+- **No `?party=` filter and no paging.** An aged listing is read whole — that is
+  what makes the bands add up — and a tenant with a thousand open documents is
+  not this wave's problem. B4.13c's screen filters what it was given.
+- **No screen** — B4.13c, which is also where `fr`/`nl` for these strings land.
+- **No dunning hook.** "Chase everything past 60 days" is B1.26's territory
+  (reminder drafts), and joining them is a wave-review item, not this one.
+
+**FLAG for the human / next items.**
+
+1. **`create_billing_bill` cannot store a hand-entered bill.** `NewBill` models
+   `source_syntax: None` as "a bill that was not imported from a file", but the
+   `billing_bills.source_syntax` column is `NOT NULL`, so such an insert fails
+   with a raw `23502` rather than a typed refusal. Both new suites work around it
+   by stating a syntax. Fixing it is a migration (drop the NOT NULL) plus a
+   nullable read — expand-only, but its own item; it belongs with B5.03/B5.05
+   (suppliers and purchase orders), where hand-entered bills become normal.
+2. **`tests/site_notify.rs` still does not compile on `main`** — unchanged from
+   B4.09c through B4.11b: the sites track's commit 18a7771 added a third
+   parameter to `alo_sites::serve::AppState::new` and never updated that test,
+   which lives under `products/mail/alo-jmap/tests/`. Fifth iteration degraded by
+   it: `-p alo-jmap --all-targets` cannot build, so this item gated `--lib
+   --bins` plus its own test targets by name. The sites loop should fix it, or a
+   human should.
+3. **Auto-posting is still not on the `/billing` issue route** (unchanged since
+   B4.09c). Issuing an invoice over HTTP writes no journal entry; postings appear
+   only when a bank line is matched to it. It is the reason P6 cannot be tested
+   here, and it is in no queue item's scope. **Worth a human's decision.**
+4. **A bill can never be marked paid.** There are no payment rows against bills,
+   and a SEPA export is an instruction rather than a payment, so an approved bill
+   ages forever on the payable side. Honest about what alo knows today, and
+   documented — but the payable side only becomes trustworthy once reconciliation
+   can settle a bill (B5.05b's three-way-lite link, or its own item).
+5. **There is still no HTTP door that seeds a tenant's chart of accounts** —
+   unchanged; this item did not need one (an aged listing reads documents, not
+   accounts), which is itself a small piece of evidence that the document-side
+   report is the right shape.
+6. **i18n**: nothing new is user-visible yet — the refusals are store/route-side
+   English like the rest of B4's, and the CSV headers are a contract that is
+   deliberately never translated. The screens (B4.13c) are where `fr`/`nl` lands.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+**Landed by the following iteration (2026-08-10).** The iteration above finished
+its work and its journal but died before the commit, leaving the whole item in
+the working tree. Rather than discard it, this iteration re-gated the identical
+tree with fresh eyes and committed it:
+
+```
+cargo fmt -p alo-store -p alo-jmap -- --check          clean
+cargo clippy -p alo-store --all-targets                clean
+cargo clippy -p alo-jmap  --all-targets                clean  ← see flag 2
+cargo test  -p alo-store --lib                         816 passed, 0 failed
+cargo test  -p alo-store --test fin_aged               5 passed
+cargo test  -p alo-jmap  --lib finance_report_aged     8 passed
+cargo test  -p alo-jmap  --test fin_aged_http          6 passed
+live server (debug alo-jmap on docker alo-pg):
+  GET /finance/reports/aged?on=2026-11-17&side=receivable   → 401
+  GET /finance/reports/aged.csv?on=2026-11-17&side=payable  → 401
+  GET /finance/reports/aged                                 → 401
+  GET /finance/reports/nosuch            (control)          → 404
+```
+
+**Flag 2 is CLEARED.** `cargo clippy -p alo-jmap --all-targets` is clean again:
+the sites track fixed `tests/site_notify.rs`, so the whole-crate target set
+builds for the first time since B4.09c. Later items need no target-by-name
+workaround.
+
+**One cut, named.** `cargo test -p alo-store` whole-crate was started and
+abandoned after ~30 minutes (it was still working through the Postgres-backed
+binaries around `fl…` alphabetically). The previous iteration recorded it green
+on this identical tree; this one re-ran instead the parts that cover the diff —
+all 816 lib tests, which include `fin_aged`'s 12 pure tests and `billing_fx`'s
+26, plus the item's own integration suite. Nothing in the diff is reachable from
+the suites not re-run (the change is one new module, one new `pub fn`, and
+additive `mod`/route lines). The full-crate run belongs in a wave review with a
+budget for it.
+
+Next item: B4.11d (VAT-return figures — the last of the four reports, and the
+one that must agree with `billing_vat_report` on the seeded year).

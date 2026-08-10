@@ -6,6 +6,22 @@ contracts.
 
 ## Unreleased
 
+- **See who owes you, and how long they have owed it.** The aged listing now
+  stands beside the balance sheet: every customer with something open, each of
+  their unpaid invoices, and how late it is — not yet due, up to a month, up to
+  two, up to three, and past three months. Ask it for any day and it answers as
+  of that day, counting the documents that had been issued by then and only the
+  money that had arrived. Credit notes sit in the customer's own group and
+  subtract, part payments leave only the remainder standing, and a settled
+  invoice is off the list entirely. The same report reads the other way round —
+  `side=payable` — over the supplier bills you have approved, so you can see what
+  is about to be chased out of you as clearly as what you are chasing. A document
+  raised in another currency shows what it says in its own and is added to the
+  bands at the rate frozen on it when it was issued; anything that cannot be
+  converted honestly is left out of the totals and counted, so a figure is never
+  part guesswork. Take it away as a CSV your accountant can open, per document
+  and per customer.
+
 - **See what you own and what you owe, on any day you name.** The balance sheet
   now stands beside the profit and loss: your bank and what customers still owe
   you on one side, suppliers and the VAT you have collected on the other, the

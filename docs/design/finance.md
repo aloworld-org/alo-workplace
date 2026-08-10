@@ -1353,14 +1353,45 @@ manual entry.
   (`finance_report_pl.rs`, `finance_report_balance.rs`). A column added to one
   report is not a change to another, and B4.11c/d add a file each rather than
   growing a shared one.
-- **Aged receivables/payables** — the one report that reads **documents**
-  (`billing_invoices` + `billing_payments`, `billing_bills`), bucketed
-  current / 1–30 / 31–60 / 61–90 / 90+ from the due date. It reads documents
-  because ageing is a property of a document, not of an account balance —
-  and the invariant that keeps the two honest is **P6**, which asserts the
-  ledger's `ar` and `ap` balances equal these totals. *Rejected: an
-  open-item sub-ledger inside the journal* — it duplicates B1's payment state
-  machine, and two implementations of "what is still owed" drift.
+- **Aged receivables/payables** (B4.11c, as built) — the one report that reads
+  **documents** (`billing_invoices` + `billing_payments`, `billing_bills`),
+  bucketed current / 1–30 / 31–60 / 61–90 / 90+ from the due date. It reads
+  documents because ageing is a property of a document, not of an account
+  balance — a receivable account holds one number, and only the invoices behind
+  it know which part of it has been owed since March. *Rejected: an open-item
+  sub-ledger inside the journal* — it duplicates B1's payment state machine, and
+  two implementations of "what is still owed" drift.
+
+  What the built report settles, beyond the bands. **The day is a boundary in
+  both directions**: a document counts when it was issued on or before `on`, and
+  money against it counts when it *arrived* on or before `on` (`paid_on`, not the
+  day it was keyed in) — so re-running last quarter answers last quarter.
+  **Only documents that stand are read**: `issued` and `paid` on the receivable
+  side (a document settled today may well have been owed on the date asked for),
+  `approved` on the payable side — a received-but-undecided bill is an intention,
+  which is the line this note already draws for the journal. **Credit notes are
+  included, negatively**, in the counterparty's own group, and each row says
+  whether it is one. **A document with nothing open is not a row**; an
+  **over**paid one is, negatively, because money held for a customer is a fact a
+  bookkeeper needs here. **The bands are added in the accounting currency**, each
+  document crossed at the rate frozen on it (`billing_fx::restated_open_cents`,
+  the scalar sibling of `restated_into` — a document already in the books'
+  currency needs no snapshot, which is also how a bill, written by somebody
+  else's system, is added at all); anything that cannot be crossed honestly is in
+  **no** band and is counted in `unconvertedCount`, exactly as the VAT summary
+  does. Every document also carries its own currency and its own open amount, so
+  the paperwork behind a converted figure stays readable. A **bill that states no
+  due date** (BT-9 is optional) is payable on receipt, so it ages from its issue
+  date. Grouping is by customer id on the receivable side and by the supplier's
+  comparable key (`Supplier::key`) on the payable one, because a bill copies its
+  supplier rather than linking to a record.
+
+  **P6 is not yet asserted**, and deliberately: the tie between these totals and
+  the ledger's `ar`/`ap` balances can only be tested once issuing a document
+  books it, which is not wired (see `docs/autonomy/STATE.md`). Nothing posts to
+  `ap` at all today, so the payable side has no ledger counterpart to tie to yet.
+  A bill also has no payment rows of its own — a SEPA export is an instruction,
+  not a payment — so a payable stays open until reconciliation can settle it.
 - **VAT return figures** — output VAT per rate, input VAT per rate,
   the net payable, from postings carrying `vat_rate_bp`. It reconciles
   against `billing_vat_report` (B1.20), which reads documents; the two are
