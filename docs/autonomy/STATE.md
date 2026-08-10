@@ -16298,3 +16298,145 @@ psql audit_log → inventory.count.create ×6, .update ×4, .cancel ×2, .line.u
 
 Next item: B5.08b (stocktake, applying — the variances become adjustment
 movements, recomputed against on-hand and skipping what moved).
+
+## B5.08b — the count becomes the ledger (2026-08-11)
+
+**Shipped.** Applying a stocktake: every counted row that still disagrees with
+its shelf becomes an ordinary adjustment movement, and the count closes as a
+record. No new table and no migration — B5.08a already reserved `applied` in the
+status vocabulary and in the CHECK constraint, so this item added a transition
+rather than a column.
+
+- **`platform/alo-store/src/inv_count_apply.rs`** (new) — `apply_inv_count`, the
+  pure `plan(expected, counted, on_hand)` that decides one row, and the
+  `ApplyOutcome`/`AppliedLine`/`SkippedLine`/`SkipReason` shapes the answer is
+  made of. Its own file, the way receiving is separate from the order it books
+  against: counting and applying change for different reasons.
+- **`products/mail/alo-jmap/src/inventory_counts.rs`** — a seventh route,
+  `POST /inventory/counts/{id}/apply`, answering with the closed count, its
+  refreshed sheet, and the two halves of what the apply did.
+- **`server.rs`** — the route registered; `tests/audit_routes.rs` grew the one
+  new action, `inventory.count.apply`, which the router-reading test derives
+  rather than declares.
+
+**The decisions, and why.**
+
+1. **The correction is against on-hand, and the snapshot's only job is to notice
+   that the shelf moved.** A counted row is applied when on-hand still equals
+   what the sheet wrote down; the movement is then `counted − on-hand`. A row
+   where the two differ is **skipped and named** (`moved`), because applying the
+   frozen difference over a delivery that went out at the far end of the room is
+   exactly how a stocktake erases a shipment. The deciding read is taken
+   `FOR UPDATE` on the cached balance row, so the reading is still true when the
+   movement lands on it; rows are visited in product-id order so two applies
+   cannot take their stock locks in opposite orders.
+2. **Every row's fate is reported, not just the successes.** `applied[]` carries
+   the product, on-hand before, what was counted, the signed variance and the
+   movement id; `skipped[]` carries the reason — `moved`, `uncounted`,
+   `unchanged` — with the three numbers that explain it. A person who pressed
+   apply needs to know which few items to re-count, not a count of successes.
+3. **The movements are ordinary ones.** Through `record_move_in`, so the cached
+   balance, the negative-stock rule and the append-only discipline stay the
+   ledger's own: reason `count`, no reason code (that is the manual door's
+   question — a count is explained by its sheet), `ref` the count, and the
+   line's note carried onto the movement, because "one broken" is the
+   explanation of exactly that variance and the ledger is where somebody will
+   look for it. Direction is the pair of locations, never a sign: a loss is
+   shelf → `ADJUST`, a surplus `ADJUST` → shelf.
+4. **A sheet nobody has counted is a `409`, not an empty apply.** Closing a fresh
+   sheet as `applied` would leave a stocktake claiming to have happened; the act
+   meant is `cancel`, and the refusal says both. A count all of whose rows are
+   skipped *does* apply — those rows were looked at, and the report says so.
+5. **The order of refusals is a tenancy rule.** Whose count it is is asked before
+   the tenant's own `adjustment` location is resolved (the B5.05b rule), so
+   another tenant's apply is a bare `404` and never "your workspace has no
+   adjustment location" — which would confirm the count was worth looking at.
+   The wire caught this: the first build answered `422` to a foreign apply, and
+   the fix is the cheap ownership check ahead of the location lookup, with the
+   authoritative status check still under the count's row lock.
+
+**Verified — gates.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+-p alo-jmap --all-targets` clean, zero warnings; `cargo test -p alo-store -p
+alo-jmap` green — 0 failures across every suite, including 7 new store unit
+tests (`plan`'s whole decision table, including the saturating subtraction) and
+the new 7-test `tests/inv_count_apply.rs`, plus 2 new route unit tests. The
+wrong-tenant test is the last of the seven: another tenant's apply of our count
+is a `NotFound`, a tenant who has **never opened Inventory** gets the same
+`NotFound` rather than a complaint about their own locations, our shelf, our
+ledger and our count are untouched by any of it, and after we apply, their stock
+and their (empty) count list are exactly as they were.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real PKCE authorization-code tokens, rows read back in psql.
+
+```
+POST /inventory/counts/{id}/apply             (no token)  → 401
+POST /inventory/counts {MAIN}                             → 200 open, 2 lines (5 chairs,
+                                                            2 lamps)
+PUT  lines/{chair} {4000,"one broken"}                    → 200 variance −1000
+PUT  lines/{desk}  {3000,"behind the pallets"}            → 200 joined the sheet,
+                                                            expected 0, variance +3000
+                                                            (the lamps left uncounted)
+POST …/apply                                  as THEM     → 404 (not a word about their
+                                                            own adjustment location)
+POST …/apply                                  as us       → 200 applied, closedBy set
+                                                            applied: Blue chair on-hand
+                                                            5000 counted 4000 var −1000;
+                                                            Oak desk 0/3000/+3000
+                                                            skipped: Brass lamp uncounted
+                                                            (expected 2000, on hand 2000)
+GET  /inventory/stock?locationId=MAIN                     → chair 4000, desk 3000,
+                                                            lamp 2000 — the shelf says
+                                                            what was counted
+GET  /inventory/moves                                     → count 1000 MAIN→ADJUST
+                                                            ref count/{id} note "one
+                                                            broken"; count 3000
+                                                            ADJUST→MAIN ref count/{id}
+                                                            note "behind the pallets";
+                                                            reasonCode null on both
+POST …/apply again · cancel · PATCH · PUT a line          → 409 ×4, each naming `applied`
+POST /inventory/counts {MAIN} again                       → 200 — applying freed the shelf;
+                                                            the new sheet snapshots
+                                                            4000/3000/2000
+POST …/apply with nothing counted                         → 409 nothing on this sheet has
+                                                            been counted yet: count a row,
+                                                            or cancel the stocktake
+                                                            (and it is still open)
+PUT  lines/{chair} {3000} · then 2 more chairs arrive     → 200, then on hand 6000
+POST …/apply                                              → 200 applied [], skipped chair
+                                                            MOVED (expected 4000, counted
+                                                            3000, on hand 6000) — the
+                                                            delivery survived; chair still
+                                                            6000 afterwards
+POST /inventory/counts/does-not-exist/apply               → 404
+psql audit_log → inventory.count.apply ×4 (one per successful apply, filed against its
+                 count) — and not one entry for any of the refusals
+```
+
+**Cuts and flags.**
+
+- **No partial apply, and no "apply anyway".** A `moved` row cannot be forced
+  through with a flag. The honest act is to re-count those few items — the sheet
+  is still open in the sense that matters, since applying frees the shelf and the
+  next count snapshots it fresh in one call.
+- **No screens.** B5.09a/b own the stocktake UI, and no user-facing string was
+  added, so there is nothing to translate yet. The wire carries everything a
+  screen needs: the two lists, the reasons, and the sheet re-read after the act.
+- **No journal posting for a stock variance.** A write-off has a value as well as
+  a quantity, and what a variance is *worth* needs a costing method (FIFO,
+  weighted average) that ADR 0035 has not chosen. The design note's "no stock
+  valuation in B5" stands; the movements exist and are the input the day it is
+  chosen.
+- **The tiny race that remains, stated.** A product with **no** `inv_stock` row
+  at that location (on-hand zero) has no row to lock, so a movement that lands
+  between the read and the write is added on top rather than noticed as `moved`.
+  It needs a surplus row and a concurrent first-ever movement of that product at
+  that place in the same milliseconds; the cost of closing it is locking the
+  whole cached table, and it is not worth that.
+- **`inventory` is still not role-gated** beyond the accountant's read-only
+  scope — any authenticated member may now apply a count, which is a write to the
+  stock ledger. Named for the sixth item running; a shipping/buying role is a
+  wave-review question, and this item is the strongest argument for it so far.
+
+Next item: B5.09a (web inventory — catalog and stock-by-location screens).

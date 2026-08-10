@@ -1194,6 +1194,44 @@ note only — the place a count is about is what the count *is*, and its state
 moves through `cancel` and `apply` rather than through a field a stale form
 could send.
 
+**As built (B5.08b).** `POST /inventory/counts/{id}/apply` writes the movements
+and closes the count, in one transaction, over `inv_count_apply.rs` — a file of
+its own, the way receiving is separate from the order it books against. Five
+things the shipped apply decided.
+
+- **Every row's fate is reported, not just the successes.** The answer carries
+  `applied[]` (product, on-hand before, counted, signed variance, the movement's
+  id) and `skipped[]` (product, `reason`, expected, counted, on-hand now)
+  alongside the count and its refreshed sheet. The three skip reasons are
+  `moved` — the shelf changed underneath the row, re-count it — `uncounted`, and
+  `unchanged` for a row that was simply right. "We applied 38 of your 51 rows"
+  without saying which is a report nobody can act on.
+- **The correction is against on-hand, and the snapshot's one job is to notice
+  movement.** A counted row is applied only when on-hand still equals the
+  snapshot; the movement's quantity is then `counted − on-hand`, which is the
+  same number, arrived at from the shelf rather than from memory. The read that
+  decides is taken `FOR UPDATE` on the cached balance row, so the reading is
+  still true when the movement lands on it, and rows are visited in product-id
+  order so two applies cannot take their locks in opposite orders.
+- **The movements are ordinary ones**, through `record_move_in` — the ledger's
+  single writer keeps the cached balance, the negative-stock rule and the
+  append-only discipline. Reason `count`, no reason code (that is the manual
+  door's question; a count is explained by its sheet), `ref` the count, and the
+  **line's note carried onto the movement**: "two boxes water-damaged" is the
+  explanation of exactly that variance, and the ledger is where somebody will
+  look for it.
+- **A sheet nobody has counted is a `409`, not an empty apply.** Closing a fresh
+  sheet as `applied` would leave a stocktake claiming to have happened; the act
+  meant is `cancel`, and the refusal says so. A count all of whose rows are
+  skipped *does* apply — those rows were looked at, and the report says what
+  happened to each.
+- **The order of refusals is a tenancy rule.** Whose count it is is asked before
+  the tenant's own `adjustment` location is resolved, so an apply of another
+  tenant's count is a bare `404` and never "your workspace has no adjustment
+  location" — which would confirm the count was worth looking at. The
+  authoritative status check is the one under the count's row lock; two people
+  pressing apply at the same moment produce one set of movements and one `409`.
+
 ## The inventory agent (B5.10)
 
 ADR 0034's shape, unchanged: a product-scoped tool set plus its description in

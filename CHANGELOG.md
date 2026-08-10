@@ -6,6 +6,23 @@ contracts.
 
 ## Unreleased
 
+- **Apply the count, and the corrections are movements like any other.** When
+  the sheet is worked down, applying the stocktake turns every difference into a
+  stock correction — out of the shelf for what is missing, onto it for what you
+  found — each one a movement with the sentence you wrote against the row and a
+  link back to the count that produced it. So "where did the other four go" has
+  the same answer it has for a delivery or a shipment, and no quantity is ever
+  quietly overwritten. The correction is worked out against what is on the shelf
+  **at the moment you apply**, not against what the sheet wrote down when you
+  opened it: if a delivery went out while you were counting, that row is left
+  alone and named in the result so you can re-count those few items — the
+  shipment is never written over. Rows nobody counted are left alone too, and so
+  are rows that turned out to be right. You are told exactly what was corrected
+  and what was not, and why, rather than a number of successes. A count applies
+  once and is then a record: no re-applying, no editing, no cancelling after the
+  fact — and the shelf is immediately free to be counted again. A sheet nobody
+  has counted cannot be applied at all; walking away from it is what `cancel` is
+  for.
 - **Count a shelf without stopping the warehouse.** Open a stocktake for one
   place and alo writes down what it believes is there — every product with stock
   on that shelf, with its SKU and barcode, ready for a phone and a scanner. Work
@@ -21,8 +38,8 @@ contracts.
   says so and asks you to re-count those few items — nothing is silently written
   over. One count per place at a time, so two people cannot produce two truths;
   a count you walk away from keeps its sheet, leaves stock untouched, and frees
-  the place to be counted again. Nothing has moved yet — turning the differences
-  into stock corrections is the next step.
+  the place to be counted again. Counting moves nothing by itself; applying the
+  count does, and that is the entry above.
 - **Tell alo how much to keep, and it tells you what to buy.** Set a minimum
   and a target for a product at a place — "keep at least four blue chairs in the
   main warehouse, and buy back up to twenty" — and the shortage report answers
