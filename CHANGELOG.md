@@ -6,6 +6,27 @@ contracts.
 
 ## Unreleased
 
+- **Sales orders: what a customer asked you for, and shipping it.** You can now
+  take an order — who it is for, what they want, at the price you quoted — as a
+  draft you edit freely, and confirm it when you say yes. Confirming gives it
+  its number, `SO-2026-00001`, stamps it with today and freezes it, so your copy
+  and theirs stay the same document. It deliberately moves no stock and reserves
+  nothing: an order is a promise, and goods move when they are picked. Shipping
+  is one act — say where you picked from, and how much of each line went if it
+  was only part of it — and it takes the stock off that shelf, moves the order
+  to partly or fully delivered, and stores the **delivery note** that travels in
+  the box: numbered within its order (`SO-2026-00001/D1`), quantities only, no
+  prices, because the person unpacking it is not the person who negotiated it.
+  If the whole order goes, you say nothing about lines at all. **You cannot ship
+  what you have not got**: a shelf that is short refuses the whole delivery and
+  says what is actually there, which is the point of counting stock by movements
+  rather than by a number somebody typed. More than was ordered is refused the
+  same way, naming the line, so an over-delivery is recorded deliberately as an
+  adjustment with a reason. An order nobody confirmed, or one cancelled or
+  already complete, ships nothing. Giving up on an order that has partly gone
+  out closes the remainder for good and has to be asked for in as many words —
+  and un-ships nothing, because what has left has left. Every order and every
+  consignment is on the record, with who booked it and the movements it wrote.
 - **Booking a delivery does the paperwork with it.** When goods arrive against a
   purchase order, say where you put them — and, if only part of the lorry turned
   up, how much of each line came. In one act the stock goes onto the shelf, the

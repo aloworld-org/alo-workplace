@@ -15604,3 +15604,190 @@ psql audit_log                → inventory.purchase_order.receipt.create ×2 pe
 
 Next item: B5.06a (sales orders: the record, the state machine, order → delivery
 note with stock moves out, routes and tests).
+
+## B5.06a — the order they place with us, and shipping it (2026-08-10)
+
+**Shipped.** The sales order: the mirror of the purchase order, and mirrored
+rather than generalised. Migration `0162_inv_sales_orders.sql` (four tables:
+`inv_sales_orders`, `inv_sales_order_lines`, `inv_so_deliveries`,
+`inv_so_delivery_lines`), the store (`inv_so.rs` — the record and the five-state
+machine; `inv_so_lines.rs` — the line and the delivered accumulator;
+`inv_so_confirm.rs` — the number draw; `inv_so_deliver.rs` — the movements out
+and the delivery note), and the routes (`inventory_so.rs`,
+`inventory_so_deliveries.rs`) under `/inventory/sales-orders`.
+
+**The three decisions.**
+
+- **Confirming moves no stock and reserves nothing.** It draws
+  `SO-YYYY-NNNNN` from its own series (kind `sales_order`, so cancelling an
+  order before it is billed leaves no hole in the invoice series), stamps the
+  day and freezes the document. A sales order is a promise; goods move when they
+  are picked. There is deliberately no reserved-quantity column: two ledgers of
+  quantity that must agree are one ledger and one bug, and "promised out" is a
+  sum over the open orders' outstanding lines, which is B5.07's query.
+- **Confirming writes no letter**, and that is the one place the mirror is not
+  symmetric. Placing a purchase order *is* asking the supplier, so B5.05a2 does
+  it in one act with the mail; confirming a sales order records an answer we
+  already gave the customer, so no message has to exist for the record to be
+  true.
+- **A delivery is a document, not a status.** `POST …/{id}/deliveries` writes
+  the movements (`MAIN → CUSTOMER`, reason `sale`, referencing the order), the
+  per-line accumulator and the order's new state in one transaction, and stores
+  the delivery note that describes them — numbered within its order
+  (`SO-2026-00001/D1`), quantities and units only, **no prices**.
+
+**Verified — clean.** `cargo fmt -p alo-store -p alo-jmap`, `SQLX_OFFLINE=true
+cargo clippy -p alo-store -p alo-jmap --all-targets` zero warnings, `cargo test
+-p alo-store` (all suites green, including the new 10-test
+`tests/inv_so_deliver.rs`) and `cargo test -p alo-jmap` (all suites green,
+`tests/audit_routes.rs` extended with the five new actions, and `singular()`
+taught `deliveries → delivery`). The wrong-tenant test is in the suite: another
+tenant cannot deliver against, confirm, cancel, delete, edit, read or list an
+order of ours, cannot name one of our lines on their own order, cannot pick from
+our shelf, and cannot resolve our number to our document (numbers are per
+tenant, so both first orders are `SO-2026-00001` — the test asserts the
+resolution stays inside the asker's tenant rather than returning nothing).
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real password-grant tokens, rows read back in psql.
+
+```
+GET/POST /inventory/sales-orders, …/{id}/deliveries  (no token) → 401 ×4
+POST  /inventory/sales-orders {}                    → 422 customerId is required to
+                                                      raise a sales order
+POST  /inventory/sales-orders (their customer)      → 404
+POST  … expectedDate "15/10/2026"                   → 422 must be YYYY-MM-DD, or null
+GET   /inventory/sales-orders?status=sent           → 422 …one of draft, confirmed,
+                                                      partially_delivered, delivered,
+                                                      cancelled  (a PO's vocabulary is
+                                                      not an SO's)
+POST  /inventory/sales-orders (2 lines, 08-20)      → draft, no number, late false,
+                                                      net 38900 / VAT 8169 / gross 47069,
+                                                      chair 4000 out / delivery charge 0
+POST  …/{draft}/deliveries                          → 409 …that is draft: it has not been
+                                                      confirmed with the customer yet
+GET   …/{draft}/deliveries                          → 200 {"deliveries":[]}
+PATCH …/{draft} {note}                              → 200
+POST  …/{id}/confirm                                → confirmed, SO-2026-00001, 2026-08-10,
+                                                      closedDate null; stock still MAIN 4000
+POST  …/{id}/confirm again                          → 409 …from confirmed it can only
+                                                      become partially_delivered or
+                                                      delivered or cancelled
+PATCH …/{id} · DELETE …/{id} after confirm          → 409 ×2 (only while it is a draft)
+POST  …/{id}/deliveries {}                          → 422 locationId is required: a
+                                                      delivery says where the goods were
+                                                      picked from
+POST  …/{id}/deliveries {lines:[]}                  → 422 a delivery must say what went
+                                                      out; it books at least one line
+POST  …/{id}/deliveries from the customer location  → 422 …from CUSTOMER: it is not a
+                                                      place anybody can walk into
+POST  …/{id}/deliveries 4001 of 4000                → 409 line 1 (Blue chair): 4000
+                                                      milli-units were ordered and 0 have
+                                                      already gone out, so 4001 more would
+                                                      make 4001; …adjustment with a reason
+POST  …/{id}/deliveries on the charge line          → 422 line 2 is a charge in words, not
+                                                      goods; nothing leaves against it
+POST  …/{id}/deliveries lineId "nope"               → 404
+POST  …/{id}/deliveries as the other tenant         → 404
+GET   …/{id}/deliveries · GET …/{id} as the other   → 404 ×2
+POST  …/nope/deliveries                             → 404
+GET   …/{id} after nine refusals                    → confirmed, delivered 0/0,
+                                                      outstanding 4000; 1 move in the
+                                                      ledger (the opening adjustment)
+POST  …/{id}/deliveries {MAIN, line 2500, note}     → 200 partially_delivered, closedDate
+                                                      null, line 2500/1500, charge 0/0,
+                                                      note SO-2026-00001/D1 seq 1 MAIN
+                                                      2026-08-10 "two boxes, driver
+                                                      Kowalski", one line 2500 piece,
+                                                      NO price field anywhere on it
+GET   /inventory/stock?productId                    → MAIN 1500
+GET   /inventory/moves                              → MAIN → CUSTOMER 2500 sale
+                                                      sales_order {the order}
+(1000 chairs written off by adjustment → MAIN 500)
+POST  …/{id}/deliveries {MAIN} (the rest, 1500)     → 409 Blue chair at MAIN has 500
+                                                      milli-units available, and 1500 were
+                                                      asked for   ← the headline refusal
+GET   …/{id} · stock · deliveries after it          → unchanged: partially_delivered,
+                                                      2500/1500, MAIN 500, 1 note
+(the 1000 found again → MAIN 1500)
+POST  …/{id}/deliveries {MAIN} (no lines)           → 200 delivered, closedDate 2026-08-10,
+                                                      line 4000/0, note …/D2 seq 2 qty 1500
+POST  …/{id}/deliveries again                       → 409 …that is delivered: everything on
+                                                      it has already gone out
+POST  …/{id}/cancel                                 → 409 …it is closed and cannot change
+                                                      again
+GET   …/{id}/deliveries                             → D2 then D1, newest first, each with
+                                                      its lines
+GET   /inventory/stock?productId                    → nothing left at MAIN
+GET   /inventory/sales-orders?status=delivered      → SO-2026-00001, gross 47069,
+                                                      Meubelhuis Amsterdam
+GET   /inventory/sales-orders  as the other tenant  → 0
+(second order, 2000 chairs, confirmed SO-2026-00002, 500 delivered)
+POST  …/{so2}/cancel {}                             → 409 part of this order has already
+                                                      gone out; cancelling it closes the
+                                                      remainder for good and leaves the
+                                                      customer to be invoiced for what they
+                                                      received, which has to be asked for
+                                                      explicitly
+POST  …/{so2}/cancel {shortClose:true}              → 200 cancelled, keeps SO-2026-00002,
+                                                      closed 2026-08-10, delivered still
+                                                      500; stock still MAIN 1500 — nothing
+                                                      is un-shipped
+psql inv_sales_orders         → SO-2026-00001 delivered, SO-2026-00002 cancelled, both
+                                confirmed and closed 2026-08-10
+psql inv_sales_order_lines    → accumulators 4000/4000, 0 on the charge line, 500/2000
+psql inv_so_deliveries        → 3 notes, one line each, notes as typed
+psql inv_so_delivery_lines ⋈  → every note line's move: qty equal, reason sale,
+  inv_moves                     ref_kind sales_order, MAIN → CUSTOMER
+psql audit_log                → sales_order.create ×2, .confirm ×2, .update ×1,
+                                .cancel ×1, .delivery.create ×3 — and not one entry
+                                for any of the fourteen refusals
+```
+
+**A cross-track defect found and fixed: two migrations were numbered 161.**
+The sites track's `0161_site_localized_publishes.sql` landed first (1740cb6);
+this track's `0161_inv_po_receipts.sql` was then minted at the same number
+(711a62a), which makes `sqlx` fail every migration run with
+`VersionMismatch(161)` — every DB-backed test on `main`, on **both** tracks,
+was red before this iteration's first line of code. Fixed the way that breaks
+nobody else: **this track's** file was renamed to `0163_inv_po_receipts.sql`
+(content byte-identical, so its checksum still matches wherever it was applied),
+the sites file keeps 161, and this machine's dev DB was corrected with
+`UPDATE _sqlx_migrations SET version = 163 WHERE version = 161`. A sites-track
+DB that applied 161 as *its* migration needs no change at all. **If any DB
+somewhere applied `inv po receipts` as version 161, it needs that same one-line
+UPDATE before it will migrate again** — no production deploy has carried either
+migration, so this is a dev-machine note, not a release note. Business
+migrations continue at 0164.
+
+**Cuts and flags.**
+
+- **No printed delivery note** (`…/deliveries/{did}/print` · `/pdf` in the
+  design's route table). The record, its number and its lines are all here and
+  the party generalisation of B1.16/B1.17 that B5.05a2 built is what would
+  render it; it is a page, not a decision, and it belongs beside the SO screens
+  in B5.09b. The store's `Delivery::note_number` already answers what the paper
+  would be headed with.
+- **No invoice.** `POST …/{id}/invoice` is B5.06b by the queue's own split, and
+  the decision it rests on is already recorded: bill what was **delivered**, not
+  what was ordered. B5.06b will want a per-line invoiced accumulator — a new
+  expand-only migration beside `delivered_qty_milli`, deliberately not minted
+  speculatively here.
+- **The delivery date is today**, exactly as a receipt's is (B5.05b's cut, same
+  reasons); a consignment typed up on Monday for a van that left on Friday is
+  dated Monday.
+- **A delivery cannot be corrected or reversed** — no `PATCH`, no `DELETE`.
+  Goods that come back are a return: a movement the other way with a person's
+  reason on it, which is the module's standing answer.
+- **No reservation, so no allocation.** Two confirmed orders can each promise the
+  same last chair, and the second van to be loaded is the one refused. That is
+  the honest behaviour for a business this size, and it is what the shortage
+  report (B5.07) exists to warn about before it happens.
+- **`inventory` is still not role-gated** beyond the accountant's read-only
+  scope — any authenticated member may ship goods, which is the write that takes
+  stock off the shelf. Named again rather than assumed; a shipping role is a
+  wave-review question.
+
+Next item: B5.06b (sales order → invoice: the delivered-and-not-yet-invoiced
+bridge into alo Billing, full arc wire-verified).
