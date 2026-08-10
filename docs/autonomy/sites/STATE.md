@@ -1852,3 +1852,29 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   and blank/template fallback. The disposable wire tenant remains only in the
   local development database; no credential or fixture helper was committed.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.28b generated-site onboarding
+
+- **Shipped:** replaced the name-first website dialog with two complete,
+  visible starting paths. Owners can describe their business, generate one
+  private draft through `POST /sites/generate`, and land directly in its Home
+  page editor. The AI-off sibling stays on the same surface: a blank option
+  plus the server's shipped style templates, site name and address, live
+  availability feedback, automatic Home-page creation, and the same direct
+  editor hand-off. No generated or manual path publishes a site.
+- **Failure contract:** the typed `reason: "unconfigured"` response switches
+  in place to the blank/template path with a human next step. Other failures
+  retain the server's own detail. Both primary buttons change label while
+  work is running, and the manual path remains usable when template loading
+  fails.
+- **Verified:** the real Sites client and routed UI passed 27 focused Vitest
+  tests. The click-path test enters a business description, submits it, checks
+  the exact generation body, and observes `/sites/{id}/pages/{home}`. A second
+  click-path receives the unconfigured response, selects the visible blank
+  template, creates the site and Home page, and observes the editor route.
+  `npx tsc --noEmit` clean; focused ESLint clean; `npm run build` green.
+- **Cuts/flags:** shipped presets currently provide the manual path's visual
+  starting points; section-layout templates remain future depth. The existing
+  multi-write manual API creates site, optional theme, then Home page; S1.28a's
+  generated path remains the atomic option.
+- **Next:** the first unchecked item in `QUEUE.md`.
