@@ -13355,3 +13355,182 @@ and `/projects`. No new top-level prefix this item.
 Next item: B4.12 (the accountant role — scoped access, finance read + journal
 write only, which is also the item that widens the `admin` gate the four reports
 share).
+
+## B4.12 — the accountant role, alo's first scoped role (2026-08-10)
+
+**Shipped.** A tenant can now say *this person is our accountant*, and the
+sentence means something enforced rather than trusted. Migration
+`0149_tenant_user_roles` (`tenant_id, user_id, role` PK, plus `granted_by` /
+`granted_at`), `platform/alo-store/src/tenant_roles.rs` (`TenantRole`,
+`AccessFacts`, grant/revoke/read on `TenantStore`, `access_facts` on
+`AccountStore`), `Account::require_finance` in the API,
+`products/mail/alo-jmap/src/scoped_roles.rs` as a router layer, `POST
+/admin/users/roles`, `roles` on `GET /admin/users`, `alo:roles` in the session
+resource, and the grant as a named checkbox in the admin console's user modal.
+
+**What the role opens, exactly.**
+
+| Surface | An accountant |
+|---|---|
+| the four reports (`/finance/reports/{pl,balance,aged,vat}` + `.csv`) | **reads** |
+| the expense approvals inbox and its approve/reject/reimburse | **decides** |
+| fiscal periods: define, close, reopen | **writes** |
+| the rest of `/finance/*`, already open to any member | unchanged |
+| `/billing/*`, `/crm/*` | **reads**; every write `403` |
+| `/finance/mileage/rates` (PUT) | `403` — admin only, deliberately |
+| `/admin/*`, including the role table itself | `403` |
+| mail, files, tasks, calendar | their own, like any user — the role adds nothing |
+
+**Six decisions.**
+
+1. **A role is a row, not a second boolean on `users`.** `is_admin` is a column
+   because there is one of it and every request reads it. A role set grows (B6's
+   HR role is the next one named); rows carry *who granted it and when*, which
+   an external accountant's access is precisely the kind of fact an auditor asks
+   the provenance of; and a column per role is a migration per role plus a
+   `WHERE` clause nobody remembers to widen.
+2. **Not a Space** — the design note's standing rejection, now built. A Space is
+   a container, the ledger is the tenant, and the first admin who tidied an
+   accountant out of a sidebar would silently revoke their access to the
+   year-end.
+3. **Not an RBAC engine.** One role; gates that name it in words. The second
+   role is a value in the enum, a value in the migration's CHECK, and a word in
+   a gate.
+4. **The billing/CRM read-only rule is a layer, not sixty gates.**
+   `scoped_roles::enforce_scoped_roles` sits over the router beside the audit
+   trail (B2.13) and for the same reason: the handler somebody adds next month
+   is the one that would have forgotten. It short circuits before touching the
+   store for every non-mutating request and every other module; it passes a
+   tokenless request straight through so the handler still answers its own
+   `401` (one place decides what an unauthenticated caller is told); and it lets
+   the dry runs through via `audit_action::writes_nothing` — one list, now
+   shared by both layers, so a preview is a read to each of them.
+5. **The roles are read *with* the admin flag, not beside it.** `authenticate`
+   runs on every request in the product, so `AccountStore::access_facts` is one
+   query returning both and the mail hot path pays nothing for a fact almost
+   nobody has. A store failure reads as *no access* rather than as an error,
+   exactly as the admin flag alone already did. A delegated handle (ADR 0017)
+   carries no roles for the reason it carries no admin flag: the grant is about
+   one mailbox, and the roles belong to the person who signed in.
+6. **A grant proves tenant membership before it writes.** `users.id` is globally
+   unique, so the naive `INSERT` would have made another tenant's user an
+   accountant here. `grant_role` goes through `assert_user` and answers
+   `NotFound` — `404` on the wire, the same answer an id that was never issued
+   gets, so the refusal is not an existence oracle either.
+
+**Verified — the suites.**
+
+```
+cargo fmt -p alo-store -p alo-jmap
+SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap --all-targets   clean
+cargo test -p alo-store -p alo-jmap        139 suites, 2 008 tests, 0 failed
+  · alo-store --lib                        832 passed
+  · alo-jmap  --lib                        479 passed
+  · alo-store --test tenant_roles          4 passed   (new)
+  · alo-jmap  --test accountant_role_http  7 passed   (new)
+npx tsc --noEmit · npx eslint <changed> · npm run build                 clean
+```
+
+`tests/tenant_roles.rs` is the store's isolation proof: a cross-tenant grant and
+a cross-tenant revoke are both `NotFound` and write nothing; the same user id
+holding the role where they belong holds none here; the admin flag and the role
+set move independently; a deleted user leaves no dangling grant.
+`tests/accountant_role_http.rs` walks one person round the product three times —
+ordinary member, accountant, somebody else's accountant — and tries every door
+from each side, including that a refused write left the record byte-identical.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8099` against
+docker `alo-pg`, a tenant bootstrapped with `identityctl bootstrap-admin`, an
+accountant created through `POST /admin/users`, every row checked in psql.
+
+```
+BEFORE the grant (an ordinary member)
+GET  /finance/reports/pl|balance|vat, /finance/expenses/pending  → 403 each
+GET  /finance/periods                                            → 200 (contrast)
+GET  /.well-known/jmap            → alo:roles [] · alo:isAdmin false
+
+THE GRANT
+POST /admin/users/roles {role:"owner"}        → 422 "invalid input: role must be
+                                                     one of: accountant"
+POST /admin/users/roles {no userId}           → 400
+POST /admin/users/roles (as the accountant)   → 403
+POST /admin/users/roles {userId:"nosuchuser"} → 404 (not a member; no oracle)
+POST /admin/users/roles {accountant,true}     → 200 {"ok":true}
+psql tenant_user_roles                        → accountant | granted_by set
+
+AFTER the grant
+GET  /finance/reports/pl · pl.csv · balance · aged · vat          → 200 each
+GET  /finance/expenses/pending                                    → 200
+GET  /.well-known/jmap            → alo:roles ['accountant'] · isAdmin false
+POST /finance/periods {2026-01-01..2026-03-31}                    → 200
+POST /finance/periods/{id}/close                                  → 200
+psql fin_periods                                                  → closed | closed_by set
+POST /finance/expenses (the boss claims) → /submit                → 200, 200
+GET  /finance/expenses/pending (the accountant's queue)           → 200
+POST /finance/expenses/{id}/approve                               → 200
+psql fin_expenses                            → approved | decided_by = the accountant
+
+BILLING AND CRM
+GET  /billing/customers · /billing/customers/{id} · /crm/deals    → 200 each
+POST /billing/customers        → 403 "an accountant may read billing and CRM,
+                                      not change them"
+PATCH /billing/customers/{id}                                     → 403
+POST /billing/customers/{id}/archive                              → 403
+POST /crm/pipelines                                               → 403
+POST /crm/imports/leads/preview → 422 (its OWN missing pipelineId/stageId — the
+                                 handler ran, so the dry run was let through)
+psql billing_customers          → name still "Kunde GmbH", archived_at still null
+                                  — the refusals changed nothing
+
+THE CONSOLE, AND OFF AGAIN
+GET  /admin/users · /admin/audit · /admin/security/checks         → 403 each
+PUT  /finance/mileage/rates                                       → 403
+GET  /admin/users (as the admin)  → boss … true [] · acct … false ['accountant']
+POST /admin/users/roles {granted:false}                           → 200
+GET  /finance/reports/pl (the same person, seconds later)         → 403
+psql tenant_user_roles                                            → 0 rows
+POST /billing/customers (no token at all)                         → 401
+```
+
+**Cuts, named.**
+
+- **No fr/nl** for the five new console strings (`userRoles`,
+  `userAccountantRole`, `userAccountantHint`, `userAccountantBadge`) — the
+  wave-review rule, B4.15 owns them.
+- **No accountant-shaped landing page.** The role opens routes; the finance
+  screens those routes serve are B4.13a–c, which is also where a client will
+  read `alo:roles` to decide what to show. Nothing here depends on that: the
+  server refuses regardless, because a client is never an access decision.
+- **The rate table was not widened** (see the table above). It is the one
+  privileged finance write left with `require_admin`, and the reason is written
+  into `finance_mileage.rs` so the next reader does not "fix" it.
+- **No per-record scoping.** A role is tenant-wide. Which board, which
+  engagement, which dashboard a person may see is still Spaces' job and still
+  unbuilt.
+
+**FLAG for the human.**
+
+1. **`ROADMAP.md` says "designed on Spaces" three times, and B4.12 delivered
+   roles instead** — lines for B2.11, B3.8 and BI-1.6. The reasoning is in
+   `docs/design/finance.md` § The accountant role (the role that turned up is
+   tenant-wide and cross-module, the one shape a Space cannot express, and the
+   queue item itself hedged with "via Spaces/roles"). Correcting three ROADMAP
+   lines is not a loop decision, so they are untouched and named here — as that
+   note promised they would be.
+2. **An accountant is still a user, and a user still gets a mailbox.** A
+   no-mailbox account type is an identity change, not a finance one. Unchanged
+   from the design note's open questions.
+3. **`identityctl` must be rebuilt after a migration** — a stale binary embeds
+   the old migration set and dies with `could not run migrations` against a
+   database the new one has already advanced. It cost ten minutes here; worth
+   knowing before the next wire arc.
+4. Everything flagged by B4.11d is unchanged: no HTTP door seeds the chart, the
+   `/billing` issue route still writes no journal entry, nothing books
+   `vat_input`, and `create_billing_bill` still cannot store a hand-entered bill.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item — `/admin/users/roles` sits
+under the `/admin` prefix that is already proxied.
+
+Next item: B4.13a (web finance — the module skeleton and the expenses flow).

@@ -1457,6 +1457,7 @@ needs the books and must not have the mail.**
 
 ```
 tenant_user_roles   tenant_id, user_id, role PK   — role ∈ {'accountant'}
+                    granted_by, granted_at        — who handed it out, and when
 ```
 
 - Finance routes accept **admin or accountant**. Read of everything in
@@ -1469,6 +1470,51 @@ tenant_user_roles   tenant_id, user_id, role PK   — role ∈ {'accountant'}
   files. The tests prove that literally: an accountant handle gets `403` on
   every admin route, `404` on another user's expense, and nothing but their
   own on every account-door read.
+
+### As built
+
+**The grant.** `POST /admin/users/roles` `{userId, role, granted}`, admin-only,
+audited as `user.role`. Its own route rather than a field beside `isAdmin`,
+because a body that could set both would make "make them an accountant" and
+"make them an admin" one call. Granting and revoking are both idempotent — the
+caller's intent is a state, not an event — and a grant proves tenant membership
+before it writes (`users.id` is globally unique, so the naive `INSERT` would
+have made another tenant's user an accountant here; the refusal is `404`, the
+same answer an id that was never issued gets). `GET /admin/users` carries
+`roles` per row, read for the whole company in one query, and the session
+resource advertises `alo:roles` beside `alo:isAdmin` so a client can show what
+the role opens — the server refuses regardless, because a client is never an
+access decision.
+
+**The finance gate** is one function, `Account::require_finance` — admin **or**
+accountant — and it replaced `require_admin` in exactly three places: the four
+reports (through `finance_reports::reader`, the single gate all eight report
+routes already shared), the expense approvals inbox and its three decisions,
+and the fiscal periods' define/close/reopen. **The mileage rate table kept
+`require_admin`**, deliberately: what a company pays per kilometre is a pay
+decision, not a bookkeeping one, and it is not on the list of accountant writes
+above.
+
+**The billing/CRM read-only rule is a layer**, `scoped_roles::enforce_scoped_
+roles`, mounted over the router beside the audit trail (B2.13) and for the same
+reason: sixty handlers with a gate each are sixty chances to forget, and the
+sixty-first is the hole. It refuses a mutating method on `/billing/*` or
+`/crm/*` to a caller who holds the role and is not an admin, short circuits
+before touching the store for everything else (including every `GET`), passes a
+tokenless request through so the handler still answers its own `401`, and lets
+the dry runs through — `audit_action::writes_nothing`, one list shared with the
+audit layer, so a preview is a read to both.
+
+**The one extra query is not extra.** `authenticate` runs on every request in
+the product, so the roles are read *with* the admin flag in a single
+`access_facts` call rather than beside it. A delegated handle (ADR 0017)
+carries no roles for the same reason it carries no admin flag: the grant is
+about one mailbox, and the roles belong to the person who signed in.
+
+**The web surface** is the admin console's user modal — a named checkbox with
+the whole rule written beside it, not a bare switch, because an access grant is
+the one control where "what does this do?" must be answerable without trying it
+— plus a badge in the user list. The finance screens themselves are B4.13.
 
 *Rejected: modelling finance as a Space.* A Space is a container with
 members, and the ledger is not in a container — it is the tenant. Making it

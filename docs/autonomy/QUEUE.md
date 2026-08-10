@@ -106,7 +106,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.11b Report: balance sheet — same contract + goldens.
 - [x] B4.11c Report: aged receivables/payables — same contract + goldens.
 - [x] B4.11d Report: VAT-return figures — same contract + goldens.
-- [ ] B4.12 Accountant role: scoped access (finance read + journal write only, no mail/files) via Spaces/roles; tests prove the scope.
+- [x] B4.12 Accountant role: scoped access (finance read + journal write only, no mail/files) via Spaces/roles; tests prove the scope.
 - [ ] B4.13a Web finance: module skeleton + expenses flow (submit/approve/reimburse screens).
 - [ ] B4.13b Web finance: bank import + reconciliation screen.
 - [ ] B4.13c Web finance: CoA editor + the four report pages with CSV buttons.

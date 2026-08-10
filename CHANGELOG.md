@@ -6,6 +6,17 @@ contracts.
 
 ## Unreleased
 
+- **Give your accountant the books, and only the books.** You can now mark
+  someone in your organization as your accountant. They get what the job needs:
+  every finance report, the expense claims waiting to be decided, and the power
+  to close a period once it is filed — plus your invoices, quotes and deals to
+  read, because a posting only makes sense next to the document behind it. They
+  get nothing else. They cannot change an invoice or a deal, cannot open the
+  admin console, cannot add users or set what you pay per kilometre, and have no
+  way into anyone's mail or files: an accountant is a person with their own
+  mailbox and nothing shared into it. Turn it on beside their name in Users &
+  mailboxes, and turn it off the same way the day the engagement ends.
+
 - **The figures for your VAT return, straight out of your books.** For any
   period you name, alo now shows the tax you charged — rate by rate, with the
   turnover each rate was charged on — the tax you paid on purchases and may
