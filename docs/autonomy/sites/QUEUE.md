@@ -57,4 +57,4 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S1.31a Wave review, language: fr/nl strings for the whole sites UI; CHANGELOG sweep.
 - [x] S1.31b Wave review, reconciliation: docs/design/sites.md as-built; features [S1] reconciliation incl. the S1.30b/c dialog fixes; human-inbox summary (production compose+Caddy additions, AI key).
 - [x] S1.32a FINAL arc, forms+publish: fixture-generate → edit sections → theme → publish → serve on subdomain Host → form submission → owner-inbox notification + submissions UI; transcript.
-- [ ] S1.32b FINAL arc, blog+domains+privacy: blog post from a real doc → custom-domain verify+serve → analytics counted with zero PII; transcript; then `LOOP COMPLETE`.
+- [x] S1.32b FINAL arc, blog+domains+privacy: blog post from a real doc → custom-domain verify+serve → analytics counted with zero PII; transcript; then `LOOP COMPLETE`.

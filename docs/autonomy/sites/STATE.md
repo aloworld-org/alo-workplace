@@ -2124,3 +2124,46 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   The public notification worker's real 30-second cadence was allowed in the
   curl proof; the regression test invokes the same sweep directly for speed.
 - **Next:** S1.32b, the final blog, custom-domain, and zero-PII analytics arc.
+
+## 2026-08-10 — S1.32b final blog, domain, and privacy arc
+
+- **Shipped:** the final cross-service regression uploads a real BlockNote
+  document through authenticated JMAP, creates its tenant-owned Drive node,
+  links and publishes it as a Sites blog post, verifies a custom domain through
+  the production DNS seam, serves the article through that custom Host, and
+  proves the resulting analytics report contains exactly one visit and one
+  anonymous visitor. The shared test harness now exposes the exact in-memory
+  blob backend attached to JMAP so the public Sites service must render the
+  bytes actually uploaded by Docs rather than a duplicate fixture.
+- **Tenant and privacy proof:** another tenant receives `404` at the analytics
+  door. The public request deliberately includes a raw IP, private user-agent,
+  referrer path/query/fragment, and page query token; the API and database keep
+  only `/blog/utrecht-mornings`, `news.example`, aggregate counts, and one
+  32-byte daily HMAC. A schema assertion proves that no analytics table exposes
+  an IP, user-agent, query-string, full-referrer, or equivalent raw-PII column.
+- **Real curl transcript:** fresh local `alo-jmap` and `alo-sites` processes,
+  Postgres on `127.0.0.1:5432`, filesystem blobs, and a fresh PKCE-authenticated
+  tenant produced: document upload `200`; Drive document creation and blog
+  publish `200`; custom-domain claim `200 pending`; no-network `.invalid` DNS
+  verify `200 pending`; deterministic local fixture activation; custom Host
+  article GET `200`; analytics `1 visit / 1 anonymous visitor`; stored dimensions
+  `/blog/calm-work + news.example + daily HMAC`; raw-PII columns `0`. The exact
+  TXT-to-live transition is covered by the injected-DNS regression, while the
+  wire run intentionally made no external DNS call. All fixture processes,
+  tenant data, and temporary blobs were removed afterward.
+- **Verified:** `cargo fmt -p alo-jmap`; `SQLX_OFFLINE=true cargo clippy -p
+  alo-jmap --all-targets --jobs 1 -- -D warnings`; focused final-arc test; full
+  `cargo test -p alo-jmap --jobs 1 -- --test-threads=1 --format terse` (493 unit
+  tests plus every integration/doc target, including 18 Sites HTTP tests); full
+  `cargo test -p alo-sites --jobs 1 -- --test-threads=1 --format terse`; `npx
+  tsc --noEmit`; and `npm run build` are green. No web file changed, so focused
+  ESLint is not applicable. The build retains only the repository's existing
+  Rollup circular re-export and large-chunk warnings.
+- **Cuts/flags:** JMAP has no `/healthz`, so the wire harness uses OIDC discovery
+  as its readiness probe. Exact public-DNS success remains deterministic and
+  no-network in tests; the real-process transcript proves the retryable pending
+  response and the complete live-domain serving path without contacting an
+  external resolver. No external AI, production system, or outbound email was
+  used.
+- **Next:** `LOOP COMPLETE` — every Sites queue item is checked and the S1 arc
+  is fully reconciled, exercised, and journaled.
