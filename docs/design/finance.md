@@ -572,8 +572,19 @@ rather than four reports' worth of queries:
 | Function | Answers | Feeds |
 |---|---|---|
 | `fin_trial_balance(from, to)` | what every account moved in a window, with the two totals that must be equal | P&L (income + expense for a period), balance sheet (no lower bound, at a date) |
-| `fin_account_ledger(account, from, to, limit)` | one account line by line, with the opening balance and a running column | every drill-down; `flag_anomalies` (B4.14b) |
+| `fin_account_ledger(account, from, to, limit)` | one account line by line, with the opening balance and a running column | every drill-down |
 | `fin_dimension_balances(scope, dimension, from, to)` | what each value of one dimension moved, over the accounts a scope names | receivables by customer, payables by supplier, cost by engagement, VAT by rate |
+| `fin_journal_range(from, to, limit)` (B4.14b) | a period of the journal, oldest first, **with every posting attached** | `flag_anomalies` — the one reader that judges entries rather than folding them |
+
+The fourth was added by B4.14b and is a *read*, not an aggregate: the sketch
+above pointed `flag_anomalies` at `fin_account_ledger`, and that was wrong.
+A ledger answers "what did this account do", one account at a time; the three
+anomaly rules ask about the *pairing* of an entry's postings — the same
+counterparty, the same account, the same signed amount — and a per-account read
+cannot see a pair. `fin_journal_range` orders by accounting date so that a
+`limit` cuts a **contiguous range of days**, which is what lets the rule about
+the rhythm of a cost trust the window it was given: a scan missing a scatter of
+entries would invent gaps that are not there.
 
 Three decisions inside them a later wave should not relitigate. **Every
 aggregate is in the accounting currency** (`base_cents`): a total that adds
@@ -1752,11 +1763,56 @@ document; there is no "book this line to 6100"). Suggesting a category for a
 thing nothing can then classify would be an offer with no accept. It belongs
 with whatever item opens that verb, not here.
 
-Two rules the third tool needs. It **names entries, never people**: an
-anomaly is a fact about a document, and an agent that summarises an
-employee's spending pattern is a profiling feature nobody asked for. And it
-**explains every flag with the rows that caused it**, because an unexplained
-flag is an accusation.
+### As built, B4.14b — `vat_summary` and `flag_anomalies`
+
+The two rules the third tool needed were held literally. It **names entries,
+never people**: no rule reads a posting's `user_id`, so no finding can carry
+one, and the tool's own description tells the model it cannot answer a question
+about somebody's spending. And it **explains every flag with the rows that
+caused it** — `Anomaly::sources` is the whole of the argument, and an
+unexplained flag is an accusation.
+
+Five decisions the slice made:
+
+- **Both tools are behind the finance gate.** `require_finance` — an admin or
+  the accountant — exactly as `GET /finance/reports/*` is. An agent is the
+  obvious way round B4.12's wall: the proposal is composed by a model, but the
+  execution is a request from a browser holding a token, and it is gated like
+  every other. `categorise_transactions` needs no such gate because it reads
+  only the caller's own claims; these two read the whole tenant's books.
+- **`vat_summary` states its period or it does not run.** Both days are
+  required, with no default — the rule `finance_reports::day` already holds for
+  the report routes, and this is the figure most likely to be copied into a
+  filing. It renders through `finance_report_vat::report_json`, so the agent and
+  the report cannot disagree about a cent; there is no second path to a VAT
+  figure in this product.
+- **Three deterministic rules, no score.** `find_anomalies` is a pure function
+  with no confidence, no ranking and no percentage in it, because a number
+  attached to a suspicion is read as evidence for it. A duplicate is the same
+  counterparty, account and **signed** amount inside a week — signed, so an
+  invoice and the payment that settles it (equal, opposite, days apart on the
+  same receivable) are never reported as a double booking. An unusual amount is
+  measured against its own account's median in the same period, with a €100
+  floor so a tenant whose median is €2 is not flagged on every lunch. A missing
+  month is only ever an **interior** one: a cost that started in March is not
+  eleven missing months, and one cancelled in October is not a hole in November.
+- **What was not looked at is part of the answer.** `truncated` (the period
+  holds more entries than one scan reads), `notComparable` (entries naming no
+  counterparty, which the duplicate rule cannot compare) and `found` vs `shown`
+  all travel, for the reason `categorise_transactions`' skipped list does:
+  silence reads as "nothing was wrong" when it means "I stopped looking".
+- **Nothing is written, and there is no dismissal.** No anomaly table, no
+  "reviewed" flag, no state on a finding. A finding is a question asked of a
+  period, and the answer to it is a correcting entry in the journal — a
+  dismissal would be a second place the books are said to be right.
+
+**Known limit, named:** the duplicate rule can only compare entries that name a
+counterparty, and today only invoices, credit notes and payments do (they carry
+`customer_id`). Nothing sets `supplier_key` yet, because bill and expense
+auto-posting is not built — so on today's books the rule effectively watches the
+sales side. It widens with no code change the day a bill posts, and until then
+`notComparable` says how much it could not see.
+
 
 ## Errors
 

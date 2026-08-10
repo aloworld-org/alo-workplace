@@ -6,6 +6,25 @@ contracts.
 
 ## Unreleased
 
+- **Ask alo what VAT you owe, and to look over your books.** Two questions alo
+  can now answer from the books themselves rather than from a search. Ask for
+  last quarter's VAT and you get the figures your journal carries — tax charged
+  on sales rate by rate, tax paid on purchases, and the difference, said plainly
+  as what you owe or what you are owed back. They are the same figures the VAT
+  report on the Reports tab shows, because they are read the same way; they are
+  **figures for a return, not a return**, and nothing is filed anywhere. Both
+  days have to be stated, so a figure never appears under a period nobody asked
+  for. Ask alo to check your books and it reads the period's entries and names
+  what is worth a second look: the same amount booked twice to the same customer
+  or supplier inside a week, an amount unlike anything else on its account, a
+  monthly cost that skipped a month. Every one comes with **the entries behind
+  it** — the day, the line, the amount — because a flag you cannot check is an
+  accusation. There is no score, no risk rating and nothing about any person:
+  these are questions about entries. Nothing is changed, nothing is marked as
+  reviewed, and if a period holds more entries than one check can read, it says
+  so instead of reporting all clear. Both answers are for admins and the
+  accountant, the same people who can open the reports.
+
 - **Ask alo to sort out your expenses — and answer each suggestion yourself.**
   Say "categorise my expenses" and alo goes through your own claims that have no
   category yet and suggests one for each, taken from the categories *you* have

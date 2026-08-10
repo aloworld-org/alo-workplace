@@ -14106,3 +14106,139 @@ Next item: B4.14b (★ Finance agent — `vat_summary` + `flag_anomalies` as
 **answers with citations**: read `/finance/reports/vat` for a period, and name
 what looks unusual in the journal with the entries as sources — entries, never
 people; structural verify, no live model calls).
+
+## B4.14b — two answers from the books: what VAT says, and what looks odd (2026-08-10)
+
+**What shipped.** The finance agent's two **answer** tools, which read the
+tenant's books and write nothing at all.
+
+- **Store, `fin_journal_range`** (`fin_journal.rs`): a period of the journal,
+  oldest first, with every posting attached — two queries rather than a join, and
+  ordered by accounting date so a `limit` cuts a *contiguous range of days*. That
+  ordering is not a detail: a scan missing a scatter of entries would invent gaps
+  that are not there, and one of the three rules is about gaps.
+- **Store, `fin_anomalies.rs`**: `find_anomalies`, a pure function over rows —
+  no score, no ranking, no confidence, because a number attached to a suspicion
+  is read as evidence for it. Three rules a person can check by hand. A
+  **duplicate** is the same counterparty, account and *signed* amount inside a
+  week; signed is the whole design, because an invoice and the payment that
+  settles it are equal, opposite and days apart on the very same receivable, and
+  an absolute comparison would report a double booking every time anybody paid
+  anything. An **unusual amount** is measured against its own account's median in
+  the same period, five times over, with a €100 floor so a tenant whose median is
+  €2 is not flagged on every lunch. A **missing month** is only ever an interior
+  one: a cost that started in March is not eleven missing months, and one
+  cancelled in October is not a hole in November — plus a rhythm test (three
+  months, one entry each, present in more than half its own span) so two bursts
+  with a quiet year between them are not a finding.
+- **Nothing names a person.** No rule reads a posting's `user_id`, so no finding
+  can carry one; a test asserts the rendered keys, and the model is told in as
+  many words that the tool cannot answer a question about somebody's spending.
+- **jmap, `agent_finance_answers.rs`**: both executors, apart from the drafting
+  tool because they answer to different rules — `categorise_transactions` reads
+  the caller's own claims, these two read the whole tenant's books and are
+  therefore behind `require_finance` (admin or accountant), the same gate as
+  `/finance/reports/*`. An agent is the obvious way somebody would try to get
+  round B4.12's wall; it does not work. `vat_summary` renders through
+  `finance_report_vat::report_json` — the same figures in the same shape, so
+  there is no second path to a VAT figure in this product — and **requires both
+  days**, no default, because that is the figure most likely to be copied into a
+  filing.
+- **What was not looked at is part of the answer**: `truncated`,
+  `notComparable`, and `found` beside `shown`. Silence would read as "nothing
+  was wrong" when it means "I stopped looking".
+- **Web:** two result cards. The VAT card shows the rates, the two sides and
+  the net said as *you owe* or *you are owed back* (the sign is the server's,
+  the words are the catalogue's), and ends by saying nothing was filed. The
+  books card shows each finding with **the entries behind it** — day, memo,
+  amount — never collapsed away, plus the truncation and not-comparable notes.
+  Proposal cards for both, so a person approves knowing which days are about to
+  be read.
+
+**How verified.**
+
+```
+cargo test -p alo-store --lib        → 857 (17 new in fin_anomalies), green
+cargo test -p alo-store --test fin_anomalies → 3, green (+ fin_categorise 7,
+                                        fin_journal_properties 6, fin_vat_return 5)
+cargo test -p alo-ai                 → 70 (3 new), green
+cargo test -p alo-jmap --lib         → 506 (6 new), green
+cargo clippy -p alo-store -p alo-ai -p alo-jmap --all-targets → clean
+cargo fmt · npx tsc --noEmit · npx eslint <changed> · npm run build → clean
+
+wire (local alo-jmap + docker alo-pg, fresh tenant, 9 seeded entries):
+POST /ai/agent/execute {vat_summary}      no token   → 401
+POST /ai/agent/execute {flag_anomalies}   no token   → 401
+POST /ai/agent/execute {vat_return_filing}           → 400 "unknown tool"
+POST … {vat_summary, args {}}                        → 422 "from is required"
+POST … {vat_summary, from only}                      → 422 "to is required"
+POST … {vat_summary, from "last quarter"}            → 422 "written YYYY-MM-DD"
+POST … {vat_summary, 2026-12-31 → 2026-01-01}        → 422 "before its start"
+POST … {flag_anomalies, 2024-01-01 → 2026-06-30}     → 422 "shorter than 366 days"
+POST … {flag_anomalies, args {}} (empty tenant)      → 200 found 0, 2025-08-11 → today
+POST … {vat_summary, 2026-01-01 → 2026-06-30}        → 200, and BYTE-IDENTICAL to
+GET  /finance/reports/vat?from&to  for the same days  (only "kind" added)
+POST … {flag_anomalies, 2026-01-01 → 2026-06-30}     → 200 found 6, scanned 9:
+      duplicate  4000 Sales / Hansen BV     -2 500.00 ← 2 invoice entries cited
+      duplicate  1100 Receivables / Hansen   2 500.00 ← the same two
+      duplicate  6000 / Kantoor Supplies       300.00 ← 2 bills, 3 days apart
+      missingRecurring 6000 / Vermeer Vastgoed, missingMonth 2026-03-01,
+                       typical 1 200.00, cited: the February and April bills
+      unusualAmount    6000 / Rare Ltd 7 000.00, typical 1 200.00
+      unusualAmount    2000 Payables  -7 000.00, typical 1 200.00
+an ordinary member (neither admin nor accountant):
+POST … {flag_anomalies}                              → 403 "admin or accountant only"
+POST … {vat_summary}                                 → 403
+POST … {categorise_transactions}                     → 200 (their own claims, untouched)
+after POST /admin/users/roles {accountant, granted}:
+POST … {vat_summary} · {flag_anomalies}              → 200, 200
+second tenant, 2 001 entries with no counterparty on any posting:
+POST … {flag_anomalies, half a year}                 → 200 scanned 2000,
+                                        truncated true, notComparable 2000
+psql: fin_entries count unchanged (9) after every call. Nothing was written.
+```
+
+**Cuts, named.**
+
+- **The duplicate rule can only compare entries that name a counterparty**, and
+  today that means invoices, credit notes and payments (they carry
+  `customer_id`). Nothing sets `supplier_key` yet, so on real books the rule
+  watches the sales side. It widens with no code change the day a bill posts;
+  until then `notComparable` says how much it could not see. The wire transcript
+  above uses seeded bills with a supplier key to prove the supplier path works.
+- **No fourth rule.** A VAT rate applied to the wrong account, a weekend-only
+  pattern, a round-number cluster: each is a real rule and each needs its own
+  false-positive argument. Three that a person can check by hand beat six that
+  train them to ignore the card.
+- **No dismissal, deliberately.** A finding has no state: no anomaly table, no
+  "reviewed" flag. The answer to a finding is a correcting entry, and a
+  dismissal would be a second place the books are said to be right. If a wave
+  review wants "I looked at this", it is a new decision, not an omission.
+- **No fr/nl** for the ~30 new strings — the wave-review rule, B4.15.
+
+**Flags for the human.**
+
+- **★ Issuing an invoice over HTTP still does not book it.** `post_invoice_issue`
+  / `post_payment_settle` / `post_credit_note_issue` (B4.04a–c) exist, are golden-
+  tested, and are called by **nothing outside the test suite** — no `/billing`
+  route invokes them. So a live tenant's journal, P&L, balance sheet, aged
+  listing, VAT return and now `flag_anomalies` are all empty of documents that
+  the billing screens show as issued. This is the largest open gap in Finance and
+  it is not inside any queue item's scope; it wants an item of its own ("post on
+  issue/settle/credit, idempotently, inside the document's transaction").
+- The **module-navigation defect** (B4.13c) is unchanged: Billing, CRM, Projects
+  and Insights still build a growing address from relative `NavLink`s.
+- `/finance/categories` still has no door (B4.14a's flag), unchanged.
+- `ROADMAP.md` still says "designed on Spaces" in three places where B4.12
+  delivered roles.
+- The `alo-jmap` integration suite still has no fast lane, so this iteration ran
+  the lib tests plus the store suites the change can reach.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B4.15 (wave review — fr/nl for the whole Finance module, CHANGELOG
+sweep, `docs/design/finance.md` as-built, `docs/features.md` [B4]
+reconciliation; the invoice-posting gap above is the first thing that
+reconciliation will find).
