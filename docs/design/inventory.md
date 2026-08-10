@@ -187,6 +187,42 @@ inventing a friendlier one.
   fallback rather than the headline because a warehouse's actual hardware is a
   wedge scanner.
 
+### As built (B5.09a — the catalog and the stock list)
+
+`web/src/inventory` exists with `InventoryModule.tsx` (two tabs, absolute
+links — the splat-route lesson Finance learned in B4.13a), `api.ts` (locations,
+stock, moves, suppliers; **no write door at all**), `types.ts`, `format.ts`,
+`parts.tsx`, `CatalogView.tsx`, `StockView.tsx`, `MoveHistory.tsx`,
+`InventoryModule.module.css` and `index.ts`. The module is registered in
+`product/workplace.tsx` between Finance and Insights; `/inventory` was already
+in `vite.config.ts` from B5.04b.
+
+Four decisions this item made, beyond the sketch above:
+
+- **The editor is Billing's `ProductDialog`, extended, not copied.** It grew the
+  five catalog fields and an optional `suppliers` prop; Billing's own price list
+  passes none and therefore shows no supplier picker, Inventory's catalog passes
+  the active suppliers it loaded. `BillingProduct`/`ProductDraft` grew the same
+  fields, and `billing/index.ts` now exports the dialog, the two types, the
+  client and `formatQty` — the "one deliberate exception" shape Finance's
+  `index.ts` already established. One product record, one form.
+- **On-hand in the catalog is a sum of integer milli-units over the rows the
+  server returned**, per product, real locations only. It is the only sum this
+  module makes; it is a count of things, exact in integers, and no money is ever
+  added up in the browser. The stock screen's total is the server's own
+  `totalValueCents` and is re-read rather than recomputed when a filter changes.
+- **A service shows `—`, not `0`.** A zero reads as an empty shelf for something
+  that can never be on one, and the ledger refuses to move a service at all.
+- **The stock screen has no editable quantity, and the history is one click from
+  every row** — filtered to that product at that place, matching either end.
+  A page filled to the server's cap says so, so a truncated history is never
+  read as the whole story.
+
+**Cut from this item, deliberately:** the product **photo**. `photoNodeId` is
+carried on the record and shown by no screen, because a thumbnail needs a Drive
+node picker and a blob read, and neither is what B5.09a is for. The field is
+read-only in the client until the picker is built.
+
 ## The catalog (B5.02)
 
 `billing_products` already exists (B1.04): name, unit, unit price in cents,

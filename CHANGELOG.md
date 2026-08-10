@@ -6,6 +6,21 @@ contracts.
 
 ## Unreleased
 
+- **Inventory has screens: a catalog, and what is on the shelves.** A new
+  Inventory tab in the workspace opens on your catalog — the same products you
+  invoice from, seen as things rather than as prices: your own code, the barcode
+  on the box, whether you keep a quantity of it at all, what you pay, what you
+  charge, and how much you have across every place. Editing one opens the same
+  product form Billing uses, now with the warehouse's fields on it and a picker
+  for who you usually buy it from, so there is one product record and not two
+  that drift apart. Beside it, Stock shows on-hand per place with a reference
+  value at today's purchase prices — labelled as a reference figure, because it
+  is not an accounting balance and alo will not pretend it is one. There is
+  deliberately **no quantity to type**: every row opens its movement history
+  instead, which says from where, to where, how many, why, and which document —
+  the actual answer to "where did the other four go". Suppliers, customers and
+  adjustments are hidden by default, since they are the other end of a movement
+  rather than a shelf, and showing them says what it does to the total.
 - **Apply the count, and the corrections are movements like any other.** When
   the sheet is worked down, applying the stocktake turns every difference into a
   stock correction — out of the shelf for what is missing, onto it for what you

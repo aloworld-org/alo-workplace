@@ -129,7 +129,7 @@ small, or a `[!]` note for the human if large.
 - [x] B5.07 Reorder rules (min/target per product/location) + shortage query feeding agent proposals.
 - [x] B5.08a Stocktake, counting: count-sheet snapshot + variance list; tests.
 - [x] B5.08b Stocktake, applying: variance → adjustment batch (B5.04b moves); wire.
-- [ ] B5.09a Web inventory: catalog + stock-by-location screens.
+- [x] B5.09a Web inventory: catalog + stock-by-location screens.
 - [ ] B5.09b Web inventory: PO + SO flow screens.
 - [ ] B5.09c Web inventory: barcode scan input (camera + keyboard-wedge fallback).
 - [ ] B5.10 ★ Inventory agent tools: `reorder_proposals` (draft POs), `stock_answer` — structural verify.

@@ -9,6 +9,7 @@
 import { Suspense, lazy } from "react";
 import {
   BarChart3,
+  Boxes,
   Briefcase,
   Building2,
   Code2,
@@ -29,6 +30,7 @@ import { MeetModule } from "../meet";
 import { CrmModule } from "../crm";
 import { FinanceModule } from "../finance";
 import { InsightsModule } from "../insights";
+import { InventoryModule } from "../inventory";
 import { ProjectsModule, TimerWidget } from "../projects";
 import { SitesModule } from "../sites";
 import { ControlConsole } from "../control";
@@ -128,6 +130,22 @@ const suiteModules: ProductModule[] = [
     Icon: Landmark,
     enabled: true,
     element: () => <FinanceModule />,
+  },
+  // Inventory is a workspace module only (ADR 0035, wave B5): what a business
+  // buys, keeps and ships. It sits after Finance and before Insights because it
+  // is the last of the modules that *record* — a receipt and a delivery are
+  // events, like an invoice and a claim — and Insights reads all of them.
+  //
+  // Its catalog is Billing's product rows seen as things rather than as prices
+  // (`docs/design/inventory.md` § The catalog). Two tabs saying "product" is the
+  // honest cost of one product record, the same trade Projects makes with Tasks.
+  {
+    id: "inventory",
+    path: "/inventory",
+    label: strings.moduleInventory,
+    Icon: Boxes,
+    enabled: true,
+    element: () => <InventoryModule />,
   },
   // Insights is a workspace module only (ADR 0037), and it sits after the
   // modules whose records it reads: a chart here is billing's and CRM's own

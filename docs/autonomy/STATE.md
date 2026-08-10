@@ -16440,3 +16440,108 @@ psql audit_log → inventory.count.apply ×4 (one per successful apply, filed ag
   wave-review question, and this item is the strongest argument for it so far.
 
 Next item: B5.09a (web inventory — catalog and stock-by-location screens).
+
+## B5.09a — the warehouse gets a face (2026-08-11)
+
+**Shipped.** `web/src/inventory`: the Inventory module in the workspace, with
+the catalog (the price list seen as things) and the stock list (on-hand by
+place), and a product's movement history one click from every stock row. No
+server change of any kind — every route these screens read has been live since
+B5.02/B5.03/B5.04, and this item is the screen and nothing else.
+
+- **`web/src/inventory/`** (new) — `InventoryModule.tsx` (two tabs, absolute
+  links: the splat-route trap Finance documented in B4.13a), `api.ts`
+  (locations / stock / moves / suppliers, all reads — there is no write door
+  here and there never will be), `types.ts`, `format.ts`, `parts.tsx`,
+  `CatalogView.tsx`, `StockView.tsx`, `MoveHistory.tsx`,
+  `InventoryModule.module.css`, `index.ts`, plus `Catalog.test.tsx` and
+  `Stock.test.tsx`.
+- **`web/src/billing/`** — `types.ts` grew the six catalog fields on
+  `BillingProduct` and five writable ones on `ProductDraft`; `ProductDialog.tsx`
+  grew those fields and an optional `suppliers` prop; `index.ts` now exports the
+  dialog, the two types, the client and `formatQty`. Four existing test fixtures
+  grew the new fields.
+- **`web/src/product/workplace.tsx`** — the module registered between Finance
+  and Insights, `Boxes` icon. **`web/src/i18n/en.ts`** — the whole `inventory*`
+  block (fr/nl at the wave review, B5.11).
+
+**The decisions, and why.**
+
+1. **One product record, one form.** The catalog's editor is Billing's
+   `ProductDialog`, extended in place with SKU, barcode, stocked, purchase price
+   and a supplier picker — not a second product form. A product is one row
+   (`docs/design/inventory.md` § The catalog); two editors over one row drift,
+   and every line ever raised from one inherits the drift. Billing's own price
+   list passes no `suppliers` and therefore shows no picker, which is why that
+   screen did not acquire a field about buying.
+2. **The dialog sends only what changed** — proven by a test that opens a
+   product, edits the SKU and the supplier, and asserts the `PATCH` body is
+   exactly those two keys. On this form that is not a nicety: an unchanged field
+   sent back is a price rewritten by somebody who came to fix a barcode.
+3. **The one sum this module makes is a count of things.** Catalog on-hand adds
+   integer milli-units per product over the real-location rows the server sent.
+   No money is added anywhere in the browser: the stock screen's total is the
+   server's own `totalValueCents`, re-read when a filter changes rather than
+   recomputed, so a filtered screen and its total cannot disagree.
+4. **A service shows `—`, never `0`.** A zero reads as an empty shelf for
+   something that can never be on one, and the ledger refuses to move a service.
+5. **No editable quantity, anywhere.** The history behind each row is what
+   replaces it: from → to, how many, why, and which document. A page filled to
+   the server's cap says so, because a truncated history read as the whole story
+   is how a person concludes stock "just changed by itself".
+6. **The counterparties are off by default, and turning them on says what it
+   does to the total** — a closed ledger sums to roughly nothing, which is not
+   an empty warehouse. The location filter offers real places only: filtering by
+   "customer" is the ledger's screen, not a shelf.
+
+**Verified.**
+
+```
+npx tsc --noEmit                         → clean
+npx eslint src/inventory src/billing …   → clean (one prefer-const caught a
+                                           missing effect cleanup, fixed)
+npm run build                            → built in 14.21s
+npx vitest run src/inventory             → 8/8 (catalog: thing-shaped row, a
+                                           service has no quantity, PATCH sends
+                                           only the two edited keys, a 422
+                                           barcode refusal shows the server's
+                                           sentence with the form still open;
+                                           stock: per-place on-hand with the
+                                           server's own value, the total labelled
+                                           a reference figure, counterparties off
+                                           until asked and the note when asked,
+                                           no numeric input on the page, history
+                                           filtered to product+place showing
+                                           SUPPLIER → MAIN / Received / po-7, and
+                                           a refused history read shown verbatim)
+npx vitest run (whole web suite)         → 405 passed, 4 failed — all four in
+                                           src/sites/Theme.test.tsx, the sites
+                                           track's file. Confirmed pre-existing:
+                                           it fails identically with this item's
+                                           i18n change stashed. Not touched
+                                           (LOOP: never the other track's areas).
+```
+
+**Cuts and flags.**
+
+- **No product photo.** `photoNodeId` is on the record and shown by no screen: a
+  thumbnail needs a Drive node picker and a blob read, which is a different
+  item's worth of work and not what "catalog + stock screens" buys. The field
+  stays read-only in the client until a picker exists.
+- **No wire-verify against a running backend, deliberately.** This item adds no
+  route; the shapes the client reads were taken from the `json!` bodies in
+  `inventory_stock.rs`, `inventory_moves.rs`, `inventory_locations.rs`,
+  `inventory_suppliers.rs` and `billing_products.rs`, and both test files record
+  those exact shapes. `/inventory` has been in the vite proxy list since B5.04b,
+  so nothing about the dev proxy is new either.
+- **No adjustment door on the stock screen.** `AdjustDialog.tsx` is in the
+  wave's file plan and stays unbuilt here: `POST /inventory/moves` is a write to
+  the stock ledger that any member may currently make, and the screen that
+  offers it is the strongest place to first ask who may. Named again for the
+  seventh item running (see B5.08b's flag).
+- **Still no fr/nl.** The whole `inventory*` block is English only; B5.11 is the
+  item that translates it, as every wave before this one did.
+- **Sites' broken theme test is left alone**, per the track rule, and is
+  recorded here only so the next iteration does not re-diagnose it.
+
+Next item: B5.09b (web inventory — purchase-order and sales-order flow screens).
