@@ -1914,3 +1914,35 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   disabled. S1.29b owns before/after visual preview and approval-card polish;
   this slice deliberately shows the reviewed operation list only.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.29b exact before/after page preview
+
+- **Shipped:** page-edit proposals now include the exact self-contained HTML
+  produced by the public site renderer after replaying the validated operation
+  set in memory. The proposal remains a no-write action; the stored page is
+  only changed by the existing explicit approval door.
+- **Surface:** the approval card names the number of proposed changes, explains
+  that nothing is saved yet, and keeps Approve and Discard visible as
+  full-size actions. Once a proposal is ready, the existing preview pane gains
+  visible Before and After controls and opens on After. Owners can compare both
+  states in one click on desktop or mobile, then approve or discard without
+  losing the manual section editor.
+- **Tenancy and safety:** the real Postgres route test retains the mandatory
+  wrong-tenant `404` proof for both proposal and approval, verifies the rendered
+  proposal contains the replacement but not the old copy, and proves proposal
+  generation leaves canonical storage unchanged.
+- **Verified:** `cargo fmt -p alo-jmap`; strict
+  `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo clippy -p alo-jmap --all-targets
+  --jobs 1 -- -D warnings` clean; full `cargo test -p alo-jmap --jobs 1` green
+  (477 library tests plus every integration and doc test). The page editor
+  passed 16 focused Vitest tests; `npx tsc --noEmit`, focused ESLint, and
+  `npm run build` are clean. A freshly built local backend and localhost-only
+  model fixture returned `200`, rendered only the proposed heading in After,
+  and a follow-up GET proved the stored heading was unchanged. No external AI
+  service was called.
+- **Cuts/flags:** the comparison is deliberately whole-page and exact, matching
+  Wix/Squarespace preview reflexes; visual pixel diffs and side-by-side narrow
+  layouts are future depth. The first live retry reached an orphaned prior
+  fixture on the same port; that local process was removed and the clean rerun
+  passed.
+- **Next:** the first unchecked item in `QUEUE.md`.
