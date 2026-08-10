@@ -155,6 +155,7 @@ list views over the same data, personal and team. ADRs 0021–0023.
 - [2] Live captions
 - [3] ★ Live translated captions — a Flemish/Walloon/German meeting where everyone reads their own language; the most European feature possible
 - [3] Webinar mode (one-to-many, registration)
+- [2] ★ Remote control — take a colleague's screen to fix it, not just watch it (ADR 0039). Desktop app only, granted per session by the person at the machine, suspended the moment they touch their own mouse, visibly indicated throughout, and fully audited. **No unattended access, ever** — that is MDM, and MDM goes to partners.
 
 ## Drive & Docs
 
