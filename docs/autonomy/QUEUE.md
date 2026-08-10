@@ -118,7 +118,7 @@ small, or a `[!]` note for the human if large.
 
 - [x] B5.01 Design note `docs/design/inventory.md` — product/stock/move model (moves-only, no in-place quantity edits), locations, PO/SO state machines.
 - [x] B5.02 Migration + store: product catalog upgrade (SKU, barcode, stocked-vs-service, purchase price, photos via Drive) building on B1.04 + tests.
-- [ ] B5.03 Suppliers (+ per-supplier price/lead time) + tests.
+- [x] B5.03 Suppliers (+ per-supplier price/lead time) + tests.
 - [ ] B5.04a Locations + stock moves: `inv_moves` (from/to/qty/reason/ref), on-hand = sum with cached per-location consistency test; wrong-tenant tests.
 - [ ] B5.04b Stock adjustments: manual adjustment moves with reason codes + routes + wire.
 - [ ] B5.05a Purchase orders, lifecycle: model + draft→sent (PDF via alo Mail draft) + state tests + routes.

@@ -14688,3 +14688,183 @@ which production already proxies.
 
 Next item: B5.03 (suppliers — `inv_suppliers`, `inv_supplier_products`, and the
 composite foreign key that finally makes `default_supplier_id` writable).
+
+## B5.03 — the people we buy from, and what they quote us (2026-08-10)
+
+**Shipped:** the supplier master record, the price list *they* publish, and the
+composite key that finally makes a product's default supplier writable —
+migration `0155_inv_suppliers.sql`, two store modules, two route modules, and
+the `/inventory` prefix arriving for the first time.
+
+- **Migration `0155`** creates `inv_suppliers` (name, address, country, VAT id,
+  registration number, email, phone, IBAN, currency, payment terms, default
+  lead time, note, `archived_at`) and `inv_supplier_products` keyed
+  `(tenant_id, supplier_id, product_id)` — their article code, purchase price in
+  integer cents, currency, minimum order quantity in **milli-units**, and a
+  nullable per-product lead time. Both foreign keys are composite and
+  tenant-first, so an offer cannot name another tenant's supplier or product
+  even if the store had a bug. It then adds
+  `billing_products_default_supplier_fk` with **`ON DELETE SET NULL
+  (default_supplier_id)`** — the column-list form (PostgreSQL 15+), because the
+  plain form would try to null `tenant_id`, which is part of the key.
+- **`inv_suppliers.rs`** is the master record on the billing-customer pattern:
+  one pure `normalize` shared by create and update, the VAT id through
+  `vat_id::canonicalize` and the IBAN through `iban::canonicalize`, archived
+  and never deleted, and `require_tenant_supplier` — the gate every pointer at
+  a supplier now goes through (the product today, a purchase order at B5.05a).
+- **`inv_supplier_prices.rs`** is the offer: an upsert on the pair (which is
+  what makes the route an idempotent `PUT`), a name-ordered read joined to the
+  catalog, the mirror read "who sells us this", a remove, and one piece of
+  arithmetic — `effective_lead_time_days`, the offer's own lead time or the
+  supplier's, answered **server-side** so no screen can get the fallback wrong.
+- **`billing_products`** now writes `default_supplier_id`: validated in
+  `require_product_links` beside the photo, mapped from the foreign-key race to
+  the same `NotFound`, and exposed as `defaultSupplierId` (nullable) on the
+  existing product routes. B5.02's reserved column is reserved no longer.
+- **Routes**: `GET/POST /inventory/suppliers`, `GET/PATCH
+  /inventory/suppliers/{id}`, `POST …/archive`, `GET …/{id}/products`,
+  `PUT/DELETE …/{id}/products/{product_id}`. `PATCH` merges (it is a master
+  record); `PUT` states the whole offer and never merges (the resource *is* the
+  offer, and a partial `PUT` would leave a price and a currency disagreeing
+  about which quote they belong to).
+- **One rule de-duplicated, not copied:** email validation moved from
+  `billing_customers` into `billing_field::email`, where the shared field rules
+  live, with its own tests. A supplier's address and a customer's are now held
+  to one rule stated once.
+
+**Gates.**
+
+```
+cargo fmt -p alo-store -p alo-jmap                          clean
+SQLX_OFFLINE=true cargo clippy -p alo-store (lib, bins,     zero warnings
+  inv_suppliers_tenancy, billing_products_tenancy,
+  billing_customers_tenancy, billing_by_number)
+SQLX_OFFLINE=true cargo clippy -p alo-jmap --all-targets    zero warnings
+cargo test -p alo-store   (full suite, real Postgres)       see below
+cargo test -p alo-jmap --lib --test inventory_suppliers_http
+  --test billing_http --test audit_routes --test conformance  see below
+web: npx tsc --noEmit / npx eslint / npm run build          clean
+```
+
+The tests that carry the item, all against the real database:
+
+- `inv_suppliers_tenancy::suppliers_round_trip_and_never_cross_tenant` — the
+  CRUD arc with every column round-tripped in its canonical form, a co-tenant
+  reading the same list, and the outsider tenant getting the clean denial on
+  **every** path (read, list, update, archive) with the record provably
+  unchanged afterwards; archive idempotent and non-restamping; the tenant
+  deletion purging the rows.
+- `inv_suppliers_tenancy::a_supplier_price_list_is_an_upsert_and_never_reaches_another_tenant`
+  — the same pair written twice leaves **one** row saying the new thing; the
+  two cross-tenant refusals that matter (an offer naming another tenant's
+  product, a product pointing at another tenant's supplier) leave nothing
+  half-written; and an archived supplier's price list stays readable.
+- `inventory_suppliers_http` — the edge through the real router: `401` before
+  anything, the five `422`s each naming their rule with the value never echoed,
+  `PATCH` merging while `PUT` replaces, the empty-body archive, and tenant B
+  getting `404` on all six verbs against A's records.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8099` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+rows read back in psql.
+
+```
+GET    /inventory/suppliers                     (no token) → 401
+POST   /inventory/suppliers                     (no token) → 401
+POST   /inventory/suppliers  {Hoffmann, de, …}             → 200 name/city trimmed,
+                                                             country DE, vatId
+                                                             DE811907980, iban
+                                                             NL91ABNA0417164300,
+                                                             currency EUR, terms 14,
+                                                             lead 9
+POST   /inventory/suppliers  {name:"   "}                  → 422 "name must not be empty"
+POST   …  {country:"Germany"}                              → 422 "country must be a
+                                                             two-letter ISO 3166-1 code"
+POST   …  {vatId:"DE811907981"}                            → 422 "check digit … DE VAT id"
+POST   …  {iban:"NL92ABNA0417164300"}                      → 422 "check digits of this IBAN"
+POST   …  {leadTimeDays:400}                               → 422 "lead time … 0 and 365"
+POST   …  {paymentTermsDays:400}                           → 422 "payment terms … 0 and 365"
+POST   …  {leadTimeDays:9.5}                               → 400 malformed body
+GET    /inventory/suppliers                                → 200 1 supplier
+PATCH  /inventory/suppliers/{id} {leadTimeDays:21}          → 200 21, name+vatId kept
+PATCH  … {vatId:null, iban:""}                              → 200 both null
+GET    /inventory/suppliers/AAAA…                          → 404
+POST   /billing/products {Blue chair, sku, barcode}         → 200
+PUT    …/{sup}/products/{prod} {315, eur, 10000, lead 9}    → 200 code trimmed, EUR,
+                                                             effectiveLeadTimeDays 9
+PUT    …/{sup}/products/{prod} {299}                        → 200 price 299, code "",
+                                                             effectiveLeadTimeDays 21
+                                                             (the supplier's own)
+GET    …/{sup}/products                                     → 200 ONE offer (upsert)
+PUT    … {purchasePriceCents:3.15}                          → 400 (never rounded)
+PUT    … {currency:"EURO"}                                  → 422 "three-letter ISO 4217"
+PUT    …/{sup}/products/AAAA…                               → 404 (unknown product)
+PUT    …/AAAA…/products/{prod}                              → 404 (unknown supplier)
+PATCH  /billing/products/{prod} {defaultSupplierId:{sup}}   → 200 echoed back
+PATCH  … {defaultSupplierId:"AAAA…"}                        → 404
+PATCH  … {defaultSupplierId:null}                           → 200 cleared
+POST   …/{sup}/archive        (empty body)                  → 200 archived, stamped
+POST   …/{sup}/archive        {archived:true}               → 200 SAME stamp
+GET    /inventory/suppliers                                 → 0   (out of the picker)
+GET    /inventory/suppliers?includeArchived=1               → 1
+GET    …/{sup}/products       (while archived)              → 200 offer still readable
+DELETE …/{sup}/products/{prod}                              → 200 {"removed":true}
+DELETE … again                                              → 404
+tenant B → GET/PATCH/POST-archive/PUT/DELETE on A's ids     → 404 ×6, B's list 0
+psql inv_suppliers        → 1 row, DE/EUR/14/21, active
+psql pg_constraint        → billing_products_default_supplier_fk = FOREIGN KEY
+                            (tenant_id, default_supplier_id) REFERENCES
+                            inv_suppliers(tenant_id, id) ON DELETE SET NULL
+                            (default_supplier_id)
+psql _sqlx_migrations     → 155 "inv suppliers" success
+```
+
+**Cuts and flags.**
+
+- **Country is required on a supplier.** The note listed it without saying
+  whether it was mandatory; it is, for the same reason it is on a customer —
+  the VAT id can only be judged against a country, and reverse charge depends
+  on where they are. Recorded in the design note's as-built block.
+- **No supplier-name uniqueness.** Two branches of one group are two rows, and
+  a name is not an identifier. Flagged in case a wave review disagrees.
+- **No `/inventory` audit trail yet.** `inventory` joins
+  `audit_action::AUDITED_MODULES` at **B5.04b** with the first stock write,
+  exactly where the design note placed it — that is the abusable write, and
+  `tests/audit_routes.rs` starts requiring coverage the moment the module joins.
+  Today's supplier writes are therefore un-audited; if that is wrong it is a
+  one-line change to `AUDITED_PREFIXES` plus the action vocabulary.
+- **No web.** The supplier screens and the default-supplier picker are B5.09a.
+  The only web change is the one line the S1.11/BI1.04 lesson requires:
+  `/inventory` added to the vite dev-proxy list, so the screens are not
+  debugged twice. No i18n strings were added.
+- **`billing_bills` still copies its supplier and gains no foreign key**, as the
+  note decided. A bill must read exactly as it arrived.
+
+**HUMAN ACTION — a NEW top-level prefix.** `/inventory` needs adding to the
+production Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`,
+`/insights`, `/projects` and `/finance`. This is the prefix B5.01 predicted;
+it is now real and serving routes.
+
+**FLAG — two pre-existing breakages from the meet track, neither this item's.**
+
+1. `cargo clippy -p alo-store --all-targets` fails with **28 errors in
+   `platform/alo-store/tests/meet.rs`**: the file is missing the
+   `#![allow(clippy::unwrap_used, clippy::expect_used)]` header every other
+   test file in the crate carries. The file is untouched by this diff (its
+   errors are lint-only and unrelated to any type this item changed), so the
+   clippy gate here was run per-target over the lib, the bins and the four test
+   binaries this change can reach. **One line fixes it**, but it is the other
+   track's file and the LOOP forbids reaching into it.
+2. `npx tsc --noEmit` failed on `web/src/meet/MeetRoom.tsx` — `@livekit/
+   components-react` is declared in `package.json` but was not installed in this
+   checkout. `npm install` fixes it (and was run here); the resulting
+   `package-lock.json` churn — `"peer": true` flags only — was **reverted**, so
+   the lockfile is untouched by this commit. Anyone picking up a fresh checkout
+   after the meet track's commits needs `npm install` before the web gate passes.
+
+**Migration number:** taken as `0155` **after** the rebase, applying B5.02's
+lesson; the tree's highest was `0154`. Re-checked before the push.
+
+Next item: B5.04a (`inv_locations` + `inv_moves`: the move ledger, on-hand as a
+sum with a cached-balance consistency test, and the un-stocking guard B5.02
+deferred until there were movements to count).

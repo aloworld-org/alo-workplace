@@ -6,6 +6,24 @@ contracts.
 
 ## Unreleased
 
+- **The people you buy from are now a list of their own.** alo keeps your
+  suppliers the way it keeps your customers — name, address, VAT id, the
+  account you pay into, what they charge you and how long they take — and
+  deliberately keeps them *apart* from your customers, because the one mistake
+  a single flagged list makes is putting a supplier in the customer picker of
+  an invoice. Each supplier carries their own price list for your products:
+  their article code, their price, the smallest quantity they will sell, and a
+  delivery time that can differ per product — enough for alo to say "forty
+  from Hoffmann at €3.15 each, here in nine days" rather than "you are short
+  forty". Saving a quote twice leaves one quote, so a slow connection cannot
+  duplicate a price. A VAT id or an IBAN with a typo in it is refused the
+  moment you type it, by its own check digits, and the refusal tells you the
+  rule without repeating the number back. A supplier is archived, never
+  deleted: an order from two years ago still names them. A product can also
+  say who you usually buy it from, which is what the reordering work will
+  start from. Today this reaches you through the API; the supplier screens
+  follow.
+
 - **Your price list now knows what is on the shelf.** A product can carry the
   code you call it by, the barcode on its box, what you *pay* for it as well as
   what you charge, a photo from your Drive, and one plain fact: whether it is a

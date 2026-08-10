@@ -215,12 +215,17 @@ So B5.02 adds to `billing_products`:
 | `photo_node_id` | `TEXT` (nullable) | a Drive node, referenced by id and never copied, exactly as a receipt is (`fin_expenses.receipt_node_id`, B4.05a) |
 | `default_supplier_id` | `TEXT` (nullable) | who we usually buy it from — the seed of a reorder proposal (B5.07) |
 
-**As built (B5.02):** all six columns exist from migration `0153`, but
-`default_supplier_id` is **reserved and not writable yet**. `inv_suppliers` is
-B5.03's table, and the composite foreign key that makes the id necessarily the
-same tenant's supplier arrives with it; until then nothing writes the column,
-so no dangling reference can exist. B5.03 adds the key, the write path and the
-picker together.
+**As built (B5.02):** all six columns exist from migration `0154` (renumbered
+from `0153`, which the meet track took first), but `default_supplier_id` was
+**reserved and not writable**: `inv_suppliers` is B5.03's table, and the
+composite foreign key that makes the id necessarily the same tenant's supplier
+could only arrive with it.
+
+**As built (B5.03):** the key and the write path arrived together in migration
+`0155`. `default_supplier_id` is now writable through `PATCH
+/billing/products/{id}` as `defaultSupplierId` (nullable, so a supplier can be
+taken off again), and a supplier that is not this tenant's answers `404` — the
+same gate the photo goes through. The *picker* is still B5.09a's.
 
 Both unique indexes are **partial and tenant-scoped**: `UNIQUE (tenant_id,
 sku) WHERE sku <> ''`. A global unique index on a barcode would be a
@@ -309,6 +314,44 @@ Prices here are a **reference**, not a snapshot: a purchase-order line copies
 the price at the moment it is drafted, the same rule `billing_line` holds
 about the sale price, so re-negotiating with a supplier never rewrites an
 order that was already placed.
+
+**As built (B5.03).** Migration `0155_inv_suppliers.sql`; store
+`inv_suppliers.rs` and `inv_supplier_prices.rs`; routes
+`inventory_suppliers.rs` and `inventory_supplier_prices.rs`. Six things the
+note did not settle, decided here:
+
+- **Country is required on a supplier**, exactly as on a customer. It decides
+  which member state's rules the VAT id is judged by and whether the purchase
+  is reverse-charged, so an id that arrives without one could only be judged
+  against a guess. The refusal is reported *before* the VAT id, since the id
+  can only be judged once the country is known.
+- **The quoted minimum order quantity is in milli-units** (`min_order_qty_milli`),
+  the thousandth-precision quantity a document line already carries (B1.06), so
+  "half a kilo" is `500` and no fraction is ever a float.
+- **The offer's lead time is nullable and the fallback is server-side.**
+  `null` means "as the supplier says"; the read answers both `leadTimeDays` and
+  `effectiveLeadTimeDays`, so the fallback lives in one place and no client can
+  get it wrong.
+- **`PUT` states the whole offer, it does not merge.** The resource *is* the
+  offer, and a partial `PUT` would leave a price and a currency disagreeing
+  about which quote they belong to. `PATCH` on the supplier itself does merge,
+  as every other master record's does.
+- **Deleting an offer is allowed** where deleting a supplier is not: an order
+  already placed copied the price onto its line, so nothing that has happened
+  depends on the row. `DELETE` on an offer that is not there is a `404`.
+- **`billing_products.default_supplier_id` is writable from this item.** The
+  composite key `(tenant_id, default_supplier_id) → inv_suppliers` arrives with
+  the table, and the store checks the supplier is the tenant's own before the
+  write, so a guessed id links nothing and answers `404`. The key names its
+  column in `ON DELETE SET NULL (default_supplier_id)` — the plain form would
+  try to null `tenant_id`, which is part of the key.
+
+Two deliberate non-additions, so a reviewer does not go looking: **no
+uniqueness rule on a supplier's name** (two branches of one group are two rows,
+and a name is not an identifier), and **no `/inventory` audit trail yet** —
+`inventory` joins `audit_action::AUDITED_MODULES` with the first stock write
+(B5.04b), which is where the note already placed it and where the abusable
+write actually is.
 
 ## Locations and the move ledger (B5.04)
 
