@@ -6,6 +6,20 @@ contracts.
 
 ## Unreleased
 
+- **The figures for your VAT return, straight out of your books.** For any
+  period you name, alo now shows the tax you charged — rate by rate, with the
+  turnover each rate was charged on — the tax you paid on purchases and may
+  reclaim, and the one number the form asks for: what is owed, or, if you paid
+  out more than you took in, what is owed back to you. It is your journal added
+  up rather than a second tally kept alongside it, so it agrees with your
+  invoices by construction; anything booked without a rate on it is shown
+  separately instead of being quietly folded into one, so you can see at a
+  glance whether everything is where it should be. Every amount is in the
+  currency you keep books in, each document converted at the rate frozen on it
+  the day it was raised, so re-running last quarter still answers last quarter.
+  Take it away as a CSV your accountant can open. These are figures for a
+  return, not a return: filing still goes through your national portal.
+
 - **See who owes you, and how long they have owed it.** The aged listing now
   stands beside the balance sheet: every customer with something open, each of
   their unpaid invoices, and how late it is — not yet due, up to a month, up to

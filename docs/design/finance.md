@@ -1398,6 +1398,38 @@ manual entry.
   compared in a test on the seeded year, because "a chart and a tax return
   cannot disagree" (BI1.01) applies hardest where the tax return is literal.
 
+  **As built (B4.11d).** `fin_vat_return.rs` holds no query either: it is four
+  `fin_dimension_balances` reads grouped by `LedgerDimension::VatRate` — the tax
+  by `Role(VatOutput)` and `Role(VatInput)`, the **taxable base** by
+  `Type(Income)` and `Type(Expense)`, which is the one scope this item added to
+  `fin_ledger` (a tenant's own expense accounts carry no role to name them by,
+  and B4.04a's rule that *the rate travels on the revenue posting too* is what
+  makes the base readable from the journal at all). Four decisions worth not
+  relitigating. The **signs flip once**, in that file's own `natural_cents`: the
+  output side is credit-positive and the input side is not, so a return is two
+  positive columns and one subtraction. **Only postings that state a rate are on
+  the return** — a rate is what makes a posting a taxable base — but what states
+  none is *reported* rather than dropped (`unratedBaseCents`, and
+  `unratedVatCents` for tax on a VAT account with no rate, which is a posting
+  rule with a bug); a return whose base is far below the period's turnover is a
+  fact the filer has to see. **A period whose rates cannot all be read is
+  refused**, not half-summed: `LEDGER_GROUPS_MAX` caps a grouped read, and a
+  legal document summed from part of a period would be a plausible wrong number
+  — unreachable from books alo writes, and a `422` if it ever is. And *rejected:
+  a comparative column*, for the balance sheet's reason — a VAT period compares
+  against the same period of the fiscal calendar, which is a fact about the
+  tenant rather than about the dates asked for.
+
+  **The reconciliation is asserted**, in `tests/fin_vat_return.rs`: over
+  documents raised through the billing store, issued through the gapless
+  sequence and booked through the real rules, the journal's output side equals
+  `billing_vat_period`'s base rows rate for rate and cent for cent. The two can
+  only differ if something was billed and not booked or booked and not billed.
+  `/finance/reports/vat` and its `.csv` twin are admin only, on the same gate as
+  the other three, and the file is named `vat-return-…` so it does not overwrite
+  `/billing/reports/vat.csv`'s `vat-…` for the same quarter in a downloads
+  folder.
+
 CSV follows `billing_reports` exactly: ISO dates, `.` decimals, untranslated
 column headers (a file read by a spreadsheet and an accountant's tooling must
 not move with the reader's locale), amounts in units with two decimals, and

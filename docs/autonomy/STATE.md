@@ -13157,3 +13157,201 @@ budget for it.
 
 Next item: B4.11d (VAT-return figures — the last of the four reports, and the
 one that must agree with `billing_vat_report` on the seeded year).
+
+## B4.11d — the VAT return (2026-08-10)
+
+**Shipped.** The fourth and last of B4.11's reports: `GET
+/finance/reports/vat?from&to` and its `.csv` twin, over
+`AccountStore::fin_vat_return` — output tax per rate with the turnover it was
+charged on, input tax per rate with the cost it was paid on, and the net
+payable. Like the P&L and the balance sheet, `platform/alo-store/src/
+fin_vat_return.rs` holds **no query of its own**: it is four
+`fin_dimension_balances` reads grouped by `LedgerDimension::VatRate`, folded
+pure and unit-tested without a database.
+
+**Five decisions, each recorded in the module and in `docs/design/finance.md`
+(now as-built).**
+
+1. **The tax is found by role, the base by type.** `Role(VatOutput)` /
+   `Role(VatInput)` for the tax; `Type(Income)` / `Type(Expense)` for the
+   taxable base. `LedgerScope::Type(AccountType)` is the one thing this item
+   added to `fin_ledger` — a discovered prerequisite, small, so it is part of
+   this item rather than a note. It exists because a tenant's own expense
+   accounts carry **no role** to name them by, and B4.04a's rule that *the rate
+   travels on the revenue posting too* is what makes a base readable from the
+   journal at all. It binds `a."type" = $4` as a parameter like the other three
+   scopes, and the "a scope never interpolates its value" test covers it.
+2. **The signs flip once**, in this file's own `natural_cents`: the output side
+   is credit-positive (tax charged and turnover both arrive negative), the input
+   side is not. A return is therefore two positive columns and one subtraction —
+   the arithmetic the form asks for.
+3. **Only postings that state a rate are on the return**, and what states none
+   is *reported* rather than dropped: `unratedBaseCents` (turnover or cost on no
+   line of the return) and `unratedVatCents` (tax on a VAT account with no rate
+   — a posting rule with a bug). Zero on books alo writes by itself, and a
+   return whose base sits far below the period's turnover is a fact the filer
+   has to see rather than one the report hides by folding it into a rate that
+   charged nothing.
+4. **A period whose rates cannot all be read is refused, never half-summed.**
+   `LEDGER_GROUPS_MAX` caps a grouped read; a legal document summed from part of
+   a period would be a plausible wrong number, so a truncated read is a typed
+   `Validation` (a `422` on the wire) naming why. Unreachable from books alo
+   writes — a tenant bills at a handful of rates — and stated rather than hoped.
+5. **Rejected: a comparative column**, for the balance sheet's reason. A VAT
+   period's comparison is the same period of the *fiscal* calendar, a fact about
+   the tenant rather than about the dates asked for; a caller who wants two
+   periods asks twice.
+
+**★ The reconciliation the queue item exists for is asserted.**
+`tests/fin_vat_return.rs` raises documents through the billing store, issues
+them through the gapless sequence, books them through the real posting rules,
+and then asserts the journal's output side equals `billing_vat_period`'s base
+rows — rate for rate and cent for cent, plus both totals and the currency. The
+two read different things (the journal vs the documents) and can only differ if
+something was billed and not booked or booked and not billed. That is what "a
+chart and a tax return cannot disagree" means when the tax return is literal.
+
+**Surface.** `finance_report_vat.rs` is its own file beside the other three, as
+B4.11b's split intended: `finance_reports.rs` grew nothing. Admin only, on the
+shared `admin` gate B4.12 widens once. The CSV is one table with a `row`
+discriminator (`outputRate` / `outputUnrated` / `outputTotal`, the same three
+for `input`, then `netPayable`), rates printed as percentages the way a document
+prints them (`21.00`, never `2100`; basis points stay on the JSON), the period
+and currency repeated on every row, and the `unrated` rows written even when
+zero — their absence would read as "the question does not arise" when it means
+"the answer is none". The file is named `vat-return-…` rather than `vat-…` so it
+does not overwrite `/billing/reports/vat.csv`'s file for the same quarter in a
+downloads folder.
+
+**Verified — gates.**
+
+```
+cargo fmt -p alo-store -p alo-jmap -- --check          clean
+cargo clippy -p alo-store --all-targets                clean
+cargo clippy -p alo-jmap  --all-targets                clean (whole-crate again)
+cargo test  -p alo-store --lib                         828 passed, 0 failed
+cargo test  -p alo-store --test fin_vat_return         5 passed  ← incl. the ★
+cargo test  -p alo-store --test fin_pl_report          7 passed
+cargo test  -p alo-store --test fin_balance_sheet      4 passed
+cargo test  -p alo-store --test fin_aged               5 passed
+cargo test  -p alo-store --test fin_journal_properties 6 passed
+cargo test  -p alo-store --test fin_invoice_posting    7 passed
+cargo test  -p alo-store --test fin_credit_note_posting 5 passed
+cargo test  -p alo-jmap  --lib                         477 passed
+cargo test  -p alo-jmap  --test fin_vat_http           6 passed
+cargo test  -p alo-jmap  --test fin_report_http        6 passed
+cargo test  -p alo-jmap  --test fin_balance_http       7 passed
+cargo test  -p alo-jmap  --test fin_aged_http          6 passed
+```
+
+The neighbouring suites are re-run because `LedgerScope` gained a variant and
+every report folds over it.
+
+**Verified — on the wire.** Local debug `alo-jmap` against docker `alo-pg`,
+tenant bootstrapped with `identityctl bootstrap-admin`, chart seeded in SQL (the
+same cost a fifth time — see the flags). The sales side is booked by the **real
+rule**: an invoice raised and issued over HTTP, then booked by matching a bank
+line to it (`invoiceBookedNow: true`, the only HTTP path that books today).
+
+```
+GET  /finance/reports/vat      (no token)          → 401
+GET  /finance/reports/vat.csv  (no token)          → 401
+GET  /finance/reports/vat                          → 422 "from is required: a
+                                                          report is always for a
+                                                          stated period"
+GET  ?to=2026-12-31                                → 422 (same)
+GET  ?from=2026-01-01                              → 422 "to is required: …"
+GET  ?from=01/01/2026&to=2026-12-31                → 422 "from must be a date of
+                                                          the form YYYY-MM-DD"
+GET  ?from=2026-01-01&to=whenever                  → 422 "to must be a date …"
+GET  ?from=2026-12-31&to=2026-01-01                → 422 "the end of the period
+                                                     must not be before its start"
+GET  /finance/reports/vat.csv?from=2026-01-01      → 422 (the file route too)
+POST /billing/customers → /billing/invoices → PATCH lines → /issue
+                                                   → INV-2026-00001, 2026-08-10,
+                                                     10 h @ €100.00 at 21 % and
+                                                     1 × €250.00 at 9 %
+POST /finance/imports/bank?format=csv&account=NL91…&date=date&amount=amount
+     &reference=description                        → 1 line staged, €1 482.50
+POST /finance/bank/lines/{L}/match {148250}        → 200 invoiceBookedNow=true
+  db: 4000 −100000 (2100) · 4000 −25000 (900) · 2100 −21000 (2100)
+      · 2100 −2250 (900) · 1100 ±148250 · 1000 +148250
+GET  ?from=2026-01-01&to=2026-12-31                → 200 output 9.00 %: base
+     €250.00 / VAT €22.50; 21.00 %: base €1 000.00 / VAT €210.00; total base
+     €1 250.00 / VAT €232.50; unrated 0/0; input all zero; net €232.50
+GET  /billing/reports/vat?from&to (the documents)  → base EUR net 125000 vat
+     23250, byRate [900: 25000/2250, 2100: 100000/21000] — **the same figures,
+     rate for rate, on the wire as well as in the test**
+GET  ?from=2026-01-01&to=2026-03-31                → 200 zeroes, currency EUR
+psql: one bill-shaped entry (6000 +40000 @2100, 1200 +8400 @2100, 2000 −48400)
+GET  ?from=2026-01-01&to=2026-12-31                → 200 input 21.00 %: base
+     €400.00 / VAT €84.00; net payable €148.50 — the subtraction, on the wire
+GET  /finance/reports/vat.csv?from=2026-01-01&to=2026-12-31
+     → content-type text/csv; charset=utf-8 · content-disposition attachment;
+       filename="vat-return-2026-01-01-to-2026-12-31.csv" · nosniff · no-store
+       row,periodFrom,periodTo,currency,vatRatePercent,base,vat
+       outputRate,…,9.00,250.00,22.50 / outputRate,…,21.00,1000.00,210.00
+       outputUnrated,…,,0.00,0.00 / outputTotal,…,,1250.00,232.50
+       inputRate,…,21.00,400.00,84.00 / inputUnrated,…,,0.00,0.00
+       inputTotal,…,,400.00,84.00 / netPayable,…,,,148.50
+POST /admin/users (a clerk) → GET /finance/reports/vat     → 403
+                              GET /finance/reports/vat.csv → 403
+                              GET /finance/periods         → 200 (contrast)
+```
+
+**Cuts, named.**
+
+- **The purchase side has no HTTP writer yet**, so the wire arc seeds one
+  bill-shaped entry in SQL. Nothing in alo posts `vat_input` today: bills are
+  approved but not booked, and expenses are approved but not booked either.
+  That is B5.05b's and B4's own remaining wiring, not this report's — the report
+  reads whatever the journal holds, which the seeded entry proves on the wire and
+  the store suite proves through `post_fin_entry`.
+- **No comparative column** — decision 5 above.
+- **No per-currency table.** `/billing/reports/vat` keeps one, because a
+  document is worth what it says in the currency it was raised in. A return is
+  filed in one currency, and the journal's base column already is that currency
+  by construction; a second table here would be a different report.
+- **No boxes, no deadlines, no reverse charge, no partial deductibility** —
+  ADR 0035's non-goal and this note's "Not built" list, unchanged. These are
+  figures for a return, not a return.
+- **No screen** — B4.13c, which is also where `fr`/`nl` for these strings land.
+  Nothing user-visible is added by this item: the refusals are store/route-side
+  English like the rest of B4's, and the CSV headers are a contract that is
+  deliberately never translated.
+
+**FLAG for the human / next items.**
+
+1. **There is still no HTTP door that seeds a tenant's chart of accounts** —
+   unchanged since B4.09c; this item's wire arc paid the cost a fifth time
+   (seven `INSERT`s in SQL). Whichever of B4.13a/b/c lands first should give
+   `GET /finance/accounts` the first-use seed; the store side
+   (`fin_accounts_or_seed`) has been ready since B4.02.
+2. **Auto-posting is still not on the `/billing` issue route** (unchanged since
+   B4.09c). Issuing an invoice over HTTP writes no journal entry; postings appear
+   only when a bank line is matched to it, which is why this item's wire arc
+   goes through a bank import to book a sale. It is in no queue item's scope and
+   is **worth a human's decision** — it is now the reason two of the four
+   reports need a detour to be exercised on the wire.
+3. **Nothing books `vat_input`.** Bill approval and expense approval both write
+   no journal entry, so the input side of the return is structurally always zero
+   on books alo wrote by itself. The report is right; the books are incomplete.
+   The rules are already written in this note's posting table — they need an
+   owner (B4.13a's expense screens are the natural place for the expense half).
+4. **`create_billing_bill` cannot store a hand-entered bill** — unchanged from
+   B4.11c: `billing_bills.source_syntax` is `NOT NULL` while `NewBill` models
+   `None` as "not imported from a file", so such an insert fails with a raw
+   `23502`. Expand-only fix (drop the NOT NULL + a nullable read), belongs with
+   B5.03/B5.05.
+5. **The `fin_vat_return` refusal on a truncated read is untested against a real
+   period**, deliberately: it would take 2 001 distinct VAT rates in one period
+   to reach, which no store door will accept in a test's lifetime. The fold's
+   own suite proves the refusal from all three truncation shapes.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B4.12 (the accountant role — scoped access, finance read + journal
+write only, which is also the item that widens the `admin` gate the four reports
+share).
