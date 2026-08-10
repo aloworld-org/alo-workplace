@@ -89,7 +89,7 @@ pub fn render_blog_feed(site: &SiteRenderContext<'_>, posts: &[BlogFeedItem<'_>]
     out.push_str("</link>\n<description>");
     out.push_str(&esc(&title));
     out.push_str("</description>\n<language>");
-    out.push_str(&esc(site.strings.lang));
+    out.push_str(&esc(site.locale));
     out.push_str("</language>\n<atom:link href=\"");
     out.push_str(&esc(&feed_url));
     out.push_str("\" rel=\"self\" type=\"application/rss+xml\"/>\n");
@@ -260,7 +260,7 @@ fn push_start(
 ) {
     let canonical = format!("{}{}", site.base_url, path);
     out.push_str("<!doctype html>\n<html lang=\"");
-    out.push_str(&esc(site.strings.lang));
+    out.push_str(&esc(site.locale));
     out.push_str("\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>");
     out.push_str(&esc(title));
     out.push_str("</title>\n<link rel=\"canonical\" href=\"");

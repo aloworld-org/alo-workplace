@@ -134,6 +134,7 @@ fn render_default(sections: Vec<Section>) -> String {
     let site = SiteRenderContext {
         name: SITE_NAME,
         base_url: BASE_URL,
+        locale: "en",
         theme: &theme,
         strings: &EN,
         images: ImageSources::PublicPaths,
@@ -188,6 +189,7 @@ fn full_page_golden_with_theme_logo_and_seo() {
     let site = SiteRenderContext {
         name: SITE_NAME,
         base_url: BASE_URL,
+        locale: "en",
         theme: &theme,
         strings: &EN,
         images: ImageSources::PublicPaths,
@@ -221,6 +223,7 @@ fn search_defaults_golden_uses_page_site_and_theme_logo() {
     let site = SiteRenderContext {
         name: SITE_NAME,
         base_url: BASE_URL,
+        locale: "en",
         theme: &theme,
         strings: &EN,
         images: ImageSources::PublicPaths,

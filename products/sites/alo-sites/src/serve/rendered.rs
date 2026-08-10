@@ -7,7 +7,10 @@ use std::collections::{HashMap, HashSet};
 use alo_store::site_theme::SiteTheme;
 use alo_store::{PublishedSite, SitePageSnapshot, SitePublishId};
 
-use crate::render::{self, EN, ImageSources, PageRenderContext, SiteRenderContext, UiStrings};
+use crate::render::{
+    self, ImageSources, LanguageAlternate, PageRenderContext, SiteRenderContext, UiStrings,
+    render_localized_page, strings_for,
+};
 use crate::stylesheet;
 
 /// The servable output of one publish of one site.
@@ -20,6 +23,8 @@ pub struct RenderedSite {
     /// Canonical page paths in navigation order. Kept separately from the
     /// render map because sitemap order must be stable across processes.
     page_paths: Vec<String>,
+    /// Exact sibling-language paths for each canonical page path.
+    page_alternates: HashMap<String, Vec<(String, String)>>,
     /// The one stylesheet, served at `/assets/site.css`.
     pub css: String,
     /// The site's themed not-found document (status 404, any unknown path).
@@ -39,15 +44,32 @@ impl RenderedSite {
     pub fn build(public_host: &str, site: &PublishedSite, snapshots: &[SitePageSnapshot]) -> Self {
         let theme = SiteTheme::from_stored(site.theme.clone());
         let base_url = format!("https://{public_host}");
-        let ctx = SiteRenderContext {
-            name: &site.name,
-            base_url: &base_url,
-            theme: &theme,
-            strings: &EN,
-            images: ImageSources::PublicPaths,
-        };
+        let mut variants: HashMap<String, Vec<(String, String)>> = HashMap::new();
+        for snapshot in snapshots {
+            variants
+                .entry(snapshot.page_id.as_str().to_owned())
+                .or_default()
+                .push((
+                    snapshot.locale.clone(),
+                    localized_path(
+                        &site.default_locale,
+                        &snapshot.locale,
+                        snapshot.is_home,
+                        &snapshot.slug,
+                    ),
+                ));
+        }
+        for translations in variants.values_mut() {
+            translations.sort_by_key(|(locale, _)| {
+                site.enabled_locales
+                    .iter()
+                    .position(|enabled| enabled == locale)
+                    .unwrap_or(usize::MAX)
+            });
+        }
         let mut pages = HashMap::with_capacity(snapshots.len());
         let mut page_paths = Vec::with_capacity(snapshots.len());
+        let mut page_alternates = HashMap::with_capacity(snapshots.len());
         let mut images = HashSet::new();
         images.extend(
             [theme.logo.as_ref(), theme.favicon.as_ref()]
@@ -56,11 +78,12 @@ impl RenderedSite {
                 .map(|blob| blob.as_str().to_owned()),
         );
         for snapshot in snapshots {
-            let path = if snapshot.is_home {
-                "/".to_owned()
-            } else {
-                format!("/{}", snapshot.slug)
-            };
+            let path = localized_path(
+                &site.default_locale,
+                &snapshot.locale,
+                snapshot.is_home,
+                &snapshot.slug,
+            );
             // The same lenient read the renderer uses, so the servable image
             // set can never disagree with what the documents reference.
             for section in render::sections_lenient(&snapshot.sections) {
@@ -78,15 +101,53 @@ impl RenderedSite {
                 seo_description: snapshot.seo_description.as_deref(),
                 sections: &snapshot.sections,
             };
-            pages.insert(path.clone(), render::render_page(&ctx, &page));
+            let Some(translations) = variants.get(snapshot.page_id.as_str()) else {
+                tracing::warn!(
+                    page = %snapshot.page_id,
+                    locale = %snapshot.locale,
+                    "localized snapshot was absent from its render group"
+                );
+                continue;
+            };
+            let alternates: Vec<LanguageAlternate<'_>> = translations
+                .iter()
+                .map(|(locale, path)| LanguageAlternate {
+                    locale,
+                    path,
+                    is_default: locale == &site.default_locale,
+                })
+                .collect();
+            let ctx = SiteRenderContext {
+                name: &site.name,
+                base_url: &base_url,
+                locale: &snapshot.locale,
+                theme: &theme,
+                strings: strings_for(&snapshot.locale),
+                images: ImageSources::PublicPaths,
+            };
+            pages.insert(
+                path.clone(),
+                render_localized_page(&ctx, &page, &alternates),
+            );
+            page_alternates.insert(path.clone(), translations.clone());
             page_paths.push(path);
         }
+        let default_strings = strings_for(&site.default_locale);
+        let default_ctx = SiteRenderContext {
+            name: &site.name,
+            base_url: &base_url,
+            locale: &site.default_locale,
+            theme: &theme,
+            strings: default_strings,
+            images: ImageSources::PublicPaths,
+        };
         Self {
             publish: site.publish.clone(),
             pages,
             page_paths,
+            page_alternates,
             css: stylesheet::stylesheet(&theme),
-            not_found: render::render_not_found(&ctx),
+            not_found: render::render_not_found(&default_ctx),
             images,
         }
     }
@@ -102,12 +163,26 @@ impl RenderedSite {
         &self.page_paths
     }
 
+    /// Exact translations of `path`, in the site's frozen language order.
+    pub fn page_alternates(&self, path: &str) -> &[(String, String)] {
+        self.page_alternates.get(path).map_or(&[], Vec::as_slice)
+    }
+
     /// Whether this publish references `blob_id` — the gate on the public
     /// image path: a live site serves exactly the images its published
     /// content shows, nothing else in the tenant.
     #[must_use]
     pub fn serves_image(&self, blob_id: &str) -> bool {
         self.images.contains(blob_id)
+    }
+}
+
+fn localized_path(default_locale: &str, locale: &str, is_home: bool, slug: &str) -> String {
+    match (locale == default_locale, is_home) {
+        (true, true) => "/".to_owned(),
+        (true, false) => format!("/{slug}"),
+        (false, true) => format!("/{locale}"),
+        (false, false) => format!("/{locale}/{slug}"),
     }
 }
 

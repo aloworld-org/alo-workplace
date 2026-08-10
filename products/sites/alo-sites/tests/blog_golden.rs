@@ -12,6 +12,7 @@ fn context<'a>(theme: &'a SiteTheme) -> SiteRenderContext<'a> {
     SiteRenderContext {
         name: "North Studio",
         base_url: "https://north.sites.test",
+        locale: "en",
         theme,
         strings: &EN,
         images: ImageSources::PublicPaths,

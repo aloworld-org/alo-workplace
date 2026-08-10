@@ -15,7 +15,7 @@ use crate::blog::{
     BlogArticle, BlogCard, BlogFeedItem, BlogPagination, render_blog_feed, render_blog_index,
     render_blog_post,
 };
-use crate::render::{EN, ImageSources, SiteRenderContext};
+use crate::render::{ImageSources, SiteRenderContext, strings_for};
 
 use super::{AppState, dynamic_html, dynamic_rss, not_found, unavailable};
 
@@ -36,8 +36,9 @@ pub(super) async fn serve(
     let context = SiteRenderContext {
         name: &resolved.name,
         base_url: &base_url,
+        locale: &resolved.default_locale,
         theme: &theme,
-        strings: &EN,
+        strings: strings_for(&resolved.default_locale),
         images: ImageSources::PublicPaths,
     };
 

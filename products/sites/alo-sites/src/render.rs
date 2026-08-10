@@ -19,7 +19,7 @@ mod script;
 mod sections;
 mod strings;
 
-pub use strings::{EN, UiStrings};
+pub use strings::{EN, FR, NL, UiStrings, strings_for};
 
 use alo_store::site_model::{SECTIONS_SCHEMA_VERSION, Section};
 use alo_store::site_theme::SiteTheme;
@@ -35,6 +35,8 @@ pub struct SiteRenderContext<'a> {
     /// Absolute origin the site is served on, no trailing slash
     /// (e.g. `https://nordwind.alosites.com`); used for canonical/OG URLs.
     pub base_url: &'a str,
+    /// Exact normalized language tag for document and feed metadata.
+    pub locale: &'a str,
     /// The site's theme (logo, favicon; the preset drives the stylesheet).
     pub theme: &'a SiteTheme,
     /// Visitor-facing chrome strings ([`EN`] until more locales ship).
@@ -88,6 +90,14 @@ pub struct PageRenderContext<'a> {
     pub sections: &'a serde_json::Value,
 }
 
+/// One exact translation of the current stable page identity.
+#[derive(Debug, Clone, Copy)]
+pub struct LanguageAlternate<'a> {
+    pub locale: &'a str,
+    pub path: &'a str,
+    pub is_default: bool,
+}
+
 /// Reads a stored sections envelope leniently: entries that parse as a known
 /// [`Section`] render; anything else is skipped with a warning. This is the
 /// read-side tolerance the design note requires — the strict counterpart
@@ -138,7 +148,17 @@ enum StylesheetRef<'a> {
 
 /// Renders one page to a complete HTML document.
 pub fn render_page(site: &SiteRenderContext<'_>, page: &PageRenderContext<'_>) -> String {
-    render_document(site, page, &StylesheetRef::Linked)
+    render_document(site, page, &StylesheetRef::Linked, &[])
+}
+
+/// Renders a published localized page with direct language links and search
+/// discovery metadata for the exact translations frozen beside it.
+pub fn render_localized_page(
+    site: &SiteRenderContext<'_>,
+    page: &PageRenderContext<'_>,
+    alternates: &[LanguageAlternate<'_>],
+) -> String {
+    render_document(site, page, &StylesheetRef::Linked, alternates)
 }
 
 /// Renders one page as a self-contained draft-preview document: the same
@@ -152,13 +172,14 @@ pub fn render_page_preview(
     page: &PageRenderContext<'_>,
     css: &str,
 ) -> String {
-    render_document(site, page, &StylesheetRef::Inline(css))
+    render_document(site, page, &StylesheetRef::Inline(css), &[])
 }
 
 fn render_document(
     site: &SiteRenderContext<'_>,
     page: &PageRenderContext<'_>,
     stylesheet: &StylesheetRef<'_>,
+    alternates: &[LanguageAlternate<'_>],
 ) -> String {
     let parsed = sections_lenient(page.sections);
 
@@ -175,13 +196,14 @@ fn render_document(
 
     let mut out = String::with_capacity(16 * 1024);
     out.push_str("<!doctype html>\n");
-    out.push_str(&format!("<html lang=\"{}\">\n", esc(site.strings.lang)));
-    push_head(&mut out, site, page, &parsed, stylesheet);
+    out.push_str(&format!("<html lang=\"{}\">\n", esc(site.locale)));
+    push_head(&mut out, site, page, &parsed, stylesheet, alternates);
     out.push_str("<body>\n");
     out.push_str(&format!(
         "<a class=\"skip-link\" href=\"#main\">{}</a>\n",
         esc(site.strings.skip_to_content)
     ));
+    push_language_switcher(&mut out, site, alternates);
     out.push_str(&header);
     out.push_str("<main id=\"main\">\n");
     out.push_str(&main);
@@ -203,7 +225,7 @@ pub fn render_not_found(site: &SiteRenderContext<'_>) -> String {
     let title = format!("{} — {}", site.strings.not_found_title, site.name);
     let mut out = String::with_capacity(2 * 1024);
     out.push_str("<!doctype html>\n");
-    out.push_str(&format!("<html lang=\"{}\">\n", esc(site.strings.lang)));
+    out.push_str(&format!("<html lang=\"{}\">\n", esc(site.locale)));
     out.push_str("<head>\n<meta charset=\"utf-8\">\n");
     out.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
     out.push_str(&format!("<title>{}</title>\n", esc(&title)));
@@ -252,6 +274,7 @@ fn push_head(
     page: &PageRenderContext<'_>,
     parsed: &[Section],
     stylesheet: &StylesheetRef<'_>,
+    alternates: &[LanguageAlternate<'_>],
 ) {
     let title = match page.seo_title {
         Some(seo) => seo.to_owned(),
@@ -272,6 +295,21 @@ fn push_head(
         "<link rel=\"canonical\" href=\"{}\">\n",
         esc(&canonical)
     ));
+    for alternate in alternates {
+        out.push_str(&format!(
+            "<link rel=\"alternate\" hreflang=\"{}\" href=\"{}{}\">\n",
+            esc(alternate.locale),
+            esc(site.base_url),
+            esc(alternate.path)
+        ));
+    }
+    if let Some(default) = alternates.iter().find(|alternate| alternate.is_default) {
+        out.push_str(&format!(
+            "<link rel=\"alternate\" hreflang=\"x-default\" href=\"{}{}\">\n",
+            esc(site.base_url),
+            esc(default.path)
+        ));
+    }
     out.push_str("<meta property=\"og:type\" content=\"website\">\n");
     out.push_str(&format!(
         "<meta property=\"og:site_name\" content=\"{}\">\n",
@@ -319,6 +357,36 @@ fn push_head(
         }
     }
     out.push_str("</head>\n");
+}
+
+fn push_language_switcher(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    alternates: &[LanguageAlternate<'_>],
+) {
+    if alternates.len() < 2 {
+        return;
+    }
+    out.push_str(&format!(
+        "<nav class=\"language-switcher\" aria-label=\"{}\">\n",
+        esc(site.strings.language_switcher_label)
+    ));
+    for alternate in alternates {
+        let current = alternate.locale == site.locale;
+        out.push_str(&format!(
+            "<a href=\"{}\" hreflang=\"{}\" lang=\"{}\"{}>{}</a>\n",
+            esc(alternate.path),
+            esc(alternate.locale),
+            esc(alternate.locale),
+            if current {
+                " aria-current=\"page\""
+            } else {
+                ""
+            },
+            esc(&alternate.locale.to_uppercase())
+        ));
+    }
+    out.push_str("</nav>\n");
 }
 
 /// The page's first-choice OG image: its first illustrated hero. The caller

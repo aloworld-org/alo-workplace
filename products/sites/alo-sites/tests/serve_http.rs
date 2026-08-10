@@ -207,6 +207,105 @@ async fn serves_a_published_site_with_the_response_contract() {
 }
 
 #[tokio::test]
+async fn serves_frozen_locales_with_direct_switching_and_discovery_metadata() {
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "localized-host").await;
+    let sub = unique("localized-host");
+    let site = acc.create_site("Atelier Nord", &sub).await.unwrap();
+    acc.set_site_locales(
+        &site,
+        "fr",
+        &["fr".to_owned(), "en".to_owned(), "nl".to_owned()],
+    )
+    .await
+    .unwrap();
+
+    let home = acc
+        .create_site_page(&site, "Accueil", "", true)
+        .await
+        .unwrap();
+    let about = acc
+        .create_site_page(&site, "Notre histoire", "notre-histoire", false)
+        .await
+        .unwrap();
+    acc.set_page_sections(
+        &site,
+        &home,
+        json!({
+            "schema_version": 1,
+            "sections": [{"type": "hero", "heading": "Bonjour le monde"}]
+        }),
+    )
+    .await
+    .unwrap();
+    acc.set_site_page_locale(
+        &site,
+        &home,
+        "en",
+        "Home",
+        "",
+        json!({
+            "schema_version": 1,
+            "sections": [{"type": "hero", "heading": "Hello world"}]
+        }),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    acc.set_site_page_locale(
+        &site,
+        &about,
+        "en",
+        "About",
+        "about",
+        json!({"schema_version": 1, "sections": []}),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    acc.publish_site(&site).await.unwrap();
+    let host = format!("{sub}.{APEX}");
+    let origin = format!("https://{host}");
+
+    let home_response = send(&state, &host, "/").await;
+    assert_eq!(home_response.status(), StatusCode::OK);
+    let home_html = body_string(home_response).await;
+    assert!(home_html.contains("<html lang=\"fr\">"));
+    assert!(home_html.contains("Bonjour le monde"));
+    assert!(home_html.contains(&format!("<link rel=\"canonical\" href=\"{origin}/\">")));
+    assert!(home_html.contains(&format!("hreflang=\"en\" href=\"{origin}/en\"")));
+    assert!(home_html.contains("aria-label=\"Langues\""));
+    assert!(home_html.contains("href=\"/en\" hreflang=\"en\""));
+    assert!(!home_html.contains("hreflang=\"nl\""));
+
+    let english_response = send(&state, &host, "/en").await;
+    assert_eq!(english_response.status(), StatusCode::OK);
+    let english_html = body_string(english_response).await;
+    assert!(english_html.contains("<html lang=\"en\">"));
+    assert!(english_html.contains("Hello world"));
+    assert!(english_html.contains("href=\"/\" hreflang=\"fr\""));
+
+    let english_about = send(&state, &host, "/en/about").await;
+    assert_eq!(english_about.status(), StatusCode::OK);
+    assert!(body_string(english_about).await.contains("<title>About"));
+    assert_eq!(
+        send(&state, &host, "/nl").await.status(),
+        StatusCode::NOT_FOUND
+    );
+
+    let sitemap = body_string(send(&state, &host, "/sitemap.xml").await).await;
+    assert!(sitemap.contains(&format!("<loc>{origin}/</loc>")));
+    assert!(sitemap.contains(&format!("hreflang=\"en\" href=\"{origin}/en\"")));
+    assert!(sitemap.contains(&format!("<loc>{origin}/en/about</loc>")));
+    assert!(!sitemap.contains(&format!("{origin}/nl")));
+
+    let feed = body_string(send(&state, &host, "/blog/rss.xml").await).await;
+    assert!(feed.contains("<language>fr</language>"));
+}
+
+#[tokio::test]
 async fn serves_only_published_blog_cards_posts_and_covers() {
     use axum::body::Bytes;
 

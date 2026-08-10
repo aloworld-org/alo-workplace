@@ -41,7 +41,7 @@ use alo_store::{PublishedSite, SitePublicStore, StoreError};
 use serde::Deserialize;
 
 use crate::render::EN;
-use crate::seo::{SITEMAP_URL_LIMIT, render_robots, render_sitemap};
+use crate::seo::{SITEMAP_URL_LIMIT, SitemapAlternate, SitemapUrl, render_robots, render_sitemap};
 pub use config::{ConfigError, ServeConfig};
 use rendered::RenderedSite;
 
@@ -213,23 +213,32 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                 }
             }
         };
-        let mut urls = Vec::with_capacity(
+        let mut urls: Vec<SitemapUrl> = Vec::with_capacity(
             site.page_paths().len() + usize::from(!posts.is_empty()) + posts.len(),
         );
-        urls.extend(
-            site.page_paths()
-                .iter()
-                .map(|path| format!("{base_url}{path}")),
-        );
+        urls.extend(site.page_paths().iter().map(|path| {
+            SitemapUrl {
+                location: format!("{base_url}{path}"),
+                alternates: site
+                    .page_alternates(path)
+                    .iter()
+                    .map(|(locale, alternate_path)| SitemapAlternate {
+                        is_default: locale == &resolved.default_locale,
+                        locale: locale.clone(),
+                        location: format!("{base_url}{alternate_path}"),
+                    })
+                    .collect(),
+            }
+        }));
         if !posts.is_empty() {
-            urls.push(format!("{base_url}/blog"));
+            urls.push(SitemapUrl::plain(format!("{base_url}/blog")));
             urls.extend(
                 posts
                     .iter()
-                    .map(|post| format!("{base_url}/blog/{}", post.slug)),
+                    .map(|post| SitemapUrl::plain(format!("{base_url}/blog/{}", post.slug))),
             );
         }
-        return dynamic_xml(render_sitemap(urls.iter().map(String::as_str)));
+        return dynamic_xml(render_sitemap(&urls));
     }
 
     // The image path of the public contract: bytes for exactly the blob ids

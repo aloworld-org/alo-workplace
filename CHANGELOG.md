@@ -36,6 +36,14 @@ contracts.
   is in your audit trail, and none of it can reach another company's suppliers,
   products or orders.
 
+- **A published alo Site can now speak each language at its own clean address.**
+  Publishing freezes every exact translation alongside the site's language
+  choices, so later draft edits cannot leak onto the live site. Visitors get
+  visible one-click language links; search engines get matching canonical,
+  `hreflang`, `x-default`, sitemap, and feed metadata. The default language
+  keeps the shortest address, translated pages use a language prefix, and alo
+  never invents a page in a language that has not actually been written.
+
 - **You can now correct the shelf — and alo makes you say why.** Two things a
   warehouse does by hand have doors of their own: moving goods between your own
   places, and admitting the shelf disagrees with the system. A correction picks

@@ -2270,3 +2270,45 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   isolation test, strict clippy, and full rebased JMAP matrix are the recorded
   storage proof.
 - **Next:** S2.01c, localized publishing and public-language discovery.
+
+## 2026-08-10 — S2.01c localized publishing and discovery
+
+- **Shipped:** publishing now freezes the site's default and enabled language
+  contract plus every exact localized page draft in immutable snapshots. The
+  default language stays at clean unprefixed paths; non-default translations
+  use language-prefixed paths. Public pages expose exact `lang`, canonical,
+  `hreflang`, and `x-default` metadata plus a visible direct language switcher.
+  Sitemap entries carry the same exact alternates and `x-default`; RSS declares
+  the frozen default language. A language enabled in the editor but missing an
+  exact page is never fabricated on the public site.
+- **Tenant proof:** the expanded publish isolation regression freezes French
+  and English while omitting missing Dutch, proves later localized draft
+  edits/deletion and theme edits cannot mutate an old publish, republishes a
+  changed English/Dutch language contract, and keeps every foreign tenant/site
+  read or publish denial clean. The public Host regression independently serves
+  exact localized routes and rejects missing translations.
+- **Real curl transcript:** a freshly rebuilt `alo-sites` binary on
+  `127.0.0.1:18081` served `localized-wire.sites.test`: French `/` and English
+  `/en` returned `200`; untranslated `/nl` returned `404`; HTML carried the
+  exact language, canonical, visible switcher, and current-language state;
+  `/sitemap.xml` carried French, English, and `x-default` alternates; and RSS
+  declared `<language>fr</language>`. The isolated service, fixture, and
+  disposable database were removed afterward. No production or external
+  service was contacted.
+- **Verified:** `cargo fmt -p alo-store -p alo-sites -p alo-jmap`; strict
+  offline all-target clippy for all three crates; the exact localized publish
+  wrong-tenant regression; full `alo-store` (912 unit tests plus every
+  integration/doc target), full `alo-sites` including eight public Host tests,
+  and full unfiltered `alo-jmap` (541 unit tests plus every integration/doc
+  target). After the sitemap `x-default` wire finding, strict alo-sites clippy
+  and its complete suite were rerun green. Web `npx tsc --noEmit` and
+  `npm run build` are green; no web source changed, so focused ESLint is not
+  applicable.
+- **Cuts/flags:** renderer chrome is translated for English, French, and Dutch;
+  other valid locales retain their exact document `lang` while using English
+  chrome until catalog coverage expands. Blog posts are not localized yet, so
+  the single public feed uses the frozen default locale. The migration is
+  `0161` after rebasing over Inventory's `0159` and Purchasing's `0160`. The visitor surface follows
+  Google Search's multilingual canonical/alternate contract and keeps language
+  choices directly visible rather than gatekeeping them in a menu.
+- **Next:** S2.01d, the visible translation editor and publish readiness.

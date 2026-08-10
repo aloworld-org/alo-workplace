@@ -3,8 +3,9 @@
 //! Section content is the tenant's own words; these are the few strings the
 //! *renderer* contributes (skip link, menu button, form labels). They are
 //! externalized here — never inline in the markup builders — so more locales
-//! are a new const, not a code hunt. English ships now; fr/nl land at the
-//! wave review, and site-level locale selection arrives with them.
+//! are a new const, not a code hunt. English, French, and Dutch ship with the
+//! multilingual public-site contract; other valid locales use English chrome
+//! while preserving their exact BCP 47 tag in document metadata.
 
 /// The renderer-contributed strings for one locale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +20,8 @@ pub struct UiStrings {
     pub footer_nav_label: &'static str,
     /// Mobile menu toggle button text.
     pub menu: &'static str,
+    /// Accessible label of the direct language links.
+    pub language_switcher_label: &'static str,
     /// Contact form: name field label.
     pub form_name: &'static str,
     /// Contact form: email field label.
@@ -84,6 +87,7 @@ pub const EN: UiStrings = UiStrings {
     nav_label: "Main",
     footer_nav_label: "Footer",
     menu: "Menu",
+    language_switcher_label: "Languages",
     form_name: "Name",
     form_email: "Email",
     form_message: "Message",
@@ -111,3 +115,86 @@ pub const EN: UiStrings = UiStrings {
     blog_page: "Page",
     blog_page_of: "of",
 };
+
+/// French renderer chrome.
+pub const FR: UiStrings = UiStrings {
+    lang: "fr",
+    skip_to_content: "Aller au contenu",
+    nav_label: "Principal",
+    footer_nav_label: "Pied de page",
+    menu: "Menu",
+    language_switcher_label: "Langues",
+    form_name: "Nom",
+    form_email: "E-mail",
+    form_message: "Message",
+    form_website: "Site web",
+    form_send: "Envoyer",
+    form_success: "Merci — votre message a été envoyé.",
+    form_sent_title: "Message envoyé",
+    form_not_sent_title: "Message non envoyé",
+    form_malformed_text: "Le formulaire n’a pas pu être lu. Revenez en arrière et réessayez.",
+    form_rate_limited_title: "Trop de messages",
+    form_rate_limited_text: "Patientez quelques minutes avant d’envoyer un autre message.",
+    form_back_hint: "Revenez en arrière et réessayez",
+    not_found_title: "Page introuvable",
+    not_found_text: "La page recherchée n’existe pas ou a été déplacée.",
+    not_found_home: "Aller à l’accueil",
+    blog_title: "Blog",
+    blog_empty: "Aucun article n’a encore été publié.",
+    blog_read_article: "Lire l’article",
+    blog_published: "Publié",
+    blog_home: "Accueil",
+    blog_rss: "RSS",
+    blog_pagination_label: "Pages du blog",
+    blog_previous: "Précédent",
+    blog_next: "Suivant",
+    blog_page: "Page",
+    blog_page_of: "sur",
+};
+
+/// Dutch renderer chrome.
+pub const NL: UiStrings = UiStrings {
+    lang: "nl",
+    skip_to_content: "Naar inhoud",
+    nav_label: "Hoofdnavigatie",
+    footer_nav_label: "Voettekst",
+    menu: "Menu",
+    language_switcher_label: "Talen",
+    form_name: "Naam",
+    form_email: "E-mail",
+    form_message: "Bericht",
+    form_website: "Website",
+    form_send: "Versturen",
+    form_success: "Bedankt — je bericht is verstuurd.",
+    form_sent_title: "Bericht verstuurd",
+    form_not_sent_title: "Bericht niet verstuurd",
+    form_malformed_text: "Het formulier kon niet worden gelezen. Ga terug en probeer opnieuw.",
+    form_rate_limited_title: "Te veel berichten",
+    form_rate_limited_text: "Wacht een paar minuten voordat je nog een bericht verstuurt.",
+    form_back_hint: "Ga terug en probeer opnieuw",
+    not_found_title: "Pagina niet gevonden",
+    not_found_text: "De gezochte pagina bestaat niet of is verplaatst.",
+    not_found_home: "Naar de startpagina",
+    blog_title: "Blog",
+    blog_empty: "Er zijn nog geen artikelen gepubliceerd.",
+    blog_read_article: "Lees artikel",
+    blog_published: "Gepubliceerd",
+    blog_home: "Start",
+    blog_rss: "RSS",
+    blog_pagination_label: "Blogpagina’s",
+    blog_previous: "Vorige",
+    blog_next: "Volgende",
+    blog_page: "Pagina",
+    blog_page_of: "van",
+};
+
+/// Renderer chrome for a normalized locale. Region variants inherit their
+/// base language; unsupported languages keep usable English chrome.
+#[must_use]
+pub fn strings_for(locale: &str) -> &'static UiStrings {
+    match locale.split('-').next().unwrap_or(locale) {
+        "fr" => &FR,
+        "nl" => &NL,
+        _ => &EN,
+    }
+}

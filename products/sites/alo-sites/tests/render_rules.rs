@@ -26,6 +26,7 @@ fn render_with(
     let site = SiteRenderContext {
         name: "Nordwind Coffee Roasters",
         base_url: "https://nordwind.alosites.com",
+        locale: "en",
         theme,
         strings: &EN,
         images: ImageSources::PublicPaths,
@@ -287,6 +288,7 @@ fn inline_image_sources_swap_srcs_per_id_and_never_touch_og_image() {
     let site = SiteRenderContext {
         name: "Nordwind Coffee Roasters",
         base_url: "https://nordwind.alosites.com",
+        locale: "en",
         theme: &theme,
         strings: &EN,
         images: ImageSources::Inline(&map),
@@ -322,6 +324,7 @@ fn preview_is_the_published_document_with_the_stylesheet_inlined() {
         let site = SiteRenderContext {
             name: "Nordwind Coffee Roasters",
             base_url: "https://nordwind.alosites.com",
+            locale: "en",
             theme: &theme,
             strings: &EN,
             images: ImageSources::PublicPaths,

@@ -49,6 +49,36 @@ a { color: var(--primary); }
 }
 .skip-link:focus { left: 0; }
 
+/* Direct, one-click language choices. The current language stays visible;
+   no translation is hidden behind a menu. */
+.language-switcher {
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: 0.5rem 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.language-switcher a {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  display: inline-grid;
+  place-items: center;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.language-switcher a:hover { border-color: var(--primary); }
+.language-switcher a[aria-current="page"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
 /* Honeypot: hidden from humans (and layout), still in the posted form. */
 .hp {
   position: absolute !important;
