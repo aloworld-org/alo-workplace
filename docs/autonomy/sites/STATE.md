@@ -1982,3 +1982,26 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   feature lists stay manual until their storage shape can identify one string
   leaf without ambiguity.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.30b self-explanatory website addresses
+
+- **Shipped:** the new-website dialog now suggests an editable address from
+  the website name, displays the complete configured address in the same
+  visible surface as its availability state, and explains which required
+  value is missing whenever Create is disabled. This follows the familiar
+  Squarespace, Wix, and GoDaddy domain-onboarding reflex without hiding the
+  direct manual path behind a menu.
+- **Input and errors:** owners can paste either a label or a complete URL such
+  as `https://acme.alosites.com/`; the configured suffix is normalized before
+  availability checks and creation. The server remains the sole authority for
+  validity, reserved names, and collisions, and its validation detail is shown
+  verbatim instead of being replaced by a generic failure.
+- **Verified:** all 28 routed Sites module tests pass, including live address
+  suggestion, full-domain normalization, taken addresses, verbatim server
+  details, disabled-state guidance, and the exact create payload. `npx tsc
+  --noEmit`, focused Sites/i18n ESLint, and `npm run build` are clean.
+- **Cuts/flags:** normalization strips only the server-configured site suffix;
+  unfamiliar domains and every semantic validation case intentionally remain
+  server-owned. This slice changes no storage or HTTP route, so Rust gates,
+  wrong-tenant testing, and live curl verification are not applicable.
+- **Next:** the first unchecked item in `QUEUE.md`.
