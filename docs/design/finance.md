@@ -100,7 +100,7 @@ read (the rename B3.11 paid for; it is not paid twice).
 | `POST /finance/receipts` | read a receipt already in the caller's Drive (`{nodeId}`), get the **parsed fields back for confirmation**. Writes nothing at all, and joins `READ_ONLY_POSTS` (as built, B4.06b) |
 | `GET/POST /finance/mileage` · `DELETE /finance/mileage/{id}` | mileage claims; each becomes an expense at the tenant's per-km rate (B4.07) |
 | `GET/PUT /finance/mileage/rates` | the per-km rate table, effective-dated (B4.07) |
-| `POST /finance/imports/bank` | a statement file (CAMT.053, MT940, or CSV with a mapping) → a statement header and staged lines (B4.08) |
+| `POST /finance/imports/bank` | a statement file (CAMT.053, MT940, or CSV with a mapping) → a statement header and staged lines (B4.08). *Admin-or-accountant from B4.13b, with the seven routes below it: a statement is the whole company's money moving past a bookkeeper, not one colleague's own record the way a claim is, and `scoped_roles` leaves `/finance/*` to gate itself per route. Gating the two reads matters as much as the writes — a statement names every counterparty the company banks with.*|
 | `POST /finance/imports/bank/preview` | the CSV mapping wizard's dry run: columns, sample rows, what would import. Writes nothing, and joins `READ_ONLY_POSTS` beside `/crm/imports/leads/preview` (B4.08c) |
 | `GET /finance/bank/statements` · `GET /finance/bank/lines?status=&statement=` | what was imported and where each line stands (B4.08) |
 | `GET /finance/bank/suggestions?statement=` | the ranked match candidates for every unmatched line — a read, never a write (B4.09c). *As built it is the bulk read, not the per-line one first sketched here: the ranking folds the open ledger once, so asking per line would fold it once per line.* |
@@ -153,9 +153,10 @@ a screen for it would rank it above the four things people do daily.
 #### As built: the expenses slice (B4.13a)
 
 `web/src/finance` exists with **one** of the four tabs drawn — Expenses —
-plus an Approvals tab that only an approver sees. Bank, Accounts and Reports
-are B4.13b and B4.13c and are deliberately not in the nav yet: a tab that
-opens an empty screen is a promise the module has not kept.
+plus an Approvals tab that only an approver sees. Bank arrived with B4.13b (as
+two tabs, below); Accounts and Reports are B4.13c and are deliberately not in
+the nav yet: a tab that opens an empty screen is a promise the module has not
+kept.
 
 Five decisions this slice took, none of which move anything above:
 
@@ -179,6 +180,64 @@ Five decisions this slice took, none of which move anything above:
   the request, so the workspace default is the server's decision.
 - **The claim form is the same form for recording and correcting**, because
   the server takes the same shape for both.
+
+#### As built: the bank and the reconciliation screen (B4.13b)
+
+Two tabs, not one, both behind the same admin-or-accountant gate the Approvals
+tab is behind — and, from this slice, behind the server's own gate as well
+(above). **Bank** is the record of what has been imported and the door that
+imports more; **Match** is the pile that import leaves and the afternoon of
+small decisions it takes to clear it. One screen with a mode would have made
+the import banner the thing a bookkeeper scrolls past four hundred times.
+
+Six decisions this slice took:
+
+- **The import is two steps, and the first writes nothing.** The dialog calls
+  `/finance/imports/bank/preview` before it calls anything else, and shows the
+  server's own reading — the format it sniffed, the encoding and delimiter, the
+  columns it mapped, the first transactions as it understood them. Correcting
+  any of that marks the reading *stale* rather than blanking it (the sample is
+  what a person is correcting against), and the primary button goes back to
+  "check this file". **What is shown and what is committed are always the same
+  reading**; an Import button that staged a mapping nobody previewed would make
+  the dry run advisory.
+- **The browser never parses the file.** A second reader would disagree with
+  the store on exactly the files that matter — a Windows-1252 export with comma
+  decimals and a `Soll/Haben` column. The bytes go up; the reading comes back.
+- **Every mapping control is a `<select>` over the file's own header**, never a
+  text box. A column name typed by hand is a `422` waiting to happen, and the
+  file already says what its columns are called. They appear for a CSV only: a
+  CAMT.053 states its dates, currency and account itself, and offering to
+  override them would invent a question the format has answered.
+- **A `422` is rendered as the report, not as its sentence.** `BankImportRefused`
+  carries the server's per-row report onto the client's error, and the dialog
+  renders it — the line numbers and the rule each broke. This is the one refusal
+  in the module a person is *expected* to act on.
+- **The evidence is a token on the wire and a sentence on the screen.** The
+  server sends `{"kind":"partPayment","remainingCents":69300}`; `evidenceLabel`
+  writes "it is part of the invoice — €693.00 would be left" in the reader's
+  language. A token this client has not learned is **dropped**, not printed:
+  an untranslated identifier in a list of reasons reads as a bug, and the guess
+  is still worth showing with the reasons that did translate.
+- **The confirm sends the line's own `amountCents`.** The person picks *which*
+  document, never *how much*; the store compares what was sent with what the
+  bank said the line moves, under the row locks, so a screen a colleague changed
+  underneath is a refusal instead of a payment for the wrong money.
+
+The manual pick (B4.09c stage 3) is a dialog over Billing's own list of
+documents that can still take money — issued, unsettled, not a credit note,
+every one of those a fact the server computed. Without it the screen would be a
+*suggestions* screen, and a line the two guessing stages had nothing to say
+about could only ever be set aside.
+
+Cut from this slice, and listed so the gap is a decision: **no split of one
+transaction across several invoices** (the store refuses it — `bank_matches` is
+unique per line, and lifting that is an additive migration, not a screen), **no
+editor for the learned matching rules** (`/finance/rules` has no screen yet;
+the rules still fire and are still named in the evidence), **no bank-side
+posting for a line that is not an invoice payment** (an expense or a charge
+settled from the bank is B4.13c's Accounts tab, which is where a person can
+choose an account at all), and **no fr/nl** — B4.15 owns the translations.
 
 Cut from this slice, on purpose, and listed so the gap is a decision rather
 than an oversight: **no category picker and no receipt attachment**. Both

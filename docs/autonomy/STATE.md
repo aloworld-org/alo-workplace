@@ -13692,3 +13692,138 @@ without it gives a 404 on a tab people can see. No new top-level prefix this
 item.
 
 Next item: B4.13b (web finance — bank import and the reconciliation screen).
+
+---
+
+## B4.13b — the bank, and the pile it leaves (2026-08-10)
+
+**Shipped.** Two tabs on the Finance module, both behind the bookkeeper gate:
+**Bank** (import a statement, and the record of what has been imported) and
+**Match** (the reconciliation screen). Plus the server-side gate they need to be
+honest.
+
+*Web (`web/src/finance`, `web/src/billing`, `web/src/i18n/en.ts`)*
+
+- `types.ts` — the eleven bank shapes the wire carries, one interface per JSON
+  object the server sends, no field invented here.
+- `api.ts` — nine methods (`previewBankImport`, `importBankFile`,
+  `bankStatements`, `bankLines`, `bankSuggestions`, `matchBankLine`,
+  `unmatchBankLine`, `ignoreBankLine`, `unignoreBankLine`) plus
+  `BankImportRefused`, the error class that carries the `422`'s per-row report
+  so a refusal stays actionable. The upload's whole query string is built in one
+  place (`importQuery`), where a blank field is an *unstated* one — sending `""`
+  would map a column called `""`.
+- `BankImportDialog.tsx` — the two-step import. Preview first (writes nothing),
+  the server's own reading rendered (format, encoding, delimiter, columns,
+  conventions, counts, sample), eleven `<select>`s over the file's **own**
+  header for a CSV, and a *stale* flag: correcting the reading sends the primary
+  button back to "check this file", so what is shown and what is committed are
+  always the same reading.
+- `BankView.tsx` — the statements table, and the commit's own counts (staged and
+  duplicates-skipped) shown afterwards rather than a bare "imported".
+- `ReconcileView.tsx` — the pile: each unmatched line with the exact and likely
+  guesses beside it, every piece of evidence spelled out as a sentence, one
+  confirm per guess, `Not ours` (reason prompted, server requires it), and the
+  two settled lists with `Take it back` / `Back to the pile` beside each row.
+  `numbersCapped`/`ledgerCapped` surface as a notice — a short list must be able
+  to say it is short.
+- `InvoicePicker.tsx` + `billing/pickers.ts::useOpenInvoices` — the manual pick
+  (B4.09c stage 3) over Billing's own list of documents that can still take
+  money. Without it a line the two guessing stages could not read would only
+  ever be settable-aside.
+- `format.ts::evidenceLabel` — the seven evidence tokens as sentences; an
+  **unknown** token is dropped rather than printed raw.
+- 120 new strings under `financeBank*`; en only (B4.15 owns fr/nl).
+
+*Server (`products/mail/alo-jmap`)* — **a defect found and fixed in the surface
+this item builds on.** `scoped_roles.rs` states that `/finance/*` routes "gate
+themselves, per route, on `Account::require_finance`". All nine bank and
+reconciliation routes were authenticated only: **any tenant member could import
+a statement, read every counterparty the company banks with, and match a line —
+which records a payment and writes journal entries.** All nine now call
+`account.require_finance()?` immediately after `authenticate`, module docs and
+per-handler docs say so, and the routes table in `docs/design/finance.md` says
+so. This narrows an existing contract (200 → 403 for a non-bookkeeper) on
+routes shipped in B4.08/B4.09 that no client outside this repo has yet used;
+flagged below for the human all the same.
+
+**How verified.**
+
+```
+cargo clippy -p alo-jmap --all-targets (SQLX_OFFLINE)          clean, 0 warnings
+cargo test  -p alo-jmap --lib                                  479 passed
+cargo test  -p alo-jmap --test accountant_role_http            8 passed (1 new)
+cargo test  -p alo-jmap --test audit_routes --test audit_http  8 + 3 passed
+npx tsc --noEmit · npx eslint <changed> · npm run build        clean
+npx vitest run                                                 37 files, 361 passed
+  · src/finance/Bank.test.tsx                                  10 passed (new)
+```
+
+**The full `cargo test -p alo-jmap` was NOT run to completion in this
+iteration, and this entry does not claim it was.** It was started, ran for
+~35 minutes and had reached the `billing_*` block — the PDF/print suites drive
+headless chromium and the whole crate is ~50 integration binaries against a real
+database, which does not fit an iteration's budget on this machine. What was run
+instead is every suite that can see this change: the crate's 479 unit tests, the
+role-boundary suite (the gate itself), and the two audit suites — the only other
+test files in the crate that name a `/finance/bank` route (`grep -rln
+'finance/bank\|imports/bank' tests/`). **A standing item for the human: the
+crate's integration suite needs a fast lane** (a `--features slow` split, or
+chromium-free PDF goldens), or no unattended iteration will ever run it whole.
+
+`the_bank_is_the_bookkeepers_and_every_act_on_a_line_is_shut_before_it_is_looked_up`
+is the wire proof of the gate, through the real router against the real
+database: an ordinary member is refused all six `POST` doors with **403 and not
+404** (a 404 would be an existence oracle for the pile), the same person handed
+the accountant role gets past the gate to the store's own 404 on a made-up line
+id, and revoking shuts them again. The three bank reads joined `FINANCE_READS`,
+so they are covered by the existing member → accountant → revoked walk.
+
+`Bank.test.tsx` runs the real router, the real module routes, the real client
+and the real catalog against a recorded network, and proves the four things a
+screen can silently get wrong about money: the first step calls the **preview**
+door and the commit door is not called at all; a `422` renders as the report
+with the line number and the rule, not as a lone sentence; a confirmed match
+sends the line's **own** `amountCents` (and the `ruleId` of the suggestion
+taken, so the server can count the hit); the evidence tokens become sentences,
+amounts among them read as money, and an unknown token contributes nothing —
+not even its name.
+
+**Cuts, named.**
+
+- **No split of one transaction across several invoices.** The store refuses it
+  (`bank_matches` is unique per line, migration 0143); lifting it is an additive
+  migration, not a screen.
+- **No editor for the learned matching rules.** `/finance/rules` has no screen;
+  the rules still fire and are still named in the evidence ("this payer has been
+  matched this way before").
+- **No settlement of a line that is not an invoice payment.** A bank charge or
+  an expense paid from the account needs an account to book to, and there is
+  still no HTTP door onto the chart — B4.13c's territory (see the flag below,
+  unchanged since B4.13a).
+- **No fr/nl** — the wave-review rule; B4.15.
+- **No live-server curl transcript.** This item added **no new routes**; what it
+  changed on the server is an authorization gate, and that is verified above
+  through the real axum router against the real docker postgres, which is a
+  stronger proof than a curl of one hand-made token. The screens are verified
+  against a recorded network with the real client and router.
+
+**FLAG for the human.**
+
+1. **The `/finance/bank/*` gate is a contract narrowing.** Non-admin,
+   non-accountant members now get `403` where they got `200`. Deliberate (see
+   above), but it is the one change in this item a human should agree with
+   rather than discover.
+2. Unchanged from B4.13a: nothing in the product seeds a chart of accounts over
+   HTTP, and `/finance/categories` still has no door. This is B4.13c's, and it
+   is now the last thing between Finance and a complete module.
+3. Unchanged: `ROADMAP.md` still says "designed on Spaces" in three places where
+   B4.12 delivered roles instead.
+4. Unchanged: an accountant is still a user, and a user still gets a mailbox.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B4.13c (web finance — the CoA editor and the four report pages with
+CSV buttons; it owns the missing `/finance/categories` and chart doors).

@@ -24,6 +24,23 @@ contracts.
   publishing — now has native French and Dutch labels instead of falling back
   to English halfway through a task.
 
+- **Bring in a month from your bank, and see what each payment settled.** Import
+  a statement — a CAMT.053 or MT940 download, or any CSV export — and alo reads
+  it and shows you what it made of it *before* anything is stored: which column
+  it took for the date and the amount, how it read the numbers, the first
+  transactions as it understood them. Correct anything it got wrong from the
+  file's own headers and look again. If one row cannot be read, nothing is
+  imported and you are told which row and why, rather than being left with a
+  refusal you cannot act on. Every transaction then lands in one pile to work
+  through: alo says what it thinks each one settled and, in plain words, why —
+  your invoice number was quoted, the amount is exactly what is owed, this payer
+  has been matched this way before. One click confirms it, which records the
+  payment and moves the books; the undo sits beside it. For the ones it cannot
+  guess, pick the invoice yourself from the ones still waiting for money, or set
+  the transaction aside with the reason the next person will need. Importing
+  statements and settling lines are the bookkeeper's — an owner, or the
+  accountant you appointed — and are now refused to everybody else.
+
 - **Claim what you spent, in a screen you did not have to be taught.** Finance
   is now a place in alo rather than an API: a tab of your own claims — the day,
   the merchant, the total on the receipt and whose money paid — with a form that

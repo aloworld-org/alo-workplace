@@ -108,7 +108,7 @@ small, or a `[!]` note for the human if large.
 - [x] B4.11d Report: VAT-return figures — same contract + goldens.
 - [x] B4.12 Accountant role: scoped access (finance read + journal write only, no mail/files) via Spaces/roles; tests prove the scope.
 - [x] B4.13a Web finance: module skeleton + expenses flow (submit/approve/reimburse screens).
-- [ ] B4.13b Web finance: bank import + reconciliation screen.
+- [x] B4.13b Web finance: bank import + reconciliation screen.
 - [ ] B4.13c Web finance: CoA editor + the four report pages with CSV buttons.
 - [ ] B4.14a ★ Finance agent, categorise: `categorise_transactions` (draft) — allowlist + executor + structural verify.
 - [ ] B4.14b ★ Finance agent, answers: `vat_summary` + `flag_anomalies` (answers with citations); structural verify.
