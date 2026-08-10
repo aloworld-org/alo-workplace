@@ -6,6 +6,25 @@ contracts.
 
 ## Unreleased
 
+- **Invoice a sales order for what actually went out.** One button on the order
+  raises a **draft** invoice in Billing carrying what has been delivered and not
+  yet billed — each line at the quantity that shipped and the price you quoted
+  on the order, plus the delivery charge or discount you agreed, billed once.
+  Nothing is invoiced before it ships: charging for goods that may never leave
+  is a VAT statement made on a hope. So a part delivery bills the part, and when
+  the rest goes out the same button raises a **second** draft for the new
+  quantity only — never a repeat of the first. Pressing it with nothing new
+  shipped raises nothing and says which of the two reasons it is: nothing has
+  gone out yet, or everything that has is already on an invoice. An order still
+  in draft is refused; an order you gave up on part-way through still bills what
+  the customer received, which is what closing the remainder always meant. The
+  invoice is billing's from the moment it exists — inventory never issues it,
+  never sends it, and never touches it again — and if you throw the draft away,
+  or void it after issuing, what it carried becomes billable again in the same
+  instant. Crediting it does not: the goods stay billed against the document the
+  credit note corrects. The order shows, per line, what has gone out, what is
+  already billed and what is left to bill, and lists every invoice it raised
+  with its number and where it has got to.
 - **Sales orders: what a customer asked you for, and shipping it.** You can now
   take an order — who it is for, what they want, at the price you quoted — as a
   draft you edit freely, and confirm it when you say yes. Confirming gives it

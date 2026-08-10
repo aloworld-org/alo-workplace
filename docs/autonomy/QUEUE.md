@@ -125,7 +125,7 @@ small, or a `[!]` note for the human if large.
 - [x] B5.05a2 Purchase orders, sending: number draw + the printed order (party generalisation of B1.16/B1.17) + covering mail draft; `POST /{id}/send` moves draft→sent in one act.
 - [x] B5.05b Purchase orders, receiving: received → stock moves + bill draft created (three-way-lite link); arc wire-verified.
 - [x] B5.06a Sales orders: model + order→delivery note (stock moves out) + routes + tests.
-- [ ] B5.06b Sales orders → invoice: delivery→invoice draft (B1 bridge); full arc wire-verified.
+- [x] B5.06b Sales orders → invoice: delivery→invoice draft (B1 bridge); full arc wire-verified.
 - [ ] B5.07 Reorder rules (min/target per product/location) + shortage query feeding agent proposals.
 - [ ] B5.08a Stocktake, counting: count-sheet snapshot + variance list; tests.
 - [ ] B5.08b Stocktake, applying: variance → adjustment batch (B5.04b moves); wire.

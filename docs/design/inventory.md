@@ -115,7 +115,8 @@ is what makes a record's history complete.
 | `POST /inventory/sales-orders/{id}/confirm` · `/cancel` | promise it, or stop promising it |
 | `GET/POST /inventory/sales-orders/{id}/deliveries` | what has gone out, and shipping some of it: the movements out and the delivery note (B5.06a) |
 | `GET /inventory/sales-orders/{id}/deliveries/{did}/print` · `/pdf` | the delivery note as paper for the box |
-| `POST /inventory/sales-orders/{id}/invoice` | raise a **draft** invoice in alo Billing for what has been delivered (B5.06b) |
+| `POST /inventory/sales-orders/{id}/invoice` | raise a **draft** invoice in alo Billing for what has been delivered (B5.06b). No body: what may be billed is what shipped |
+| `GET /inventory/sales-orders/{id}/invoices` | what has been billed against this order — each document, where it has got to, and the quantities it carried (B5.06b) |
 | `GET/POST /inventory/reorder-rules` | the minima, per product per location (B5.07) |
 | `PATCH/DELETE /inventory/reorder-rules/{id}` | change one, or stop watching |
 | `GET /inventory/shortages` | the computed answer: everything at or under its minimum, with the quantity that would bring it to target and the supplier who sells it. CSV twin |
@@ -1013,6 +1014,42 @@ new is the idempotency: delivering more later and invoicing again must produce
 a **second** invoice for the new quantity only, not a duplicate of the first,
 so each order line tracks `invoiced_qty_milli` and the route raises nothing
 (a `422` naming the order) when there is nothing left to bill.
+
+**As built (B5.06b).** Three things came out differently from the paragraph
+above, and each is a decision rather than a slip.
+
+- **`invoiced_qty_milli` is a fold, not a column.** `inv_so_invoices` records
+  each raising and `inv_so_invoice_lines` which ordered line contributed which
+  quantity to it; how much of a line is billed is the sum of those rows over
+  invoices that still stand. The delivered figure had to be an accumulator
+  because two lines may name one product and the movement ledger could not say
+  which line a movement belonged to; here the link names the line itself, so the
+  sum is unambiguous — and it buys the release paths for free. Throwing away the
+  draft removes the link rows by cascade; voiding the issued document is skipped
+  by the fold; a **credit note does not release**, because crediting corrects a
+  document and the goods stay billed against it. An accumulator would need a
+  hook on each of those paths (`time_invoice::release_billed_hours` is exactly
+  that), and a hook is a thing that gets forgotten on the fourth path.
+- **A charge in words rides on the first invoice, in full, once** — and only
+  once goods have actually gone out. It never leaves on a pallet, so "what was
+  delivered" cannot answer for it; prorating it across consignments would be
+  arithmetic nobody agreed to, and billing it before anything shipped would
+  charge for a van that never came. An order that sells no goods at all is the
+  one exception: there is no first consignment to wait for, so its charges are
+  billable as soon as it is confirmed.
+- **Only a `draft` order is refused** (`409`). `cancelled` is invoiceable on
+  purpose: closing the remainder of a part-delivered order leaves the customer
+  to be invoiced for what they received, which is what the short-close refusal
+  says out loud. Whether there is anything left to bill is answered from the
+  lines, not from the state, and the `422` says which of the two reasons it is —
+  nothing has gone out yet, or everything that has is already on a document.
+
+The customer's own reference travels from the order onto the invoice; the
+order's internal note does not, and the store writes no sentence of its own onto
+a document a customer reads, because it has no language. Each ordered line
+reports `deliveredQtyMilli`, `invoicedQtyMilli` and `invoiceableQtyMilli`, the
+last computed by the same code the button uses, so what a screen offers to bill
+and what pressing it bills cannot disagree.
 
 ## Reorder rules and the shortage query (B5.07)
 

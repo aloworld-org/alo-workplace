@@ -15791,3 +15791,164 @@ migrations continue at 0164.
 
 Next item: B5.06b (sales order → invoice: the delivered-and-not-yet-invoiced
 bridge into alo Billing, full arc wire-verified).
+
+## B5.06b — billing what actually left the building (2026-08-10)
+
+**Shipped.** `POST /inventory/sales-orders/{id}/invoice` raises a **draft**
+invoice in alo Billing for what has been delivered and not yet invoiced, and
+`GET …/{id}/invoices` lists what an order has billed. Store module
+`platform/alo-store/src/inv_so_invoice.rs`, route module
+`products/mail/alo-jmap/src/inventory_so_invoice.rs`, migration
+`0164_inv_so_invoices.sql` (`inv_so_invoices` + `inv_so_invoice_lines`), new
+`InvSoInvoiceId`, `SoStatus::ensure_invoiceable`, and `SoLine` gains
+`invoiced_qty_milli`.
+
+**The three decisions.**
+
+1. **What is already billed is a FOLD, not an accumulator column** — the
+   opposite of `delivered_qty_milli`, deliberately. The delivered figure had to
+   be a column because two lines of one order may name the same product and the
+   movement ledger could not say which line a movement belonged to; the invoice
+   link names the *ordered line*, so the sum can never be ambiguous. The fold
+   (`inv_so_lines::read`, a correlated `sum(...)::bigint` over
+   `inv_so_invoice_lines` joined to `billing_invoices`, skipping `void`) buys
+   both release paths for nothing: throwing away the draft removes the link rows
+   by cascade, voiding the issued document is skipped by the fold, and a **credit
+   note does not release** (crediting corrects a document; the goods stay billed
+   against it, and re-billing would charge the customer twice). The alternative
+   — a column plus a release hook on delete and on void, which is exactly what
+   `time_invoice::release_billed_hours` is — was rejected because a hook is a
+   thing that gets forgotten on the fourth path somebody adds.
+2. **A charge in words rides on the first invoice, in full, once**, and only
+   once goods have actually gone out. It never leaves on a pallet, so "what was
+   delivered" cannot answer for it; prorating it across consignments is
+   arithmetic nobody agreed to, and billing it before anything shipped charges
+   for a van that never came. One exception, stated as its own clause: an order
+   that sells **no goods at all** has no first consignment to wait for, so its
+   charges are billable at confirm — otherwise a services-only order would carry
+   lines that could never be billed, which is money silently left on the table.
+   A negative charge (a discount granted) travels as the negative quantity it is
+   and is granted exactly once.
+3. **Only a `draft` order is refused** (`409`). `cancelled` is invoiceable on
+   purpose: closing the remainder of a part-delivered order leaves the customer
+   to be invoiced for what they received — what the short-close refusal already
+   says out loud. Whether anything is left to bill is answered from the lines,
+   and the `422` names the order and says which of the two reasons it is
+   ("nothing has gone out against SO-2026-00001 yet" vs "everything that has
+   gone out … is already on an invoice; deliver more of it").
+
+The whole raising is one transaction under the order's row lock, so two callers
+pressing the button at one instant serialise and the loser sees an order with
+nothing left to bill rather than raising a duplicate. The customer's own
+reference travels onto the invoice; the order's internal note does not, and the
+store writes no sentence of its own onto a customer's document (it has no
+language — `time_invoice`'s rule). Each ordered line now reports
+`invoicedQtyMilli` and `invoiceableQtyMilli`, the latter from the same pure fn
+the button uses, so a screen can never offer to bill a quantity the button would
+not.
+
+**Verified — the gate.** Formatting: only the item's own three new files were
+run through `rustfmt` (`main` is not rustfmt-clean on this machine; edited files
+were hand-wrapped to 100 columns). `SQLX_OFFLINE=true cargo clippy -p alo-store
+-p alo-jmap --all-targets` clean; `cargo test -p alo-store` green (990 unit +
+every suite, including the new 10-test `tests/inv_so_invoice.rs`); `cargo test
+-p alo-jmap` green (59 suites, `tests/audit_routes.rs` updated with the one new
+action `inventory.sales_order.invoice`). The wrong-tenant test is in the suite:
+another tenant cannot invoice our order, list its raisings, read one raising, or
+read the document it produced — and their own order's figures are untouched by
+any of it.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real PKCE authorization-code tokens (`/oauth/authorize` → `/oauth/token`; the
+password grant does not exist), rows read back in psql.
+
+```
+POST …/invoice · GET …/invoices  (no token)         → 401 ×2
+POST /inventory/sales-orders/nope/invoice           → 404
+GET  /inventory/sales-orders/nope/invoices          → 404
+POST …/{draft order}/invoice                        → 409 this sales order is still a
+                                                      draft: nothing has been promised
+                                                      and nothing has gone out, so there
+                                                      is nothing to invoice
+POST …/{id}/confirm                                 → confirmed, SO-2026-00001
+POST …/{id}/invoice (nothing delivered)             → 422 nothing has gone out against
+                                                      sales order SO-2026-00001 yet, and
+                                                      an invoice carries what was
+                                                      delivered
+POST …/{id}/deliveries {MAIN, line 1 × 2500}        → partially_delivered; line 1
+                                                      delivered 2500, invoiced 0,
+                                                      invoiceable 2500; the charge line
+                                                      invoiceable 1000
+POST …/{id}/invoice                                 → 200 draft invoice, no number;
+                                                      order lines now invoiced 2500 /
+                                                      1000, invoiceable 0 / 0
+GET  /billing/invoices/{it}                         → draft, EUR, reference "Their PO
+                                                      4711"; lines Blue chair 2500 @8600
+                                                      @2100 and Delivery to the third
+                                                      floor 1000 @4500; net 26000, VAT
+                                                      5460, gross 31460
+POST …/{id}/invoice again                           → 422 everything that has gone out
+                                                      against sales order SO-2026-00001
+                                                      is already on an invoice; deliver
+                                                      more of it before invoicing it again
+GET  …/{id}/invoices                                → 1 raising, draft, no number,
+                                                      carried [2500, 1000]
+POST …/{id}/invoice · GET …/{id}/invoices  as them  → 404 ×2
+GET  /billing/invoices/{it}                as them  → 404
+POST …/{id}/deliveries {MAIN} (the rest)            → delivered, closed 2026-08-10;
+                                                      line 1 4000 delivered, 2500
+                                                      invoiced, 1500 invoiceable
+POST …/{id}/invoice                                 → 200 second draft carrying [1500]
+                                                      ONLY — Blue chair 1500 @8600, net
+                                                      12900, gross 15609; the delivery
+                                                      charge is not billed twice
+POST /billing/invoices/{first}/issue                → issued, INV-2026-00001,
+                                                      2026-08-10, due 2026-09-09; the
+                                                      raising reports the number
+DELETE /billing/invoices/{second draft}             → 200; the order's line 1 is back to
+                                                      2500 invoiced / 1500 invoiceable,
+                                                      and the raising is gone with it
+POST /billing/invoices/{first}/void                 → 200; line 1 back to 0 invoiced /
+                                                      4000 invoiceable, charge line 0 /
+                                                      1000 — the record of the raising
+                                                      stays, marked void
+POST …/{id}/invoice                                 → 200 one draft carrying [4000, 1000]:
+                                                      net 38900, gross 47069 — exactly
+                                                      the whole order
+POST …/{id}/invoice again                           → 422 (already on an invoice)
+psql inv_so_invoices        → 2 rows: the voided INV-2026-00001 and the current draft
+                              (the deleted draft's row went with it)
+psql inv_so_invoice_lines ⋈ → 2500/1000 against the voided one, 4000/1000 against the
+  inv_sales_order_lines       draft, each naming its ordered line in print order
+psql audit_log              → inventory.sales_order.invoice ×3 — the three raisings, and
+                              not one entry for any of the six refusals
+```
+
+**Cuts and flags.**
+
+- **No line or quantity selection.** The route takes no body: what may be billed
+  is what the warehouse shipped, and letting a client state quantities would
+  make the one number a customer's document rests on a number a client could
+  invent. A tenant who wants different lines edits the draft in Billing, which
+  is what a draft is for.
+- **No screens.** The order and its raisings are on the wire with everything a
+  UI needs (`invoiceableQtyMilli` per line, the raisings list with number and
+  status); the button and the "to invoice" column belong with the SO screens in
+  B5.09b.
+- **One order per invoice**, enforced by a unique index on `invoice_id`. Billing
+  several orders onto one document is a thing a person does in Billing by
+  editing lines; letting this seam do it would make "what has this order billed"
+  a question with a double-counted answer.
+- **A goods line whose product was deleted from the catalog** would fall into
+  the charge-in-words branch and look billable in full. There is no delete path
+  for a product anywhere in the suite (they are archived, and no store function
+  issues `DELETE FROM billing_products`), so this is unreachable today;
+  the `ON DELETE SET NULL` that would cause it is defence for a path that does
+  not exist. Named here rather than guarded speculatively.
+- **`inventory` is still not role-gated** beyond the accountant's read-only
+  scope — any authenticated member may now raise a customer's invoice. Named
+  again, third item running; a shipping/sales role is a wave-review question.
+
+Next item: B5.07 (reorder rules and the shortage query — the minima per product
+per location, and the fold over open orders that feeds the agent's proposals).
