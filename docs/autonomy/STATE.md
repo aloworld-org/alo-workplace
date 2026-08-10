@@ -14571,3 +14571,120 @@ is the first item that writes a migration.
 Next item: B5.02 (the catalog upgrade — the six additive `billing_products`
 columns, the GTIN validator, the tenant-scoped partial unique indexes, and the
 wrong-tenant tests).
+
+## B5.02 — the price list learns what is on the shelf (2026-08-10)
+
+**Shipped:** the catalog upgrade, as six additive columns on the table that
+already owns a product rather than a sibling table beside it — migration
+`0153_billing_product_catalog.sql`, a new pure module
+`platform/alo-store/src/inv_barcode.rs`, the store and the wire.
+
+- **Migration `0153`** adds `sku`, `barcode`, `stocked` (default **false**, so
+  no existing tenant acquires a stock ledger by upgrade), `purchase_price_cents`,
+  `photo_node_id` and `default_supplier_id`; three CHECK constraints as defence
+  in depth; **two partial, tenant-scoped unique indexes** (`(tenant_id, sku)
+  WHERE sku <> ''` and the same for `barcode`); and a partial index on the
+  stocked, unarchived rows for B5.09a's screens. Expand-only: nothing is
+  rewritten and nothing is dropped, and a build that has not seen it reads and
+  writes products exactly as before.
+- **`inv_barcode`** is the GTIN check-digit validator, the shape `vat_id.rs`
+  (B1.03) established: characters in, a verdict out, no store handle and no
+  door. Digits kept as **text** (a GTIN's leading zeros are part of it), four
+  lengths only (8/12/13/14), blank always valid, separators treated as
+  presentation, and errors that name the rule and never carry the code.
+- **`billing_products`** carries the five facts through `NewProduct`/`Product`,
+  validates them in the same pure `normalize` both doors already share, gates
+  the photo through `drive_require_read` (B4.05a's rule — a guessed node id
+  attaches nothing), and maps the two uniqueness violations to a
+  `Conflict` naming **which** field collided. New read
+  `billing_product_by_barcode` — the call a scanner makes (B5.09c): a bad code
+  is `None` rather than an error, because a bad scan found nothing, and it can
+  never see another tenant's stock.
+- **`/billing/products`** carries the same fields additively (`sku`, `barcode`,
+  `stocked`, `purchasePriceCents`, `photoNodeId`), `photoNodeId` nullable
+  through `absent_or_null` so a photo attached by mistake can be taken off.
+  **No new route and no new prefix** — the design note's own decision that the
+  inventory UI edits products through the existing billing routes.
+
+**How verified.**
+
+```
+cargo fmt -p alo-store -p alo-jmap                          clean
+SQLX_OFFLINE=true cargo clippy -p alo-store --all-targets   zero warnings
+SQLX_OFFLINE=true cargo clippy -p alo-jmap  --all-targets   zero warnings
+cargo test -p alo-store   (full suite, real Postgres)       871 unit + every
+                                                            integration binary,
+                                                            0 failed
+cargo test -p alo-jmap --lib --test billing_http            511 + 14, 0 failed
+```
+
+The tests that carry the item, all against the real database:
+
+- `billing_products_tenancy::product_catalog_is_unique_within_a_tenant_and_never_across_them`
+  — the **wrong-uniqueness** proof the design note calls mandatory: tenant B
+  stores the very SKU and barcode tenant A already uses and **neither insert
+  fails**, while a second use inside one tenant is a `Conflict` naming the
+  field, on create *and* on update. Plus the round trip (separators stripped,
+  SKU trimmed, both prices exact integers), the scan read finding A's chair and
+  never B's, a bad code scanning to nothing, and the photo gate: B pointing at
+  A's Drive node gets the same `NotFound` as a node that never existed, on
+  create and on update, leaving no half-written row.
+- `billing_http::a_product_carries_its_catalog_facts_and_refuses_a_bad_code`
+  and `::the_same_barcode_in_two_tenants_is_two_products` — the same rules at
+  the edge, through the real router: `200` with the fields echoed, `422` naming
+  the field for three bad codes with the code itself never in the detail, `409`
+  naming SKU or barcode, `404` for an unseeable photo, and `false`/`""` read as
+  stated values rather than absences.
+- 12 new unit tests: every single-digit change to six real GTINs is refused
+  (the check digit's whole purpose), leading zeros survive, and the two prices
+  are bounded separately.
+
+**Gate note, stated plainly:** no separate curl transcript this iteration. The
+LOOP requires a live wire-verify for **new HTTP routes**; this item registers
+none — the route table is byte-identical and the fields are additive on routes
+B1.05 already proved on the wire. The edge is instead proven by `billing_http`,
+which drives the **real axum router over the real Postgres** and asserts the
+real status codes. A socket is the only thing between that and curl.
+
+**Cuts and flags:**
+
+- **`default_supplier_id` is reserved, not writable.** The column exists (the
+  note asks for it in B5.02) but no code writes it: `inv_suppliers` is B5.03's
+  table, and the composite foreign key that makes the id necessarily the same
+  tenant's supplier can only arrive with it. Writing an unvalidated supplier id
+  now would be a dangling reference by construction. B5.03 adds the key, the
+  write path and the picker together; `docs/design/inventory.md` records this
+  as-built beside the column table.
+- **No un-stocking guard yet.** The error map says un-stocking a product that
+  carries movements is a `409`. There are no movements until B5.04a creates
+  `inv_moves`, and a guard that reads a table which does not exist is a lie in
+  the shape of a check. The module doc says where it belongs; B5.04a owns it.
+- **Archived products still hold their codes.** The unique indexes do not
+  exclude archived rows, so an archived item's SKU cannot be reused. Deliberate:
+  archived is not deleted, and history that reuses a code stops being
+  explainable. Flagged here in case a wave review disagrees.
+- **SKU uniqueness is case-sensitive**, exactly as the note specifies
+  (`(tenant_id, sku)`); `CH-blue-01` and `CH-BLUE-01` are two products. If real
+  catalogues turn out to want case-insensitivity, that is an expand migration on
+  `upper(sku)` and a decision to make with data in front of us.
+- **Web: none.** The catalogue screens are B5.09a; nothing in `web/` changed, so
+  no i18n strings were added this iteration.
+
+**Migration number, and the collision that was caught:** the file was written
+as `0153` against a tree whose highest was `0152`, and the rebase before the
+push brought `0153_meetings.sql` from the other track. Two files with the same
+version is a migrator error, not a merge conflict, so git says nothing — it was
+caught by listing the directory after the rebase. Renumbered to
+**`0154_billing_product_catalog.sql`**, the local dev database's mis-numbered
+row and its DDL undone by hand (dev only — no production database is ever
+touched by this loop), and both suites re-run afterwards: migrations now apply
+151 → 152 → 153 (meetings) → 154, `billing_products_tenancy` and `billing_http`
+green again. **The lesson for the next iteration: take the migration number
+AFTER the rebase, not before**, or re-check it in the pre-push rebase.
+
+**No human action added.** `/inventory` is still the pending Caddyfile prefix
+from B5.01, and this item did not need it — the catalog rides on `/billing`,
+which production already proxies.
+
+Next item: B5.03 (suppliers — `inv_suppliers`, `inv_supplier_products`, and the
+composite foreign key that finally makes `default_supplier_id` writable).

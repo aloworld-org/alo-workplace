@@ -215,6 +215,13 @@ So B5.02 adds to `billing_products`:
 | `photo_node_id` | `TEXT` (nullable) | a Drive node, referenced by id and never copied, exactly as a receipt is (`fin_expenses.receipt_node_id`, B4.05a) |
 | `default_supplier_id` | `TEXT` (nullable) | who we usually buy it from — the seed of a reorder proposal (B5.07) |
 
+**As built (B5.02):** all six columns exist from migration `0153`, but
+`default_supplier_id` is **reserved and not writable yet**. `inv_suppliers` is
+B5.03's table, and the composite foreign key that makes the id necessarily the
+same tenant's supplier arrives with it; until then nothing writes the column,
+so no dangling reference can exist. B5.03 adds the key, the write path and the
+picker together.
+
 Both unique indexes are **partial and tenant-scoped**: `UNIQUE (tenant_id,
 sku) WHERE sku <> ''`. A global unique index on a barcode would be a
 cross-tenant information leak of the plainest kind — tenant B's insert failing

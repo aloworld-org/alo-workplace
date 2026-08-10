@@ -6,6 +6,19 @@ contracts.
 
 ## Unreleased
 
+- **Your price list now knows what is on the shelf.** A product can carry the
+  code you call it by, the barcode on its box, what you *pay* for it as well as
+  what you charge, a photo from your Drive, and one plain fact: whether it is a
+  thing with a quantity or a service. Nothing changed for what you already
+  sell — every existing product stays a service, and every field is optional,
+  so a consultancy never sees a warehouse. Two refusals are on purpose: a
+  barcode is checked against its own check digit, so a mistyped or misread code
+  is caught while you are typing it rather than when the wrong item ships; and
+  a code you already use on another product is refused by name. That
+  uniqueness is yours alone — another company selling the same book is no
+  business of your catalogue, and never blocks you. Today this reaches you
+  through the API; the catalogue screens follow.
+
 - **alo Finance now speaks French and Dutch, from the receipt to the return.**
   The whole module reads in your own language: the claim you fill in, the queue
   an approver works through, the bank import and the screen where you say what
