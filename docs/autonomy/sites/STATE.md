@@ -7,16 +7,22 @@ except to actually fire them.
 
 Human-action inbox (things the loop must not do itself):
 
-- ~~Buy/choose the public sites domain and set wildcard DNS~~ **DONE
-  2026-08-07: alosites.com purchased (Namecheap). Verified live on public
-  DNS: apex/`*`/www A → 152.53.179.142, null SPF + DMARC reject. The env for
-  the alo-sites service is `SITES_DOMAIN=alosites.com`.**
-- At next deploy: add the alo-sites container to production compose + Caddy
-  wildcard/on-demand-TLS config (the loop never touches deploy/).
-- Configure an AI provider key on the live server before real "generate my
-  site" runs (loop verifies with fixtures only).
-- Post-launch hardening (not urgent): submit alosites.com to the Public
-  Suffix List so browsers isolate customer subdomains from each other.
+- **Domain/DNS done (2026-08-07):** `alosites.com` is purchased and its
+  apex/wildcard/www DNS is live. Use `SITES_DOMAIN=alosites.com`.
+- **Next production deploy:** add the `alo-sites` service to compose with its
+  database/blob settings and a strong `ALO_SITES_ANALYTICS_SECRET` (at least
+  32 bytes). Route workspace `/sites` to `alo-jmap`, wildcard and custom
+  public Hosts to `alo-sites`, and Caddy on-demand TLS decisions to
+  `/internal/tls/ask`. The loop never edits `deploy/`.
+- **Enable real generation:** in the live tenant's Settings, configure and
+  select an OpenAI-compatible AI provider with its base URL, model, and key
+  when required. Loop tests use fixtures and never call an external model.
+- **Customer custom-domain help:** retain the shown TXT proof through
+  verification, then CNAME a subdomain to the deployment ingress; apex
+  domains need ALIAS/ANAME or CNAME flattening. Explain that HTTPS may take a
+  few minutes after DNS propagates.
+- **Post-launch hardening:** submit `alosites.com` to the Public Suffix List
+  so browsers isolate customer subdomains from each other.
 
 ---
 
@@ -2050,4 +2056,30 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   the human-error rule and hide the authoritative reason. No storage or HTTP
   route changed, so Rust gates, wrong-tenant testing, and live curl verification
   are not applicable.
+- **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.31b S1 as-built reconciliation
+
+- **Shipped:** `docs/design/sites.md` now records the shipped Websites web
+  surface, creation/editor flow, storage and service boundaries, form
+  notification path, custom-domain gate, privacy analytics implementation,
+  AI review guarantees, and all deliberate global capabilities as built. An
+  eleven-row reconciliation accounts for every `[S1]` promise, including the
+  S1.30b/c full-address and direct-Home fixes. `docs/features.md` links to that
+  accounting rather than leaving the wave's status implicit.
+- **Human inbox:** consolidated the remaining production-only work: compose
+  and Caddy routing, `ALO_SITES_ANALYTICS_SECRET`, live tenant AI-provider
+  configuration, customer custom-domain DNS help, and the post-launch Public
+  Suffix List submission. The purchased domain and live wildcard DNS remain
+  recorded as done without repeating production infrastructure details.
+- **Verified:** `git diff --check`, `npx tsc --noEmit`, and `npm run build`
+  are clean. The build retains only the repository's existing Rollup circular
+  re-export and large-chunk warnings. No source, storage, or HTTP route changed,
+  so ESLint, Rust gates, wrong-tenant testing, and live curl verification are
+  not applicable.
+- **Cuts/flags:** V1 themes intentionally expose seven accessibility-checked
+  presets rather than free-form colors; form-notification server copy remains
+  English in S1; automatic CRM lead creation remains owned by B2. The public
+  Sites service is code-complete but still awaits the human production deploy
+  and configuration listed above.
 - **Next:** the first unchecked item in `QUEUE.md`.

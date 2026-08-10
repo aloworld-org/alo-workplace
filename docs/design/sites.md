@@ -1,15 +1,15 @@
 # Design note — alo Sites (marketing site + blog + forms)
 
-Status: building · 2026-08 · ADR 0036 · Sites track wave S1
+Status: S1 as built · 2026-08 · ADR 0036 · Sites track wave S1
 
 alo Sites is the AI-native no-code website builder: "tell me about your
 business" produces a complete draft site, then editing is conversational
 (propose-then-approve, the ADR 0034 trust pattern) or manual through
 typed section forms. V1 ships a marketing site + blog + contact forms,
 published instantly at `<subdomain>.<SITES_DOMAIN>` and optionally on a
-verified custom domain. This note records the data model, the render
-pipeline, the two-service boundary, and the privacy posture before the
-first migration lands; it is updated to as-built at the S1 wave review.
+live custom domain. This note records the as-built data model, web surface,
+render pipeline, two-service boundary, and privacy posture after the S1 wave
+review.
 
 ## Surface
 
@@ -32,6 +32,25 @@ first migration lands; it is updated to as-built at the S1 wave review.
   `alo-jmap`; the public internet calls `alo-sites`; `alo-ai`'s sites
   module produces generation/edit envelopes that `alo-jmap` applies.
 
+### Web surface — as built
+
+The Websites module follows the Wix/Squarespace builder reflex without
+hiding the core path behind a menu. Its list surface keeps **New website**
+visible. Creation shows the complete configured address while the user types,
+checks availability, accepts either a slug or pasted full URL, and repeats the
+server's validation reason verbatim. The name suggests a slug but never locks
+it. Both AI generation and manual creation atomically create a Home page and
+open its editor; an empty Home page exposes **Add your first section**, which
+opens the Hero form in one click. The general **Add section** control remains
+visible for every other section type.
+
+The page editor keeps page management, section insertion, preview, theme,
+publish, submissions, analytics, domains, and blog visible on the surface.
+Typed forms edit section data; move and remove actions remain beside each
+section. AI changes are review surfaces, never direct writes: per-field copy
+names the exact field and shows old and proposed text, while whole-page edits
+show the exact before/after rendered HTML. Approve is the only write.
+
 ### Data model (tenant-scoped unless noted)
 
 All tables carry `tenant_id` and are reached only through the
@@ -45,8 +64,9 @@ store's tenancy doors; ids are newtypes; timestamps are
   `draft | live`, theme JSON, created/updated. The subdomain column is
   the single deliberate cross-tenant surface: the claim check touches a
   global unique index but reveals only *taken / free*, never the owner.
-- **`site_pages`** — site ref, `slug` (unique per site, `[a-z0-9-]`,
-  empty allowed only for the home page), title, `sections` JSON
+- **`site_pages`** — site ref, `slug` (unique per site, 1–80 characters
+  from `[a-z0-9-]`, with empty allowed only for the home page), title,
+  `sections` JSON
   (validated against the typed schema below on every write), SEO meta
   (title/description overrides), nav order, home flag.
 - **Section JSON versioning** — a page's `sections` value is an
@@ -84,16 +104,20 @@ store's tenancy doors; ids are newtypes; timestamps are
   section references a form id; submissions store the posted fields
   (size-capped), `received_at`, and handled flag. **No IP and no
   user-agent are ever stored.**
-- **`site_domains`** — domain name, TXT verification token, status
-  `pending | verified | live`. Serving on a custom Host requires
-  status `verified`+; the Caddy on-demand-TLS "ask" endpoint answers
-  from this table.
+- **`site_domains`** — globally unique normalized domain name, TXT
+  verification token, status `pending | verified | live`. The verification
+  action promotes an exact TXT proof directly to `live`; public Host serving
+  and the Caddy on-demand-TLS "ask" endpoint require `live`, so a pending or
+  otherwise non-serveable claim never earns a certificate.
 - **`site_analytics_daily`** — (tenant, site, date, path, referrer
-  domain, hit count, unique-ish count). Uniqueness is a
-  **daily-salted hash** kept only in memory for the day; the stored
-  schema has **no PII columns** — a test asserts the column list, and
-  raw request data (IP, UA, full referrer URL) is dropped after the
-  in-memory aggregation step.
+  domain, hit count, unique count), plus
+  **`site_analytics_daily_visitors`**, which stores only an opaque 32-byte
+  HMAC token scoped to one site and one day. The source address is used
+  transiently to derive that token with a deployment secret; query strings
+  are stripped, Referer is reduced to its lowercase domain, and user-agent is
+  never read. No raw IP, UA, full referrer URL, or cross-day visitor identity
+  is persisted. Exact daily uniqueness therefore survives a process restart
+  without becoming a visitor profile.
 
 ### Render pipeline
 
@@ -142,8 +166,10 @@ visitor → POST /f/:form_id on alo-sites
     persisted)
   → insert into site_form_submissions (tenant-scoped via the form's
     site)
-  → notification by INTERNAL delivery to the owner's inbox (the
-    existing local-delivery path — never outbound SMTP)
+  → an alo-jmap background sweep claims each unnotified row at most once
+    and delivers an INTERNAL message to the site owner's inbox (the existing
+    local-delivery path — never outbound SMTP); From is the site's no-reply
+    address and Reply-To is the visitor when supplied
   → CRM lead creation when the business track's B2 lands (out of
     scope here; the seam is the submission row)
 ```
@@ -156,8 +182,10 @@ edit ops (add/remove/reorder section, set prop, rewrite copy) with
 strict schema parse + one repair retry. Everything is
 propose-then-approve; a draft site is never auto-published. The loop
 verifies with **fixture model outputs only** — live calls require a
-human-configured key, and the unconfigured path degrades to
-blank-site + templates.
+human-configured, tenant-scoped OpenAI-compatible provider (base URL, model,
+and optional key in Settings), and the unconfigured path degrades to
+blank-site + templates. Per-field copy operations are constrained to an
+exact stored section and JSON string pointer; proposing writes nothing.
 
 ## Errors
 
@@ -200,10 +228,12 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
   → (tenant, site), and every subsequent read (snapshots, posts,
   forms, analytics) is scoped by that pair. The Host-isolation
   integration test proves site A's host cannot serve site B.
-- Deliberate global surfaces, and the only ones: the `subdomain`
-  unique index (leaks taken/free only) and the host→site resolver
-  (public data by definition). Everything else — pages, snapshots,
-  posts, submissions, domains, analytics — is tenant-scoped.
+- Deliberate global surfaces, and the only ones: the `subdomain` unique index
+  (leaks taken/free only), the globally unique normalized custom-domain claim
+  (one Host can name only one site), the host→site resolver (public data by
+  definition), and the opaque random form id used as the anonymous submission
+  capability. All subsequent reads and writes are tenant/site scoped; the
+  form id reveals no tenant data and has no public read-back route.
 - Form submissions and analytics write **into** a tenant's scope from
   anonymous traffic; the writable set is exactly {insert submission,
   bump aggregate} for the resolved site — no read-back surface exists
@@ -222,10 +252,10 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
   has its substrate).
 - CRM lead creation from form submissions (waits for business-track
   B2; the seam is the stored submission).
-- Production serving infrastructure: the `alo-sites` container,
-  wildcard DNS/TLS, and the `SITES_DOMAIN` purchase are human deploy
-  actions recorded in the sites STATE human-inbox — the loop never
-  touches `deploy/`.
+- Production serving infrastructure: the public domain and wildcard DNS are
+  ready, but adding the `alo-sites` container and Caddy wildcard/custom-host
+  routing remains a human deploy action recorded in the Sites STATE inbox —
+  the loop never touches `deploy/`.
 - Multi-site-per-tenant limits, quotas, and billing integration —
   unlimited sites per tenant in v1; revisit with billing.
 
@@ -243,3 +273,38 @@ unauthenticated, internet-facing surface inside the workspace API
 process — a separate `alo-sites` binary keeps the blast radius, cache
 behavior, and scaling profile of anonymous traffic away from tenant
 data paths.
+
+## What S1 promised, and what S1 shipped (S1.31b)
+
+Every `[S1]` line in `docs/features.md` § alo Sites is reconciled here. No
+feature is silently absent: each is shipped or names its explicit dependency.
+
+| `[S1]` feature | State | Where / narrowing |
+|---|---|---|
+| ★ AI builds the first draft | **Shipped** | `alo-ai` and the authenticated Sites routes exchange a strict full-site envelope, allow one repair turn, and store only after review. Fixture providers cover unattended tests; production still needs a human-configured tenant provider. Creation now shows the full address and opens the generated Home editor directly (S1.30b/c). |
+| Section-based editor | **Shipped** | All twelve typed section variants have visible add/edit/move/remove controls and schema-checked writes. A new empty Home page opens its Hero form in one click; no pixel canvas or hidden core action. |
+| Themes | **Shipped** | Seven validated palette/typography presets and Drive-backed logo/favicon references feed the single generated stylesheet. V1 deliberately keeps colors inside accessible presets rather than exposing unsafe free-form token editing. |
+| ★ Static Rust rendering | **Shipped** | `alo-sites` renders semantic, escaped, SEO-complete HTML with near-zero JS from the same library used by authenticated preview; golden and byte-budget tests pin it. |
+| Publish snapshots and instant subdomain | **Shipped** | Atomic immutable snapshots are the public service's only page source. Drafts and unpublished sites resolve like unknown hosts. The configured full address is visible and checked during creation. |
+| ★ Custom domains | **Shipped**, deployment pending | TXT proof creates a `live` normalized claim; Host serving and the Caddy ask endpoint accept only currently serveable published sites. Customer DNS guidance is recorded below; production Caddy/container work remains human-owned. |
+| Contact forms | **Shipped**, one stated dependency | Contact sections create their form records; public submit has caps, honeypot and rate limiting; submissions are reviewable/exportable CSV; internal notifications are claimed at most once. Notification server copy is English in S1. **CRM lead creation remains intentionally deferred to B2**, exactly as the feature line states. |
+| ★ Blog written in alo Docs | **Shipped** | Tenant-owned Docs become draft/published posts; the public index paginates, post HTML is sanitized, and RSS is served. |
+| SEO | **Shipped** | Per-page overrides, Open Graph, canonical URLs, sitemap and robots are rendered from published state. |
+| ★ Privacy-first analytics | **Shipped** | Daily path/referrer aggregates and exact day-scoped uniques use opaque HMAC tokens. No cookies, raw IP, UA, query, full referrer, or cross-day visitor identity is stored. |
+| ★ AI copy tools per section | **Shipped** | Exact-field and whole-page proposals show reviewable before/after content; approve is the sole write and selecting a different field cannot silently retarget a proposal. |
+
+**Languages.** The complete Sites surface is translated in English, French,
+and Dutch. A catalog parity test fails when a new Sites key lacks either
+translation.
+
+**Human production inbox.** At the next production deploy, add the
+`alo-sites` service with `SITES_DOMAIN=alosites.com`, blob/database settings,
+and a strong `ALO_SITES_ANALYTICS_SECRET` (at least 32 bytes); route workspace
+`/sites` traffic to `alo-jmap`; route wildcard and custom public Hosts to
+`alo-sites`; and connect Caddy on-demand TLS to `/internal/tls/ask`. Configure
+the live tenant's OpenAI-compatible provider in Settings (base URL, model,
+and key when the provider requires one). Customer DNS help must say: keep the
+shown TXT proof until verification succeeds, then CNAME a subdomain to the
+deployment ingress; an apex needs the DNS host's ALIAS/ANAME or CNAME
+flattening equivalent. Certificate issuance may take a few minutes. After
+launch, submit `alosites.com` to the Public Suffix List.

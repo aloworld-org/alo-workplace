@@ -524,6 +524,14 @@ fast-follow · **[S+]** = later. Built by the Sites track loop
 - [S1] SEO: per-page titles/descriptions, OG tags, sitemap.xml, robots, canonical
 - [S1] ★ Privacy-first analytics: daily aggregate visits + referrer domains, no IPs, no cookies, no consent banner — proven by tests
 - [S1] ★ AI copy tools per section: rewrite, tone, shorten/lengthen — propose-then-approve
+
+> **S1 reconciliation (2026-08-10):** all eleven S1 promises are accounted
+> for in [`docs/design/sites.md`](design/sites.md#what-s1-promised-and-what-s1-shipped-s131b),
+> including the full-address and direct-Home creation fixes from S1.30b/c.
+> The only product dependency remains the one already stated above: automatic
+> CRM lead creation waits for B2. Production container, Caddy, analytics-secret,
+> and tenant AI-provider configuration remain explicit human operations.
+
 - [S2] ★ Whole-site AI translation (multilingual EU sites in one click) with language switcher
 - [S2] ★ **Collections — structured content from alo Base** (the CMS layer): repeatable content (menu items, team members, portfolio projects, FAQs) lives as an alo Base table, and a collection-backed section renders its rows — add a row, the site updates on next publish. One brain: the tables product IS the CMS; AI can fill/translate rows propose-then-approve. Includes per-collection field mapping (column → card title/image/price) and empty-state handling.
 - [S2] **Site-editor role**: invite a colleague (e.g. the marketing person) who can edit and publish the site — and only the site: no mail, no files, no workspace admin (on Spaces permissions, same pattern as the accountant role).
