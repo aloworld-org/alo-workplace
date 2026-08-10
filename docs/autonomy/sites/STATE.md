@@ -2083,3 +2083,44 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   Sites service is code-complete but still awaits the human production deploy
   and configuration listed above.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.32a final forms and publish arc
+
+- **Shipped:** AI-generated contact sections now receive a real tenant-owned
+  form and its ID inside the same transaction that creates the site and pages.
+  A generated website can therefore move directly through section editing,
+  theme selection, publishing, public rendering, visitor submission, the
+  owner's submissions surface, and the owner's inbox without a dead form or a
+  manual repair step. Generation rejects model-supplied form IDs, applies the
+  existing per-site form limit, and derives the owner-facing form name from the
+  section heading.
+- **Tenant and atomicity proof:** the storage regression proves the generated
+  form, linked section, site, and pages are visible to their owner and absent
+  through another tenant's account door. The cross-service HTTP regression
+  proves the outsider receives `404` for submissions and no inbox message.
+  Site, form, and linked page writes remain one transaction.
+- **Real curl transcript:** with fresh local `alo-jmap` and `alo-sites`
+  processes, Postgres on `127.0.0.1:5432`, and a localhost scripted model
+  fixture: generation returned `200` with a linked form; section edit `200`;
+  midnight theme `200`; publish `200`; the generated subdomain Host returned
+  `200` with the edited snapshot; theme CSS returned `200` with the midnight
+  tokens; public form POST returned `200`; the authenticated submissions door
+  returned one tenant row; and JMAP returned one internal owner-inbox
+  notification. The fixture provider, generated site, and test processes were
+  removed afterward. No external AI or outbound email was used.
+- **Verified:** `cargo fmt -p alo-store -p alo-jmap`; `SQLX_OFFLINE=true cargo
+  clippy -p alo-store -p alo-jmap --all-targets --jobs 1 -- -D warnings`;
+  `cargo test -p alo-store --jobs 1 -- --test-threads=1` (832 unit tests and all
+  integration/doc tests); `cargo test -p alo-jmap --jobs 1 --
+  --test-threads=1 --format terse` (479 unit tests and every HTTP integration
+  binary, including all five Sites generation tests); `cargo test -p alo-sites
+  --jobs 1 -- --test-threads=1 --format terse`; `npx tsc --noEmit`; and `npm
+  run build` are green. No web file changed, so focused ESLint is not
+  applicable. The build retains only the repository's existing Rollup circular
+  re-export and large-chunk warnings.
+- **Cuts/flags:** the first full storage attempts omitted the required local
+  `DATABASE_URL` and timed out against the harness fallback; explicitly using
+  `postgres://alo:alo-dev-only@127.0.0.1:5432/alo` produced the clean full run.
+  The public notification worker's real 30-second cadence was allowed in the
+  curl proof; the regression test invokes the same sweep directly for speed.
+- **Next:** S1.32b, the final blog, custom-domain, and zero-PII analytics arc.
