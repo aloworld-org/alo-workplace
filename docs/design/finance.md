@@ -97,6 +97,7 @@ read (the rename B3.11 paid for; it is not paid twice).
 | `GET /finance/expenses/pending` | **approver-only**: the claims of this tenant awaiting a decision, oldest purchase first, each with its claimant's address and its category's name. A view of the same collection rather than a second one, because the decisions are on the claim itself (B4.05b) |
 | `GET /finance/expenses/reimbursable` | **approver-only**: the claims this tenant has approved and **still owes an employee** for, oldest decision first, same three facts beside each. Added by B4.13a, when the payer's screen needed a list it could work through: `pending?status=approved` would have been the wrong list, because an approved claim a company card paid is approved and owes nobody anything — it would sit in a payer's queue forever, refused by `reimburse` every time. The two reads share one joined statement in the store and differ only in their predicate |
 | `POST /finance/expenses/{id}/submit` · `/withdraw` · `/approve` · `/reject` · `/reimburse` | the transitions; `submit`/`withdraw` are the claimant's, the last three approver-only (B4.05b) |
+| `POST /finance/expenses/{id}/category/accept` · `/decline` | answer the category the agent SUGGESTED for one claim (B4.14a). The claimant's own verbs on their own claim, which is why they sit here and not beside the tool: accepting *is* picking a category and obeys every rule picking one by hand does (still theirs to change, word still offered). Declining clears the suggestion and is remembered, so nothing suggests that claim again |
 | `POST /finance/receipts` | read a receipt already in the caller's Drive (`{nodeId}`), get the **parsed fields back for confirmation**. Writes nothing at all, and joins `READ_ONLY_POSTS` (as built, B4.06b) |
 | `GET/POST /finance/mileage` · `DELETE /finance/mileage/{id}` | mileage claims; each becomes an expense at the tenant's per-km rate (B4.07) |
 | `GET/PUT /finance/mileage/rates` | the per-km rate table, effective-dated (B4.07) |
@@ -1713,9 +1714,43 @@ right rows against the local database). No live model call in the loop, ever.
 
 | Tool | Kind | What it may do |
 |---|---|---|
-| `categorise_transactions` | **draft** | propose a category (hence an account) for unmatched bank lines or uncategorised expenses. Writes proposals; a human approves each |
+| `categorise_transactions` | **draft** | propose a category (hence an account) for the caller's own uncategorised expense claims. Writes proposals; a human answers each |
 | `vat_summary` | **answer** | read `/finance/reports/vat` for a period and answer with the figures as sources. No writes |
 | `flag_anomalies` | **answer** | read the journal for a period and name what looks unusual — a duplicate amount to the same counterparty, an expense far outside its category's range, a month with no rent — **with the entries as sources**. No writes, no scores, no "risk" |
+
+### As built, B4.14a — `categorise_transactions`
+
+Four decisions the slice made, none of them reversible by a later one without
+saying so:
+
+- **The suggestion is a different column from the decision.** `fin_expenses`
+  gained `proposed_category_id` / `proposed_at` / `proposed_reason` (0150), and
+  nothing — no posting rule, no report, no VAT return — reads them.
+  `category_id` stays what a *person* chose. A guess written into the decided
+  column would be indistinguishable from a decision the moment it landed.
+  Accepting **moves** the value between the two columns.
+- **The model chooses nothing.** The classification is the store's
+  (`fin_categorise::plan_categorisation`, a pure function): for each
+  unclassified claim, the category this person has most often agreed to for the
+  same merchant, ties broken by recency, and **no suggestion at all** for a
+  merchant they have never classified. The tool's arguments are a period and
+  nothing else — there is no category argument to smuggle a guess through, and
+  the prompt says so.
+- **Only the claimant's own history is read**, which is a privacy rule and not
+  a convenience: a tenant-wide merchant map built out of everybody's receipts
+  would answer "who has been to that pharmacy" as a side effect. The personal
+  door has no cross-user read, and this slice did not open one.
+- **A "no" outlives the suggestion it was about** (`proposal_declined_at`).
+  Without it the next run offers the same rejected word, and a suggestion a
+  person has to decline twice is one they stop reading. A claim that already
+  carries an unanswered suggestion is skipped for the same reason.
+
+**Cut, and named:** *unmatched bank lines*. The sketch above offered them
+beside the claims, but a bank line has no category — booking one to an account
+is a verb that does not exist on any door (`match` settles a line against a
+document; there is no "book this line to 6100"). Suggesting a category for a
+thing nothing can then classify would be an offer with no accept. It belongs
+with whatever item opens that verb, not here.
 
 Two rules the third tool needs. It **names entries, never people**: an
 anomaly is a fact about a document, and an agent that summarises an

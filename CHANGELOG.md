@@ -6,6 +6,18 @@ contracts.
 
 ## Unreleased
 
+- **Ask alo to sort out your expenses — and answer each suggestion yourself.**
+  Say "categorise my expenses" and alo goes through your own claims that have no
+  category yet and suggests one for each, taken from the categories *you* have
+  already used for that merchant, with how many earlier claims back it. Every
+  suggestion waits for you: accept it or say no, one claim at a time, right on
+  the card. Nothing is classified, booked, reported or put on a VAT return until
+  you accept — a suggestion is kept apart from the category you chose, so a
+  guess can never end up in your books. A merchant you have never classified
+  gets no guess at all, and the claims it left out are listed with the reason.
+  Say no once and it will not suggest that claim again, though you can still
+  pick a category yourself.
+
 - **See where your money actually stands, and keep the chart of accounts
   yourself.** Finance has two new tabs. **Accounts** is your chart of accounts,
   grouped by what each account holds and showing what it moved over any period

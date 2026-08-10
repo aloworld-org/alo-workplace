@@ -13992,3 +13992,117 @@ and `/projects`. No new top-level prefix this item.
 Next item: B4.14a (★ Finance agent — `categorise_transactions` as a draft:
 allowlist entry, executor over the B4.09 matcher and the chart this item opened,
 structural wire-verify with no model calls).
+
+## B4.14a — the finance agent's first tool: a suggested category, and the two ways to answer it (2026-08-10)
+
+**What shipped.** `categorise_transactions` — the fourth product's first agent
+tool (ADR 0034 seam; ADR 0035 wave B4.14). Ask alo to sort out your expenses and
+it goes through *your own* claims with no category, suggests one for each, and
+waits. Four pieces, and one sentence holds all of them together: **a suggestion
+is not a classification.**
+
+- **Migration 0150** adds `proposed_category_id` / `proposed_at` /
+  `proposed_reason` / `proposal_declined_at` to `fin_expenses`, expand-only.
+  Nothing downstream reads the first three: no posting rule, no P&L, no VAT
+  return. `category_id` remains what a *person* chose. Accepting **moves** the
+  value between the two columns; a guess in the decided column would be
+  indistinguishable from a decision the moment it landed.
+- **`alo-store/fin_categorise.rs`** decides, deterministically and with no model
+  anywhere: `plan_categorisation` is a pure function over rows — for each
+  unclassified claim, the category this person has most often agreed to for the
+  same merchant (case/space-insensitive), ties broken by recency, and **nothing
+  at all** for a merchant they have never classified. It reads only the caller's
+  own history, which is a privacy rule and not a shortcut: a tenant-wide
+  merchant map built from everybody's receipts would answer "who has been to
+  that pharmacy" as a side effect. It contains no vocabulary — no "Uber →
+  Travel" table, no English — for the reason `fin_categories` ships empty.
+- **`alo-ai/agent_finance.rs`** is the tool list and the paragraph. The
+  description names **no category argument**, because there is none: a model
+  that believed it was choosing the category would start passing one, and a cost
+  booked to an invented word is a wrong P&L nobody can see.
+- **`alo-jmap/agent_finance.rs`** executes: parses a *period* and nothing else,
+  asks the store, and answers with figures and reason codes — never a sentence.
+  `POST /finance/expenses/{id}/category/accept` · `/decline` are the answer
+  verbs, in `finance_expenses.rs` because they are the claimant's own verbs on
+  their own claim. Accepting obeys every rule picking a category by hand does
+  (still theirs to change; the word still offered). Declining is **remembered**:
+  without that, the next run offers the same rejected word, and a suggestion a
+  person must decline twice is one they stop reading.
+- **Web:** the agent receipt renders the suggestions *answerably* — Accept / No
+  on each line, with the merchant, the day, the tenant's own word for the
+  category and how many earlier claims back it, plus the claims it skipped with
+  their reason. The answered line keeps its place and says what was answered
+  rather than vanishing under the cursor. The finance module's public surface
+  gained exactly two names (`useFinanceApi`, `financeMessage`) so the shell
+  answers through *this* module's client rather than growing a second one.
+
+**How verified.**
+
+```
+cargo test -p alo-store            → 840 lib + 7 new fin_categorise integration, green
+cargo test -p alo-ai               → 67, green      cargo test -p alo-jmap --lib → 499, green
+cargo clippy -p alo-store -p alo-ai -p alo-jmap --all-targets → clean
+npx tsc --noEmit · npx eslint <changed> · npm run build · vitest Expenses.test → clean
+
+wire (local alo-jmap + docker alo-pg, fresh tenant, 6 claims):
+POST /ai/agent/execute {categorise_transactions}   no token   → 401
+POST /finance/expenses/x/category/accept           no token   → 401
+POST /ai/agent/execute {categorise_everything}                → 400 "unknown tool"
+POST /ai/agent/execute {from 2026-07-01, to 07-31}            → 200 suggested 1 / considered 3
+                                                    proposed: Reisekosten, evidence 2
+                                                    skipped: noMerchant, noHistory
+GET  /finance/expenses?…                                      → categoryId null,
+                                                    proposedCategoryId cat-reise, reason merchantHistory
+POST /ai/agent/execute (the same period, again)               → suggested 0, "alreadyProposed"
+POST /finance/expenses/{id}/category/accept                   → 200 categoryId set, proposal cleared
+POST …/category/accept (again)                                → 409 "carries no suggested category"
+POST /finance/expenses/nope/category/accept                   → 404
+POST …/category/decline                                       → 200 declinedAt set, categoryId still null
+POST /ai/agent/execute (again)                                → suggested 0, "declined"
+POST …/category/decline (again)                               → 409
+POST /ai/agent/execute {from 2024-01-01}                      → 422 "shorter than 366 days"
+POST /ai/agent/execute {from "yesterday"}                     → 422 "written YYYY-MM-DD"
+POST /ai/agent/execute {}                                     → 200, 2026-05-13 → 2026-08-10
+psql: fin_postings for the tenant → 0 rows. The books were never touched.
+```
+
+**Cuts, named.**
+
+- **Unmatched bank lines are out of this tool**, against the design note's
+  original sketch. A bank line has no category, and booking one to an account is
+  a verb that exists on no door: `match` settles a line against a *document*,
+  and there is no "book this line to 6100". Suggesting a classification for a
+  thing nothing can then classify would be an offer with no accept. The design
+  note now says so; it belongs with whatever item opens that verb.
+- **No `/finance/categories` door, still.** B4.13a's cut, and it bit here: the
+  wire test had to insert a category with `psql` because no HTTP route creates
+  one, and the *expenses screen* cannot show a suggestion by name — it only has
+  ids. That is why the answer verbs live on the agent receipt (which carries the
+  names the server resolved) rather than on the claims table. **Opening
+  `/finance/categories` is now the highest-value small item in Finance**: it
+  unblocks the claim form's category picker *and* the suggestion chip on the
+  expenses row.
+- **No fr/nl** for the ~18 new strings — the wave-review rule, B4.15.
+- **The suggestion is not shown on the Expenses tab** (same cause as above), so
+  a person who closes the agent card answers the remaining suggestions by asking
+  again — which is idempotent (`alreadyProposed`) and therefore safe, but it is
+  a second-best path until the categories door exists.
+
+**Flags for the human.**
+
+- The **module-navigation defect** flagged under B4.13c is unchanged and still
+  product-wide: Billing, CRM, Projects and Insights each build a growing address
+  from relative `NavLink`s. Finance is fixed; the other four are not.
+- `ROADMAP.md` still says "designed on Spaces" in three places where B4.12
+  delivered roles; an accountant is still a user and a user still gets a mailbox.
+- The `alo-jmap` integration suite still has no fast lane, so this iteration ran
+  the lib tests plus the crates the change can reach, not the whole suite.
+
+**HUMAN ACTION (unchanged):** `/finance` still needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`
+and `/projects`. No new top-level prefix this item.
+
+Next item: B4.14b (★ Finance agent — `vat_summary` + `flag_anomalies` as
+**answers with citations**: read `/finance/reports/vat` for a period, and name
+what looks unusual in the journal with the entries as sources — entries, never
+people; structural verify, no live model calls).
