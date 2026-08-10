@@ -63,7 +63,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 
 - [x] S2.00 Wave contract: split every requested S2/S+ capability into tenant-safe, independently shippable slices; name cross-product seams and no-AI/manual siblings; preserve the one-item-per-commit rule.
 - [x] S2.01a Locale foundation: site default locale + enabled locales + locale validation in storage/routes; migration, wrong-tenant tests, and wire transcript.
-- [ ] S2.01b Localized pages: one stable page identity with per-locale title, slug, SEO, and section drafts; fallback rules and wrong-tenant tests.
+- [x] S2.01b Localized pages: one stable page identity with per-locale title, slug, SEO, and section drafts; fallback rules and wrong-tenant tests.
 - [ ] S2.01c Localized publishing: immutable locale snapshots, alternate/canonical links, locale-aware sitemap/RSS, language switcher, and public Host goldens.
 - [ ] S2.01d Translation editor: visible language controls, missing-translation states, manual copy/create path, and publish readiness without requiring AI.
 - [ ] S2.01e Whole-site AI translation: deterministic proposal envelope across pages/posts, before/after review, approve-only writes, and fixture tests with no external calls.

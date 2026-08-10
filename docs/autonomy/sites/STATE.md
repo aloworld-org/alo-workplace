@@ -2224,3 +2224,48 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   page content and visitor switching intentionally follow in S2.01b–d. The
   local wire script and fixture were removed after the transcript.
 - **Next:** S2.01b, localized page drafts and fallback rules.
+
+## 2026-08-10 — S2.01b localized page drafts
+
+- **Shipped:** every site page now keeps one stable identity while storing a
+  complete draft per enabled language: title, slug, section envelope, SEO
+  title, and SEO description. Reads resolve the requested language first,
+  then the site's default language, then the page's recorded base language;
+  every response exposes `requestedLocale`, `resolvedLocale`, and `fallback`
+  so editors never mistake fallback copy for a finished translation. Changing
+  the site's default language preserves the old base draft instead of erasing
+  it, and localized slugs remain unique within each site and language.
+- **Tenant proof:** the storage regression covers exact and fallback reads,
+  full localized upserts, localized slug collisions, disabled languages,
+  default-language promotion, and another tenant receiving `NotFound` on both
+  read and write while the owner's French draft remains unchanged. The HTTP
+  regression repeats the outsider `404` behavior through the real router.
+- **Real curl transcript:** after killing the stale process and starting a
+  freshly built local JMAP server on `127.0.0.1:8080`, a PKCE-authenticated
+  admin created a three-language site and page (`200`, `200`); requested French
+  before translation (`200`, fallback `true`, resolved `en`); saved the full
+  French draft (`200`, fallback `false`, resolved `fr`, slug
+  `notre-histoire`); received `422` for disabled German; and deleted the test
+  site (`200`). No production, external AI, DNS, or email system was contacted.
+- **Verified:** `cargo fmt -p alo-store -p alo-jmap`; strict offline all-targets
+  clippy for both crates; focused storage wrong-tenant and localized-route
+  tests; existing page lifecycle and locale-route regressions; full
+  `alo-store` tests before the final rebase (858 unit tests plus every
+  integration/doc target), followed by the exact changed tenant-isolation test
+  on rebased main; full `alo-jmap` tests on rebased main against a blank
+  disposable database (511 unit tests plus every integration/doc target,
+  including all 20 Sites HTTP tests); fresh `alo-jmap` and `alo-identity` build;
+  `npx tsc --noEmit`; and `npm run build`. No web source changed, so focused
+  ESLint is not applicable. Current main's meeting fixtures were repaired and
+  independently pushed as `40f2bb1`; the duplicate field introduced when the
+  same upstream fix crossed that rebase was removed in `3be01f5`.
+- **Cuts/flags:** this slice stores editable drafts only. Immutable localized
+  publish snapshots, public alternate/canonical links, locale-aware feeds, and
+  the visitor language switcher intentionally follow in S2.01c. The local wire
+  fixture and disposable gate databases were deleted after verification. The
+  migration was renumbered to `0155` after rebasing over Billing's `0154`. A
+  second post-rebase full `alo-store` run exceeded the 15-minute process cap
+  without an assertion failure; the already-green full run, exact rebased
+  isolation test, strict clippy, and full rebased JMAP matrix are the recorded
+  storage proof.
+- **Next:** S2.01c, localized publishing and public-language discovery.
