@@ -1817,3 +1817,38 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   S1.29 owns the authenticated endpoint, before/after preview, and explicit
   Approve/Discard persistence flow. No AI endpoint or network was contacted.
 - **Next:** the first unchecked item in `QUEUE.md`.
+
+## 2026-08-10 — S1.28a generated-site backend
+
+- **Shipped:** added authenticated `POST /sites/generate` with a small,
+  strict `{description}` body. It loads only the caller tenant's configured AI
+  provider, runs the S1.26 complete-site parser and single repair turn, then
+  translates the accepted proposal into store-owned inputs. A new
+  `create_generated_site` boundary validates the site, theme, every page and
+  every section before committing the site plus ordered pages in one database
+  transaction. Generated sites have no writable status input and are always
+  born `draft`; the route performs no publish operation.
+- **Failure contract:** an absent or disabled provider answers `503` with
+  `reason: "unconfigured"` and points the UI to blank-site creation; an
+  unreachable provider answers typed `502`; invalid output after the one repair
+  answers typed `422` and states that nothing changed. Request and description
+  bounds are enforced before inference.
+- **Tenancy and rollback:** focused store and HTTP suites prove a foreign
+  tenant cannot resolve the generated site or page list, a refused second page
+  leaves no site behind, invalid model output consumes exactly two turns and
+  persists nothing, and the successful response contains exactly one home page
+  with its full sections.
+- **Verified:** `cargo fmt -p alo-store -p alo-jmap`; strict
+  `SQLX_OFFLINE=true CARGO_INCREMENTAL=0 cargo clippy -p alo-store -p alo-jmap
+  --all-targets --jobs 1 -- -D warnings` clean; full `cargo test -p alo-store
+  --jobs 1` green (805 unit tests plus all integration/doc tests); full `cargo
+  test -p alo-jmap --jobs 1` green (464 unit tests plus all integration/doc
+  tests). Fresh-binary curl against local docker `alo-pg`: unconfigured
+  generation returned `503` with `reason:"unconfigured"`; the localhost
+  fixture provider returned `200` with two pages and `status:"draft"`; a
+  follow-up `GET /sites/{id}` returned `publish:null`. No external service was
+  contacted.
+- **Cuts/flags:** S1.28b owns the describe-your-business UI, editor redirect,
+  and blank/template fallback. The disposable wire tenant remains only in the
+  local development database; no credential or fixture helper was committed.
+- **Next:** the first unchecked item in `QUEUE.md`.
