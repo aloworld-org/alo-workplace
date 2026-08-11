@@ -6,6 +6,23 @@ contracts.
 
 ## Unreleased
 
+- **The letters your company writes, filled in for you.** HR can now write the
+  letters this company is willing to put its name to — an employment
+  confirmation, a letter for a landlord, a reference — once, in your own words
+  and your own language, with `{{employee.name}}`-style blanks the editor lists
+  for you. From then on, asking alo for one fills the blanks in and leaves the
+  letter in your Drafts, addressed to nobody unless you said who, for you to
+  read and send yourself. It never writes a letter of its own: ask for one
+  nobody has written and it tells you which letters exist and stops there. The
+  blanks it can fill are the ones the staff directory already shows everybody —
+  what somebody is called, their job title, their team, the day they started —
+  plus your company's own name and address. There is no blank for pay, a bank
+  account, a date of birth or a home address, so no letter it fills can state
+  one. A colleague you cannot look up is a colleague it will not write about;
+  your own letter you can always ask for. And if the person is missing a fact
+  the letter states — no job title on record yet — it says which fact and about
+  whom, rather than handing you a letter with a gap in the middle of it.
+
 - **Ask alo who is off.** "Who's away next week?" is now a question you can ask
   anywhere in the workspace: alo proposes the look-up, shows you the exact days
   it will read before you approve it, and answers with one line per colleague —

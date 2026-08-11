@@ -19062,3 +19062,169 @@ the answer that will never tell you why.
 
 Next item: B6.09b (the HR agent's draft — tenant-authored letter templates, then
 `draft_letter_from_template`).
+
+## B6.09b — the letters a company writes, and a tool that fills them in
+
+**Item:** B6.09b ★ HR agent, the draft — tenant-authored letter templates, then
+`draft_letter_from_template`. The half B6.09a split out and journalled; the tool
+name arrived in `HR_TOOLS` in **this** commit, beside the table it merges,
+because `alo_ai::agent`'s invariant test holds the prompt and the allowlist to
+exactly the tools that can act.
+
+**What shipped.**
+
+- `platform/alo-store/migrations/0206_hr_letter_templates.sql` — one table
+  (`tenant_id`, `id`, `name`, `subject`, `body`, `created_by`, timestamps), a
+  unique index on `lower(name)` per tenant, CHECKs on name and body. No
+  `archived_at`: a letter already drafted is a copy in somebody's Drafts, so the
+  verb is DELETE and it is honest.
+- `platform/alo-store/src/hr_letters.rs` — the closed merge vocabulary
+  (`MergeField`, 11 variants), the placeholder scanner, `merge_fields`,
+  `render`, `render_letter`, `LetterFacts::of`, and the five CRUD functions on
+  `TenantStore`. `HrLetterTemplateId` in `id.rs`; module + re-exports in
+  `lib.rs`.
+- `products/mail/alo-jmap/src/hr_letters.rs` — `/hr/letter-templates` and
+  `/hr/letter-templates/{id}` (GET/POST/GET/PATCH/DELETE), **HR only**. The list
+  answers with `fields`: the vocabulary itself, so the editor offers the
+  placeholders rather than asking somebody to remember them.
+- `products/mail/alo-jmap/src/agent_hr.rs` — `execute_draft_letter_from_template`
+  plus the pure `pick_letter` and `stated_address`; dispatch in `agent.rs`;
+  routes in `server.rs`; `HR_TOOLS`/`HR_TOOL_DOC` in `alo_ai::agent_hr`.
+
+**The four decisions.**
+
+- **The tenant writes the letter; the agent fills it in.** There is no code path
+  below the executor that composes prose. A name matching nothing is a `422`
+  **naming the letters that exist**, and a tenant with none is told who writes
+  the first one — that refusal is the design, because "no such template" is
+  exactly where a model would otherwise write the letter itself.
+- **The vocabulary is the directory.** All eleven placeholders resolve out of
+  `DirectoryEntry` (the projection every member already reads, which carries no
+  private field), the tenant's billing letterhead, and the server's own date.
+  That is the privacy argument in one line: no query in `hr_letters` *could*
+  return a home address. **No pay placeholder** — the strict reading of the
+  design note, per the loop's compliance rule.
+- **Two doors.** Writing/browsing the letters is HR's (`require_hr`); filling one
+  in answers to the door on the **person** (`hr_leave_door` — HR, their manager,
+  or themselves), so somebody can ask for their own employment confirmation
+  without being able to read or edit a template. A colleague the caller may not
+  write about is refused in the **same words** as one who does not exist.
+- **A missing fact is a refusal, not a blank.** "employed as  since " is worse
+  than no letter; the `422` names the field and the person. Placeholders are
+  parsed on write, so a bad one is caught in the editor rather than at the moment
+  somebody needed the letter.
+
+**How it was verified.**
+
+- `cargo fmt`; `clippy -p alo-store -p alo-ai -p alo-jmap --all-targets` clean,
+  zero warnings.
+- Rust: **1 902 tests green, 0 failed** — 1 122 `alo-store` lib (10 this
+  module's), 103 `alo-ai` (2 new: the letter tool may only fill in a letter the
+  company wrote; nothing it fills can state pay or anything private), 641
+  `alo-jmap` lib (4 route-body + 3 executor tests new), and 36 across six HR
+  integration suites including the new `hr_letters_tenancy.rs` (4).
+- **Wrong tenant, proven twice.** `hr_letters_tenancy.rs`: A's template cannot
+  be read, listed, edited or deleted from B (every denial the clean `NotFound`),
+  B's attempts leave A's row byte-identical, and B may hold a template of the
+  same name. On the wire, the same four verbs from tenant B answered `404`/`0
+  templates`, and `draft_letter_from_template` for "Ada" from B answered "no
+  colleague of yours is called Ada".
+- **Web: untouched.** No route prefix, no UI in this item (see cuts).
+- **Wire, against the local backend** (docker `alo-pg` → fresh `alo_loop`, the
+  debug `alo-jmap`, two tenants from `identityctl bootstrap-admin`, real tokens;
+  no model call anywhere — the proposal envelope was written by hand and
+  executed):
+
+```
+GET  /hr/letter-templates           (no token) → 401
+GET  /hr/letter-templates                      → 200 templates [] + the 11
+                                                   fields, so an empty editor
+                                                   still knows what it may say
+POST /hr/letter-templates {{employee.salary}}  → 422 "this build knows no merge
+                                                   field {{employee.salary}}; the
+                                                   fields are: …" (all 11 named)
+POST /hr/letter-templates Werkgeversverklaring → 200 id + fields derived from
+                                                   its own text, subject first
+POST same name again (different case)          → 409
+GET/PATCH/DELETE …/{id} as tenant B            → 404 · 404 · 404
+GET  /hr/letter-templates as tenant B          → 200 0 templates
+seed: letterhead (Voorbeeld BV, Kade 1, 1011 AB Amsterdam, NL),
+      Ada Byron (Systeembeheerder, Techniek, from 2024-03-04),
+      Joris Claes (no terms on record)
+POST /ai/agent/execute       (no token)        → 401
+  draft_letter_from_template {}                → 422 "which letter is required:
+                                                   …never writes one of its own"
+  {template} without employee                  → 422 "who the letter is about is
+                                                   required"
+  employee "Nobody Here"                       → 422 "no colleague of yours is
+                                                   called Nobody Here"
+  template "Salariscertificaat"                → 422 "no letter of yours is
+                                                   called Salariscertificaat.
+                                                   The letters your company has
+                                                   written are: Werkgevers…"
+  to "her landlord"                            → 422 "…is not an email address;
+                                                   leave it out and the draft
+                                                   waits for one"
+  employee "Joris" (no terms)                  → 422 "this letter states
+                                                   {{employee.started_on}}, and
+                                                   there is no …on record for
+                                                   Joris Claes"
+  Ada + to landlord@example.test               → 200 kind letterDraft, subject
+                                                   "Verklaring voor Ada Byron",
+                                                   the 8 fields it used
+  the row: messages.subject / to_addrs / mailbox / keyword
+                                               → "Verklaring voor Ada Byron" ·
+                                                 landlord@example.test · Drafts ·
+                                                 $draft
+  the blob:  "Voorbeeld BV, Kade 1, 1011 AB Amsterdam (NL) / 2026-08-11 /
+              Hierbij verklaren wij dat Ada Byron sinds 2024-03-04 bij ons in
+              dienst is als Systeembeheerder (Techniek)."  — nothing unmerged
+  no "to"                                      → 200 to "" (the draft waits)
+the person door: Ada's own login (not HR)
+  GET /hr/letter-templates                     → 403 "admin or hr only"
+  draft … employee "Ada Byron"                 → 200 her own letter
+  draft … employee "Joris"                     → 422 "no colleague of yours is
+                                                   called Joris"
+PATCH …/{id} body → two fields                 → 200 fields ['employee.name',
+                                                   'company.name']
+DELETE …/{id} · GET after · DELETE twice       → 200 · 404 · 404
+draft after the delete                         → 422 "your company has not
+                                                   written any letter templates
+                                                   yet — somebody in HR writes
+                                                   the letter once…"
+```
+
+**Cuts and flags.**
+
+- **No UI.** The queue item is the migration, the store, the CRUD and the tool;
+  the HR-settings screen that edits a letter, and a card for `letterDraft`, are
+  **not** built. The result falls through `AgentResultCard`'s generic path, and
+  the API is complete and curl-verified, so the screen is a web item a human can
+  schedule — flagged here because a tenant can today write a letter only through
+  the API. No i18n strings were added (none were needed).
+- **Dates merge as `YYYY-MM-DD`.** "1 september 2026" is a user-facing string in
+  a language the server does not know it is writing in; a tenant who wants their
+  own wording writes the date into the template. Per-locale rendering is a
+  wave-review item (B6.11), not a silent default.
+- **The working pattern is not a placeholder.** An employment confirmation that
+  must state "32 hours per week" cannot be filled in: the hours live on the
+  employment, not the directory, and a decimal separator is a language. Kept out
+  deliberately — widening the vocabulary is a decision, and this is the note it
+  gets made from.
+- **★ The pay tension is resolved the strict way**, and stays a human's to widen:
+  no pay placeholder, so a salary certificate is a letter a person completes.
+  The design note's § "As built (B6.09)" says so as-built. Standing since B6.09a.
+- **★ `features.md`'s `[B6]` line still promises CV screening.** The design note
+  refuses it outright (Annex III 4(a)); the line needs a human's amendment.
+  Standing since B6.01.
+- **★ `/hr` remains a new top-level prefix** needing the production Caddyfile at
+  the next deploy (standing since B6.02b). This item adds no new prefix.
+- **★ The double directory read** (B6.07) and **★ the `snooze.rs` flake**
+  (B6.05) are untouched and still a human's.
+- **Business migrations continue at `0207`.**
+
+CHANGELOG: one entry, in a person's voice, about the letters a company writes
+once and an assistant that fills them in without ever writing one of its own.
+
+Next item: B6.10 (payroll export — the per-period CSV with no calculation, and
+the per-country column mapping).

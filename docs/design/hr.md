@@ -121,12 +121,14 @@ registration in `server.rs`.
 | `POST /hr/applicants/{id}/move` | move to another stage — **the only way a stage changes**, and always a person's act (§ *The EU AI Act posture*) | HR |
 | `POST /hr/applicants/{id}/notes` | an interview note, written by the person who was in the room | HR |
 | `DELETE /hr/applicants/{id}` | erase a candidate whose retention date has passed — the record, its notes and their CV. Added at B6.06a: § *Applicants are different, and get a deadline* promises a person presses a button, and a button needs an endpoint | HR |
+| `GET/POST /hr/letter-templates` | the letters this company will write about its people, and the merge vocabulary they may use (B6.09b) | HR |
+| `GET/PATCH/DELETE /hr/letter-templates/{id}` | one letter | HR |
 | `POST /hr/payroll-exports` | draw the period's CSV **and file the fact that somebody drew it** (B6.10) | HR |
 
-Thirteen path segments are reserved words under `/hr` — `me`, `employees`,
+Fourteen path segments are reserved words under `/hr` — `me`, `employees`,
 `org`, `leave-policies`, `leave-balances`, `leave-requests`, `absences`,
-`holidays`, `holiday-calendars`, `checklist-templates`, `openings`,
-`applicants`, `payroll-exports`. Ids are base64url'd 16-byte random tokens
+`holidays`, `holiday-calendars`, `checklist-templates`, `letter-templates`,
+`openings`, `applicants`, `payroll-exports`. Ids are base64url'd 16-byte random tokens
 (`id.rs`), so a record can never *be* one of them, and matchit prefers a static
 segment to a capture; this is the shape `/tasks/labels` beside `/tasks/{id}`
 and `/inventory/stock` beside `/inventory/moves` already have.
@@ -1123,10 +1125,10 @@ Neither tool can reach `hr_applicants`, `hr_applicant_notes` or any pay field.
 That is enforced by which store functions the executors call, and asserted by a
 test that the HR executor module names no applicant or pay symbol at all.
 
-### As built (B6.09a), and what the second tool is waiting for
+### As built (B6.09)
 
-**`who_is_off` shipped whole.** `alo_ai::agent_hr` contributes the name, its
-description and the HR paragraph of the system prompt;
+**`who_is_off` shipped whole (B6.09a).** `alo_ai::agent_hr` contributes the
+name, its description and the HR paragraph of the system prompt;
 `alo_jmap::agent_hr::execute_who_is_off` runs it against the caller's own
 tenant through `hr_absences` — the *same* function `GET /hr/absences` calls,
 which is why the agent and the Agenda cannot disagree and why neither can
@@ -1138,22 +1140,59 @@ each person is away, and the first and last of them. **`awayDays` is a count,
 not a span** — somebody off Monday and Friday has two days away and worked the
 three between, and no field in the answer says otherwise.
 
-**`draft_letter_from_template` is not in the tool list yet, and is item
-B6.09b.** It merges a *tenant-authored* template, and this module has no table
-that holds one: the migration list above never contained it. Describing the
-tool to a model before the templates exist would be a dead proposal — the
-allowlist and the prompt are held to exactly the tools that can act by an
-invariant test in `alo_ai::agent` — so the name arrives with the templates it
-merges, not before.
+**`draft_letter_from_template` shipped with the letters it merges (B6.09b).**
+The name arrived in `HR_TOOLS` in the same commit as migration `0206`
+(`hr_letter_templates`), `alo_store::hr_letters` and the
+`/hr/letter-templates` CRUD — because the allowlist and the prompt are held to
+exactly the tools that can act by an invariant test in `alo_ai::agent`, and a
+tool described to a model but refused by the execute route is a dead proposal.
 
-**One tension in this section is flagged rather than resolved.** The paragraph
-above offers "a salary certificate for a landlord" as an example letter, and
-the paragraph below it forbids either tool reaching **any pay field**. B6.09b
-implements the strict reading — the merge vocabulary carries no pay
-placeholder — because that is the sentence written as a rule; a certificate
-that must state a salary is then a letter a person completes, not one the agent
-fills. Whether to widen the merge fields to pay for HR-role callers only is a
-product decision for a human (`docs/autonomy/STATE.md`).
+Four decisions are worth reading before changing anything here.
+
+- **A template is a subject and a body somebody in the company typed**, in the
+  company's language. The tool fills one in and leaves the result in the
+  caller's Drafts; it sends nothing, files nothing on the employment record and
+  tells nobody. A name matching no template is a `422` **naming the letters that
+  exist** — and a tenant with none is told who writes the first one, because "no
+  such template" is exactly the moment a model is tempted to write the letter
+  itself. There is no code path below the executor that composes prose.
+- **The merge vocabulary is closed, and it is the directory.** Eleven
+  placeholders: `employee.name`, `.given_name`, `.family_name`, `.work_email`,
+  `.job_title`, `.team`, `.started_on`; `company.name`, `.address`, `.country`;
+  `letter.date`. Every one of them resolves out of `DirectoryEntry` — the
+  projection every member already reads, which *has* no private field — plus the
+  tenant's billing identity (the letterhead every printed document already
+  carries) and the server's own date. That is the privacy argument in one line:
+  there is no query in `hr_letters` that could return a home address, and
+  `MergeField::ALL` is a list a later hand cannot widen by accident.
+- **Two doors, deliberately different.** Writing and browsing the letters is
+  **HR's** (`/hr/letter-templates`, `require_hr`) — what the company will put its
+  name to is a company decision. *Filling one in* answers to the door on the
+  **person** (`hr_leave_door`: HR, their manager, or themselves), so somebody can
+  ask for their own employment confirmation for a landlord without being able to
+  read, edit or write a template. A colleague the caller may not write about is
+  refused in the **same words** as one who does not exist.
+- **A fact the person has not got is a refusal, not a blank.** A letter reading
+  "employed as  since " is worse than a letter that was not written, and it is
+  the kind of thing somebody signs without re-reading; the `422` names the field
+  and the person, so the fix is the next thing the reader does. Placeholders are
+  parsed on *write*, so a bad one is caught in the editor rather than at the
+  moment somebody needed the letter.
+
+**Dates merge as `YYYY-MM-DD`, and that is a cut.** "1 september 2026" and
+"01.09.2026" are user-facing strings in a language the server does not know it
+is writing in (CLAUDE.md); a tenant who wants their own wording writes the date
+into the template and leaves the placeholder out. A per-locale date rendering is
+a wave-review item, not a silent default.
+
+**The tension in this section is resolved the strict way.** The paragraph above
+offers "a salary certificate for a landlord" as an example letter, and the
+paragraph below it forbids either tool reaching **any pay field**. The merge
+vocabulary carries no pay placeholder — that is the sentence written as a rule —
+so a certificate that must state a salary is a letter a person completes, not
+one the agent fills. Whether to widen the merge fields to pay for HR-role
+callers only remains a product decision for a human
+(`docs/autonomy/STATE.md`); nothing in the code presumes it.
 
 ## Payroll export (B6.10)
 
@@ -1560,11 +1599,13 @@ hr_holidays.rs           the seed table, Easter, the per-tenant selection
 hr_checklists.rs         templates, and instantiation into a task project
 hr_openings.rs           job openings and their two transitions
 hr_applicants.rs         applicants, stages, notes, the retention deadline
+hr_letters.rs            letter templates + the closed merge vocabulary
 hr_payroll_export.rs     the period fold + the per-country column mappings
 tenant_roles.rs          widened by one value (existing file)
 migrations/…             hr_employees, hr_employments, hr_leave_policies,
                          hr_leave_requests, hr_holidays, hr_checklist_templates,
-                         hr_openings, hr_applicants, hr_payroll_exports,
+                         hr_openings, hr_applicants, hr_letter_templates,
+                         hr_payroll_exports,
                          and the CHECK widening on tenant_user_roles
 ```
 

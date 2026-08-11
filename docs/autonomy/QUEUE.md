@@ -151,7 +151,7 @@ small, or a `[!]` note for the human if large.
 - [x] B6.08b Web HR: leave request/approve screens + absence calendar.
 - [x] B6.08c Web HR: recruitment board screen + approvals-inbox integration.
 - [x] B6.09a ★ HR agent, the answer: `who_is_off` — allowlist + executor over the absence layer + proposal/result cards; screening explicitly absent per design note; structural verify.
-- [ ] B6.09b ★ HR agent, the draft: tenant-authored letter templates (migration + store + `/hr/letter-templates` CRUD, strict merge vocabulary with no pay field) then `draft_letter_from_template` — a template the tenant has not written is a 422, never an improvisation; structural verify.
+- [x] B6.09b ★ HR agent, the draft: tenant-authored letter templates (migration + store + `/hr/letter-templates` CRUD, strict merge vocabulary with no pay field) then `draft_letter_from_template` — a template the tenant has not written is a 422, never an improvisation; structural verify.
 - [ ] B6.10 Payroll export: per-period CSV of salary-relevant data (no calculation) with a per-country column mapping config.
 - [ ] B6.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B6] reconciliation.
 - [ ] B6.12a FINAL arc, money: quote→invoice→payment→ledger and deal→won→invoice, wire-verified end-to-end on local; transcript in STATE.md.
