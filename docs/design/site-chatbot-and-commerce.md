@@ -117,3 +117,80 @@ transcripts, and AI minutes posted back into the room the meeting belongs to —
 The claim to make is not "better than Teams at everything". It is: **the
 meeting, the room it belongs to, the file discussed in it and the invoice it
 produced are one product** — and neither Microsoft nor Odoo can say that.
+
+## alo Commerce — the shop as a surface, not a system
+
+**Status:** direction. Not queued, and further out than everything above.
+
+Odoo is the right comparison and the honest one. Their e-commerce is strong
+for a reason that has nothing to do with their storefront: the shop sells the
+*same* catalog that Inventory counts, Sales quotes and Accounting posts. Add a
+product once and it exists everywhere; an order reserves stock and lands in the
+books with no integration to maintain.
+
+Shopify has the better shop and none of that. Every Shopify merchant of any
+size ends up paying somebody to reconcile Shopify with their accounting, their
+stock and their CRM. That reconciliation is the tax they pay for a good
+storefront.
+
+alo is already in Odoo's position rather than Shopify's: the catalog landed in
+Billing, Inventory tracks suppliers, locations and moves, Finance posts, CRM
+holds the customer. **The shop is a surface over things that already exist —
+not a system to integrate.**
+
+### So where is "better than Odoo"?
+
+Not in features. They have had twenty years and they will out-configure us for
+a long time. It is in the thing every Odoo customer complains about: **Odoo is
+powerful and genuinely hard.** Setting up a shop means understanding product
+templates versus variants, tax positions, fiscal mappings, delivery carriers
+and pricelists. Most Odoo e-commerce sites were configured by a paid
+implementation partner, and that is the industry those partners are in.
+
+The wedge is that alo can *propose* the configuration instead of demanding it:
+
+> "I run workshops in Antwerp and sell two books."
+>
+> A draft catalog with the workshops as dated products and the books as stock
+> items. VAT proposed for each — Belgian rate on the workshops, the reduced
+> rate on books, flagged as needing confirmation. A shop page built from the
+> sections that already exist. Shipping for the books, nothing for the
+> workshops. **Reviewed and approved, not configured.**
+
+That is the same propose-then-approve pattern used everywhere else in alo, and
+it is worth more here than anywhere: this is the screen where Odoo loses
+customers who cannot afford a consultant.
+
+### Order of building, narrowest first
+
+1. **Tickets and dated products** — one product type, no shipping, no
+   variants, no stock. The calendar is the inventory. Covered above.
+2. **Simple stock items** — one price, one tax, a shipping rate. Enough for
+   the books, the merchandise, the parts.
+3. **Variants** — size, colour, and the combinatorial explosion behind them.
+   This is where every commerce system becomes complicated, and it should be
+   attempted only when a real customer needs it.
+4. **The rest** — subscriptions, bundles, B2B pricelists, multi-warehouse.
+   Odoo's territory, entered deliberately or not at all.
+
+### What must be right, and what must not be built
+
+- **Stock is one number.** The shop must not hold its own count. The whole
+  argument for building rather than integrating collapses the moment two
+  systems disagree about how many are left.
+- **Payments are never ours.** Hosted page, Mollie or Adyen, card details
+  never touching alo (product doctrine, non-goals).
+- **Tax is a rule, not a field.** Cross-border EU selling means OSS and IOSS
+  thresholds, and a shop that quietly gets this wrong hands its owner a
+  compliance problem years later. This deserves a professional's review before
+  code, exactly like the event VAT question above.
+- **Never a price or a stock figure the model invented.** The catalog answers,
+  or nobody answers.
+
+### The sentence the whole thing is for
+
+Odoo can say the shop and the books are one system. Shopify can say the shop is
+lovely. **Neither can say the customer who bought, the invoice they paid, the
+email thread about their delivery, the meeting where you agreed the discount
+and the project you delivered are the same product.** That is the only claim
+worth making, and it is only true if the shop stays a surface.
