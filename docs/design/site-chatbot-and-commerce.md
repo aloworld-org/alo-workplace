@@ -140,12 +140,16 @@ not a system to integrate.**
 
 ### So where is "better than Odoo"?
 
-Not in features. They have had twenty years and they will out-configure us for
-a long time. It is in the thing every Odoo customer complains about: **Odoo is
-powerful and genuinely hard.** Setting up a shop means understanding product
-templates versus variants, tax positions, fiscal mappings, delivery carriers
-and pricelists. Most Odoo e-commerce sites were configured by a paid
-implementation partner, and that is the industry those partners are in.
+Not by matching their configuration surface — **deliberately**, because that
+surface is the problem rather than the prize. Setting up an Odoo shop means
+understanding product templates versus variants, tax positions, fiscal
+mappings, delivery carriers and pricelists. An entire consulting industry
+exists to do it for people. Every one of those settings is a decision the
+software could have made and asked you to confirm, and chose to demand instead.
+
+Matching it would mean inheriting it. We are going the other way on purpose,
+and the fact that it is hard is the point: if it were easy somebody would
+already have done it.
 
 The wedge is that alo can *propose* the configuration instead of demanding it:
 
@@ -168,10 +172,13 @@ customers who cannot afford a consultant.
 2. **Simple stock items** — one price, one tax, a shipping rate. Enough for
    the books, the merchandise, the parts.
 3. **Variants** — size, colour, and the combinatorial explosion behind them.
-   This is where every commerce system becomes complicated, and it should be
-   attempted only when a real customer needs it.
+   This is where every existing commerce system becomes complicated, which
+   makes it the most interesting problem here rather than the one to avoid:
+   the goal is variants somebody can set up in a minute without learning what
+   a product template is.
 4. **The rest** — subscriptions, bundles, B2B pricelists, multi-warehouse.
-   Odoo's territory, entered deliberately or not at all.
+   Sequenced by what customers actually ask for, not by what a competitor's
+   feature list contains.
 
 ### What must be right, and what must not be built
 

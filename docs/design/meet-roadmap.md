@@ -4,11 +4,16 @@ What exists, what is missing, and the order to close it. Written after the
 first slice shipped (`docs/design/meet.md`), because "make it as good as Google
 Meet" is not a task until it is a list.
 
-**An honest frame.** Those products carry hundreds of engineer-years. Parity is
-not a sprint and pretending otherwise produces a demo that fails in the first
-real customer meeting. What follows is ordered so that each stage is usable on
-its own, and so the earliest stages remove the reasons somebody would refuse to
-use alo Meet at all.
+**How this list is ordered, and why that matters more than its length.** Each
+stage is usable on its own, and the earliest ones remove the reasons somebody
+would refuse to use alo Meet at all. That ordering is the whole value of the
+document: a demo that fails in a real customer meeting fails on a Stage 1
+defect, never on a missing Stage 4 feature.
+
+Nothing here is a judgement about what can be reached. Incumbency is not a
+moat — it is a list of decisions made years ago that nobody can revisit. The
+reason to close Stage 1 before Stage 3 is that a broken join ruins the meeting
+where you would have shown them the minutes, not that the gap is wide.
 
 ## What alo Meet has today
 
