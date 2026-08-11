@@ -10,10 +10,11 @@ would refuse to use alo Meet at all. That ordering is the whole value of the
 document: a demo that fails in a real customer meeting fails on a Stage 1
 defect, never on a missing Stage 4 feature.
 
-Nothing here is a judgement about what can be reached. Incumbency is not a
-moat — it is a list of decisions made years ago that nobody can revisit. The
-reason to close Stage 1 before Stage 3 is that a broken join ruins the meeting
-where you would have shown them the minutes, not that the gap is wide.
+Nothing here is a judgement about what can be reached. State a competitor as a
+weakness and a move, never as a size: *Teams keeps the meeting, the file and
+the conversation in three places, so we put them in one* — not *Teams is large*.
+The reason to close Stage 1 before Stage 3 is that a broken join ruins the
+meeting where you would have shown them the minutes, not that the gap is wide.
 
 ## What alo Meet has today
 

@@ -7,12 +7,13 @@ building a half-formed idea.
 
 ## Why this belongs to alo and not to Wix
 
-A website chatbot is a commodity. Every builder has one, and it answers
-questions from the page you were already looking at.
+**Their weakness:** a website chatbot is a commodity, and every builder's one
+answers questions from the page you were already looking at. It cannot book
+anything, quote anything or remember you, because Wix and Squarespace do not
+own a calendar, a CRM, a catalog or a set of books. Their AI builds a site from
+a *prompt* for the same reason — a prompt is all they have.
 
-What none of them can do is *act*, because none of them owns the calendar, the
-CRM, the catalog or the books. alo does. So the interesting product is not a
-bot that answers — it is a bot that finishes the job:
+**Our move:** a bot that finishes the job rather than describing it.
 
 > A visitor asks whether you do this kind of work. The bot answers from the
 > site, offers twenty minutes on Thursday, books it against real availability,
@@ -102,12 +103,24 @@ review the diff", it is something neither of them has.
 
 ## alo Chat and alo Meet against Microsoft
 
-Stated as intent, with the honest gap.
+**Their weakness:** Teams is three products in a trench coat. A file shared in
+a chat lands in a SharePoint folder nobody finds again; the meeting about that
+file is a fourth place; the recording is a fifth. Every seam is somewhere work
+goes missing, and the seams exist because those parts were separate products
+before they were one tab.
+
+**Our move:** remove the seams rather than decorate them. A file in a room is a
+Drive pointer, not a copy. A meeting belongs to the room it was started from.
+The transcript posts back into that room. Nothing is anywhere else.
+
+The second move is the one Teams cannot answer at all: agents as participants,
+with identity separated from authority — an agent posts as itself and acts on
+behalf of the person who asked, and only that person may approve what it
+proposes.
 
 Chat is genuinely competitive today: threads, reactions, mentions, search,
 Drive attachments as pointers, formatting with code and maths shared with Docs
-and Mail, and agents as participants with identity separated from authority —
-which Teams does not have and, given its architecture, cannot easily add.
+and Mail.
 
 Meet is not there yet, and `meet-roadmap.md` says exactly what is missing and
 in what order. The differentiators that matter are recording with consent,
@@ -128,10 +141,14 @@ for a reason that has nothing to do with their storefront: the shop sells the
 product once and it exists everywhere; an order reserves stock and lands in the
 books with no integration to maintain.
 
-Shopify has the better shop and none of that. Every Shopify merchant of any
-size ends up paying somebody to reconcile Shopify with their accounting, their
-stock and their CRM. That reconciliation is the tax they pay for a good
-storefront.
+**Shopify's weakness** is the mirror image: a beautiful shop with no books
+behind it. Every merchant of any size ends up paying somebody — a bookkeeper, an
+integration, a monthly SaaS bill — to reconcile Shopify against their
+accounting, their stock and their CRM. That reconciliation is the tax on a good
+storefront, and it never ends.
+
+**Our move:** there is nothing to reconcile, because there is one catalog and
+one set of books.
 
 alo is already in Odoo's position rather than Shopify's: the catalog landed in
 Billing, Inventory tracks suppliers, locations and moves, Finance posts, CRM
@@ -140,16 +157,25 @@ not a system to integrate.**
 
 ### So where is "better than Odoo"?
 
-Not by matching their configuration surface — **deliberately**, because that
-surface is the problem rather than the prize. Setting up an Odoo shop means
-understanding product templates versus variants, tax positions, fiscal
-mappings, delivery carriers and pricelists. An entire consulting industry
-exists to do it for people. Every one of those settings is a decision the
-software could have made and asked you to confirm, and chose to demand instead.
+State it as a weakness and a move, never as a comparison of size.
 
-Matching it would mean inheriting it. We are going the other way on purpose,
-and the fact that it is hard is the point: if it were easy somebody would
-already have done it.
+**Their weakness:** every setting is a form somebody has to fill in. Product
+templates versus variants, tax positions, fiscal mappings, delivery carriers,
+pricelists. The software already knows most of those answers — a bookshop in
+Belgium selling paperbacks has one plausible VAT treatment, not a blank field —
+and it demands them anyway. That is why an entire consulting industry exists to
+type them in, and why a shop is a project with a partner rather than a decision
+somebody makes.
+
+**Our move:** propose the whole configuration from a sentence about the
+business, and let somebody approve it. Not fewer settings — the *same* settings,
+already answered, shown for confirmation. Every wrong guess is one correction
+instead of one lesson in accounting.
+
+That is a harder engineering problem than a settings screen, which is the point.
+Nobody has done it because it requires the software to understand the business,
+and alo is the only one holding the invoices, the stock and the customers needed
+to try.
 
 The wedge is that alo can *propose* the configuration instead of demanding it:
 
@@ -198,6 +224,6 @@ customers who cannot afford a consultant.
 
 Odoo can say the shop and the books are one system. Shopify can say the shop is
 lovely. **Neither can say the customer who bought, the invoice they paid, the
-email thread about their delivery, the meeting where you agreed the discount
-and the project you delivered are the same product.** That is the only claim
-worth making, and it is only true if the shop stays a surface.
+email thread about their delivery, the meeting where you agreed the discount and
+the project you delivered are the same product.** That is the only claim worth
+making, and it is only true if the shop stays a surface.
