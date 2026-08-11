@@ -6,6 +6,18 @@ contracts.
 
 ## Unreleased
 
+- **Scan a barcode to find the thing.** The catalog and the stock list gain a
+  **Scan** button. A handheld scanner needs nothing set up: it is a keyboard, so
+  it types the code into the field and presses Enter for you, and the answer
+  comes back as the product, how many you have, and which places they are in —
+  no camera, no permission, and it works on the machine bolted to the packing
+  bench. On a phone, where the browser can do it, the camera reads the code
+  instead and stops as soon as it has one. A code the scanner misread is told
+  apart from a product you do not stock: the first says the check digit does not
+  match, so you scan again, and the second offers to add the item to your
+  catalog with the barcode already filled in. Scanning finds *your* products
+  only — two businesses can carry the same barcode and neither ever sees the
+  other's.
 - **Purchasing and sales orders, with the paperwork attached.** Inventory gains
   two tabs. On the purchasing side you raise a draft order for a supplier, fill
   it from your catalog — where picking an item copies **what you pay**, not what

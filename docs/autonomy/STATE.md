@@ -16670,3 +16670,145 @@ npx vitest run (whole web suite)     → 420 passed, 4 failed — all four in
 
 Next item: B5.09c (web inventory — barcode scan input: camera plus the
 keyboard-wedge fallback).
+
+---
+
+## B5.09c — pointing a machine at a box (2026-08-11)
+
+**What shipped.** Scanning, end to end: one read on the wire and one component
+on the two screens that are about products. `GET /inventory/scan?code=` answers
+a code with the product carrying it, its on-hand by real location, and the
+server's own total; the catalog and the stock list each grew a **Scan** button
+that opens a field a handheld reader types into, plus the phone camera where the
+browser can read one. The catalog opens the scanned product in the same editor a
+clicked one opens — and offers to create it, barcode pre-filled, when the code
+was real and matched nothing; the stock list finds the row.
+
+**The files.**
+
+- **`products/mail/alo-jmap/src/inventory_scan.rs`** (new) — the route. It
+  validates through `alo_store::inv_barcode::canonicalize` *before* asking the
+  store, because `billing_product_by_barcode` answers `None` for a code it
+  cannot parse and that would turn every misread scan into "you do not stock
+  this". Three unit tests cover the three refusals and prove the code never
+  travels in the error text.
+- **`billing_products.rs` / `inventory_stock.rs`** — `product_json` and
+  `level_json` became `pub(crate)`, with the reason written on each. A scanned
+  product is byte-for-byte the product read by its id; a scanned quantity is the
+  stock screen's own row.
+- **`server.rs` / `lib.rs`** — the route registered between `/inventory/stock`
+  and `/inventory/moves`. `scan` is the tenth reserved segment under
+  `/inventory`.
+- **`web/src/inventory/ScanInput.tsx`** (new) — the dialog: the wedge field, the
+  camera, the answer, and the two acts a screen can hang off it (`action`,
+  `onUnknown`).
+- **`web/src/inventory/api.ts`, `types.ts`** — `scan()` and `ScanResult`.
+- **`CatalogView.tsx`, `StockView.tsx`, `InventoryModule.tsx`,
+  `InventoryModule.module.css`, `i18n/en.ts`** — the button on both screens,
+  the scanner's styles, and 19 new strings.
+- **`web/src/billing/ProductDialog.tsx`** — an `initialBarcode` prop, used by
+  exactly one caller: the scan that found nothing.
+- **`web/src/inventory/Scan.test.tsx`** (new) — 7 tests.
+
+**Five decisions.**
+
+1. **The wedge scanner is the headline, the camera is the fallback** — the
+   opposite of how a demo would order them and the right way round for a
+   warehouse. A handheld reader is a keyboard: no permission, no HTTPS, no
+   library, and it works on the ten-year-old PC at the packing bench, which is
+   what the hardware in the room actually is.
+2. **A misread code and an unknown product are different answers.** `422` with
+   the store's sentence (charset, length, check digit) versus `404`. Collapsing
+   them would send somebody hunting the shelves for a product that was there all
+   along, and a torn label is far more common than a missing catalog row.
+3. **A hit clears the field; a miss keeps and selects it.** A wedge scanner
+   types into whatever holds the focus, so leftover digits get prefixed to the
+   next scan and produce a code that never existed.
+4. **The camera is `BarcodeDetector` or it is not offered** — no library, no
+   WASM decoder, no third language. Where the API is absent the screen says so
+   and points at the handheld reader. `upc_e` is left out of the requested
+   formats on purpose: its raw value is the compressed form, whose check digit
+   belongs to the expanded code, so it would arrive as a code that cannot
+   validate.
+5. **A code that matched nothing pre-fills the new product.** Re-typing thirteen
+   digits a machine just read is the manual step this product does not ask for.
+
+**Verified.**
+
+```
+rustfmt on this item's own files (main is not rustfmt-clean on this machine)
+SQLX_OFFLINE=true cargo clippy -p alo-jmap --all-targets → clean, zero warnings
+DATABASE_URL=…5432 SQLX_OFFLINE=true cargo test -p alo-jmap -p alo-store
+                                     → 157 suites ok, 2419 passed, 0 failed
+npx tsc --noEmit                     → clean
+npx eslint src/inventory src/billing/ProductDialog.tsx src/i18n/en.ts → clean
+npm run build                        → built in 16.96s
+npx vitest run src/inventory         → 30/30 (7 new)
+```
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real PKCE authorization-code tokens, rows read back in psql.
+
+```
+seed A  Blue chair CH-1 4006381333931 stocked; Assembly hour 0012345678905 service
+seed B  Rode stoel RS-9 4006381333931 — THE SAME digits, accepted: uniqueness is
+        tenant-scoped, and a constraint that fired here would leak A's catalog
+seed A  ADJUST→MAIN 5500 (found), MAIN→VAN1 1500 (transfer)
+
+GET /inventory/scan?code=4006381333931   no token → 401
+GET /inventory/scan                               → 422 code is required: a scan
+    …?code=   ·   ?code=%20%20%20                 → 422 ×2  carries the code that was read
+GET …?code=CH-1                                   → 422 a barcode may only contain digits
+GET …?code=40063                                  → 422 a barcode must be 8, 12, 13 or 14
+                                                        digits
+GET …?code=4006381333930                          → 422 the check digit of this barcode
+                                                        does not match; check for a typo
+GET …?code=4006381333931            as A          → 200 Blue chair, onHandQtyMilli 5500,
+                                                        stock MAIN 4000 / VAN1 1500 (both
+                                                        real, valueCents 24000 / 9000) —
+                                                        the ADJUST leg of −5500 is NOT in
+                                                        it, and the total is the server's
+GET …?code=+400-638+133+393+1+      as A          → 200 identical: separators are
+                                                        presentation
+GET …?code=0012345678905            as A          → 200 Assembly hour, stock [], onHand 0
+                                                        — a service has no shelf
+GET …?code=4006381333931            as B          → 200 Rode stoel, THEIR row, onHand 0;
+                                                        never ours
+GET …?code=0012345678905            as B          → 404 no product in this catalog carries
+                                                        this barcode
+psql   billing_products @ that barcode → both tenants' rows present, distinct tenant_id
+psql   inv_stock @ the chair           → ADJUST −5500 | MAIN 4000 | VAN1 1500
+```
+
+**Cuts and flags.**
+
+- **No SKU fallback.** A code that is not a GTIN is refused as a barcode rather
+  than tried as an SKU. A tenant printing their own Code-39 labels is a real
+  case, but the store has one lookup and a second one is a store change plus a
+  rule about which wins; the catalog's search field still finds an SKU typed
+  into it. Recorded in `billing.md`'s sibling — `docs/design/inventory.md` §
+  As built (B5.09c) — as a deliberate cut.
+- **The camera is untested against real glass.** `BarcodeDetector` is stubbed in
+  the vitest suite (present/absent, and one detection), which proves the wiring
+  and the "offered only where it works" rule; whether a given phone focuses on a
+  crumpled EAN-13 is a device question no test here can answer. **Flagged for
+  the human:** worth one pass on a real phone before the wave review.
+- **No scan in the order editors or the count sheet.** Scanning to *add a line*
+  and scanning to *count a row* are the two places a warehouse would want it
+  next; neither screen is what B5.09c names, and the count sheet has no UI at
+  all yet (B5.08a/b shipped the store and the routes). The route they will both
+  call is now there.
+- **`cargo test` needs `DATABASE_URL` on this machine.** The suites' default is
+  `…@127.0.0.1:5433`, the `alo-pg` container publishes 5432, and without the
+  variable nine DB-backed suites fail with `PoolTimedOut` — an environment
+  trap, not a regression (first noted at B1.16, still unfixed, and it cost this
+  iteration a re-run).
+- **Still no fr/nl.** The whole `inventory*` block, now 19 strings longer, is
+  English only; B5.11.
+- **No new route prefix.** `/inventory` has been in the vite proxy list and on
+  the Caddyfile note since B5.04b; `scan` is a segment under it.
+
+Next item: B5.10 (★ inventory agent tools — `reorder_proposals` drafting POs
+from the shortage query, and `stock_answer`; allowlist, executors, structural
+verify with no model calls).

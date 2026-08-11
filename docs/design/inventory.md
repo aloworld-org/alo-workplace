@@ -102,6 +102,7 @@ is what makes a record's history complete.
 | `GET/POST /inventory/locations` | the places stock can be (B5.04a) |
 | `GET/PATCH/DELETE /inventory/locations/{id}` | one location. `DELETE` only while it has never carried a move; after that it archives, because a location's name is part of the explanation of a movement |
 | `GET /inventory/stock?product_id=&location_id=` | on-hand: the derived figure, per product, per location, with the value at purchase price beside it. CSV twin |
+| `GET /inventory/scan?code=` | what the code on a box is: the product carrying that barcode, and its on-hand by real location (B5.09c). A code that is not a GTIN is a `422` carrying the rule it broke, so a misread scan is never reported as a product nobody stocks |
 | `GET /inventory/moves?product_id=&location_id=&from=&to=` | the ledger itself, newest first — every movement with its reason and the document that caused it |
 | `POST /inventory/moves` | the one route that writes a movement **directly**: a transfer between two of the tenant's locations, or an adjustment against a virtual one, with a reason code (B5.04b). Every other movement in the system is a consequence of a document |
 | `GET/POST /inventory/purchase-orders` | the order list (with a status filter) and a new draft (B5.05a) |
@@ -125,8 +126,8 @@ is what makes a record's history complete.
 | `PUT /inventory/counts/{id}/lines/{product_id}` | record what was actually on the shelf |
 | `POST /inventory/counts/{id}/apply` · `/cancel` | turn the variances into adjustment movements (B5.08b), or walk away |
 
-Nine path segments are reserved words under `/inventory` — `suppliers`,
-`locations`, `stock`, `moves`, `purchase-orders`, `sales-orders`,
+Ten path segments are reserved words under `/inventory` — `suppliers`,
+`locations`, `stock`, `scan`, `moves`, `purchase-orders`, `sales-orders`,
 `reorder-rules`, `shortages`, `counts`. Ids are base64url'd 16-byte random
 tokens (`id.rs`), so a record can never *be* one of them, and matchit prefers
 a static segment to a capture; this is the shape `/tasks/labels` beside
@@ -222,6 +223,58 @@ Four decisions this item made, beyond the sketch above:
 carried on the record and shown by no screen, because a thumbnail needs a Drive
 node picker and a blob read, and neither is what B5.09a is for. The field is
 read-only in the client until the picker is built.
+
+### As built (B5.09c — scanning)
+
+One new read, `GET /inventory/scan?code=`
+(`products/mail/alo-jmap/src/inventory_scan.rs`), and one new component,
+`web/src/inventory/ScanInput.tsx`, opened by a **Scan** button on the two
+screens that are about products — the catalog and the stock list. The route
+answers `{code, product, stock[], onHandQtyMilli}`, reusing
+`billing_products::product_json` and `inventory_stock::level_json` rather than
+declaring a second shape of either: a product read by scanning it must be
+byte-for-byte the product read by its id.
+
+Five decisions this item made.
+
+- **The scanner is not a tab.** Reading the code on a box is how a person
+  *addresses* a product, not a place they go, so it is a button beside the
+  search field on both product screens and each says what to do with what was
+  found — the catalog opens the record (or offers to create one), the stock
+  list finds the row. A "Scan" tab would be a screen whose only content is a
+  question.
+- **Three answers, not two.** A code that is not a GTIN is a `422` carrying the
+  store's own sentence (`inv_barcode`: charset, length, check digit), a
+  well-formed code nobody stocks is a `404`, and a scan with no code at all is
+  a `422` naming the missing parameter. Collapsing the first into the second
+  would send a person hunting the shelves for a product that was there all
+  along, and it is the single most likely thing to happen in a warehouse: a
+  scanner reads a torn label wrong far more often than a catalog is missing an
+  item.
+- **A miss keeps and selects the digits; a hit clears them.** A wedge scanner
+  types into whatever holds the focus, so text left behind is prefixed to the
+  next scan and produces a code that never existed. Selecting on a miss makes
+  the next scan overwrite it while leaving it readable.
+- **The camera is `BarcodeDetector`, or it is not offered.** No library, no
+  WASM decoder, no third language — Chrome and Android have the API, Safari and
+  Firefox do not, and where it is absent the screen says so and points at the
+  handheld reader instead of announcing a button that then apologises. `upc_e`
+  is deliberately not among the requested formats: its raw value is the
+  compressed form, whose check digit belongs to the expanded code, so it would
+  reach the server as a code that cannot validate. One detection stops the
+  camera and looks the code up.
+- **A scanned code that matched nothing pre-fills the new-product form** —
+  `ProductDialog` grew an `initialBarcode` prop and opens `stocked` on, since a
+  thing with a barcode in somebody's hand is a thing on a shelf. Re-typing
+  thirteen digits a machine just read is exactly the manual step this product
+  does not ask for.
+
+**Cut from this item, deliberately:** looking a code up **as an SKU** when it
+is not a GTIN. A tenant printing their own Code-39 labels carrying `CH-1` is a
+real case, but the store has one lookup (`billing_product_by_barcode`) and a
+second one is a store change plus a rule about which wins; the catalog's search
+field still finds an SKU by typing it. The scan route's `422` says the code was
+not a barcode rather than pretending it looked.
 
 ## The catalog (B5.02)
 
