@@ -18243,3 +18243,163 @@ by a person on purpose.
 Next item: B6.06a (recruitment, the model — openings + applicants with CVs in
 Drive, notes and stages, routes and scoping tests; screening stays absent by
 design, `docs/design/hr.md` § The EU AI Act posture).
+
+---
+
+## B6.06a — recruitment, the model: the openings, and the people who applied
+
+**What shipped.** The hiring record, end to end and behind one door. Three
+tables (`0205_hr_recruitment.sql`): `hr_openings` — title, team, location, the
+terms on offer from the *employment* vocabulary, and a status of `draft`, `open`
+or `closed` with the day it was published and the day it closed;
+`hr_applicants` — the opening, a name in one field, address, telephone, source,
+stage, the CV as a Drive node id, and `retain_until`; `hr_applicant_notes` —
+body, author, time, cascading from the candidate.
+
+Two store files. `hr_openings.rs` holds the record and its **two** transitions:
+`publish` (draft only, stamps `opened_on`) and `close` (from draft or open,
+stamps `closed_on`, terminal). A closed opening is frozen against edits and
+against new applications, because rewriting the title of a role thirty people
+applied for rewrites what they applied for. A list read carries the size of each
+pipeline in the same query, so a hiring screen is one round trip rather than one
+per row. `hr_applicants.rs` holds the people: record, read (with the CV's own
+name/size/trashed joined from `drive_nodes`), correct, **move**, note, list and
+erase. The stage vocabulary is closed and ordered — applied, reviewing,
+interview, offer, hired, rejected, withdrawn — and `ApplicantStage::ALL` is the
+one place it is written down; the pipeline is sorted by it in Rust rather than
+by a `CASE` that would be a second copy of the list.
+
+`hr_recruitment.rs` (routes) is thirteen handlers over one door: `GET/POST
+/hr/openings`, `GET/PATCH /hr/openings/{id}`, `POST …/publish`, `POST …/close`,
+`GET/POST /hr/openings/{id}/applicants`, `GET/PATCH/DELETE /hr/applicants/{id}`,
+`POST …/move`, `POST …/notes`. Every one is `require_hr` — there is no
+employee-facing or manager-facing view of a candidate at all.
+
+**Four decisions worth naming.**
+
+- **`move` is the only way a stage changes.** The `PATCH` will not write one: a
+  body carrying `"stage":"hired"` corrects whatever else it names and moves
+  nobody (asserted on the wire). So every decision about a person is one audited
+  act, `hr.applicant.move`, with a human's id on it — which is the record the AI
+  Act posture rests on. Moves are not restricted to going forwards: a rejection
+  reversed and a candidate who comes back are ordinary, and a state machine that
+  forbade them is one people work around with a spreadsheet.
+- **A CV is uploaded into the HR area in the same act** (the B6.02b shape), so
+  `/drive` never has to accept the HR area as a location a client can name.
+  Attaching a node from somebody's personal files, from another tenant, or one
+  already trashed is the same `404`. Unlike a *document* detach — whose whole
+  point is that the paper survives to be refiled — **replacing or clearing a CV
+  trashes the file it replaced**, because a CV belongs to one candidate and an
+  orphan in the HR area is a file no retention date points at any more.
+- **Erasure is a route, not a job.** `DELETE /hr/applicants/{id}` removes the
+  row, its notes (cascade) and the CV. `retentionExpired` is computed at read
+  against today — a stored flag is a flag that is wrong every morning — and the
+  default deadline is six calendar months from the day the application was
+  recorded, reusing `hr_leave_math::add_months` (now `pub(crate)`) rather than
+  copying month arithmetic that is quietly wrong for four months of the year.
+- **Nothing reads a CV.** No extracted text, no parsed fields, no score, rank,
+  shortlist or "fit" — not even suggest-only with a human after it. The absence
+  of a column to put a score in is the guarantee, and the tenancy suite says in
+  its own header that there is no such function to test.
+
+**How it was verified.**
+
+- Store: `platform/alo-store/tests/hr_recruitment_tenancy.rs`, 7 tests, all
+  green — wrong tenant across **every** function (read, list, edit, publish,
+  close, record, move, note, list-notes, erase, and recording against the other
+  tenant's opening), wrong Drive area for a CV, the opening's life and its
+  terminal state, the stage-moves-only-through-`move` proof over all seven
+  words, board order, notes with their author and newest-first, and the
+  retention deadline with its erasure.
+- Unit: 1 112 store + 624 jmap tests green; the stage/status vocabularies
+  round-trip, the refusal lists the whole vocabulary, an over-long field names
+  the limit and never echoes the value, a past deadline is kept (correcting an
+  expired candidate's telephone number must still work) and a century-out one is
+  refused.
+- `cargo fmt`; `clippy -p alo-store -p alo-jmap --all-targets` clean;
+  `tests/audit_routes.rs` green with nine new lines pasted into the vocabulary.
+- **Wire, against the local backend** (docker `alo-pg`, the debug `alo-jmap`,
+  two tenants from `identityctl bootstrap-admin` plus an ordinary member of
+  tenant A through `POST /admin/users`, real PKCE tokens):
+
+```
+GET  /hr/openings · /hr/applicants/x   (no token)  → 401 ×2
+POST /hr/openings  fixed_term          → 200 draft, openedOn null, applicants 0
+POST /hr/openings  title "  "          → 422 "opening title must not be empty"
+POST /hr/openings  kind "freelance"    → 422 lists the six contract kinds
+POST …/{id}/publish                    → 200 open, openedOn 2026-08-11
+POST …/{id}/publish  again             → 409 "…this one is open"
+PATCH …/{id} location                  → 200, openedOn unchanged
+POST …/{id}/applicants                 → 200 stage applied, retainUntil 2027-02-11
+   … email "not-an-address"            → 422  ·  name "  " → 422
+   … retainUntil "2026-08-11T00:00:00Z" → 422 "…written YYYY-MM-DD"
+POST /jmap/upload → PATCH cv{blobId}   → 200 cvFileName, cvSize, cvTrashed false
+GET  /drive/nodes/{cv}/download        HR → 200 · tenant B → 404 · member → 404
+PATCH /hr/applicants/{id} stage=hired  → 200 stage still "interview"
+POST …/{id}/move interview             → 200  ·  "shortlisted" → 422 lists all 7
+POST …/{id}/notes                      → 200 author = caller · "   " → 422
+GET  /hr/applicants/{id}               → 200 applicant + notes + stages[7]
+GET  /hr/openings/{id}/applicants      → 200 board order reviewing, interview,
+                                             offer, rejected; stages served
+GET  /hr/openings                      → 200 applicants 4 on the row
+POST …/{id}/close                      → 200 closed, closedOn set
+PATCH …/{id} · POST …/applicants · POST …/close   → 409 ×3, each naming why
+GET  /hr/openings                      → live 0  ·  ?includeClosed=1 → 1
+GET  …/applicants after closing        → 200 the 4 people, untouched
+tenant B: GET/PATCH/publish/close/applicants(GET,POST)/applicant(GET,PATCH)/
+          move/notes/DELETE            → 404 ×11, and A's record unchanged
+member  : the same nine reads and writes → 403 ×8 (and 404 on the CV)
+PATCH retainUntil 2026-08-10           → 200 retentionExpired true
+PATCH retainUntil 2126-01-01           → 422 "at most 10 years away"
+DELETE /hr/applicants/{id}             → 200 {"erased":true} → GET 404 ·
+                                         DELETE again 404 · CV node trashed true
+                                         · pipeline 4 → 3
+psql audit_log                         hr.opening.create/.update/.publish/.close,
+                                       hr.opening.applicant.create ×4,
+                                       hr.applicant.update ×4/.move ×4/
+                                       .note.create/.delete — each with its
+                                       record's id and the actor; every refused
+                                       attempt (403/404/409/422) filed nothing
+```
+
+**Cuts and flags.**
+
+- **The six-month retention default is a constant, not a per-tenant setting.**
+  The design note says "defaulted from a per-tenant setting"; a setting needs an
+  HR-settings row, its route and a screen to change it on, and no HR screen
+  exists until B6.08. The caller may state any date, so the capability is whole —
+  what is missing is a place to change the default from. Recorded in the note's
+  § Retention as-built.
+- **★ `DELETE /hr/applicants/{id}` is a route the design note's table did not
+  have.** § *Applicants are different, and get a deadline* promises "a person
+  presses a button", and a button needs an endpoint; without one the module
+  would show an expired record and offer no way to act on it. Added to the
+  note's route and error tables rather than done quietly. It is a real erasure —
+  no tombstone — because a tombstone is the same personal data under another
+  name.
+- **No stage-move history table.** CRM keeps one for deals; here the audit log
+  is the history, and it already carries the record, the verb, the actor and the
+  time. A second table would be a second copy of a decision about a person.
+- **No web work.** The hiring board, the candidate drawer and the
+  past-its-date list are B6.06b and B6.08c. What shipped is the layer they read,
+  and the stage vocabulary is served with every pipeline so the board never
+  hard-codes it.
+- **No applicant → employee bridge.** Moving somebody to `hired` records the
+  outcome; it does not create an employee record, because that record needs the
+  name split, a contract and a start date a person states. The bridge is a
+  screen decision for B6.08c.
+- **★ `/hr` is still a new top-level prefix** needing the production Caddyfile
+  at the next deploy (standing since B6.02b; already in `web/vite.config.ts`).
+- Refusal sentences remain English in every language — the standing
+  cross-cutting item from B1.27, B2.14, B4.15 and B5.11.
+- **★ The pre-existing `snooze.rs` flake noted at B6.05 is untouched and still
+  a human's to fix** (it asserts `sweep_snoozes() == 1` on a deployment-global
+  sweeper).
+- **Business migrations continue at `0206`.**
+
+CHANGELOG: one entry, in a person's voice, about hiring kept honestly — and
+about the refusal to let any machine read a CV.
+
+Next item: B6.06b (recruitment, the board — the applicant pipeline UI on the
+shared board pattern, over the routes and the served stage vocabulary this item
+shipped).

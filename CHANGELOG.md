@@ -6,6 +6,27 @@ contracts.
 
 ## Unreleased
 
+- **Hiring, kept honestly — and no machine ever reads a CV.** A company can
+  write down the roles it is hiring for (the title, the team, where the work is,
+  the terms on offer), publish one when the advertisement goes out, and close
+  the round when it is over. Everybody who applies is recorded against the
+  opening with what they sent — their name, how to reach them, where the
+  application came from, and their CV, which is stored in the HR-only part of
+  Drive where nobody without the HR role can open it or even learn it exists.
+  Candidates move through seven stages, and a stage changes in exactly one way:
+  a person moves them, and the trail records who and when. Correcting a
+  telephone number can never move somebody by accident. Interview notes are
+  written against the candidate with the name of whoever was in the room on
+  them. **Nothing in alo scores, ranks, shortlists or otherwise evaluates an
+  applicant — not even as a suggestion with a human decision after it.** That is
+  a refusal, not a feature we have not got to yet: the EU AI Act treats
+  automated filtering of job applications as high-risk, and there is no column
+  in our database to put such a score in. Because an unsuccessful applicant's
+  data has no employment-law retention behind it, every candidate carries a
+  keep-until date — six months by default — and the record says plainly when
+  that day has passed. Erasing them then removes the record, the notes and the
+  CV, and it happens because somebody decided to: no timer deletes people here.
+
 - **A new colleague's first week arrives as work, not as a wiki page.** A
   company can write down what it does when somebody joins or leaves — order the
   laptop five days before they start, countersign the contract the day before,

@@ -120,6 +120,7 @@ registration in `server.rs`.
 | `GET/PATCH /hr/applicants/{id}` | one applicant: their documents by reference, their notes, their stage | HR |
 | `POST /hr/applicants/{id}/move` | move to another stage — **the only way a stage changes**, and always a person's act (§ *The EU AI Act posture*) | HR |
 | `POST /hr/applicants/{id}/notes` | an interview note, written by the person who was in the room | HR |
+| `DELETE /hr/applicants/{id}` | erase a candidate whose retention date has passed — the record, its notes and their CV. Added at B6.06a: § *Applicants are different, and get a deadline* promises a person presses a button, and a button needs an endpoint | HR |
 | `POST /hr/payroll-exports` | draw the period's CSV **and file the fact that somebody drew it** (B6.10) | HR |
 
 Thirteen path segments are reserved words under `/hr` — `me`, `employees`,
@@ -491,10 +492,14 @@ period is national law we do not encode. The stance:
 - **Applicants are different, and get a deadline.** An unsuccessful applicant's
   data has no employment-law retention behind it; the common European guidance
   is weeks to months unless the person agrees to a talent pool. So an applicant
-  row carries `retain_until` (defaulted from a per-tenant setting, six months),
-  and the hiring screen shows what is past its date. **The deletion is still a
-  person pressing a button** — but the module is the thing that remembers to
-  ask, which is the difference between a policy and a promise.
+  row carries `retain_until` (six months by default), and the hiring screen
+  shows what is past its date. **The deletion is still a person pressing a
+  button** (`DELETE /hr/applicants/{id}`, which takes the notes and the CV with
+  it) — but the module is the thing that remembers to ask, which is the
+  difference between a policy and a promise. *As built at B6.06a: the six
+  months is a constant with the caller free to state any date, not yet a
+  per-tenant setting — a setting needs an HR-settings surface, which no screen
+  exists for until B6.08.*
 
 ### The HR area of Drive — decided at B6.02b
 
@@ -1156,6 +1161,10 @@ map, not a billing rule.
 | archiving an employee with a request awaiting a decision | `Conflict` | `409` with the count |
 | deleting a policy an employment has ever been on | `Conflict` | `409` — archive instead |
 | moving an applicant to a stage that is not in the vocabulary | `Validation` | `422` listing the stages |
+| editing a closed opening, applying to one, or closing it twice | `Conflict` | `409` naming the state |
+| publishing an opening that is not a draft | `Conflict` | `409` naming the state it is in |
+| a CV that is not a live node in this tenant's HR area | `NotFound` | `404` — the same answer for another tenant's node, a personal file and a trashed one |
+| a retention date more than ten years out | `Validation` | `422` — a slipped digit, not a policy |
 | a payroll export over a period with no employments | `Validation` | `422`, never an empty file that reads as "nobody is paid" |
 | a document node that is not this tenant's, or not in the HR area | `NotFound` | `404` |
 | database error | `Db` | `500`, opaque — the wire never sees a raw error |
