@@ -6,6 +6,22 @@ contracts.
 
 ## Unreleased
 
+- **A People module, opening on the hiring board.** The workspace has a People
+  entry of its own, and everybody has it: the screens most of us open here are
+  our own. The first one built is Hiring, for the people who run it — the roles
+  the company is hiring for in a picker, and the candidates for the chosen one
+  on a board that works exactly like the task and deal boards: drag somebody
+  from one column to the next and that is the whole act. The columns are the
+  stages the server has, so the board and the record can never disagree about
+  what a candidacy looks like. Opening a card shows what the application said,
+  their CV to download, and the notes from the people who met them, with a stage
+  picker beside them for anybody working without a mouse. The keep-until date is
+  on the card and in the record, marked plainly once it has passed, with the
+  button that erases the person's details, their notes and their CV — after
+  asking, because that one cannot be undone. **Nothing on these screens scores,
+  ranks or sorts a candidate**, and no column shows a machine's opinion of
+  anybody, because there is none to show.
+
 - **Hiring, kept honestly — and no machine ever reads a CV.** A company can
   write down the roles it is hiring for (the title, the team, where the work is,
   the terms on offer), publish one when the advertisement goes out, and close

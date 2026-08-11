@@ -219,6 +219,41 @@ Three UX laws bite hardest here and are worth naming with their screen:
   (the confirm sentence says what the file contains and that the download is
   recorded).
 
+#### As built (B6.06b), and the four decisions the module's first screen made
+
+The module exists with **one** tab, `Hiring` (`HrModule.tsx`, `HiringView.tsx`,
+`HiringBoard.tsx`, `ApplicantDrawer.tsx`, `OpeningDialog.tsx`,
+`ApplicantDialog.tsx`, `parts.tsx`, `api.ts`, `types.ts`, `format.ts`,
+`hr.module.css`). The rail entry is every member's, as this section says — but
+the member-facing tabs are B6.08, so a member who opens People today is told in
+the module's own words what will live there rather than shown a tab that
+answers nothing. The tab itself is **hidden, not disabled**, for anybody who is
+not HR: the pattern Finance set for its bookkeeper tabs, and for the same
+reason — a tab that exists only to refuse advertises a door.
+
+1. **The columns are the served vocabulary.** `GET …/applicants` answers
+   `stages`, and the board draws exactly those, in that order. A build that
+   gains a stage gains a column with no web release, and the test proves it by
+   serving three stages and counting three columns.
+2. **A drag has no position, unlike the CRM board it otherwise copies.** An
+   applicant row has no order within a stage, deliberately: two people at
+   `interview` are not ranked, and a board that let one be dragged above the
+   other would be a hand-drawn ranking of candidates. Cards read in the order
+   the applications arrived — the order the server sends.
+3. **The stage picker in the drawer is not a convenience.** A board that can
+   only be worked by dragging cannot be worked from a keyboard, and deciding
+   somebody's candidacy is the last place an interface may require a mouse.
+   Both paths post the same audited `POST …/move`.
+4. **The client is never the access decision.** `canWorkHr()` (session
+   `alo:isAdmin` or the `hr` role) decides whether the *tab is drawn*; every
+   `/hr` route asks `require_hr` again for itself, so a stale session hides a
+   tab at worst and opens nothing at all.
+
+Two acts here are confirmed, for the reason the law above gives: **closing a
+round** (terminal, and it freezes what the role said) and **erasing a
+candidate** (the record, its notes and the CV really go). Publishing is not:
+nothing worse than closing the round undoes it.
+
 ## Three doors
 
 B3 established two doors — `AccountStore` for a person's own data,

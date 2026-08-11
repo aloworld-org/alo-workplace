@@ -18403,3 +18403,107 @@ about the refusal to let any machine read a CV.
 Next item: B6.06b (recruitment, the board — the applicant pipeline UI on the
 shared board pattern, over the routes and the served stage vocabulary this item
 shipped).
+
+---
+
+## B6.06b — the hiring board, and the module it opens in (2026-08-11)
+
+**What shipped.** The People module (`web/src/hr`), and its first screen: the
+hiring board over the routes B6.06a shipped. Twelve files, one reason each —
+`HrModule.tsx` (the tab layout and the door), `HiringView.tsx` (which round is
+on screen and what may be done to it), `HiringBoard.tsx` (columns and cards),
+`ApplicantDrawer.tsx`, `OpeningDialog.tsx`, `ApplicantDialog.tsx`, `parts.tsx`,
+`api.ts`, `types.ts`, `format.ts`, `hr.module.css`, `index.ts` — plus the rail
+entry in `product/workplace.tsx`, `canWorkHr()` on the JMAP client, the `hr`
+value on the web's `TenantRole`, ~90 `hr*` strings in `i18n/en.ts`, and
+`HiringBoard.test.tsx` (6 tests).
+
+The whole arc a recruiter needs is on one screen: write down a role → publish it
+→ record the people who apply → move them along as they are met → read what was
+written about one → erase them when their date has passed. The round on screen
+and the open candidate both live in the address (`?opening=`, `?applicant=`), so
+a link to either is a link somebody can send and a reload lands where the work
+was.
+
+**The decisions this item made** (all four are in `docs/design/hr.md` §
+*As built (B6.06b)*):
+
+- **The columns are the vocabulary the API served**, never a list the app holds.
+  The test proves it by serving three stages and counting three columns; a
+  build that gains an eighth stage gains a column with no web release.
+- **A drag carries no position**, unlike the CRM board it otherwise copies:
+  applicants have no order within a stage, and a board that let one be dragged
+  above another would be a hand-drawn ranking of candidates. That is the same
+  refusal as the module's absent screening, expressed in an interaction.
+- **The drawer's stage picker is not a convenience**: a board workable only by
+  dragging is not workable from a keyboard, and both paths post the same audited
+  `POST …/move`.
+- **The tab is hidden, not disabled, for anybody who is not HR** (Finance's
+  pattern). `canWorkHr()` decides whether the tab is *drawn*; every `/hr` route
+  asks `require_hr` again, so a stale session hides a tab at worst.
+
+Two acts ask first, because neither can be undone: closing a round, and erasing
+a candidate (the sentence names the person and says the notes and the CV go).
+Publishing does not ask.
+
+**How it was verified.**
+
+- `npx tsc --noEmit` clean; `npx eslint src/hr src/product/workplace.tsx
+  src/jmap/client.ts src/jmap/types.ts src/i18n/en.ts` clean; `npm run build`
+  clean (14.7 s).
+- `HiringBoard.test.tsx`, 6 tests green against a recorded network, with the
+  real router, module routes, client, board, drawer and forms running: the
+  served stages become the columns and each person lands in theirs; a drag is
+  **exactly one** `POST /hr/applicants/{id}/move` carrying `{"stage":"hired"}`;
+  a drop on the column somebody is already in sends nothing at all; recording
+  somebody posts to the round on screen and opens their record; erasing asks
+  first (nothing sent while the question is up) and then really `DELETE`s; and a
+  member who is not HR sees the module's own words with **no** `/hr` read
+  attempted.
+- Full web suite: 449 passed. The 4 failures are `src/sites/Theme.test.tsx`,
+  **pre-existing and the sites track's** — verified by stashing this item's
+  changes and re-running: same 4 failures on a clean tree. Untouched, per the
+  one-track rule; flagged here for that track or a human.
+
+**Cuts and flags.**
+
+- **No wire-verify against a running backend, and none was owed** (the B5.09b
+  precedent). This item adds no route: every path the screens call was shipped
+  and wire-verified in B6.06a — the transcript above covers all eleven — and the
+  shapes read here were taken field by field from `opening_json`,
+  `applicant_json` and `note_json` in `hr_recruitment.rs` and checked against
+  the `Opening`/`Applicant`/`ApplicantNote` structs. The test file records those
+  exact shapes, so a server change that breaks one breaks a test. `/hr` has been
+  in the vite proxy list since B6.02b.
+- **★ A member who opens People sees a "not here yet" page**, because the
+  member-facing tabs (My leave, Team, Directory) are B6.08a/b. The design note
+  says the rail entry is every member's and the entry is therefore live now;
+  what a member gets today is the module saying in its own words what will live
+  there. It is the shell's existing `ComingSoon`, not a stub screen with dead
+  controls. B6.08b replaces it.
+- **No CV upload from the browser.** The record route takes a `cv` blob and the
+  drawer downloads one through Drive's HR-gated path, but there is no upload
+  control: attaching paper belongs with the rest of a candidate's documents
+  (B6.08c). A CV recorded through the API is fully usable here.
+- **No applicant → employee bridge**, unchanged from B6.06a: moving somebody to
+  `hired` records the outcome and creates nothing. B6.08c.
+- **No opening list screen.** Rounds are a picker, not a table — the board is
+  what Hiring is for. A closed round is one checkbox away and its board still
+  reads.
+- **The stage vocabulary's *words* are ours** (`hrStage*`), while the stage
+  *set* is the server's: an unknown word from a newer server is shown verbatim
+  rather than dropped, so a candidate can never quietly vanish from a board.
+- **Still English only**: the whole `hr*` block, like every wave before its
+  review. fr/nl at B6.11.
+- **★ `/hr` is still a new top-level prefix** needing the production Caddyfile
+  at the next deploy (standing since B6.02b).
+- **★ The pre-existing `snooze.rs` flake noted at B6.05 is untouched and still
+  a human's to fix.**
+- No Rust changed, so no migration was drawn: business migrations remain at
+  `0206`.
+
+CHANGELOG: one entry, in a person's voice, about a People module that opens on
+the hiring board — and about the columns it refuses to draw.
+
+Next item: B6.07 (the approvals inbox — one manager view unifying leave,
+expenses and timesheets with counts).

@@ -20,6 +20,7 @@ import {
   MessagesSquare,
   Receipt,
   Sigma,
+  Users,
   Video,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ import { ChatModule } from "../chat";
 import { MeetModule } from "../meet";
 import { CrmModule } from "../crm";
 import { FinanceModule } from "../finance";
+import { HrModule } from "../hr";
 import { InsightsModule } from "../insights";
 import { InventoryModule } from "../inventory";
 import { ProjectsModule, TimerWidget } from "../projects";
@@ -146,6 +148,19 @@ const suiteModules: ProductModule[] = [
     Icon: Boxes,
     enabled: true,
     element: () => <InventoryModule />,
+  },
+  // HR is a workspace module only (ADR 0035, wave B6): the people a business
+  // employs, and the people applying to join it. Unlike the business modules before
+  // it, its rail entry is meant for **every member** — the most-used HR screen
+  // is an employee's own (`docs/design/hr.md` § Web surface) — so what varies
+  // by door is the tabs inside, not whether the module is there at all.
+  {
+    id: "hr",
+    path: "/hr",
+    label: strings.moduleHr,
+    Icon: Users,
+    enabled: true,
+    element: () => <HrModule />,
   },
   // Insights is a workspace module only (ADR 0037), and it sits after the
   // modules whose records it reads: a chart here is billing's and CRM's own
