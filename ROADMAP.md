@@ -410,6 +410,38 @@ language. The shortage CSV's column headings stay English on purpose, for the
 same reason B4's do.
 
 ### Wave B6 — HR — records, leave, recruitment-lite (payroll calc = permanent non-goal)
+
+Built on the same terms as B2–B5: code, migrations and tests, none of it
+deployed. The last Work OS module, and the first whose records are **about
+people who have rights over them** — a person can demand a copy of their record,
+demand it corrected, in cases demand it erased, and the law separately says keep
+parts of it for years after they leave. Hence its one rule: *a person's record is
+readable by them, by the people who must act on it, and by nobody else, and every
+act on it is recorded.* Three doors, never a tenant-wide read.
+
+- [x] B6.1 The record and the doors: an employee, the employments under them, and three doors — your own record, your reports', and HR's — deciding field by field who sees a home address, a date of birth or a pay figure; an org chart folded from manager links that refuses a cycle; archived and never deleted, because retention and erasure pull opposite ways on the same row; and contract letters filed in an **HR-only area of Drive** where nobody without the role can open them or learn they exist
+- [x] B6.2 Leave, the arithmetic: entitlement in **minutes** over a person's own working pattern rather than in days that mean different things to different contracts, accrual a twelfth at a time, carry-over with its expiry, and a first annual policy seeded from the tenant's country so leave works before anybody configures anything — *a default, not advice* — *editing a policy, or having a sick or unpaid one at all, is API-only*
+- [x] B6.3 Leave, the flow: request → the manager's or HR's decision with a note, nobody approving their own, a request withdrawable while undecided and cancellable until the day it starts, and an approved day that appears in the team absence layer as **a name and a date and nothing else** — never a reason
+- [x] B6.4 Public holidays: fifteen European calendars seeded, one chosen per tenant, and a holiday inside a leave request that costs nobody a day — *choosing the calendar is API-only*
+- [x] B6.5 Onboarding and offboarding: a template a company writes once, an instance per person, each step naming who does it — and the mailbox is a **task for an administrator**, never a write path from HR into identity — *store and routes only, no screen*
+- [x] B6.6 Recruitment-lite: openings, applicants with their CV in the HR-only Drive area, interview notes and a stage board on the shared board pattern, ending in a hire that opens the directory form — and **no machine ever reads a CV**
+- [x] B6.7 One approvals inbox: leave, expense claims and timesheet weeks in a single manager view with counts, each row opening the screen that decides it
+- [x] B6.8 The screens: the directory and the org chart, asking for leave and answering it, the month that says who is away, the hiring board and the day a candidate becomes a colleague
+- [x] B6.9 ★ The HR agent, two tools and a refusal: `who_is_off`, which reads names and days and is told in its own description never to guess why; and `draft_letter_from_template`, which fills in a letter **the company itself wrote** and refuses rather than improvise one about a person
+- [ ] B6.10 ★ CV screening — **refused, not scheduled.** Not suggest-only, not ranked, not scored, in any form: EU AI Act Annex III 4(a) high-risk territory, and a scored candidate list is a decision dressed as a suggestion. `docs/features.md` still promises it and needs a product owner's amendment
+- [ ] B6.11 The screens the wave did not reach: leave policies, holiday-calendar selection, onboarding checklists, letter templates and the payroll export — *all five are shipped, routed and tested behind the API. The letter templates one is the first item of any B6 follow-up: the agent tool refuses a template the tenant has not written, and there is no way in the product to write one*
+- [ ] B6.12 The absence layer drawn in **Agenda** — features.md names it and what shipped is a month in People; also a decision about whether everybody's calendar should show colleagues' absences by default
+
+Payroll **calculation** stays a permanent non-goal. The **export** — a `[B+]`
+line brought forward into this wave — ships: a per-period CSV in four column
+mappings with a receipt for every draw, and no figure alo computed.
+
+HR is translated end to end in en/fr/nl — and, unlike B1–B5, without a
+translation pass at the wave review, because the i18n ratchet has been green
+since B2 and each screen landed its French and Dutch in its own commit. What
+B6.11 added is a test that no HR string may ever be exempted from that, and that
+**no string in any language ever says why somebody is away**.
+
 ### Wave BI-1 — alo Insights first slice ⇄ inserted after B2 (ADR 0037: zero-setup overview dashboard, tile gallery, ask-to-chart)
 
 Inserted ahead of B3 by owner decision. Built on the same terms as B2: code,

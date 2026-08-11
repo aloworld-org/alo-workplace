@@ -1,7 +1,7 @@
 # Design note — alo HR (people, their time off, and the two things we refuse to build)
 
-Status: **design** (B6.01, written before the first migration) · ADR 0035 ·
-Business track wave B6
+Status: **as built** (B6.11 wave review; written as design at B6.01, before the
+first migration) · ADR 0035 · Business track wave B6
 
 alo HR is the sixth and last Work OS module, and the first one whose records
 are **about people who have rights over them**. Every other module in this
@@ -1712,6 +1712,103 @@ Web (`web/src/hr`): `HrModule.tsx`, `api.ts`, `MyLeaveView.tsx`,
 `hr.module.css`, plus the approvals merge in the shell and `hr*` keys in
 `i18n/en.ts`.
 
+## Languages (B6.11)
+
+Every HR string ships in en/fr/nl, and unlike the five waves before it this one
+did not need a translation pass at the wave review: the ratchet in
+`web/src/i18n/locale.test.ts` has been green since B2, so each B6 web item
+(B6.08a/b/c, B6.09a) landed its French and Dutch in the same commit as its
+screen. What this review added is the thing the ratchet cannot do — a seventh
+completeness describe, *"alo HR is fully translated (B6.11)"*, which pins four
+decisions and closes the ratchet's one escape hatch:
+
+- **No HR key may take an `UNTRANSLATED` exemption.** The ratchet permits an
+  explicit exemption line, which is right for a stream that must land English
+  today; it is wrong for every string on this surface, because the reader is a
+  person reading about their own employment — the day they asked for, the answer
+  they got, the record their employer keeps. A test asserts the intersection of
+  the HR key set and `UNTRANSLATED` is empty.
+- **★ No string in any of the three languages says WHY somebody is away.** The
+  absence layer carries names and days and no reason at all (§ *Sickness is
+  health data*), and translation is exactly where a reason creeps back in: a
+  Dutch *ziekteverlof* on a screen whose English says only "away" would invent
+  health data the server never sent. A regex over all three catalogs — `sick`,
+  `malad`, `ziek`, `matern`, `parental`, `ouderschap`, `zwangerschap` — must
+  match nothing. It matched nothing when written; the word *sickness* appears in
+  the whole i18n directory exactly once, in a code comment explaining why it is
+  not in a string. Public holidays are a different thing and stay.
+- **French names an employment by its term; Dutch uses the trade's own word.**
+  A French contract is a *durée indéterminée* or a *durée déterminée* — what the
+  paper itself says — where "Permanent" would be a translation of our English
+  rather than the name of the thing. A Dutch self-employed person is a
+  *zelfstandige*; *aannemer* is a builder. Same finding as B4.15's *afletteren*
+  and B5.11's *inslag/uitslag*, three waves running: the tell of a translated
+  product is a correct word nobody in the trade uses.
+- **A rejection is worded as a process ending, not a verdict on a person.**
+  *Non retenu* is what a French rejection letter says; *Rejeté* is what a form
+  says about a row. Dutch takes the same care with *niet verder* over
+  *afgewezen*. Beside it, the opposite care: *hrLeft* is **Parti** /
+  **Vertrokken**, plainly, because a euphemism for having left a job reads as
+  something to hide.
+
+French agreement here has no clean answer and the catalogs pick one
+deliberately: *Parti*, *1 rattaché*, *Non retenu* all agree with a person whose
+gender the sentence never learns. This is the mirror of B5.11's goods problem —
+there the fix was to use nouns, here there is no noun to retreat to — and the
+alternative, inclusive forms (*rattaché·e*), is a house-style decision a
+European B2B product should not make unilaterally in a loop. `fr.ts` contains no
+inclusive form anywhere, so the choice is at least consistent across the suite.
+Flagged below for a human.
+
+Two things are deliberately **not** translated, both contracts with a machine
+rather than sentences a reader's locale chooses: the **payroll export's column
+headings**, whose whole point is that a named bureau's import wizard recognises
+them (§ *Payroll export*, and B4/B5's CSVs for the same reason), and the
+**server's refusal sentences**, which are English in every language — the
+standing cross-cutting `StoreError` item from B1.27, B2.14, B4.15 and B5.11.
+It bites hardest in this module, because the refusals an employee reads are
+about their own leave.
+
+## What B6 promised, and what B6 shipped (B6.11)
+
+Every `[B6]` line of `docs/features.md` against the code, checked rather than
+assumed.
+
+| `docs/features.md` promises | Shipped? |
+|---|---|
+| ★ HR agent: "who's off next week?" | **Yes** — `who_is_off` (B6.09a), reading the same absence layer the screen does, with a proposal card that shows the days before you approve |
+| ★ HR agent: "draft a contract letter from the template" | **Yes** — `draft_letter_from_template` (B6.09b), which fills in a letter the tenant has written and 422s rather than improvise one. **No proposal card**: it falls to the generic card in `AgentActionCard.tsx`, so you approve it seeing only the model's own sentence, not the template or the colleague named |
+| ★ HR agent: onboarding checklist proposals | **No.** `HR_TOOLS` is exactly two tools. A cut, not a refusal — the checklist store it would call shipped at B6.05 |
+| ★ CV screening, suggest-only with human decision | **Refused, not cut** — § *The EU AI Act posture*. No screening in any form. The features.md line is the open question below |
+| Employee records: personal data, role, team, manager | **Yes** — B6.02a, three doors, field-level scoping |
+| Org chart from manager links | **Yes** — B6.02b store, B6.08a screen |
+| Contract PDFs in Drive with HR-only permissions | **Yes** — B6.02b, the HR area of Drive |
+| Leave: request → manager approval | **Yes** — B6.03b, with the manager's and HR's decision both audited |
+| Leave: balances per policy (annual, sick, unpaid) | **Yes** — B6.03a, property-tested, in minutes over a working pattern. **Editing a policy is API-only**: `/hr/leave-policies` has no screen. The first annual policy is seeded on first read from the tenant's country, so leave works out of the box; a company that wants a different entitlement, or a sick or unpaid policy at all, needs the API |
+| Team absence calendar (**renders in Agenda**) | **Partly.** The absence layer, `/hr/absences`, and a month calendar all shipped (B6.03b, B6.08b) — but the month is **People → Who's away**, and `web/src/agenda/` makes no HR call at all. The one thing features.md names explicitly is the one that is not there |
+| Public-holiday calendars per country/region | **Yes** — B6.04, fifteen European calendars affecting the balance arithmetic. **Choosing which calendar a tenant uses is API-only**: `/hr/holiday-calendars` has no screen; the web reads `/hr/holidays` and nothing else |
+| Onboarding/offboarding checklists (account creation ties into alo admin) | **Store and routes only.** B6.05 shipped templates, instances and the deliberate manual account-creation step; **no screen** — `web/src` makes no checklist call. The hire dialog names the checklist in a comment and does not create one |
+| Recruitment-lite: openings, applicant pipeline board, CV in Drive, notes, stage kanban | **Yes** — B6.06a/b, B6.08c, whole |
+| Expense/leave/timesheet approvals in one inbox | **Yes** — B6.07 store, B6.08c screen, three queues with counts |
+| **[B+]** Payroll data export to local providers | **Yes, ahead of its tier** — B6.10, four column mappings, drawn with a receipt. **API-only, no screen**, and the tenant-defined column mapping the note describes is not built |
+| **[B+]** Payroll calculation | **Permanent non-goal**, as promised |
+
+**The pattern in the misses is one pattern.** Nothing in B6 is half-built at
+depth — every store function, route and guard listed above is tested and
+wire-verified. What is missing is **five screens over surfaces that already
+work**: leave policies, holiday-calendar selection, checklists, letter templates
+and the payroll export. Four of them are administrative and could wait; the
+**letter templates one is not**, and it is the sharpest finding of this review:
+B6.09b's agent tool refuses any template the tenant has not written, and there
+is no way in the product to write one. The feature is, from a user's seat,
+unreachable until somebody POSTs to `/hr/letter-templates`. Same shape as
+B5.11's four missing inventory screens, and a follow-up wave's first items.
+
+**The CHANGELOG sweep found no missing slice.** Every B6 item that changed
+behaviour has its line in the house voice — B6.02a/b, B6.03a/b, B6.04, B6.05,
+B6.06a/b, B6.07, B6.08a/b/c, B6.09a/b and B6.10 — and B6.01, a design note,
+correctly has none. The second wave review running where that was true.
+
 ## Out of scope for B6 (cuts are decisions)
 
 - **★ Payroll calculation, in any country.** A permanent non-goal, recorded in
@@ -1782,3 +1879,17 @@ Web (`web/src/hr`): `HrModule.tsx`, `api.ts`, `MyLeaveView.tsx`,
   standing cross-cutting `StoreError` vocabulary item from B1.27, B2.14, B4.15
   and B5.11. This module makes it sharpest: the refusals an employee reads are
   about their own leave.
+- **★ Whether French should use inclusive forms** (*rattaché·e*, *non
+  retenu·e*). Added at B6.11. HR is the first module whose sentences agree with
+  a *person* rather than a document, so the question could be deferred until
+  now; the catalogs default to the masculine, consistently across the whole
+  suite, because a house style for a product sold in France and Belgium is a
+  product owner's decision and not a loop's. Whichever way it goes, it is one
+  pass over `fr.ts` and a line in the test that pins it.
+- **Whether the Agenda should draw the absence layer.** Added at B6.11.
+  `docs/features.md` says the team absence calendar "renders in Agenda"; what
+  shipped is a month in People. The layer and its route exist, so this is a
+  reading in `web/src/agenda/`, not a model change — but it is also a decision
+  about whether everybody's calendar should show colleagues' absences by
+  default, which § *Absence notification to the team* is deliberately careful
+  about.

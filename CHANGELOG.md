@@ -6,6 +6,18 @@ contracts.
 
 ## Unreleased
 
+- **People, in French and Dutch, and a promise about what it will never say.**
+  alo HR is complete, and every word of it — the directory, asking for time off
+  and answering it, the month that says who is away, the hiring board — reads in
+  English, French and Dutch. A French contract is named the way the paper names
+  it (*durée indéterminée*, not a translation of "permanent"), a Dutch
+  self-employed colleague is a *zelfstandige* rather than a builder, and a
+  candidate who did not get the job is told the process ended rather than that
+  they were rejected. One rule is now enforced by a test in all three languages:
+  **no screen in People ever says why somebody is away.** The absence view
+  carries names and days, and translation is exactly where a reason would have
+  crept back in.
+
 - **The payroll file, for the bureau who actually runs your payroll.** Draw one
   period — a month, a fortnight, whatever you pay on — and alo hands you a CSV
   of what a payroll bureau needs: staff number, name, national insurance number,

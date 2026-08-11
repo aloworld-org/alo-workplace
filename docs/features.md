@@ -500,6 +500,24 @@ EU models, suggest-only where the EU AI Act calls a use high-risk.
 
 ### [B6] HR — people, without the payroll trap
 
+> Wave B6 is built. `docs/design/hr.md` § "What B6 promised, and what B6
+> shipped" reconciles every `[B6]` line below against the code: each is
+> shipped, or a cut with its reason. Three are load-bearing enough to repeat
+> here. **CV screening is refused, not deferred** — not suggest-only, not
+> ranked, not scored, in any form; the line below still promises it and needs a
+> product owner's amendment, and until then the document and the code disagree
+> with the code being the conservative one. **The absence calendar does not
+> render in Agenda**: the layer, the route and a month view all shipped, but
+> the month is in People → Who's away and `web/src/agenda/` makes no HR call.
+> And **five surfaces work without a screen** — leave policies, holiday-calendar
+> selection, onboarding checklists, letter templates and the payroll export are
+> all shipped, routed and tested, reachable only through the API. Four of those
+> are administrative; the letter-template one is not, because the agent's
+> `draft_letter_from_template` refuses any template the tenant has not written
+> and there is no way in the product to write one. Also cut, each named there:
+> the agent proposes no onboarding checklist, the letter tool has no proposal
+> card of its own, and the payroll export has no tenant-defined column mapping.
+
 - [B6] ★ **HR agent** — "who's off next week?", "draft a contract letter from the template", onboarding checklist proposals. CV screening is **suggest-only with mandatory human decision** (EU AI Act high-risk class), every decision logged
 - [B6] Employee records: personal data, role, team, manager (org chart from this), documents (contract PDFs in Drive with HR-only permissions)
 - [B6] Leave management: request → manager approval, balances per policy (annual, sick, unpaid), team absence calendar (renders in Agenda)

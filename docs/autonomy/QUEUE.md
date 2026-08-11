@@ -153,6 +153,6 @@ small, or a `[!]` note for the human if large.
 - [x] B6.09a ★ HR agent, the answer: `who_is_off` — allowlist + executor over the absence layer + proposal/result cards; screening explicitly absent per design note; structural verify.
 - [x] B6.09b ★ HR agent, the draft: tenant-authored letter templates (migration + store + `/hr/letter-templates` CRUD, strict merge vocabulary with no pay field) then `draft_letter_from_template` — a template the tenant has not written is a 422, never an improvisation; structural verify.
 - [x] B6.10 Payroll export: per-period CSV of salary-relevant data (no calculation) with a per-country column mapping config.
-- [ ] B6.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B6] reconciliation.
+- [x] B6.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B6] reconciliation.
 - [ ] B6.12a FINAL arc, money: quote→invoice→payment→ledger and deal→won→invoice, wire-verified end-to-end on local; transcript in STATE.md.
 - [ ] B6.12b FINAL arc, operations: hours→invoice line, PO→receive→bill→reconcile, leave→Agenda — transcripts; then `LOOP COMPLETE`.

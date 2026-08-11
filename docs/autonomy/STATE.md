@@ -19418,3 +19418,151 @@ actually reads — and about the wages alo will never calculate.
 Next item: B6.11 (wave review — fr/nl for every B6 string, CHANGELOG sweep,
 `docs/design/hr.md` as-built, `features.md` [B6] reconciliation; the CV-screening
 line is the reconciliation's first question).
+
+## 2026-08-11 — B6.11 the last wave review: HR pinned in three languages, and B6 reconciled
+
+Wave B6 closes, and with it the last of the six Work OS modules. The module whose
+records are *about people who have rights over them* now has a design note that
+describes what was built, a ROADMAP slice list it never had, a `[B6]`
+reconciliation in `docs/features.md`, and a test that pins the one promise this
+wave makes about language. No Rust changed, no route was added, nothing was
+deployed. One file of production-adjacent code changed: `locale.test.ts`.
+
+**The translation half was already done, and that is the finding.** Unlike
+B1.27, B2.14, BI1.08, B3.11, B4.15 and B5.11 — each of which translated its
+whole wave at the review — B6 needed no translation pass. The i18n ratchet has
+been green since B2, so every B6 web item (B6.08a/b/c, B6.09a) landed its French
+and Dutch in the same commit as its screen: 199 `hr*` keys, `moduleHr`, and the
+seven `agentWhoIsOff*` keys, all three catalogs, checked rather than assumed.
+The wave review's job here was therefore not to write translations but to make
+them un-droppable.
+
+**A seventh completeness describe** — *"alo HR is fully translated (B6.11)"*,
+mirroring billing's, CRM's, Insights', Projects', Finance's and Inventory's —
+does what the ratchet cannot:
+
+- **It closes the ratchet's escape hatch.** The ratchet lets a key take an
+  explicit `UNTRANSLATED` exemption, which is right for a stream that must land
+  English today. No HR key may take one: the reader is a person reading about
+  their own employment. A test asserts the intersection is empty.
+- **★ It forbids a reason.** `no string in any language says WHY somebody is
+  away` runs a regex — `sick`, `malad`, `ziek`, `matern`, `parental`,
+  `ouderschap`, `zwangerschap` — over **all three** catalogs' HR keys. The
+  absence layer carries names and days and no reason (the design note's health-
+  data and AI Act posture), and translation is precisely where a reason creeps
+  back in: a Dutch *ziekteverlof* on a screen whose English says only "away"
+  would invent health data the server never sent. It matched nothing; the word
+  *sickness* appears in the whole i18n directory exactly once, in a comment
+  explaining why it is not in a string. **Proved non-vacuous** rather than
+  trusted — the regex was run against nine sample strings and correctly caught
+  *Ziekteverlof*, *Congé maladie*, *Sick leave* and *Zwangerschapsverlof* while
+  passing *Muziek*, *Fysiek*, *Public holiday*, *Feestdag* and *Vertrokken*.
+- **Three vocabulary decisions, pinned.** French names an employment by its term
+  (*Durée indéterminée* / *Durée déterminée*, what the paper itself says) rather
+  than translating our "Permanent"; Dutch calls a self-employed colleague a
+  *zelfstandige*, because *aannemer* is a builder — B4.15's *afletteren* and
+  B5.11's *inslag/uitslag*, three waves running. A rejection is a process ending
+  (*Non retenu*, *Niet verder*), not a verdict on a person (*Rejeté*,
+  *afgewezen*). And having left is said plainly — *Parti*, *Vertrokken* — with
+  no euphemism, because a euphemism for leaving a job reads as something hidden.
+- Plus the standard arity/non-empty checks and the anti-vacuity floor
+  (`hrKeys.length > 190`). `locale.test.ts` goes **54 → 65 tests**.
+
+**Docs, as-built.** `docs/design/hr.md` is now `Status: as built`; a new §
+**Languages (B6.11)** records the four decisions, the French-agreement problem
+this module cannot dodge, and the two things deliberately left English (the
+payroll CSV's column headings — a contract with a bureau's import wizard — and
+the server's refusal sentences). A new § **"What B6 promised, and what B6
+shipped (B6.11)"** answers every `[B6]` line in a table. `docs/features.md`
+gains the pointer blockquote B1/B2/B3/B4/B5/BI-1 have. `ROADMAP.md` gains the B6
+slice list it was entirely missing — the heading had no body at all — as B6.1–
+B6.9 ticked with B6.10–B6.12 left open with their reasons inline.
+
+**The reconciliation's findings — what B6 did NOT ship:**
+
+- **★ CV screening is refused, not cut**, in any form: not suggest-only, not
+  ranked, not scored. Unchanged from B6.01, and restated because `features.md`
+  still promises it. The document and the code disagree and the code is the
+  conservative one; the amendment needs a product owner's signature.
+- **★ The absence calendar does not render in Agenda.** `features.md` says it
+  does. The layer, `/hr/absences` and a month view all shipped — but the month
+  is **People → Who's away**, and `web/src/agenda/` makes **no HR call at all**
+  (verified by grep over the directory, not assumed). B6.03b explicitly deferred
+  the Agenda drawing to B6.08b, and B6.08b built the view inside People instead.
+- **★ Five surfaces work and have no screen**: leave policies, holiday-calendar
+  selection, onboarding checklists, letter templates, and the payroll export.
+  All shipped, routed and tested; reachable only through the API. Verified by
+  listing what `web/src` actually calls under `/hr/*` against what `server.rs`
+  registers. **The letter-template one is the sharpest thing in this review**:
+  B6.09b's `draft_letter_from_template` refuses any template the tenant has not
+  written — correctly, it must never improvise a letter about a person — and
+  there is no way in the product to write one. The feature is unreachable from a
+  user's seat. Same shape as B5.11's four missing inventory screens.
+- **Two things that look like gaps and are less bad than they look**, found by
+  reading the code rather than guessing: leave still **works out of the box**,
+  because `hr_leave_policies` seeds a tenant's first annual policy from their
+  country on first read (what is API-only is *editing* it, or having a sick or
+  unpaid policy at all); and the hire dialog's silence about the onboarding
+  checklist is deliberate — it says it creates no login, which is the permanent
+  non-goal, and the checklist is named only in a comment.
+- **The agent proposes no onboarding checklist** (`HR_TOOLS` is exactly two
+  tools — a cut, not a refusal, since B6.05 shipped the store it would call),
+  **`draft_letter_from_template` has no proposal card of its own**
+  (`AgentActionCard.tsx:558` falls to the generic card, so you approve it seeing
+  the model's sentence but not the template or the colleague named — verified
+  against the switch's case list), and the **payroll export has no
+  tenant-defined column mapping** (B6.10's own declared cut).
+
+**The CHANGELOG sweep found no missing slice** — the second wave review running
+where that was true. B6.02a/b, B6.03a/b, B6.04, B6.05, B6.06a/b, B6.07,
+B6.08a/b/c, B6.09a/b and B6.10 each have their line in the house voice; B6.01 is
+a design note and correctly has none. This item's own line was added.
+
+**How verified.**
+
+```
+npx tsc --noEmit                          → clean
+npx eslint src/i18n/locale.test.ts        → clean
+npx vitest run src/i18n/locale.test.ts    → 65 tests, green (was 54)
+npm run build                             → built in 17.87s
+node -e '<the reason regex against 9 strings>' → 4 caught, 5 passed, as intended
+key counts: 199 hr* + moduleHr + 7 agentWhoIsOff*, identical in en/fr/nl
+```
+
+  the whole web suite:
+```
+with this item:  538 passed | 4 failed (542)  ·  17 errors
+```
+  the 4 failures are **`src/sites/Theme.test.tsx`** — `site.theme` undefined at
+  `ThemeDialog.tsx:114` — **the same four B5.11 recorded**, in the **sites
+  track's** file, and this item changed exactly one file (`locale.test.ts`) which
+  cannot reach them. Still not this track's to touch.
+
+**Cuts and flags.**
+
+- **Nothing was translated in this item**, and that is the honest report rather
+  than a cut: there was nothing left untranslated. The wave review's translation
+  budget went into the test that keeps it that way.
+- **No fr/nl for the Mail agent's own card strings** — unchanged from B2.14,
+  B3.11, B4.15 and B5.11; ADR 0034's mail wave.
+- **No sweep of untranslated keys outside B1–B6.** Other waves' surfaces.
+- **★ Whether French should use inclusive forms** (*rattaché·e*, *non retenu·e*)
+  is **new, and added to the design note's open questions.** HR is the first
+  module whose sentences agree with a *person* rather than a document, so the
+  question could be deferred until now. The catalogs default to the masculine,
+  consistently — `fr.ts` contains no inclusive form anywhere — because a house
+  style for a product sold in France and Belgium is a product owner's decision.
+- **★ The pay tension** (B6.09), **★ the CV-screening line** (B6.01), **★ `/hr`
+  needing the production Caddyfile** (B6.02b), **★ the double directory read**
+  (B6.07) and **★ the `snooze.rs` flake** (B6.05) are all still a human's.
+- The wave gate at the top of `docs/design/hr.md` — B2 onward built ahead of "B1
+  live with ≥1 real tenant" — **is still unanswered**, and B6 wrote the
+  migrations holding home addresses and pay under it.
+
+**HUMAN ACTION:** unchanged from B6.02b — `/hr` needs adding to the production
+Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`,
+`/projects`, `/finance` and `/inventory`. No new route prefix this item.
+
+Next item: B6.12a (the FINAL arc, money — quote→invoice→payment→ledger and
+deal→won→invoice, wire-verified end to end against the local backend, with the
+transcript here).
