@@ -30,7 +30,7 @@ import { ChatModule } from "../chat";
 import { MeetModule } from "../meet";
 import { CrmModule } from "../crm";
 import { FinanceModule } from "../finance";
-import { HrModule } from "../hr";
+import { ApprovalsWidget, HrModule } from "../hr";
 import { InsightsModule } from "../insights";
 import { InventoryModule } from "../inventory";
 import { ProjectsModule, TimerWidget } from "../projects";
@@ -234,7 +234,15 @@ export const surface: ProductSurface = {
   // The running timer, visible from every module: a clock you cannot see from
   // your inbox is a clock you forget to stop. It draws nothing when none runs,
   // which is the ordinary state of a workspace.
-  railWidgets: [{ id: "timer", Widget: TimerWidget }],
+  //
+  // Beside it, the approvals count (B6.07) — leave, expense claims and
+  // timesheet weeks summed across the three modules that hold them, for the
+  // people who have to decide them. It draws nothing when nothing is waiting,
+  // and nothing at all for the majority who have no queue to work.
+  railWidgets: [
+    { id: "timer", Widget: TimerWidget },
+    { id: "approvals", Widget: ApprovalsWidget },
+  ],
   defaultPath,
   brand: {
     headline: () => strings.brandHeadline,

@@ -6,6 +6,20 @@ contracts.
 
 ## Unreleased
 
+- **One inbox for everything waiting on you.** Time off, expense claims and
+  timesheet weeks used to wait in three different modules, which meant the one
+  you opened least was the one that kept somebody waiting longest. They now
+  arrive in a single list under People → Approvals, ordered by who has waited
+  longest — the person, what they are asking for, the days or the amount, and
+  the day they handed it in — with Approve and Send back on every row. Sending
+  something back asks you for a sentence, because whoever gets it back is going
+  to read it. A running count sits in the rail wherever you are, and shows
+  nothing at all when nothing is waiting. Who may decide what has not changed by
+  a word: leave is a manager's or HR's, claims are the bookkeeper's, weeks are
+  the admin's, and each decision still goes to the module that holds the record.
+  If one of the three cannot be reached, the list says so rather than quietly
+  looking empty.
+
 - **A People module, opening on the hiring board.** The workspace has a People
   entry of its own, and everybody has it: the screens most of us open here are
   our own. The first one built is Hiring, for the people who run it — the roles

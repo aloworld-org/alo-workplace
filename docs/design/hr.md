@@ -1169,6 +1169,55 @@ items sees "first 50 of each" rather than a single ranked stream. For the
 number of approvals a company of this size has, that is not a real limitation;
 if it becomes one, it becomes one endpoint with a stated contract, not a fix.
 
+### As built (B6.07)
+
+Server routes added: **none**, as decided above. What shipped is six web files
+and two narrow exports:
+
+```
+platform/approvals.ts    the shared row shape + queue interface — no client,
+                         no rules, no React
+projects/approvals.ts    weeks   → the shape (exported as `useWeekApprovals`)
+finance/approvals.ts     claims  → the shape (exported as `useExpenseApprovals`)
+hr/leaveApprovals.ts     leave   → the shape
+hr/queues.ts             which of the three are this caller's to work
+hr/inbox.ts              the merge, the counts, and the decision
+hr/ApprovalsView.tsx     the screen; hr/ApprovalsWidget.tsx the rail count
+```
+
+Five decisions the first build made, each of which could have gone otherwise:
+
+1. **A module hands over rows it has already put into words.** `Approval` carries
+   `what`, `detail` and `figure` as finished strings, so Finance's cents are
+   formatted by Finance's formatter and a week's minutes by Projects'. An inbox
+   that formatted three kinds of record itself would be a fourth place those
+   decisions live, and money is the one thing in this suite that never gets a
+   second formatter.
+2. **Who may decide is asked once and drawn, never enforced.** `queues.ts` maps
+   three doors — `canWorkHr` (or a direct report) for leave, `canWorkTheBooks`
+   for claims, `isAdmin` for weeks — and a caller with none of them gets an
+   empty list and no tab. Every route behind the queues asks its own door again,
+   so a stale session hides a queue at worst.
+3. **The manager case costs two reads**, and they are the only reads this adds:
+   nothing on the session says "somebody reports to you", so a caller who is not
+   HR is resolved from `/hr/me` plus the directory, both every-member surfaces.
+   The answer is cached per signed-in session (a `WeakMap` on the session's own
+   fetch), because the tab, the list and the rail badge all ask for it.
+4. **A queue that fails is named, never counted as zero.** The three reads are
+   settled rather than raced: an unreachable Finance leaves a manager able to
+   decide the leave in front of them, and the screen says the list is short. A
+   silently short inbox reads as "nothing is waiting", which is the one wrong
+   thing an inbox can say.
+5. **HR still lands on Hiring.** The inbox is usually empty, and a module that
+   opened on an empty screen would read as a module with nothing in it. A
+   manager who is not HR has the inbox as their only tab and lands there.
+
+Cuts, recorded: **reimbursement is not in the queue** (paying somebody back is
+not a decision, and it stays on Finance's own screen beside what is owed); the
+row links to the owning module rather than opening a record in place, because
+the member-facing leave screens are B6.08b; and the badge re-reads rather than
+decrements, so it can never disagree with the list it links to.
+
 ## Errors
 
 One map, `billing::map_store_err`, used and not copied — the same call CRM,

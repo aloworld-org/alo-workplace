@@ -18507,3 +18507,101 @@ the hiring board — and about the columns it refuses to draw.
 
 Next item: B6.07 (the approvals inbox — one manager view unifying leave,
 expenses and timesheets with counts).
+
+## B6.07 — one inbox for three queues, and the fourth endpoint we did not build (2026-08-11)
+
+**What shipped.** The approvals inbox: leave (B6.03b), expense claims (B4.05b)
+and timesheet weeks (B3.05) in one list under People → Approvals, ordered by who
+has waited longest, with a running count in the rail.
+
+The design note settled the shape before the item started, and this build kept
+it: **no server route was added.** Nothing in Rust changed; business migrations
+remain at `0206`.
+
+- `web/src/platform/approvals.ts` — the one thing that crosses a module
+  boundary: a row shape (`Approval`) and a queue interface (`ApprovalQueue`).
+  No client, no rules, no React.
+- `web/src/projects/approvals.ts`, `web/src/finance/approvals.ts`,
+  `web/src/hr/leaveApprovals.ts` — each module puts its own queue into that
+  shape, **already in words**: Finance formats its cents, Projects its minutes,
+  HR the server's fold of working days. Two narrow index exports
+  (`useWeekApprovals`, `useExpenseApprovals`) beside the ones the shell's agent
+  card and Finance's expense form already had.
+- `web/src/hr/queues.ts` — which of the three are this caller's, resolved once
+  per session and cached on the session's own fetch (a `WeakMap`), because the
+  tab, the list and the rail badge all ask.
+- `web/src/hr/inbox.ts` — the merge, the counts, the decision.
+- `web/src/hr/ApprovalsView.tsx`, `ApprovalsWidget.tsx` (+ its CSS), the tab and
+  route in `HrModule.tsx`, the widget in `product/workplace.tsx`'s
+  `railWidgets`, `queueLabels.ts`, the `hr*` inbox strings and the table CSS.
+
+**The five decisions**, in `docs/design/hr.md` § "As built (B6.07)" rather than
+only here: rows arrive pre-worded; the doors are drawn, never enforced (every
+route asks its own again); the manager case costs two every-member reads
+(`/hr/me` + the directory) because nothing on the session says "somebody reports
+to you"; a queue that fails is **named, never counted as zero**; and HR still
+lands on Hiring, because an inbox that is usually empty is a bad first screen.
+
+**How it was verified.**
+
+- `npx tsc --noEmit` clean; `npx eslint` clean over every changed file;
+  `npm run build` clean (14.3 s).
+- `src/hr/Approvals.test.tsx`, **7 tests green** against a recorded network with
+  the real router, module routes, queues, merge and screen running: three
+  queues arrive as one list ordered by wait (claim 1 Aug → leave 3 Aug → week
+  5 Aug, which is *not* the order the queues answered in); each Approve goes to
+  the route of the module that owns the record and **never to an endpoint of
+  the inbox's own**; Send back asks first, sends nothing while the question is
+  up, and carries the sentence; a cancelled question decides nothing; a `403`
+  from Finance leaves the other two decidable, names the kind that failed and
+  counts 2 rather than 3; somebody with no door sees no tab and **no queue is
+  read at all**; and HR asks `scope=all` (with no org read) while a manager asks
+  `scope=team&status=requested`.
+- The ordering test was mutation-checked: with `rows.sort(byWait)` removed it
+  fails and the other six still pass, so it is testing the merge and not the
+  fixtures.
+- `src/hr/HiringBoard.test.tsx` still 6/6 after the module gained the tab; its
+  session mock now rotates per test, because the doors are cached per session.
+- Full web suite: **456 passed**. The 4 failures are `src/sites/Theme.test.tsx`,
+  **pre-existing and the sites track's** — re-verified this iteration by
+  stashing every change and re-running: the same 4 fail on a clean tree.
+- fr/nl were added for the two strings this item put in **already-reviewed**
+  waves (`projectsBillableOf`, B3.11; `financeClaimOf`, B4.15) — `locale.test.ts`
+  fails the build otherwise, and rightly.
+
+**Cuts and flags.**
+
+- **No wire-verify, and none was owed**: the item adds no route. Every path the
+  screen calls was shipped and wire-verified in B3.05, B4.05b and B6.03b, and
+  the JSON shapes read here were taken field by field from `week_json`,
+  `pending_json` and `request_json` and are recorded in the test's fixtures, so
+  a server change that breaks one breaks a test.
+- **Reimbursement is deliberately not in the queue.** An inbox is a list of
+  decisions; paying somebody back is not one, and it stays on Finance's own
+  screen beside what is owed.
+- **A row links to the owning module, it does not open the record in place.**
+  The member-facing leave screens are B6.08b; until then a leave row links to
+  the inbox itself rather than to a screen that does not exist.
+- **The three lists page independently** — the honest cost the design note named
+  in advance. A manager with hundreds waiting sees the first page of each, not a
+  single ranked stream.
+- **The manager check reads the whole directory** to answer one yes/no. It is an
+  every-member surface and a company of this size makes it cheap; the smaller
+  fix is an additive `manages` count on `/hr/me`, and it is a server change this
+  item was told not to make. Flagged for whoever does B6.08a.
+- **Still English only** for the `hr*` block, like every wave before its review;
+  fr/nl at B6.11.
+- **★ `/hr` remains a new top-level prefix** needing the production Caddyfile at
+  the next deploy (standing since B6.02b).
+- **★ The pre-existing `snooze.rs` flake noted at B6.05 is untouched and still a
+  human's to fix.**
+- The open question the design note left for a human is now live in the product:
+  **the HR role does not imply the expense or timesheet queues** (they are
+  `require_finance` and `require_admin`). An HR holder sees leave only. Widening
+  is a word each, and it is a question about how a customer's company is
+  organised.
+
+CHANGELOG: one entry, in a person's voice, about one inbox for everything
+waiting on you — and about the count that shows nothing when nothing is.
+
+Next item: B6.08a (Web HR — the directory and the org chart).

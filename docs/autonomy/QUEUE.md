@@ -146,7 +146,7 @@ small, or a `[!]` note for the human if large.
 - [x] B6.05 Onboarding/offboarding checklists (template → instance per employee, ties to admin account creation as manual steps).
 - [x] B6.06a Recruitment, model: openings + applicants (CV in Drive, notes, stages) + routes + scoping tests.
 - [x] B6.06b Recruitment, board: applicant pipeline board UI on the shared board pattern.
-- [ ] B6.07 Approvals inbox: one manager view unifying leave/expenses/timesheets (B3/B4 hooks) with counts.
+- [x] B6.07 Approvals inbox: one manager view unifying leave/expenses/timesheets (B3/B4 hooks) with counts.
 - [ ] B6.08a Web HR: directory + org chart.
 - [ ] B6.08b Web HR: leave request/approve screens + absence calendar.
 - [ ] B6.08c Web HR: recruitment board screen + approvals-inbox integration.
