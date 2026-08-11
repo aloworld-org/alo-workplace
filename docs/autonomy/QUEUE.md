@@ -139,7 +139,7 @@ small, or a `[!]` note for the human if large.
 
 - [x] B6.01 Design note `docs/design/hr.md` — employee model, leave policies/balances, approvals, recruitment pipeline; explicit EU AI Act posture (screening = suggest-only + logged human decision).
 - [x] B6.02a Employees, records: migration + store (person data, role, team, manager, linked user) + HR-role access scoping tests.
-- [ ] B6.02b Employees, org + documents: org chart from manager links + contract PDFs in Drive under HR-only permissions; routes + wire.
+- [x] B6.02b Employees, org + documents: org chart from manager links + contract PDFs in Drive under HR-only permissions; routes + wire.
 - [ ] B6.03a Leave, the math: policies (annual/sick/unpaid, accrual per year) + balance computation property-tested.
 - [ ] B6.03b Leave, the flow: request→manager approval + balances applied + team absence feed into Agenda; routes + wire.
 - [ ] B6.04 Public-holiday calendars per country (seed data + per-tenant selection) affecting balance math.

@@ -17449,3 +17449,157 @@ Next item: B6.02b (employees, the org chart and the documents — `GET /hr/org`
 folding `manager_id` into a tree, contract PDFs as Drive nodes under HR-only
 permissions, the first `/hr/*` routes, `require_hr`, the vite proxy entry, and
 the wire transcript).
+
+## 2026-08-11 — B6.02b the first /hr routes: two doors on the wire, and a place a contract can live
+
+**Shipped.** The module's first HTTP surface, the org chart, and the papers on a
+person's file — with the thing the design note named but had not defined: the
+HR-only area.
+
+```
+platform/alo-store/migrations/0169_hr_documents.sql  the filing: node ↔ person, kind, note, filer
+platform/alo-store/src/drive.rs                      DriveLocation::Hr — a third location kind
+platform/alo-store/src/hr_documents.rs               file / list / read / detach, HR door
+platform/alo-store/src/hr_org.rs                     fold_org_chart + AccountStore::hr_org_chart
+platform/alo-store/src/id.rs                         HrDocumentId
+platform/alo-store/tests/hr_documents_tenancy.rs     4 tests: tenant, role, area, one-file-one-person
+products/mail/alo-jmap/src/state.rs                  Account::require_hr
+products/mail/alo-jmap/src/hr_employees.rs           the directory, the record, the archive
+products/mail/alo-jmap/src/hr_org.rs                 GET /hr/org, GET /hr/me
+products/mail/alo-jmap/src/hr_documents.rs           documents on a person
+products/mail/alo-jmap/src/server.rs                 7 routes registered
+products/mail/alo-jmap/tests/audit_routes.rs         5 new actions in the golden vocabulary
+web/vite.config.ts                                   "/hr" in API_PATHS (the S1.11 lesson)
+docs/design/hr.md                                    § The HR area of Drive — decided at B6.02b
+```
+
+**The HR area is the item's real decision.** The note said documents were "Drive
+nodes in the HR-only area" and never said what that area was; Drive had two
+location kinds and no per-node permission. So the area is a **third location
+kind, `hr`, one per tenant, gated by `TenantRole::Hr`-or-admin for reading *and*
+writing**, answering `NotFound` (never `Forbidden`) to everybody else. Three
+things follow, and each is why this shape was chosen over a Space called "HR":
+
+- The protection is **Drive's own**. A filed contract is fetched with the
+  ordinary `GET /drive/nodes/{id}/download`, which refuses the colleague who
+  learns the node id — so there is deliberately no second download route under
+  `/hr` to keep in step.
+- **Nothing indexes it.** `search.rs` whitelists `personal` and `space` by
+  construction and `drive_find` is personal-only, so an HR file's *name* never
+  reaches a colleague's search. A Space would not have given that for free.
+- A Space's membership is managed per Space, so access to everybody's contract
+  could drift away from the HR role without anyone deciding it had — an access
+  rule with two sources of truth, which is the failure this module exists to
+  prevent.
+
+`hr_documents` refuses to file anything that is not a live node in this tenant's
+HR area, so a filing row can never claim "HR-only" over a file somebody else can
+open. The filing is the record; **a detach removes the filing, not the file.**
+
+**The two doors, on the wire and not only in the types.** `GET /hr/employees`
+and `GET /hr/employees/{id}` are every member's read *and* HR's, and which
+answers is decided by **calling a different store function** — never by deleting
+keys from a JSON object, because a deletion somebody forgets is the leak. A
+member's read of the same person yields `DirectoryEntry`, a type with no private
+field on it.
+
+**Verified — gates.**
+
+```
+cargo fmt (alo-store, alo-jmap, the new files)
+SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap --all-targets → clean, zero warnings
+DATABASE_URL=…5432 cargo test -p alo-store  → every suite green (5 new fold tests,
+                                              2 new kind tests, 4 new tenancy tests)
+DATABASE_URL=…5432 cargo test -p alo-jmap   → every suite green (608 unit + 40 suites),
+                                              incl. audit_routes with the 5 new actions
+npx tsc --noEmit · npx eslint vite.config.ts · npm run build → clean, built in 13.10s
+```
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants from `identityctl bootstrap-admin`, plus two
+ordinary users of tenant A created through `/admin/users` — one granted `hr`,
+one granted nothing — so the role gate is exercised by a real token and not by
+an admin standing in for one. Rows read back in psql.
+
+```
+GET  /hr/employees            no token            → 401   GET /hr/org no token → 401
+POST /hr/employees            plain member        → 403   admin or hr only
+POST /hr/employees            hr + employment     → 200   Inès Dupont, E-0001, terms in one act
+POST /hr/employees            hr, reports to her  → 200   Bram Peeters, part_time 4½ days
+POST /hr/employees            staff number twice  → 409   names the rule, not the holder
+PATCH /hr/employees/{ceo}     managerId = Bram    → 422   "would report to themselves through {id}"
+POST /hr/employees            iban "BE00 0000"    → 422   an IBAN is two letters, two digits…
+POST /hr/employees            dob as a timestamp  → 422   dateOfBirth must be YYYY-MM-DD
+PATCH /hr/employees/{bram}    with `employment`   → 422   terms are appended, not edited
+POST /hr/employees            contractKind zero_hours → 422 lists the six words
+GET  /hr/employees/{ceo}      hr                  → 200   whole record: nationalId, iban, address, dob
+GET  /hr/employees/{ceo}      member              → 200   name, jobTitle, team, managerId — and
+                                                          grep for the 6 planted private strings: 0 hits
+GET  /hr/org                  member              → 200   Nes Dupont → [Bram Peeters], two levels
+GET  /hr/me                   hr user, unlinked   → 200   {"employee":null,"isHr":true}
+PATCH /hr/employees/{ceo}     userId = that user  → 200   then GET /hr/me → her whole record
+GET  /hr/me                   plain member        → 200   {"employee":null,"isHr":false}
+POST /jmap/upload/{user}      a 43-byte PDF       → 200   blobId
+POST …/{ceo}/documents        member              → 403   ·  unknown kind → 422 (lists the five)
+POST …/{ceo}/documents        no blobId           → 400   ·  unknown employee → 404 (before any file)
+POST …/{ceo}/documents        hr                  → 200   contract-ines.pdf filed, note kept
+GET  …/{ceo}/documents        hr → 200 (1)  ·  member → 403  ·  tenant B → 404
+GET  /drive/nodes/{node}      hr → 200      ·  member → 404  ·  download member/B → 404 ×2
+GET  /drive/nodes/{node}/download  hr       → 200   43 bytes, `cmp` identical to the upload
+GET  /search?q=contract-ines  member → {"hits":[]}   ·  hr → {"hits":[]} (the area is out of search)
+GET/PATCH/POST/DELETE on every /hr route as tenant B → 404 ×5, and their own list/chart empty
+DELETE …/documents/{id}       member → 403 · hr → 200 detached · again → 404
+GET  /drive/nodes/{node}      after the detach    → 200   the FILE is still there
+POST …/{ceo}/archive          she still has a report → 409 "reassign 1 direct report(s)"
+PATCH …/{bram} managerId null → 200, then archive  → 200  and the chart now roots on Bram
+GET  /hr/employees?includeArchived=1  hr → both (archived last) · member → the living one only
+POST …/{ceo}/archive {"archived":false}            → 200   restored
+GET  /audit?entity=hr.employee:{ceo}  hr → hr.employee.create/update/archive and
+                                          hr.employee.document.create/delete, filed against HER
+                                          record, actor named, **no field value in any entry**
+GET  /audit?entity=hr.employee:{ceo}  tenant B → {"entries":[]}
+psql  hr_documents ⋈ drive_nodes → every filing's node is location_kind='hr' AND
+                                   location_id = its own tenant_id
+psql  drive_nodes GROUP BY location_kind → personal 1524 | space 407 | hr 12
+```
+
+**Cuts, recorded rather than silent.**
+
+- **Terms are set at hire and not changed by a route yet.** `POST /hr/employees`
+  takes an optional `employment` block (so nobody exists without a working
+  pattern), and `PATCH` refuses one with a `422` naming the rule — appending on
+  a PATCH would let a stale form restate somebody's pay by resubmitting.
+  Appending later terms needs `POST /hr/employees/{id}/employments`, **which the
+  design note's route table does not list**; inventing surface is what the queue
+  forbids, so it is a question for the human below rather than a route added
+  here.
+- **`GET /hr/me` does not list the caller's own documents.** The door table
+  grants it and the area's gate is the role, so serving it needs a decision (a
+  per-node exception in the location rule, or an HR-served copy). Written into
+  `docs/design/hr.md` § The HR area of Drive as an open decision, due by B6.03b.
+- **No screens.** B6.08a–c are the HR UI; nothing in `web/` changed but the dev
+  proxy list.
+
+**Flags for the human.**
+
+- **★ HUMAN ACTION: `/hr` is a new top-level prefix** and needs adding to the
+  production Caddyfile at the next deploy. It is in `web/vite.config.ts` already
+  (this commit); the loop never edits `deploy/`.
+- **★ The terms-change route is a design-note question.** Either the note's
+  `PATCH /hr/employees/{id}` is meant to cover appending terms (it should not —
+  see the cut above), or the table is missing `POST /hr/employees/{id}/employments`.
+  A human decides; until then a pay rise is unrecordable through the API.
+- **A tenant admin passes `require_hr`.** Deliberate and consistent with
+  `require_finance`, but it means "who may read everybody's home address" is
+  today "HR *or* any tenant admin". If a tenant wants HR data closed even to
+  their own admins, that is a different gate and a decision worth making
+  explicitly.
+- Refusal sentences remain English in every language — the standing
+  cross-cutting item from B1.27, B2.14, B4.15 and B5.11.
+
+CHANGELOG: one entry, in a person's voice, about the two doors, the HR-only
+files, archiving-not-deleting, and the audit trail — saying plainly that the
+screens follow.
+
+Next item: B6.03a (leave, the math — policies and the accrual/balance
+computation, property-tested; no routes).

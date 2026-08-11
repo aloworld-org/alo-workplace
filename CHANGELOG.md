@@ -13,6 +13,24 @@ contracts.
   nothing; approval writes the reviewed language atomically, and manual
   translation remains available when AI is not configured.
 
+- **alo HR opens: the people you employ, and the papers you keep about them.**
+  A company can now keep an employee record — who somebody is, how to reach
+  them, who they report to, and the terms they are employed on — and it is
+  readable by **two different doors on purpose**. Everybody in the workspace
+  sees the directory and the org chart: a name, a job title, a team, and who
+  reports to whom, because a company where you cannot find out who your
+  colleague's manager is has its org chart in a filing cabinet. The home
+  address, the date of birth, the bank details and the pay are HR's alone, and
+  your own record is always yours to read in full. Contracts, amendments and
+  letters are filed as real files in an **HR-only area of your Drive**: a
+  colleague who is handed the link is told the file does not exist, and it never
+  turns up in anybody's search. Archiving is the only removal — employment
+  records must be kept for years after somebody leaves — and archiving a manager
+  who still has reports is refused rather than quietly cutting a branch off the
+  chart. Every change is in the audit trail: who did what, to whose record, and
+  when, and never what the value was. The HR screens follow; this release is the
+  module the API and the screens are both built on.
+
 - **alo Inventory now speaks French and Dutch, from the shelf to the order.**
   The whole module reads in your own language: the catalog, what is on the
   shelves and the movement history behind a row, both order documents with the

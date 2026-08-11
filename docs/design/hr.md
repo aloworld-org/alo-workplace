@@ -496,6 +496,40 @@ period is national law we do not encode. The stance:
   person pressing a button** — but the module is the thing that remembers to
   ask, which is the difference between a policy and a promise.
 
+### The HR area of Drive — decided at B6.02b
+
+This note said documents were "Drive nodes in the HR-only area" without saying
+what that area *is*. Drive (ADR 0027) had two location kinds, `personal` and
+`space`, and access follows location — there is no per-node permission. So the
+area is a **third location kind, `hr`: one per tenant, whose read and write gate
+is [`TenantRole::Hr`] or being a tenant admin**, and a non-holder is answered
+`NotFound` rather than `Forbidden`, because here the existence of a file is part
+of what is being kept. `hr_documents` refuses to file a node that is not in it,
+so a filing row can never claim "HR-only" over a file a colleague can open.
+
+Two consequences worth stating, both asserted by tests:
+
+- **The protection is Drive's own, not this module's.** A contract is fetched
+  with the ordinary `GET /drive/nodes/{id}/download`, which refuses the
+  colleague who learns the node id. There is deliberately no second download
+  route under `/hr`, because a second path is a second access rule to keep in
+  step with the first.
+- **Nothing indexes it.** `search.rs` whitelists `personal` and `space`, and
+  `drive_find` is personal-only, so an HR file's *name* never surfaces in a
+  colleague's search — which a Space with a careful membership list would not
+  have given us for free.
+
+*Rejected: a Space called "HR".* A Space's members are managed per Space by
+whoever manages it, so access to everybody's contract could drift away from the
+HR role without anyone deciding it had. An access rule with two sources of truth
+is the failure this module exists to prevent.
+
+**Not yet decided (open, B6.03b at the latest):** an employee reading *their
+own* contract. The door table above grants it, and the area's gate is the role,
+so it needs either a per-node exception in the location rule or an HR-served
+copy — a decision, not an oversight. Until it is made, `GET /hr/me` returns the
+record and the terms and does not list documents.
+
 ## Leave
 
 ### Minutes, and the working pattern that makes a day mean something
