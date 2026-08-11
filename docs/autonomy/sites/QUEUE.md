@@ -131,6 +131,8 @@ reserved through their owner, never stored again (ADR 0041).
 - [ ] S3.02c Cost and abuse: a per-site monthly **spend** ceiling that is defaulted rather than blank, per-visitor and per-IP rate limits below it, a graceful unavailable message that offers the contact form, and the tenant told when it is hit.
 - [ ] S3.02d Source-adding UI: the screen that publishes a source to the bot says *anyone on the internet will be able to read this* above the button, every time; the ceiling is set in the same screen the bot is switched on.
 - [ ] S3.02e Visitor chat UI: on-site widget, keyboard-accessible, mobile, citations as links, and an honest empty/unavailable state.
+- [ ] S3.02f Appearance and voice model (ADR 0040 §5): the widget inherits the site's preset palette, logo and favicon; the tenant owns the welcome message, bot name and avatar, up to three suggested questions, a tone note, launcher position and icon, and the offline message. Colour is a choice among the site's own palette roles — no free-form colours, no custom CSS, no custom fonts. Validation tests proving no stored value can produce failing contrast, and a test that nothing in the tone note widens what §1 and §2 allow.
+- [ ] S3.02g Appearance UI: a live preview of the real widget beside the fields, a written default welcome message rather than an empty box, suggested questions drafted from the published site's own headings and editable, and an accessibility check shown in the screen rather than discovered later.
 
 ### The chatbot that acts (ADR 0040)
 

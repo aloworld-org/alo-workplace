@@ -114,6 +114,48 @@ their existing public seams.** Where a seam does not exist it is added by the
 module that owns it, as its own queue item, before the bot's item is taken.
 No sites item may edit a file under a Billing or CRM path.
 
+## 5. What the tenant can change about it
+
+**Decision: it wears the site's theme by default, and everything a tenant
+changes about it is content or a bounded choice — never free-form CSS.**
+
+The bot is not a separate product bolted to the page. The site already carries
+a contrast-checked preset palette, a logo and a favicon (`site_theme`), and
+asking somebody to pick their brand colour a second time is precisely the seam
+alo exists to remove. So the widget inherits all of it, and the customisation
+screen starts from "this already looks like you".
+
+Changeable, because it is the tenant's voice:
+
+- **Welcome message** — the first thing the visitor reads, and the single
+  highest-value field on the screen. A default is written for them rather than
+  left blank, because an empty greeting is how these end up saying "Hi! 👋".
+- **Bot name and avatar** — often deliberately not the company logo. "Ask
+  Marie" outperforms "Chat with us", and the avatar may be a person.
+- **Suggested opening questions** — three at most, drafted from the published
+  site's own headings, editable.
+- **Tone**: a short scale between formal and warm, plus a free-text note about
+  the business's voice. This shapes the prompt, never the boundaries — no
+  wording in this box can widen what ADR 0040 §1 and §2 allow.
+- **Launcher**: which corner, which icon, and whether it opens by itself on a
+  page (off by default; an uninvited popup is the thing everyone hates).
+- **Offline message and the fallback** when the ceiling is hit (§3).
+
+Bounded rather than free:
+
+- **Colour is a choice among the site's own palette roles**, not a picker. If a
+  tenant wants a different accent they change the site's preset and the widget
+  follows. The reason is the reason `site_theme` gives for presets: every
+  shipped palette is contrast-checked at build time, and a bot bubble is small
+  text on a coloured field — the single worst place to let somebody pick
+  #FFFF00 on white.
+- **No custom CSS and no custom fonts.** The widget renders on pages we do not
+  control, inside a boundary that has to stay predictable.
+
+*Rejected: a theme editor of its own.* Two branding screens that can disagree
+is how a product starts feeling like three products in a trench coat, which is
+the exact criticism `positioning.md` makes of Teams.
+
 ## Consequences
 
 - The grounding set is small enough to be auditable, and its rule fits in a
