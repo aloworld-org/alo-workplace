@@ -31,12 +31,28 @@ renamed from the retired "Ficina" name to `alo-workplace`); nothing was
 committed and B1.02 is untouched in the queue. One observation from that
 attempt is worth keeping, because it prevents a real collision:
 
-**The business track mints migrations in the `01xx` block; the sites track
-continues in `00xx`.** The two loops run on different machines and cannot see
-each other's uncommitted work, so picking "the next number after the highest
-one I can see" makes both tracks eventually choose the same version — and two
-different migrations sharing a version is a broken schema, not a merge
-conflict. Sites is at `0056`; business starts at `0100`.
+**Each track mints migrations in its own block.** The loops run on different
+machines and cannot see each other's uncommitted work, so picking "the next
+number after the highest one I can see" makes two tracks eventually choose the
+same version — and two migrations sharing a version is a broken schema, not a
+merge conflict.
+
+| Track | Block | Highest as of 2026-08-11 |
+|---|---|---|
+| Business modules | `01xx`–`02xx` | `0208` |
+| Sites | `03xx` | `0300` |
+
+The blocks below were the original allocation and both tracks have long since
+grown past them: business ran `0100` into the `02xx` range, and sites moved
+from `00xx` to `03xx` rather than colliding with it. The table above is the
+live answer; update it rather than re-deriving it.
+
+**Checking the other checkout is necessary and not sufficient.** Both checkouts
+read `0206` as the highest on 2026-08-11, and the two tracks still both minted
+a `0207` — because the other one pushed between the check and the rebase. Look
+again immediately before rebasing, not only before writing the file. Since a
+migration is a filename, renumbering is cheap right up until it has run
+somewhere real.
 
 marathon preflight from the Mac, 2026-08-06 — toolchain and push access verified.
 
