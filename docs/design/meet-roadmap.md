@@ -74,11 +74,42 @@ product. Each is small on its own; together they are the reason to switch.
 | **Who you are talking to** | On a customer call, the participant panel shows the deal, the last invoice, and what was agreed last time — from CRM and Billing, beside their face. This is the single most valuable thing on this list for a business, and Teams cannot do it because it does not know who your customers are |
 | **Decisions become tasks, with owners** | Not "action items in a summary" — real Tasks in alo, assigned, due, appearing on somebody's board before they have left the call. The summary is the by-product; the task is the point |
 | **The follow-up writes itself** | A draft email to the attendees, in Mail, with what was decided. Proposed and approved like everything else — never sent by a machine |
+| **Notes sent to everyone who was there** | A setting, because a team that meets weekly should not approve the same email fifty times. Attendance is already recorded when somebody takes a join token, so the recipient list is a fact rather than a guess. **The design tension is real and is settled below** |
 | **The room's files are at hand** | A meeting started from a chat room can offer what was shared in that room, so nobody hunts through Drive while eleven people watch |
 | **"What have I missed?"** | Joining late, ask the agent. It has the transcript so far and the room's history. Every other product makes you interrupt |
 | **Consent as a record, not a checkbox** | Recording in the EU is a legal act. Who consented, when, and to what, stored as an artefact somebody can produce later. Zoom shows a banner; a European product should keep evidence |
 | **Notes in a real document** | Shared notes during the call are an alo Doc from the start, so they survive in Drive rather than in a panel nobody opens again |
 | **Meeting templates** | A "customer demo" that always brings the deck, the CRM card and the agenda. Templates work here because the meeting can reach the things it needs |
+
+### Sending the notes automatically — where the line is
+
+Everything else in alo that reaches outside waits for a person: an agent
+drafts an email and somebody presses send, because sending is irreversible and
+a mistake arrives in somebody else's inbox. Automatically mailing minutes to
+everyone who attended is exactly that act, and a setting that switches it on is
+a setting that switches off the rule.
+
+The resolution is not to refuse it — a team meeting weekly should not approve
+the same email fifty times — but to make the boundary the one that already
+matters everywhere else in the product:
+
+- **Inside the workspace, automatic is fine.** Colleagues were in the meeting,
+  they can already read the room, and the notes tell them nothing they were not
+  present for. Default on.
+- **Outside the workspace, it is a draft.** The moment a recipient is not a
+  member — a customer, a candidate, a supplier — the send waits for a person.
+  Not because the content differs, but because nobody can un-send a summary
+  containing a sentence somebody wishes they had not said. Default off, and
+  switching it on is a deliberate act with the consequence written on it.
+- **Guests get what guests heard.** If a guest joined for twenty minutes of a
+  ninety-minute meeting, minutes covering the other seventy are a disclosure.
+  Either send them the part they attended or send them nothing.
+- **Who it came from is a person, not the system.** The mail is from the
+  organiser, so a reply reaches somebody rather than a mailbox nobody reads.
+
+This depends on Stage 3's transcript and minutes; it is listed here because
+the setting must be designed with them rather than bolted on afterwards, when
+the easy answer is one switch that mails everybody everything.
 
 Two more, honestly labelled as table stakes rather than differentiators, and
 both genuinely expected in 2026: **noise suppression**, and **speaking-time
