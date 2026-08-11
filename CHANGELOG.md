@@ -6,6 +6,21 @@ contracts.
 
 ## Unreleased
 
+- **A candidate's CV, and the day they become a colleague.** You can now attach
+  a CV to somebody's record from the browser: choose the file on the candidate
+  form and it is filed in the HR area, where only HR can open it — replace it or
+  take it off from the same place, and nothing is saved unless the file went up.
+  Nothing reads it: no screening, no ranking, no score, in this release or any
+  other. And when somebody takes the job, their card carries the one act that
+  was missing — *Add them to the directory*. It opens with their name split into
+  its two halves, the role, team and contract from the round they applied to,
+  and asks for the day their terms begin, because every leave balance is counted
+  from it. If the address is already a colleague's, the form says whose before
+  you write a second record — and says it differently for somebody who has left,
+  since a returning colleague is a real second record. It writes a record in
+  People and nothing else: no login and no mailbox, which stay an
+  administrator's to create.
+
 - **Time off, asked for and answered in the workspace.** People now opens on
   *My leave*: what you have left on every kind of leave the company runs, with
   the working under the figure — this year's entitlement, what you have taken,

@@ -18812,3 +18812,120 @@ says who is out and never why.
 
 Next item: B6.08c (Web HR — the recruitment board screen and the
 approvals-inbox integration).
+
+---
+
+## B6.08c — the paper a candidate brings, and the day they become a colleague (web)
+
+**Item:** B6.08c Web HR: recruitment board screen + approvals-inbox integration.
+
+**What the item actually had left.** Both names in the item shipped early: the
+recruitment board screen was B6.06b, and the approvals-inbox integration was
+B6.07 (tab, rail count, three queues) finished by B6.08b (a leave row opens the
+member screen). Those were **verified, not rebuilt** — `Approvals.test.tsx`
+7/7 and `Leave.test.tsx` 8/8 still green here, and the three queue adapters each
+carry an `href` into the module that owns the record (`/projects/approvals`,
+`/finance/approvals`, `/hr/leave?scope=…&request=…`), so no row links nowhere.
+Recruitment contributes no queue by design: an opening's two transitions are
+nobody's to approve.
+
+What was genuinely outstanding is what B6.06b's own cuts named as this item's,
+and it is what shipped:
+
+- `web/src/hr/hire.ts` — pure: the particle-aware name split, the form's
+  prefill, the body `POST /hr/employees` is sent, and whether an address is
+  already a colleague's.
+- `web/src/hr/HireDialog.tsx` — *Add them to the directory*: the record and the
+  terms in one act, the directory read that names a duplicate, and the sentence
+  saying this creates no login.
+- `ApplicantDialog.tsx` — the CV control: attach, replace, take off.
+- `ApplicantDrawer.tsx` — *Attach a CV* (which opens the form: one upload path)
+  and the hire section on a candidate at `hired`.
+- `HiringView.tsx`, `types.ts` (`CvUpload`, `EmployeeDraft`, `EmploymentDraft`,
+  `HrCreatedEmployee`), `api.ts` (`createEmployee`), `hr.module.css`, 21 `hr*`
+  strings in `i18n/en.ts` (English only).
+
+**No server change, and none was owed.** `cv` has been a field on the record
+route since B6.06a and `POST /hr/employees` has taken `employment` beside the
+person since B6.02a. Nothing in Rust changed; business migrations remain at
+`0206`.
+
+**The five decisions**, in `docs/design/hr.md` § "The paper a candidate brings,
+and the bridge to the directory" rather than only here: the file is uploaded on
+submit and a failed upload saves nothing; one upload path, with `cv: null` as
+the explicit removal; a hired candidate is not a colleague until a person says
+so (and nothing is written back to the application afterwards); the prefill
+comes from **that candidate's** round or from nothing at all, and the start date
+is never defaulted to today; and a known work address is *named*, not refused,
+with a different sentence for somebody who has left.
+
+**How it was verified.**
+
+- `npx tsc --noEmit` clean; `npx eslint src/hr src/i18n/en.ts` clean;
+  `npm run build` clean (13.6 s).
+- `src/hr/Hire.test.tsx`, **8 tests green** against a recorded network with the
+  real router, module routes, client, drawer and forms running: choosing a file
+  uploads nothing until the form is submitted, and then exactly once, with the
+  record carrying `{blobId, name, size, contentType}` — **the server's own
+  measurement of the blob, not the `File`'s idea of its size**; an upload that
+  fails leaves the form open, says its own sentence and writes **nothing**;
+  taking a CV off sends `{"cv": null}` and no upload; a candidate with no CV is
+  offered one *through the record form* (no second control, nothing sent); the
+  bridge is drawn on `hired` and on nobody else; the hire form opens split as
+  `Amara` / `van den Berg` with the round's role, team and `fixed_term`, an
+  **empty** start date, and posts one `POST /hr/employees` with the person and
+  the terms in one body, then lands on `/hr/directory?q=Amara%20van%20den%20Berg`;
+  and a directory that already holds the address is read with
+  `?includeArchived=1`, names the colleague, and still lets the record through.
+- `src/hr/hire.test.ts`, **15 tests green** on the pure edges: `van den Berg`
+  and `de Vries` stay whole while a front particle falls back to the last-word
+  rule, a middle name goes with the given name, a one-word name leaves the
+  family name for the form to ask for (and `canHire` is false until it does),
+  blank optional fields are left out rather than sent empty, and a blank address
+  never matches a colleague's blank address.
+- **Mutation-checked**: replacing the uploaded blob's `size` with the `File`'s
+  fails **exactly** the one test that claims it and leaves the other seven
+  green.
+- Full HR suite **73 green** (8 files). Full web suite **518 passed**. The 4
+  failures are `src/sites/Theme.test.tsx`, **pre-existing and the sites
+  track's** — re-verified this iteration by stashing every change and running
+  that file on a clean tree: the same 4 fail.
+
+**Cuts and flags.**
+
+- **No wire-verify, and none was owed**: the item adds no route. Every field
+  these screens send was taken from `ApplicantBody`/`CvBody` in
+  `hr_recruitment.rs` and `EmployeeBody`/`EmploymentBody` in `hr_employees.rs`
+  and is asserted key-for-key in the tests, so a server change that drops one
+  breaks a test.
+- **Nothing is written back to the applicant after a hire.** No column links a
+  candidate to the employee they became; adding one is a migration this item did
+  not need, and an auto-written interview note would put machine words in a
+  person's mouth. The duplicate check answers "is this person already in?" where
+  the answer matters — in the form.
+- **The hire form sends four fields of thirty.** Name, work address and the
+  terms; the home address, date of birth, national id and bank account on the
+  create route are HR's to enter on the record screen, with the person in front
+  of them. That screen (`PeopleView`/`EmployeeDrawer` in the design note's file
+  plan) is **not in the B6 queue at all** — flagged for a human, because a
+  tenant can today create a colleague only through this bridge or the API.
+- **The bridge is offered on the word `hired` alone.** The stage *set* stays the
+  server's; this one word is knowledge the bridge cannot do without, and a
+  vocabulary without it offers nothing rather than guessing at the last column.
+- **A duplicate address warns, it does not refuse** — there is no unique index
+  behind it, and a returning colleague is a real second record.
+- **Still English only** for the `hr*` block; fr/nl at the wave review, B6.11.
+- **★ `/hr` remains a new top-level prefix** needing the production Caddyfile at
+  the next deploy (standing since B6.02b).
+- **★ The double directory read** (approvals resolver + this form) is still paid
+  by an additive `manages` count on `/hr/me` that nobody has built; standing
+  since B6.07.
+- **★ The pre-existing `snooze.rs` flake noted at B6.05 is untouched and still a
+  human's to fix.**
+
+CHANGELOG: one entry, in a person's voice, about attaching a CV nothing reads —
+and about the day a candidate becomes a colleague, which is a thing a person
+does and not a card moving.
+
+Next item: B6.09 (★ HR agent tools — `who_is_off` and
+`draft_letter_from_template`; screening explicitly absent per the design note).

@@ -1351,6 +1351,72 @@ person's balance shown to their manager** (the route allows it, the screen shows
 the reader their own — a manager deciding a request sees its cost, which is the
 figure the decision turns on).
 
+## The paper a candidate brings, and the bridge to the directory
+
+### As built (B6.08c), and the five decisions the screens made
+
+The hiring board (B6.06b) shipped without two things it named as this item's:
+attaching a CV from a browser, and what happens after somebody is moved to
+`hired`. Both are here, and **neither needed a server route** — `cv` has been a
+field on the record route since B6.06a, and `POST /hr/employees` has taken the
+terms beside the person since B6.02a. Nothing in Rust changed; business
+migrations remain at `0206`.
+
+`web/src/hr/hire.ts` (pure: the name split, the prefill, the duplicate check),
+`HireDialog.tsx`, the CV control in `ApplicantDialog.tsx`, the two new sections
+in `ApplicantDrawer.tsx`, the form's state in `HiringView.tsx`.
+
+1. **The file is uploaded when the form is submitted, not when it is chosen.**
+   A form somebody closes has uploaded nothing, and the record and its paper are
+   written in one act rather than two that can half-fail. An upload that fails
+   saves *nothing* and says so in its own sentence: a candidate whose telephone
+   number saved but whose CV silently did not is the worse outcome.
+2. **One upload path.** The record form owns it; the drawer's CV panel offers
+   *Attach a CV* by opening that form rather than growing a control of its own
+   that would have to agree with it. Taking a CV off is an explicit `cv: null`
+   (which trashes the file), because an empty file input cannot be told apart
+   from "leave what is there".
+3. **A hired candidate is not a colleague until somebody says so.** Moving a
+   card to `hired` records an outcome; the directory record is a separate,
+   offered act with a person's id on it. A board that created people would
+   create them on a mis-drop — and the same refusal is why nothing writes back
+   to the applicant afterwards: the candidate's record says what happened to
+   their candidacy, and the directory is where a colleague exists.
+4. **The prefill is a prefill.** The name is split by a particle-aware
+   heuristic (`van den Berg` stays whole), the role, team and contract kind come
+   from the round that was advertised — and from **that candidate's** round
+   only, so a stale `?applicant=` fills in nothing rather than the wrong role.
+   The start date is never defaulted to today: every leave balance is folded
+   from it. Both names and that date are what the form needs; the rest of the
+   thirty fields on the create route belong to HR with the person in front of
+   them, and a hiring board is not the place to type somebody's bank account.
+5. **A known address is named, not refused.** The server keeps no unique index
+   on a work address, so the form asks the directory first (HR's read, including
+   the people who have left) and says which colleague already has it — a
+   different sentence for somebody who has left, because a returning employee is
+   a genuine second record and only the person filling the form knows which case
+   this is. It creates no login and says so: a write path from HR into identity
+   is a permanent non-goal, and the mailbox is a task on the onboarding
+   checklist.
+
+The confirmation is the colleague themselves — the hire lands on
+`/hr/directory?q=<their name>` — rather than a sentence saying it worked.
+
+**The approvals-inbox side of this item was already standing** and was verified
+rather than rebuilt: the tab and the rail count (B6.07), the three queues each
+linking to the module that owns the record, and leave rows opening the member
+screen at `/hr/leave?scope=…&request=…` (B6.08b). Recruitment contributes no
+queue, deliberately: an opening has two transitions and neither is anybody's
+decision to approve.
+
+Cuts: **no CV upload while recording somebody in one press from the board's Add
+card** beyond the form itself (the form *is* that press); **no employee record
+written from a rejected or withdrawn candidate** (the bridge is offered on
+`hired` alone, and a vocabulary without that word offers nothing rather than
+guessing); and **no link back from the colleague to the application they came
+from** — that is a column on `hr_employees` and a migration this item did not
+need.
+
 ## Errors
 
 One map, `billing::map_store_err`, used and not copied — the same call CRM,
