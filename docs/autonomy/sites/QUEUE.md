@@ -102,3 +102,58 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [ ] S2.15b Domain purchase state machine: quote → explicit approval → payment reference → register/configure/renew states with idempotency and tenant tests; Billing remains behind its owned public seam.
 - [ ] S2.15c Domain purchase UI: search, honest renewal pricing, checkout handoff, progress/recovery, and automatic Sites DNS/domain attachment where configured.
 - [ ] S2.16 Wave review: complete browser arcs, accessibility/responsiveness/performance, language parity, privacy/security reconciliation, changelog, as-built docs, and final cross-service transcripts.
+
+## Wave 3 — commerce, the chatbot, and editing on the page
+
+Settled in **ADR 0040** (what the bot may read, do and cost), **ADR 0041** (the
+shop as a surface over one catalog) and **ADR 0042** (direct manipulation
+without a canvas). Read the ADR before the item; the arguments are not repeated
+here.
+
+Two rules hold across the whole wave. **No item may edit a file the Billing,
+CRM, Inventory or Agenda track owns** — where a seam is missing, the item that
+adds it is listed here as owned by that module and must land first. And
+**nothing keeps a second copy**: stock, price and availability are read and
+reserved through their owner, never stored again (ADR 0041).
+
+### Editing on the page (ADR 0042)
+
+- [ ] S3.01a Inline text editing: edit a typed section's text on the page rather than in a sidebar form, producing the same change shape an AI edit produces; undo/redo, and a test proving both paths yield an identical diff.
+- [ ] S3.01b Reorder by dragging, with the page reflowing live and a keyboard-accessible equivalent; ordering is a change to typed sections, with diff goldens proving it.
+- [ ] S3.01c Constrained resize: each section type declares its allowed ratios and shapes, and the editor offers only those; responsive goldens at phone, tablet and desktop, and a test that no gesture can produce free positioning.
+- [ ] S3.01d Section palette: drag a new section in, previewed with the tenant's own content rather than lorem ipsum; keyboard path and goldens.
+- [ ] S3.01e Editor arc review: one browser arc from blank page to published site using only direct manipulation, checked for accessibility, mobile and the reviewable-diff property.
+
+### The chatbot that answers (ADR 0040)
+
+- [ ] S3.02a Grounding model: the corpus is the **published** site plus a named Public knowledge collection; drafts and scheduled-but-unpublished versions are excluded by construction; tenant isolation tests, and a test that no unpublished string can ever be retrieved.
+- [ ] S3.02b Answering with citations: retrieval over the corpus, every answer naming the page it came from, and a refusal rather than an answer when it cannot cite; fixture-only tests, no live model calls.
+- [ ] S3.02c Cost and abuse: a per-site monthly **spend** ceiling that is defaulted rather than blank, per-visitor and per-IP rate limits below it, a graceful unavailable message that offers the contact form, and the tenant told when it is hit.
+- [ ] S3.02d Source-adding UI: the screen that publishes a source to the bot says *anyone on the internet will be able to read this* above the button, every time; the ceiling is set in the same screen the bot is switched on.
+- [ ] S3.02e Visitor chat UI: on-site widget, keyboard-accessible, mobile, citations as links, and an honest empty/unavailable state.
+
+### The chatbot that acts (ADR 0040)
+
+- [ ] S3.03a **Agenda-owned**: a public seam exposing published availability for a site, without exposing the calendar behind it.
+- [ ] S3.03b Booking from the conversation: create the meeting, send the confirmation, put it in the visitor's calendar, and include a cancellation link — with the reversible-only rule enforced in code rather than in the prompt.
+- [ ] S3.03c **CRM-owned**: a public seam to create a contact and a lead from a site conversation.
+- [ ] S3.03d Lead capture through that seam, storing aggregate attribution only and no individual visitor journey.
+- [ ] S3.03e What the bot did: a tenant-facing transcript showing each action, the fact it used and the page that fact came from.
+
+### Commerce wave one — tickets and dated products (ADR 0041)
+
+- [ ] S3.04a **Billing-owned**: a read seam exposing published catalog items and their prices to a site, with no write path and no second copy.
+- [ ] S3.04b Hold-with-expiry: capacity is reserved *before* payment and released if the buyer does not finish; concurrency tests proving two simultaneous buyers cannot oversell the last seat. This is the first commit of the wave, not hardening.
+- [ ] S3.04c Hosted payment handoff: a provider adapter with a fixture provider and no external calls in tests, an order → payment-reference → paid state machine, idempotent webhook handling, and a test that no card data can reach alo. Mollie or Adyen ahead of Stripe.
+- [ ] S3.04d Fulfilment: the ticket by email and in the buyer's calendar, the contact in CRM and the invoice in Billing, each through its owned seam.
+- [ ] S3.04e Place-of-supply VAT for event tickets as a rules table with tests — reviewed by a tax professional before this item is taken, because wrong here is wrong in Finance years later.
+- [ ] S3.04f Shop sections and checkout on the published site: typed sections like every other, public render goldens, mobile.
+- [ ] S3.04g The arc: a visitor asks the bot about an event, is offered tickets at a price read from the catalog, pays on the provider's page, and the ticket, the contact and the invoice all exist. No price the model invented.
+
+### Commerce wave two — stock items (ADR 0041)
+
+- [ ] S3.05a Simple stock items: one price, one tax, one shipping rate, with stock read and reserved through Inventory's seam and never copied.
+- [ ] S3.05b Propose the configuration: from a sentence about the business, draft the catalog, the VAT treatment per item and the shipping, and present it for approval with every guess flagged — the screen where Odoo loses the customers who cannot afford a consultant. Fixtures only.
+- [ ] S3.05c Shop UI for stock items, sharing the checkout built in wave one.
+
+- [ ] S3.06 Wave review: browser arcs for all three strands, accessibility, responsiveness, language parity in English, Dutch and French, privacy and security reconciliation, changelog and as-built docs.
