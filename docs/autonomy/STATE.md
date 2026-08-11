@@ -19228,3 +19228,193 @@ once and an assistant that fills them in without ever writing one of its own.
 
 Next item: B6.10 (payroll export — the per-period CSV with no calculation, and
 the per-country column mapping).
+
+## B6.10 — the payroll file, and the receipt for having drawn it
+
+**Item:** B6.10 Payroll export — a per-period CSV of salary-relevant data with
+**no calculation**, and a per-country column mapping over it. The last build
+item of wave B6 before its review.
+
+**What shipped.**
+
+- `platform/alo-store/migrations/0207_hr_payroll_exports.sql` — the **receipt**:
+  tenant, id, `from_day`, `to_day`, `mapping_key`, `line_count`, `drawn_by`,
+  `created_at`, CHECKs on the period, the mapping and the count, and a
+  newest-first index. It holds **no payroll data at all** — no employee, no
+  name, no figure — so it can be kept as long as the audit trail without keeping
+  anybody's salary with it.
+- `platform/alo-store/src/hr_payroll_export.rs` — the period fold:
+  `PayrollLine` (25 facts in stored units — cents, minutes, whole dates),
+  `TenantStore::hr_payroll_lines`, `record_hr_payroll_export`,
+  `hr_payroll_exports`, the pure `terms_for_period`, and the private
+  day-by-day `leave_minutes_in`.
+- `platform/alo-store/src/hr_payroll_mapping.rs` — the formatting layer:
+  `PayrollColumn` (25, closed, each with `key()`, `is_private()`, `is_text()`),
+  `DateStyle`, `DecimalStyle`, `ColumnMapping`, four seeded sheets, `mapping()`
+  and `mapping_for_country()`. **Split from the fold on purpose**: a new
+  country's conventions and a new fact on the file are two different reasons to
+  change one file, and the design note's single `hr_payroll_export.rs` would
+  have carried both (recorded in the note's as-built).
+- `products/mail/alo-jmap/src/hr_payroll.rs` — `POST /hr/payroll-exports`
+  (draws the file **and** files the receipt), `GET /hr/payroll-exports` (the
+  receipts), `GET /hr/payroll-mappings` (the sheets, their columns, and which
+  are private). All three **HR only**; routes in `server.rs`, module in
+  `lib.rs`.
+- `products/mail/alo-jmap/src/csv.rs` — `row_delimited`, additive: the quoting
+  rule now follows whatever delimiter a mapping chose. `row` is unchanged in
+  behaviour and is now one line over it.
+- `HrPayrollExportId` in `id.rs`; re-exports in `lib.rs` (`payroll_mapping`,
+  `PAYROLL_MAPPINGS`, … — renamed on the way out, because `mapping` is too
+  common a word for a crate root).
+
+**The decisions worth reading twice.**
+
+- **★ The mappings are per COUNTRY, not per bureau.** The design note names
+  DATEV, SD Worx and Loket as the motivation. Shipping a column set *called*
+  `datev` that we had derived from anything other than DATEV's own published
+  specification would be a compliance claim we cannot stand behind, and the
+  loop's rule for compliance work is the strict reading of a cited spec. So
+  what ships is `alo` (neutral, ISO, all 25 columns), `de`, `nl`, `fr` —
+  headings in the country's language, its date format, its decimal comma, and
+  the semicolon a decimal comma makes necessary. **A tenant-defined mapping is
+  not built** (see cuts).
+- **Leave is bucketed by what it does to PAY**: paid / sick / unpaid, decided by
+  the policy's own `paid` flag and `LeaveKind`, never by a name somebody typed.
+  Sick leave a tenant does not pay is *unpaid absence* on the file. Per-policy
+  columns were rejected: they are dynamic columns, i.e. a sheet whose shape
+  changes when somebody adds a policy.
+- **A day of leave costs what the pattern in force on that day says**, holidays
+  free — the same rule `hr_leave_balances` charges a balance by, so the file and
+  the screen cannot disagree. A fortnight spanning a move to a three-day week
+  costs five days then three, and a test says so.
+- **A contractor is off the file** (`ContractKind::Contractor` invoices — the
+  vocabulary said so when it was defined). A period in which everybody invoices
+  is a `422`, exactly like a period with nobody in it: an empty file reads as
+  "nobody is paid", which the design note's error map already forbade.
+- **Claims are the employee's own money, already decided**, dated by the day it
+  was spent: personal-method expenses approved or reimbursed, with mileage told
+  apart by the journey behind it so the two columns cannot double-count. **A
+  claim in another currency is COUNTED, never added** — `claimsOtherCurrency` is
+  a column. Adding sterling to euro is the kind of wrong nobody checks.
+- **The receipt is written before the file leaves**, and the derived audit line
+  (`hr.payroll_export.create`) is filed by the middleware that files every other
+  business write — verified on the wire, in the table.
+
+**Verified — the gate.**
+
+- `cargo fmt` on the two crates (one unrelated pre-existing drift in `meet.rs`
+  was reverted rather than smuggled in). `SQLX_OFFLINE=true cargo clippy -p
+  alo-store -p alo-jmap --all-targets` — **zero warnings**.
+- New tests: 12 store unit (the fold's rules, the mappings, the money and hour
+  rendering, the private/text column sets), 5 route unit (the neutral file, the
+  German sheet byte-for-byte, formula neutralisation, the file name, the mapping
+  JSON), 1 CSV writer unit (a stated delimiter takes the quoting rule with it),
+  and `tests/hr_payroll_tenancy.rs` — **5 integration tests on the real
+  Postgres**.
+- `cargo test -p alo-store -p alo-jmap` — **2 653 tests green, 0 failed**,
+  across 169 binaries plus the doctests. (Run as ONE cargo invocation: two
+  concurrent `cargo test` invocations block each other on the target-directory
+  lock, which cost this iteration an hour of a job that looked like it was
+  running and was in fact waiting. Beside the `pgrep -f` trap in LOOP.md, this
+  is the second way a gate can look alive and be asleep.)
+- **Wrong tenant** (`hr_payroll_tenancy.rs`): two companies draw the same March;
+  neither file carries a stranger, B's `hr_payroll_lines` over a period only A
+  employs anybody in is the clean `Validation`, and A's receipts are invisible to
+  B. Repeated on the wire: B's draw returned B's one person and nothing of A's.
+- **★ A pre-existing red test on `main`, fixed here.** `tests/audit_routes.rs`
+  holds the whole audit vocabulary as a golden list and B6.09b added three
+  `hr.letter_template.*` actions without pasting them in — so `cargo test -p
+  alo-jmap` was already failing before this item. The three lines are added here
+  beside this item's own `POST /hr/payroll-exports -> hr.payroll_export.create`.
+  The suite passes.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080`, docker
+`alo-pg` → a fresh `alo_b610`, two tenants from `identityctl bootstrap-admin`,
+real PKCE tokens. Nothing external, no mail sent, no model called.
+
+```
+POST /hr/payroll-exports  · GET ×2   (no token) → 401 · 401 · 401
+GET  /hr/payroll-mappings                      → alo(25 cols, ','), de(18, ';'),
+                                                 nl(18, ';'), fr(18, ';');
+                                                 private = nationalId, iban,
+                                                 dateOfBirth, payAmount
+POST {}                                        → 422 "from is required: a report
+                                                   is always for a stated period"
+POST from 2026-03-01 to 2026-02-01             → 422 "the period must end on or
+                                                   after the day it starts"
+POST mapping "datev"                           → 422 "column mapping must be one
+                                                   of: alo, de, nl, fr"
+POST March, nobody employed yet                → 422 "no period of employment
+                                                   covers these days — a payroll
+                                                   file over nobody is not a file"
+seed: Ada Byron 0042 (permanent, from 2025-01-01, €3 200,50/month, BSN + IBAN
+      + date of birth), Joris Claes 0007 (CONTRACTOR), Inès Dupont, jr 0100
+      (joins 2026-04-01), "=cmd|calc" Aarts 0300 (3-day week), and Zora Neale
+      in tenant B; approved leave for Ada: 2..6 March (paid) and 16..17 March
+      (unpaid); four approved personal claims + one nobody decided
+POST March (neutral)                           → 200, text/csv; charset=utf-8,
+                                                 attachment payroll-2026-03-01-
+                                                 to-2026-03-31-alo.csv, nosniff,
+                                                 no-store; header + 3 rows —
+                                                 the contractor and the April
+                                                 joiner are not on it
+  Ada's row  …,40.00,3200.50,month,EUR,40.00,0.00,16.00,57.50,0.00,1,…
+             (a week paid, two days unpaid, €45,00+€12,50 owed back, the
+              sterling claim COUNTED, the February one and the undecided one
+              absent)
+  "Dupont, jr" and "Adviseur, senior"          → quoted, per RFC 4180
+  "=cmd|calc"                                  → written "'=cmd|calc"; the
+                                                 amounts beside it untouched
+POST March mapping "de"                        → Personalnummer;Nachname;…;
+                                                 0042;Byron;Ada;10.12.1990;…;
+                                                 40,00;3200,50;month;EUR;16,00;
+                                                 0,00;40,00;… (semicolons, dotted
+                                                 dates, decimal commas)
+POST March mapping "nl" / "fr"                 → 10-12-1990 / 10/12/1990, same
+                                                 figures, headings in Dutch and
+                                                 French
+POST March as tenant B                         → their one person only
+GET  /hr/payroll-exports (A)                   → the receipts, newest first:
+                                                 period, mapping, lineCount,
+                                                 drawnBy, drawnAt
+GET  /hr/payroll-exports (B)                   → 1, their own
+audit_log                                      → entity hr.payroll_export,
+                                                 action hr.payroll_export.create,
+                                                 target /hr/payroll-exports,
+                                                 actor present, one per draw
+hr_payroll_exports                             → one row per draw, the period and
+                                                 the mapping, no figures
+```
+
+**Cuts and flags.**
+
+- **No UI.** The `Payroll` tab the design note's web table names is not built;
+  the API is the surface today, and a screen is a web item a human can schedule.
+  No i18n strings were added (none were needed — the file's headings are a
+  contract with a machine, not a string a reader's locale chooses).
+- **★ No tenant-defined column mapping.** The design note says "seed data plus a
+  tenant-defined one"; the seeds ship, the tenant-defined one does not. It is a
+  table, a CRUD surface and a validation of a column list against
+  `PayrollColumn::ALL` — a whole item's worth, and the honest next step for
+  anybody whose bureau wants its own sheet. **This is the one part of the listed
+  slice that is not in this commit.**
+- **A bureau's own layout is a human's to describe** (the ★ decision above).
+  Until somebody hands us DATEV's or Loket's published specification, `alo` is
+  the sheet their import wizard is pointed at.
+- **Hours are rendered to the hundredth** (`0.42` for 25 minutes); the exact
+  figure is minutes, which no sheet carries as a column yet.
+- **A claim approved after a draw appears in the next draw of the same period.**
+  Deliberate and documented: the file selects by the day money was spent, and
+  only claims already decided. It is why the draw is recorded with its date.
+- **★ The pay tension** (B6.09), **★ `features.md`'s CV-screening line**
+  (B6.01), **★ `/hr` needing the production Caddyfile** (B6.02b), **★ the double
+  directory read** (B6.07) and **★ the `snooze.rs` flake** (B6.05) are all
+  untouched and still a human's. This item adds no new route prefix.
+- **Business migrations continue at `0208`.**
+
+CHANGELOG: one entry, in a person's voice, about the file your payroll bureau
+actually reads — and about the wages alo will never calculate.
+
+Next item: B6.11 (wave review — fr/nl for every B6 string, CHANGELOG sweep,
+`docs/design/hr.md` as-built, `features.md` [B6] reconciliation; the CV-screening
+line is the reconciliation's first question).

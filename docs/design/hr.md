@@ -124,11 +124,13 @@ registration in `server.rs`.
 | `GET/POST /hr/letter-templates` | the letters this company will write about its people, and the merge vocabulary they may use (B6.09b) | HR |
 | `GET/PATCH/DELETE /hr/letter-templates/{id}` | one letter | HR |
 | `POST /hr/payroll-exports` | draw the period's CSV **and file the fact that somebody drew it** (B6.10) | HR |
+| `GET /hr/payroll-exports` | the receipts: who drew which period, in which sheet, when — no figures (B6.10) | HR |
+| `GET /hr/payroll-mappings` | the per-country sheets this build writes, their columns and which are private (B6.10) | HR |
 
-Fourteen path segments are reserved words under `/hr` — `me`, `employees`,
+Fifteen path segments are reserved words under `/hr` — `me`, `employees`,
 `org`, `leave-policies`, `leave-balances`, `leave-requests`, `absences`,
 `holidays`, `holiday-calendars`, `checklist-templates`, `letter-templates`,
-`openings`, `applicants`, `payroll-exports`. Ids are base64url'd 16-byte random tokens
+`openings`, `applicants`, `payroll-exports`, `payroll-mappings`. Ids are base64url'd 16-byte random tokens
 (`id.rs`), so a record can never *be* one of them, and matchit prefers a static
 segment to a capture; this is the shape `/tasks/labels` beside `/tasks/{id}`
 and `/inventory/stock` beside `/inventory/moves` already have.
@@ -1220,6 +1222,76 @@ export.
 Money stays integer cents internally and is rendered per the mapping's format
 on the way out — the one place a decimal separator is a per-country decision
 rather than a bug.
+
+### As built (B6.10), and the seven decisions the file made
+
+```
+hr_payroll_export.rs      the period fold + the receipt (what is TRUE)
+hr_payroll_mapping.rs     the columns, the headings, the formats (what it
+                          LOOKS like) — split from the fold, because a new
+                          country's conventions and a new fact on the file are
+                          two different reasons to change one file
+migrations/0207_…         hr_payroll_exports: the receipt, and no figures
+alo-jmap/hr_payroll.rs    POST /hr/payroll-exports, GET /hr/payroll-exports,
+                          GET /hr/payroll-mappings — all three HR-only
+alo-jmap/csv.rs           `row_delimited`, additive: the delimiter a mapping
+                          chose, with the quoting rule following it
+tests/hr_payroll_tenancy  wrong tenant, the fold, the claims, the period
+```
+
+1. **The mappings are per country, not per bureau.** The section above names
+   DATEV, SD Worx and Loket as the motivation, and shipping a column set *called*
+   `datev` that we had derived from a blog post would be a compliance claim we
+   cannot stand behind (the loop's rule: the strict reading of a cited spec,
+   never a loose guess). What ships is `alo` (neutral, ISO, every column), `de`,
+   `nl` and `fr` — headings in the country's language, its date format, its
+   decimal comma, and the semicolon that a decimal comma makes necessary. **A
+   tenant-defined mapping is not built**: a bureau's own layout is a human's to
+   describe, and until then the neutral sheet is what their import wizard is
+   pointed at.
+2. **Leave is bucketed by what it does to pay, never by a policy's name.** Three
+   columns — paid, sick, unpaid — decided by the policy's own `paid` flag and
+   its `LeaveKind`, so a tenant running six policies still produces a file a
+   bureau can read. Sick leave a tenant does not pay is *unpaid absence* on the
+   file, because the column is about the money. Per-policy columns were rejected:
+   they would be dynamic columns, which is a sheet whose shape changes when
+   somebody adds a policy.
+3. **A day of leave costs what the pattern in force on that day says**, holidays
+   free — the same fold `hr_leave_balances` charges a balance by, so the file and
+   the screen cannot disagree. A fortnight spanning a move to a three-day week
+   costs five days then three, and the test says so.
+4. **A contractor is off the file.** `ContractKind::Contractor` invoices; the
+   vocabulary said so when it was defined, and this is where that sentence
+   became code. A period in which *everybody* invoices is a `422`, like a period
+   with nobody in it: an empty file reads as "nobody is paid".
+5. **Claims are the employee's own money, already decided**, dated by the day it
+   was spent: personal-method expenses approved or reimbursed, with mileage told
+   apart by the journey behind it (so the two columns never double-count). A
+   claim in a currency other than the person's pay currency is **counted in a
+   column of its own, never added** — the file would rather say "one claim is not
+   in here" than add sterling to euro.
+6. **The receipt is written before the file leaves.** `record_hr_payroll_export`
+   in the same handler, plus the derived `hr.payroll_export.create` audit line
+   the business-mutation middleware files for any `POST /hr/*`. The row carries a
+   period, a mapping, a count, a user and a time — no figure and nobody's name,
+   so a receipt can be kept as long as the audit trail without keeping anybody's
+   salary with it.
+7. **Two extra GETs, and neither carries payroll data.** `GET
+   /hr/payroll-exports` answers "who drew the file, and when" — the question the
+   POST decision above exists to make answerable, which the generic audit read
+   cannot answer without an entity id. `GET /hr/payroll-mappings` lists the
+   sheets with their columns and which of them are private, so a screen can warn
+   *before* the download rather than after (undo over confirm does not apply: a
+   draw is not undoable, and the section above says it is one of the two acts
+   that is confirmed).
+
+**Cuts, recorded.** No `PayrollView.tsx`: the Payroll tab named in the web table
+above is not built, and the API is the surface today. Hours are rendered to the
+hundredth (`0.42` for 25 minutes); the exact figure is the minutes, which the
+JSON-free CSV does not carry — a bureau needing exact minutes needs a column,
+which is a mapping change. `PayPeriod` and `ContractKind` travel as their stored
+words (`month`, `fixed_term`) in every sheet, untranslated: they are a contract
+with the machine reading the file, not a string for a person.
 
 ## The approvals inbox (B6.07)
 

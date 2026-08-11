@@ -6,6 +6,26 @@ contracts.
 
 ## Unreleased
 
+- **The payroll file, for the bureau who actually runs your payroll.** Draw one
+  period — a month, a fortnight, whatever you pay on — and alo hands you a CSV
+  of what a payroll bureau needs: staff number, name, national insurance number,
+  bank account, contract, hours a week, the pay on their terms, the leave they
+  took inside that period, and what you owe them back in expenses and mileage
+  that has already been approved. Holiday, sick leave and **unpaid** leave are
+  three separate columns, because only one of them changes what somebody is
+  paid, and a public holiday inside somebody's week off costs them nothing here
+  exactly as it costs them nothing on their balance. alo calculates no wages: no
+  gross-to-net, no tax, no contributions — that is your bureau's profession and
+  it stays theirs. Pick the sheet your country's payroll software reads
+  (German, Dutch, French conventions, or a neutral ISO one for everyone else)
+  and the headings, the dates and the decimal comma come out the way that
+  country writes them. People who invoice rather than being paid are left off;
+  somebody who left mid-period is on it, with their last day; a claim in a
+  currency you do not pay them in is counted in a column of its own rather than
+  quietly added to a total. And because this one file carries everybody's pay
+  and bank details on one page, drawing it is written down: who drew which
+  period, in which sheet, and when — visible to HR, and to nobody else.
+
 - **The letters your company writes, filled in for you.** HR can now write the
   letters this company is willing to put its name to — an employment
   confirmation, a letter for a landlord, a reference — once, in your own words
