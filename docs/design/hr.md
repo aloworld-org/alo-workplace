@@ -794,6 +794,51 @@ Three decisions:
   balance computed on the working pattern alone, which is correct rather than
   degraded.
 
+#### As built (B6.04), and the five decisions the code had to make
+
+The seed is `platform/alo-store/src/hr_holiday_seed.rs` (pure: fifteen national
+calendars, the rules, the computus), the per-tenant choice is
+`hr_holidays.rs` over migration `0203`, and the surface is
+`products/mail/alo-jmap/src/hr_holidays.rs` —
+`GET /hr/holidays?calendar=&year=` and `GET`/`PUT /hr/holiday-calendars`.
+Five things the note above left open were decided while building it:
+
+- **Two files, not one.** The note listed one `hr_holidays.rs`; the data and
+  the computus have no database in them and the choice has nothing else, so
+  they split the way `hr_leave_math.rs` and `hr_leave_balances.rs` already do.
+  The pure half is testable without a fixture, which is what a table of
+  statutory dates deserves.
+- **The choice is one row per tenant, and it distinguishes "none" from "not
+  yet".** `hr_holiday_selection` holds an array of observed calendars and the
+  one the arithmetic uses. No row means nobody has chosen, and the first read
+  seeds it from the country the company invoices under (`billing_settings`) —
+  the same zero-setup rule that seeds their first leave policy. An **empty
+  array** means a company deliberately observes none, and the seed never
+  overwrites it. A row per calendar could not tell those two apart.
+- **One calendar counts, the rest are for looking at.** A company with staff in
+  three countries observes three, but the leave fold uses the default only:
+  "is this day free" with two answers is a balance nobody can explain. The
+  per-employment override the note anticipated (a cross-border employee on
+  their own calendar) needs a column on `hr_employments` and is **not built**;
+  the resolver (`TenantHolidays`) is the single seam it will grow from.
+- **National days only, and the omission is on the wire.** German *Länder*,
+  Spanish *comunidades*, Italian patron saints' days and Belgium's
+  employer-chosen replacement day for a holiday falling on a Sunday are not
+  carried. Each calendar has a `note` field saying so in the country's own
+  language, because a missing holiday costs an employee leave they should have
+  kept.
+- **Reading the calendars is every member's, writing is HR's** — the same
+  correction B6.03b made to this table's row for leave policies, for the same
+  reason: an employee whose Christmas week costs four days is entitled to know
+  which day was free. The route table above says HR for both; the code says HR
+  for the `PUT` only.
+
+Two names on one date is one day off (Luxembourg's Europe Day fell on Ascension
+in 2024): the days list carries both names and the fold sees the date once.
+Nothing is stored per request — a company that adds a calendar in March sees
+January's approved leave recomputed with January's holidays in it, which is the
+same "no stored figure" rule the balance itself follows.
+
 ### The absence layer, and why it is not a calendar
 
 `GET /hr/absences?from=&to=` answers with, per day, the people who are away —

@@ -6,6 +6,17 @@ contracts.
 
 ## Unreleased
 
+- **Public holidays now count, so a week off over Christmas costs four days.**
+  A company sees the public holidays of the country it invoices under from the
+  first time it opens the leave screens — fifteen European calendars, each
+  naming the law it comes from — and can choose which countries it observes and
+  which one its leave arithmetic uses. A public holiday inside a leave request
+  costs nobody a day: the request says how many minutes it saved, and the
+  balance agrees. Movable feasts (Easter and the days that hang off it) are
+  computed rather than listed, days the law added or removed appear and
+  disappear on the right year, and a year we have not checked is refused by
+  name instead of quietly answering "no holidays".
+
 - **Published Base collections stay exactly as visitors saw them.** Website
   owners can publish mapped Base rows as reusable cards with titles, paths,
   summaries, images, links, and dates. Later Base edits remain drafts until

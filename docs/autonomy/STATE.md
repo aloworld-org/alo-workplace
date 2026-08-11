@@ -17943,3 +17943,138 @@ company that can see who is away without being told why.
 Next item: B6.04 (public-holiday calendars per country — seed data with its
 source named per country, computed movable feasts, per-tenant selection, and the
 `holiday` flag in `hr_leave_requests::leave_days` finally meaning something).
+
+---
+
+## B6.04 — public-holiday calendars, and the day inside leave that costs nothing
+
+**What shipped.** The days a company does not work, and what they do to leave.
+
+- **`hr_holiday_seed.rs` — pure, no database, no clock.** Fifteen national
+  calendars (AT BE DE DK ES FI FR IE IT LU MT NL PL PT SE — exactly the
+  countries `hr_statutory_leave.rs` carries a leave minimum for, proven by a
+  test), each naming the instrument it comes from and, where it matters, what it
+  leaves out in the country's own language. Days are **rules**, not rows: a
+  fixed date, a fixed date that steps off a Sunday (Koningsdag), an offset from
+  Easter, the first weekday on or after a date (Ireland's Monday holidays,
+  Swedish and Finnish Midsummer and All Saints), and that last one with the
+  Irish St Brigid exception. Easter itself is the anonymous Gregorian computus,
+  pinned against a published table for every covered year.
+- **A choice, not a copy of the law, is what is per-tenant.** Migration `0203`
+  adds `hr_holiday_selection`: one row per tenant, an array of observed
+  calendars and the one the arithmetic uses. No row = nobody has chosen (the
+  first read seeds it from `billing_settings.country`); an **empty array** = a
+  company that deliberately observes none, which the seed never overwrites.
+- **The fold learned about them, in both places.** `leave_days` /
+  `leave_request_cost` (`hr_leave_requests.rs`) and `fold_leave_year`
+  (`hr_leave_balances.rs`) both take a `TenantHolidays` resolver — one query,
+  then pure arithmetic — so what a request says it costs and what the balance
+  charges are one answer. A request's JSON gained `holidayMinutes`: a week that
+  costs four days can now say why.
+- **Routes.** `GET /hr/holidays?calendar=&year=` (any member; the company's own
+  default when no calendar is named) and `GET`/`PUT /hr/holiday-calendars`
+  (reading any member's, writing HR's). A year outside the reviewed range
+  (2020–2035) and a calendar we do not carry are each `422` **naming the gap** —
+  "no holidays in 2040" and "we have not checked 2040" must never look alike.
+
+**How verified.**
+
+- `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap
+  --all-targets` clean; `cargo test -p alo-store --lib` 1 096 green,
+  `-p alo-jmap --lib` 614 green.
+- New store suite `tests/hr_holidays_tenancy.rs` (4 tests, real Postgres):
+  **wrong tenant** (A's choice invisible to B; the same Christmas week costs A
+  four days on Belgium, B five on nothing and three once B chooses Poland, whose
+  Christmas Eve became a holiday in 2025 — neither company's figure moves when
+  the other changes its mind); the seed (a Belgian company observes Belgium
+  without pressing anything, once; a country we do not carry gets an explicit
+  empty choice); the refusals (unknown code, eleven calendars, a default nothing
+  observes); and the arithmetic end to end (request 4×480, approval, balance
+  taken 4×480, dropping the calendar recomputes both to 5×480, a 2040 request
+  refused for an observer and allowed for a company observing nothing).
+- Unit tests: the computus against sixteen published Easter dates; every
+  calendar well-formed in every covered year (unique keys, 7–16 days, no two
+  *fixed* days on one date — two names on one date is allowed only where a
+  movable feast meets a fixed one, which is Luxembourg 2024); wall-calendar spot
+  checks (14 July, Easter Monday/Ascension/Whit Monday 2026, Irish first and
+  last Mondays, St Brigid falling on Friday 1 February 2030, Swedish Midsummer);
+  Koningsdag stepping back to 26 April 2025; store bededag gone from 2024,
+  Polish Christmas Eve arriving in 2025, St Brigid arriving in 2023.
+- **Wire, against the local backend** (docker `alo-pg`, the debug `alo-jmap`,
+  two tenants from `identityctl bootstrap-admin` plus one ordinary member of
+  tenant A created through `POST /admin/users`, real PKCE tokens):
+
+```
+GET  /hr/holidays · GET/PUT /hr/holiday-calendars   (no token)  → 401 ×3
+PATCH /billing/settings country=BE                              → 200
+GET  /hr/holiday-calendars            first read → 200 calendars=[BE] default=BE
+                                      hr=true, 15 available, years 2020–2035
+GET  /hr/holidays?year=2026           → 200 BE, 10 days, 25 Dec "Kerstmis / Noël"
+GET  /hr/holidays?calendar=FR&year=2026 → 200 11 days incl. 2026-07-14
+GET  /hr/holidays?calendar=UK         → 422 "there is no public-holiday calendar
+                                             for UK; the ones we carry are AT, BE, …"
+GET  /hr/holidays?year=2040           → 422 "seeded for 2020 to 2035; 2040 is not
+                                             covered yet"
+GET  /hr/holidays?year=2026           ordinary member → 200
+GET  /hr/holiday-calendars            member → 200 hr=false
+PUT  /hr/holiday-calendars            member → 403  ·  [BE,UK] → 422  ·
+                                      default NL not observed → 422  ·
+                                      ["be","nl"] default "be" → 200 [BE,NL]/BE
+POST /hr/leave-requests  21–25 Dec 2026 (member) → 200 costMinutes 1920,
+                                      workingDays 4, holidayMinutes 480
+POST …/{id}/approve                   (HR) → 200
+GET  /hr/leave-balances?…&on=2026-12-31 → 200 taken 1920, remaining 7680
+PUT  /hr/holiday-calendars  []        (HR) → 200  → the same request re-reads as
+                                      2400 over 5 days, balance taken 2400
+GET  /hr/holiday-calendars · /hr/holidays  tenant B → 200 [], calendar null, 0 days
+psql audit_log                        hr.holiday_calendar.update ×2 per tenant,
+                                      actor recorded, each row its own tenant's
+```
+
+**Cuts and flags.**
+
+- **No per-employment calendar.** The design note anticipated a cross-border
+  employee observing their own country; that needs a column on
+  `hr_employments` and its route surface, and it is not built. The tenant's
+  default is what the fold uses, and `TenantHolidays` is the one seam it grows
+  from. Recorded in the note's as-built section.
+- **National days only.** No German *Länder*, Spanish *comunidades*, Italian
+  patron saints, Belgian Sunday-replacement days, Dutch Good Friday or
+  Bevrijdingsdag (a working day for most), Finnish Christmas Eve (not
+  statutory). Each calendar carries a `note` saying so, returned by the API, so
+  the omission is visible to the person it costs.
+- **No web work.** The calendar picker and the holidays drawn behind a leave
+  form are B6.08b. What shipped is the layer they read.
+- **A collection-level audit entry cannot be read back through `/audit`.** The
+  `PUT` files `hr.holiday_calendar.update` with no entity id (there is no
+  record id — the choice *is* the tenant), and `/audit?entity=` requires
+  `type:id`. Rows verified in psql instead. This is the existing shape of
+  `PATCH /billing/settings`, `PUT /billing/fx/rates` and
+  `PUT /finance/mileage/rates`; widening the audit route's contract is a
+  cross-cutting change, not this item's.
+- **Business migrations continue at `0204`.**
+
+**Flags for the human.**
+
+- **★ LEGAL/DATA REVIEW: the fifteen calendars are hand-entered law.** Each
+  names its instrument and the tests prove the *shape* (dates land in their
+  year, no two fixed days collide, the year bounds bind), but no test can prove
+  a country's list is complete — and a missing day silently charges an employee
+  a day of leave they should have kept. Review before this reaches a real
+  tenant, and re-review the reviewed range before **2035**: the seed refuses
+  years past it by design, so the failure mode is a clean refusal rather than a
+  wrong balance.
+- **★ `/hr` is still a new top-level prefix** needing the production Caddyfile
+  at the next deploy (standing since B6.02b; already in `web/vite.config.ts`).
+- The B6.03a statutory-leave flag stands, now doubly load-bearing: a seeded
+  policy's entitlement and a seeded calendar's days both come from our tables.
+- Refusal sentences remain English in every language — the standing
+  cross-cutting item from B1.27, B2.14, B4.15 and B5.11.
+
+CHANGELOG: one entry, in a person's voice, about a Christmas week costing four
+days, the calendars a company observes, and a year we have not checked being
+said out loud rather than answered with silence.
+
+Next item: B6.05 (onboarding/offboarding checklists — template → instance per
+employee, over the existing task projects, with admin account creation as
+explicit manual steps).
