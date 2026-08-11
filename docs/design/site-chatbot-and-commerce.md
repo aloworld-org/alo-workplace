@@ -1,9 +1,13 @@
 # The site chatbot, and selling through it
 
-**Status:** direction, not a decision. Nothing here is queued. The load-bearing
-questions are marked, and each needs settling in an ADR before code — putting
-any of this straight into `docs/autonomy/sites/QUEUE.md` would start a loop
-building a half-formed idea.
+**Status:** the load-bearing questions are now settled — **ADR 0040** (what the
+bot may read, what it may do, who pays), **ADR 0041** (the shop as a surface
+over one catalog) and **ADR 0042** (direct-manipulation editing). This file
+stays as the argument behind them; the ADRs are what binds.
+
+What remains before code is sequencing, not thinking: the items go into
+`docs/autonomy/sites/QUEUE.md` in the order ADR 0041 sets out, and no sites
+item may edit a file the Billing or CRM track owns.
 
 ## Why this belongs to alo and not to Wix
 
@@ -66,7 +70,7 @@ Three parts that must be right, in the order they bite:
   know. A hallucinated price on a public site is one a customer will hold you
   to.
 
-## The open questions — each an ADR, not a queue item
+## The questions, and where they were answered
 
 1. **What may an anonymous visitor's bot read?** Whatever it can read, the
    internet can read. If a tenant can point it at a Drive folder, the interface
