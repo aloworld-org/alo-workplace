@@ -34,7 +34,9 @@ Nothing here is a feature; each is a defect a first meeting would expose.
 
 | Gap | Notes |
 |---|---|
-| **Screen sharing that is ours** | LiveKit carries it; the picker, the "you are sharing" indicator and stop control are ours |
+| **Do not show somebody their own screen share** | *First item.* We render the sharer's own screen back to them, which produces the infinite hall-of-mirrors when they share the window holding the call. Meet substitutes "You are presenting". Filter `Track.Source.ScreenShare` where `participant.isLocal` and render a card instead — it removes the recursion for the only person who sees it, and saves decoding your own stream |
+| **Leave room for the browser's sharing bar** | *Second item.* Chrome's "…is sharing a window — Stop sharing" strip is browser-owned, unmovable, and currently covers our control bar. Every browser product has it; they reserve space and we do not. Pad the controls while `isScreenShareEnabled` |
+| **Screen sharing that is ours, around the parts that cannot be** | **The picker itself can never be ours.** `getDisplayMedia()` always shows the browser's own chooser and a page can neither style nor replace it — if a site could draw that dialog it could show you a slide deck while capturing your bank. Meet, Zoom and Teams all show the same unstyled dialog for the same reason. What *is* ours: the trigger, a pre-share warning that everyone will see this, the persistent "you are sharing" indicator, our own stop control, and the presenter layout others see. **In the Tauri desktop app a native picker in our own colours IS possible** — the same native capability ADR 0039 needs, so the two share a foundation |
 | **Raise hand, reactions** | Data channel; cheap and disproportionately missed |
 | **In-meeting chat that is alo chat** | Their chat is a separate island. Ours should post into the room the meeting belongs to, so the conversation survives the call |
 | **Lobby / knock** | `[L]` in features. Anyone with a link joining a board meeting unannounced is a security incident |
