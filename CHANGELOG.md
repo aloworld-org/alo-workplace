@@ -14,6 +14,9 @@ contracts.
   how to recover, and the device check has a visible way back. Join no longer
   stays disabled behind LiveKit's hidden name field, controls use alo's visual
   tokens, and one accessible Leave action remains visible throughout the call.
+  Inside the room, meeting identity and live duration stay visible, controls
+  sit in a compact dock, chat opens as a focused panel, and presenters see a
+  calm sharing status rather than their own screen repeated forever.
 
 - **People, in French and Dutch, and a promise about what it will never say.**
   alo HR is complete, and every word of it — the directory, asking for time off

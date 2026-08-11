@@ -20,6 +20,8 @@ The reference interaction model is Google Meet and Zoom, interpreted through
 | Joining | Plain text gave weak progress feedback. | Immediate, honest feedback | Added a labelled, reduced-motion-aware joining state. |
 | Join failure | The only action was Close and the error offered no recovery. | Errors speak human and help | Added Try again beside Close. The deployment-configuration state remains close-only because retry cannot configure a server. |
 | Connected room | Leave was below the 40px target, lacked explicit focus treatment, duplicated LiveKit's own Leave, and used hardcoded colors/geometry. | Fitts's law; keyboard reach; token scale; one voice | Rebuilt it with the shared danger button, 40px target and focus ring; removed the duplicate engine exit. |
+| Connected room composition | The raw engine surface had no meeting identity, elapsed time, or alo hierarchy; controls formed a full-width footer and chat looked bolted on. | Calm surfaces; recognition over recall; no seams | Added a persistent meeting identity/live-duration card, a compact floating control dock, familiar red muted-device states, calmer participant placeholders, and a raised chat panel that belongs to the same room. |
+| Local screen sharing | Hiding the recursive local screen prevented the hall of mirrors but left a mostly empty stage with no explanation. | Immediate, honest feedback | Added a centered “You’re presenting” state while everyone else continues to receive the shared screen. Stop sharing remains visible in the dock and in the browser-owned safety strip. |
 
 ## Journey and decision record
 
