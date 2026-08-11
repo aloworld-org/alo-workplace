@@ -71,6 +71,12 @@ contracts.
   disappear on the right year, and a year we have not checked is refused by
   name instead of quietly answering "no holidays".
 
+- **Build website collections from the Base tables you already use.** A new
+  Collections workspace finds the Bases you can read, lets you match their
+  columns to website cards, previews the exact rows the next publish will
+  use, and makes reusable collections available in the page builder. You can
+  disconnect a collection without deleting its Base or any of its rows.
+
 - **Published Base collections stay exactly as visitors saw them.** Website
   owners can publish mapped Base rows as reusable cards with titles, paths,
   summaries, images, links, and dates. Later Base edits remain drafts until

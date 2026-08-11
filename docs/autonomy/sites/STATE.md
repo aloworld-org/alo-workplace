@@ -2471,3 +2471,51 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   card conventions, with semantic markup and no AI dependency.
 - **Next:** S2.02c, visible collection connection, mapping, preview,
   disconnect, and empty-state controls.
+
+## 2026-08-11 — S2.02c visible collection workspace
+
+- **Shipped:** every site now has a visible Collections action and a complete
+  recognition-first workspace. It discovers the caller's readable personal
+  and Space Bases through Drive, opens the first table ready to connect,
+  keeps Base/table/name and all seven field mappings on the surface, previews
+  normalized rows, and disconnects without touching the source Base. A site
+  with no Base gets one direct “Open Drive” next step rather than an empty
+  form or an opaque-id prompt.
+- **Page-builder path:** Collection is now a first-class thirteenth section.
+  The picker names it, the form lists the site's connected collections, and
+  a missing connection links directly to the Collections workspace. Draft
+  page preview resolves current Base rows through the same validation and
+  normalization path as publishing, including mapped collection images,
+  while the live site remains pinned to its immutable publish snapshot.
+- **Feedback and safety:** connection save, preview, and disconnect failures
+  keep the server's specific reason visible through the shared Sites error
+  path. Disconnect is a two-click reversible-boundary action whose second
+  state explicitly says the Base rows remain. A direct preview of a missing
+  or foreign connection is tenant-hidden `404`; publish-time dangling page
+  references remain an actionable validation refusal.
+- **Tenant and wire proof:** the real router test connects, lists, previews,
+  updates, renders, and disconnects a collection, proves another tenant gets
+  `404` for list/create/update/preview/delete, and proves the Base survives.
+  A freshly built local server on `127.0.0.1:8080` then completed a real OAuth
+  PKCE flow and real HTTP create/list/preview/page-preview/disconnect cycle on
+  a disposable database; the rendered HTML contained the mapped heading,
+  title, and summary, and the Base remained readable afterward.
+- **UI proof:** the real Sites client tests cover no-Base onboarding, Drive
+  navigation, type-compatible field choices, one-click connect, normalized
+  row preview, explicit disconnect state, and the expanded section picker.
+  The workspace follows Webflow CMS's visible collection setup and
+  Contentful's source-to-field mapping conventions; AI is neither required
+  nor part of the core flow.
+- **Verified:** touched Rust formatting; strict offline all-target Clippy for
+  `alo-store` and `alo-jmap`; full unfiltered `alo-store` (1,096 unit tests
+  plus every integration/doc target) and `alo-jmap` (614 unit tests plus
+  every integration/doc target) suites on a freshly migrated disposable
+  PostgreSQL database; focused Sites web tests; TypeScript; focused ESLint;
+  the production Vite build; real curl; and `git diff --check`.
+- **Cuts/flags:** collection cards in the mapping workspace show normalized
+  content and image presence; the authenticated page preview is the exact
+  visual render, including image bytes. The workspace does not duplicate a
+  Base editor: “Open Drive” remains the visible one-click route to change
+  source rows. No external AI, production service, email, or DNS was used.
+- **Next:** S2.03a, a tenant-safe per-site editor grant that exposes no other
+  site or workspace data.
