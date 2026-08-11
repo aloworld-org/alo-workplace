@@ -18929,3 +18929,136 @@ does and not a card moving.
 
 Next item: B6.09 (★ HR agent tools — `who_is_off` and
 `draft_letter_from_template`; screening explicitly absent per the design note).
+
+---
+
+## B6.09a — asking who is off, and the answer that refuses to say why
+
+**Item:** B6.09 ★ HR agent tools. **Split**, and the queue now reads B6.09a
+(shipped here) and B6.09b (next). The reason is in the second half of this
+entry; the short version is that the item's second tool merges a
+**tenant-authored letter template** and no table in this module holds one — the
+design note's own migration list never had it. Describing a tool to a model
+before it can act is a dead proposal, and `alo_ai::agent`'s invariant test holds
+the prompt and the allowlist to exactly the tools that execute.
+
+**What shipped.** `who_is_off`, whole, from the model's words to the card:
+
+- `platform/alo-ai/src/agent_hr.rs` — `HR_TOOLS`, `HR_TOOL_DOC`, `HR_GUIDANCE`,
+  the sixth product on the seam `agent_billing` opened; wired into
+  `system_prompt()`, `is_agent_tool()` and `lib.rs`.
+- `products/mail/alo-jmap/src/agent_hr.rs` — `execute_who_is_off` over
+  `hr_absences`, the pure `away_people` roll-up, and `person_json`.
+- `hr_leave_balances::absence_json` became `pub(crate)`: the two surfaces that
+  state who is away now state it in **one shape**, so a field the layer is
+  careful not to load cannot be added to one of them alone.
+- Dispatch in `agent.rs`; `WhoIsOffResultDto` in `web/src/jmap/types.ts`; the
+  proposal case in `AgentActionCard`, the `WhoIsOffResult` card in
+  `AgentResultCard`, 7 `agentWhoIsOff*` strings in `i18n/en.ts` (English only).
+
+**No migration, no route, no store change.** The layer B6.03b built answers the
+whole question; business migrations remain at `0206`.
+
+**The decisions**, in `docs/design/hr.md` § "As built (B6.09a)" rather than only
+here:
+
+- **The same store function as the screen.** `hr_absences` is what
+  `GET /hr/absences` calls, so the agent and the Agenda cannot disagree — and
+  neither can be made to disclose a policy, a kind of leave or a note, because
+  the query never selects one.
+- **The same gate as that layer, which is every member.** No role check was
+  added here: adding one to the agent and not to the route would be a second
+  answer to the same question. What the executor must never do is *widen*, and a
+  test asserts the acting half of the module names no employee, employment,
+  balance, request, document, applicant or payroll symbol at all.
+- **`from` is required; `to` defaults to it.** "Who is off on Friday" is one day
+  rather than a window somebody has to interpret, and only an explicitly stated
+  `to` widens the read. The store owns both range refusals.
+- **`awayDays` is a count, not a span.** Somebody off Monday and Friday is away
+  two days and worked the three between; `firstDay`/`lastDay` are stated beside
+  the count and never instead of it, and the card draws them only when they say
+  something the count does not.
+- **The prompt forbids the inference the data cannot make.** Never why somebody
+  is away; never a tally, a comparison or a conclusion about a person; never
+  "everybody else is in", because silence is not presence.
+
+**How it was verified.**
+
+- `cargo fmt`; `clippy -p alo-jmap -p alo-ai --all-targets` clean.
+- Rust: **1 029 tests green, 0 failed** — 101 `alo-ai` + 634 `alo-jmap` lib
+  (10 of them this module's) across 58 binaries. The unit tests are the fold's
+  own claims: three days are one line with three counted, two days apart stay
+  two days, days out of order widen the ends rather than replacing them, two
+  colleagues of one name stay two people, the person object has exactly five
+  keys, and the acting half names no widening symbol.
+- Web: `tsc --noEmit`, `eslint` on the changed files and `npm run build` clean;
+  `src/shell/AgentCards.test.tsx`, **6 tests green** rendering the real cards —
+  including one that hands the card a `reason`, a `policyName` and a `note` the
+  server does not send and proves none of them is drawn.
+- Full web suite **524 passed**; the 4 failures are `src/sites/Theme.test.tsx`,
+  **pre-existing and the sites track's** (unchanged from B6.08c).
+- **Wire, against the local backend** (docker `alo-pg`, the debug `alo-jmap`,
+  two tenants from `identityctl bootstrap-admin`, real tokens; no model call
+  anywhere — the proposal envelope was written by hand and executed):
+
+```
+POST /ai/agent/execute            (no token) → 401
+  tool "who_is_absent"                       → 400 "unknown tool"
+  who_is_off {}                              → 422 "from is required: an
+                                                    absence answer is always
+                                                    about stated days"
+  from "next week"                           → 422 "from must be … YYYY-MM-DD"
+  to "10/08/2026"                            → 422 "to must be … YYYY-MM-DD"
+  to before from                             → 422 "the window must end on or
+                                                    after the day it starts"
+  2026-01-01 → 2027-06-01                    → 422 "…not be longer than 366 days"
+  empty week                                 → 200 people [] · daysInRange 7
+seed: 2 employees + annual policy + 2 approved requests (Mon–Wed, Fri)
+GET  /hr/absences?from=…&to=…                → 200 4 days
+POST …execute who_is_off same window         → 200 the SAME 4 days, plus
+                                                 Amara 3 days 10→12,
+                                                 Mikkel 1 day 14→14
+tenant B, same window                        → 200 people [] (A's people are
+                                                 invisible to B)
+one stated day (Tue), no "to"                → 200 daysInRange 1, Amara 1 day
+a request left pending (Thu→Mon)             → 200 people []  (not decided is
+                                                 not away)
+the same request approved                    → 200 Mikkel 3 days 20→24 — the
+                                                 weekend inside it is not a day
+                                                 away, because the working
+                                                 pattern decides
+the whole year                               → 200 daysInRange 365, both people
+                                                 in name order
+```
+
+**Cuts and flags.**
+
+- **★ `draft_letter_from_template` is item B6.09b, not a silent drop.** It needs
+  a `hr_letter_templates` migration, its store, `/hr/letter-templates` CRUD, a
+  strict merge vocabulary and the draft path — a full iteration on its own. The
+  queue item is written; the design note says what the tool list is waiting for.
+- **★ A tension in the design note, for a human.** § "The two tools that do
+  ship" offers "a salary certificate for a landlord" as an example letter, and
+  the paragraph below it forbids either tool reaching **any pay field**. B6.09b
+  will implement the **strict reading** (no pay placeholder in the merge
+  vocabulary), per the loop's compliance rule; whether to widen it to pay for
+  HR-role callers only is a product decision, not the loop's.
+- **★ `features.md`'s `[B6]` line still promises CV screening** "suggest-only
+  with mandatory human decision". The design note refuses it outright
+  (Annex III 4(a)); the line needs a human's amendment. Standing since B6.01.
+- **No fr/nl** for the 7 `agentWhoIsOff*` strings; wave review, B6.11.
+- **No chat surface of its own.** The tool rides the existing agent envelope, so
+  it already works wherever a proposal can be approved — including a chat room,
+  where the standing rule that only the asker may decide applies unchanged.
+- **★ `/hr` remains a new top-level prefix** needing the production Caddyfile at
+  the next deploy (standing since B6.02b). This item adds **no** new prefix:
+  `/ai/agent/execute` is already proxied.
+- **★ The double directory read** (B6.07) and **★ the `snooze.rs` flake**
+  (B6.05) are untouched and still a human's.
+- **Business migrations continue at `0206`.**
+
+CHANGELOG: one entry, in a person's voice, about asking who is away — and about
+the answer that will never tell you why.
+
+Next item: B6.09b (the HR agent's draft — tenant-authored letter templates, then
+`draft_letter_from_template`).

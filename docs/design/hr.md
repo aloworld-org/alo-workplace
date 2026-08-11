@@ -1123,6 +1123,38 @@ Neither tool can reach `hr_applicants`, `hr_applicant_notes` or any pay field.
 That is enforced by which store functions the executors call, and asserted by a
 test that the HR executor module names no applicant or pay symbol at all.
 
+### As built (B6.09a), and what the second tool is waiting for
+
+**`who_is_off` shipped whole.** `alo_ai::agent_hr` contributes the name, its
+description and the HR paragraph of the system prompt;
+`alo_jmap::agent_hr::execute_who_is_off` runs it against the caller's own
+tenant through `hr_absences` — the *same* function `GET /hr/absences` calls,
+which is why the agent and the Agenda cannot disagree and why neither can
+disclose a reason the query never selected. `from` is required and `to`
+defaults to it, so "who is off on Friday" is one day rather than a window
+somebody has to interpret; the store owns both range refusals. The answer is
+the layer's own days plus a per-person roll-up: how many days of the window
+each person is away, and the first and last of them. **`awayDays` is a count,
+not a span** — somebody off Monday and Friday has two days away and worked the
+three between, and no field in the answer says otherwise.
+
+**`draft_letter_from_template` is not in the tool list yet, and is item
+B6.09b.** It merges a *tenant-authored* template, and this module has no table
+that holds one: the migration list above never contained it. Describing the
+tool to a model before the templates exist would be a dead proposal — the
+allowlist and the prompt are held to exactly the tools that can act by an
+invariant test in `alo_ai::agent` — so the name arrives with the templates it
+merges, not before.
+
+**One tension in this section is flagged rather than resolved.** The paragraph
+above offers "a salary certificate for a landlord" as an example letter, and
+the paragraph below it forbids either tool reaching **any pay field**. B6.09b
+implements the strict reading — the merge vocabulary carries no pay
+placeholder — because that is the sentence written as a rule; a certificate
+that must state a salary is then a letter a person completes, not one the agent
+fills. Whether to widen the merge fields to pay for HR-role callers only is a
+product decision for a human (`docs/autonomy/STATE.md`).
+
 ## Payroll export (B6.10)
 
 A per-period CSV of what a payroll bureau needs, **with no calculation

@@ -6,6 +6,18 @@ contracts.
 
 ## Unreleased
 
+- **Ask alo who is off.** "Who's away next week?" is now a question you can ask
+  anywhere in the workspace: alo proposes the look-up, shows you the exact days
+  it will read before you approve it, and answers with one line per colleague —
+  the days counted, and the first and last of them. It reads the same team
+  absence view everybody here already sees, so it can tell you nothing your
+  calendar could not; it books nothing, decides nothing and tells nobody it
+  looked. What it will never say is *why* somebody is away. Sickness, holiday
+  and unpaid leave are indistinguishable to it on purpose, and somebody it does
+  not name is not thereby at their desk — the card says both, so nobody reads
+  more into an answer than is in it. Somebody off on Monday and again on Friday
+  is two days off, never a week.
+
 - **A candidate's CV, and the day they become a colleague.** You can now attach
   a CV to somebody's record from the browser: choose the file on the candidate
   form and it is filed in the HR area, where only HR can open it — replace it or
