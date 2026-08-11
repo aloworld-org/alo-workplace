@@ -17332,3 +17332,120 @@ No CHANGELOG line: a design note changes no behaviour (the B5.01 precedent).
 Next item: B6.02a (employees, the records — the migration and the store, with
 the HR-role access scoping tests: wrong tenant, wrong user, wrong role with its
 field-by-field absence assertions, and wrong manager on a three-level chart).
+
+## 2026-08-11 — B6.02a the record itself: two tables, three doors, four tenancy proofs
+
+**Shipped.** The first code of the last wave: the person, the terms under them,
+and the second scoped role — all store-side, no routes yet (those are B6.02b).
+
+```
+platform/alo-store/migrations/0167_hr_employees.sql   hr_employees + hr_employments
+platform/alo-store/migrations/0168_tenant_role_hr.sql the CHECK widened by one word
+platform/alo-store/src/hr_employees.rs                the person: CRUD, 2 projections, archive
+platform/alo-store/src/hr_employments.rs              the terms, appended; ContractKind, PayPeriod
+platform/alo-store/src/hr_org.rs                      the cycle refusal, on write
+platform/alo-store/src/tenant_roles.rs                TenantRole::Hr (existing file, +1 value)
+platform/alo-store/src/id.rs                          HrEmployeeId, HrEmploymentId
+platform/alo-store/tests/hr_employees_tenancy.rs      7 tests, the four mandatory ones among them
+products/mail/alo-jmap/src/audit_action.rs            `hr` joins AUDITED_MODULES
+products/mail/alo-jmap/tests/audit_routes.rs          and the suite's own copy of the list
+```
+
+**The doors, as built.** `AccountStore::my_hr_employee` / `my_hr_employments`
+carry `user_id = self.user` in the statement, so a colleague's record is
+unrepresentable through the own door rather than merely refused. `hr_directory`
+exists on both handles and returns the **same** `DirectoryEntry` type either
+way — a struct with no private field on it — so the "wrong role" property is
+structural: a caller of the directory cannot leak a home address however
+careless, because the projection has nowhere to put one. The whole record
+(`Employee`, including `national_id` and `iban`) is returned by exactly two
+functions: the own door's, and the HR door's single-record read. Nothing that
+lists people returns it, which is the design note's "never in a list response"
+made unrepresentable instead of remembered.
+
+**Verified** (local Postgres `alo-pg`, `DATABASE_URL=…@localhost:5432/alo`):
+
+- `cargo test -p alo-store` — **1 030 unit + every integration suite green**,
+  including the 7 new HR tests; `cargo clippy -p alo-store --all-targets` clean;
+  `cargo clippy -p alo-jmap --all-targets` clean; `cargo test -p alo-jmap
+  --test audit_routes --test accountant_role_http` green (12 tests) — the role
+  enum grew a variant and the accountant's gate is provably untouched.
+- The four mandatory tenancy proofs (`docs/design/hr.md` § Tenancy), one test
+  each: **wrong tenant** (read, list, both doors' directory, employments,
+  employment-on-date, update, archive, append-terms, end-terms, and a manager
+  link across the boundary — all `NotFound`/empty, and the record is unchanged
+  afterwards); **wrong user** (two colleagues in one tenant, each door answering
+  only about its own caller, including the pay figure on the history);
+  **wrong role** (a record with eight planted private values, read through both
+  directory doors, asserted absent by **value** — not by trusting the type);
+  **wrong manager** (a three-level chart: the loop through the middle, the
+  short loop, and self-management each refused on write, with nothing written).
+- `rustfmt` on the four **new** files only. `main` is still not
+  `cargo fmt --check` clean under this machine's rustfmt (the standing finding);
+  formatting whole pre-existing files would bury the diff and collide with the
+  sites track.
+
+**Decisions taken inside the item, each a refinement of the note rather than a
+departure from it.**
+
+- **`archived_at TIMESTAMPTZ` where the note wrote `status 'active'|'archived'`.**
+  Same fact, strictly more of it: statutory retention is counted *from* a date,
+  and the codebase's every other master record (customers, suppliers, products)
+  already archives this way. `Employee::is_archived()` is the note's word.
+- **The cycle refusal names record ids, never names.** The note's error table
+  already requires exactly this of the staff-number clash ("naming the holder's
+  record id, not their name"), and law 1 forbids personal data in an error. The
+  message is "employee {id} would report to themselves through {id}".
+- **Archiving somebody who still has active direct reports is a `409`** naming
+  the count. The chart hides archived people, so permitting it would silently
+  cut a branch off the org chart and leave reports with nobody to decide their
+  leave. Reassign first — which is the act that was actually meant.
+- **`append_hr_employment` is transactional and back-dating is refused.** It
+  locks the employee row (`FOR UPDATE`), closes the running period the day
+  before the new one starts, and inserts — so no reader ever sees a person on
+  two sets of terms or none. A partial unique index (`ended_on IS NULL`) says
+  the same thing one layer down. New terms must start *after* the period they
+  replace: back-dating would restate balances already folded from the terms it
+  replaced, and a repair is not an ordinary write.
+- **`hr` joined `AUDITED_MODULES` now, before the first route exists.** The
+  suite reads the router's own source, so listing the module first means
+  B6.02b's routes cannot ship unaudited; adding it after the routes is the
+  mistake B3 paid to undo.
+
+**Cuts, both recorded rather than silent.**
+
+- **`leave_policy_ids` and `holiday_calendar` are not yet columns on
+  `hr_employments`.** They reference tables that do not exist until B6.03a and
+  B6.04, and a foreign key to a table that is not there is not a schema. They
+  arrive as an additive migration in the item that creates their target — the
+  expand-only rule, not a deferral of depth.
+- **The own door is read-only.** An employee updating their own address is a
+  reasonable screen and it is not in this item's sentence; every write here is
+  HR's, and each takes the acting user explicitly.
+
+**Flags for the human.**
+
+- **★ The wave gate from B6.01 is now spent, not answered.** This item created
+  the tables that hold home addresses, national identifiers, bank accounts and
+  pay. They are empty and no route reaches them, but the schema exists — a
+  tenant should agree to that before B6.02b opens a door onto it.
+- The `hr_employees.national_id` column is the single most sensitive plain field
+  in the schema. It is out of every list projection by construction today; the
+  payroll export (B6.10) must stay the only place it leaves the system.
+- Refusal sentences remain English in every language — the standing
+  cross-cutting item from B1.27, B2.14, B4.15 and B5.11, and this module holds
+  its sharpest instances ("date of birth must be in the past" is a sentence an
+  employee reads about themselves).
+
+**HUMAN ACTION unchanged from B6.01:** `/hr` will be a new top-level prefix and
+needs adding to the production Caddyfile *and* to `API_PATHS` in
+`web/vite.config.ts` in B6.02b, the item that registers the first route. The
+loop never edits `deploy/`.
+
+No CHANGELOG line: still nothing a person can see — a schema, a store and a
+role word, with no route and no screen yet.
+
+Next item: B6.02b (employees, the org chart and the documents — `GET /hr/org`
+folding `manager_id` into a tree, contract PDFs as Drive nodes under HR-only
+permissions, the first `/hr/*` routes, `require_hr`, the vite proxy entry, and
+the wire transcript).
