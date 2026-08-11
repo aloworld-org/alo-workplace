@@ -1,6 +1,7 @@
 # Design note — alo Inventory (purchasing, stock, and the two chains that move it)
 
-Status: **design** (B5.01) · ADR 0035 · Business track wave B5
+Status: **as built** (B5.11, the wave review; written as a design note at
+B5.01, before the first migration) · ADR 0035 · Business track wave B5
 
 alo Inventory is the fifth Work OS module and the first one whose records
 are not the truth. A customer is what our table says a customer is; an
@@ -1591,3 +1592,99 @@ module entry in `product/workplace.tsx`; `/inventory` in `vite.config.ts`.
   natural third option is a sales order. It is a one-line addition to
   `crm_handoff` and a product decision about which of the three is the
   default.
+
+## Languages (B5.11)
+
+The module reads in **English, French and Dutch**, end to end: the catalog and
+the product form, the stock list and the movement history behind a row, both
+order documents with the sentences that precede an irreversible act, the two
+fulfilment dialogs, the barcode scanner, and the two agent cards — 251 keys per
+language, pinned by `locale.test.ts` § "alo Inventory is fully translated
+(B5.11)" so a key added later without its translations turns the suite red.
+
+Three choices worth recording, because each is a place a transliteration would
+have been wrong rather than merely clumsy:
+
+- **A French reason is a noun; a French status is a participle.** The reason a
+  movement happened, and the reason somebody adjusted a shelf, describe
+  *goods* — and a sentence never learns the gender of the goods, so
+  *Réceptionné* / *Endommagé* would be right only by luck. Every one of them is
+  therefore a noun: *Réception*, *Livraison*, *Transfert*, *Démarque*,
+  *Comptage*; *Casse*, *Perte*, *Excédent*, *Péremption*. An order **status**
+  is the opposite case and agrees on purpose — *Passée*, *Reçue*, *Livrée*,
+  *Annulée* — because its subject is always *la commande* and never another
+  document. This is the same split B4.15 found between Finance's sentences and
+  its statuses, and both halves are asserted by a test. The one agent sentence
+  that interpolates a quantity is invariable for the same reason as B4.15's
+  money sentences: *12 pièces à commander*, never *nécessaires*.
+- **Dutch uses the warehouse's own verbs.** Goods are **ingeslagen** and
+  **uitgeslagen** — inslag and uitslag are what a Dutch or Flemish warehouse
+  calls receiving and issuing — where *gepickt* would be a loanword on the one
+  screen a warehouse worker has open all day. Shrinkage is **derving**, the
+  retail term, not *verlies*. Same finding as B4.15's *afletteren*.
+- **A word shared with Billing stays one word.** A sales order raises a
+  *billing* invoice and a receipt raises a *billing* bill, so a draft invoice
+  is a *facture en brouillon* / *conceptfactuur* on an inventory screen exactly
+  as it is on a billing one (B1.27, B2.14), and the sentence that says a draft
+  carries no number until somebody issues it names the Billing module by its
+  own translated name. Pinned by its own test.
+
+Untranslated on purpose, and stated so the gap is a decision:
+
+- **The server's refusal sentences are English in every language** — a quantity
+  larger than what is owing, a barcode whose check digit is wrong, an edit to a
+  frozen order. Unchanged since B1.27 and still the same cross-cutting item (a
+  typed error vocabulary across `StoreError`), and still a human's roadmap call
+  rather than a wave review's. It matters more here than in any earlier wave,
+  because this module deliberately shows the server's own words verbatim rather
+  than paraphrasing them.
+- **The shortage report's CSV column headings stay English in every language**
+  (`inventory_reorder.rs` says so where they are declared), for B4.15's reason:
+  a downloaded file is a contract read by a buyer's own spreadsheet, and what a
+  *person* reads is the screen.
+
+Two things that look like gaps and are not, recorded so a later reader does not
+re-open them:
+
+- **The printed purchase order and its covering letter are already
+  translated.** `inventory_po_print.rs` reuses Billing's `strings_for` and
+  `inventory_po_send.rs` reuses `mail_strings_for`, both en/fr/nl, both taking
+  `?lang=` from the caller (B5.05a2 generalised B1.16/B1.17 to a party rather
+  than a customer). The one document in this wave a *stranger* reads was
+  therefore in three languages before this review.
+- **The seeded location names are written in the reader's language**, not in
+  English: `inventory_location_names.rs` holds one table per language (en, fr,
+  nl, de) and `inv_locations.rs` deliberately holds none, the same split
+  B4.13c made for the chart of accounts. From the moment the seed runs they
+  are ordinary tenant data — a tenant renames a place, and alo never revises
+  the name afterwards, which is also why a language added later cannot
+  retranslate an existing tenant's locations.
+
+## What B5 promised, and what B5 shipped (B5.11)
+
+Every `[B5]` line of `docs/features.md`, against the code. A line is shipped,
+or it is a cut with its reason — nothing is silently missing.
+
+| `[B5]` feature | Status |
+|---|---|
+| ★ Inventory agent — "what needs reordering?", draft POs under minimum, demand notes from sales history | **Shipped as two tools** (B5.10): `reorder_proposals` writes one draft purchase order per supplier for everything under its minimum, priced from that supplier's own quote and never sent; `stock_answer` reads one product back — on hand, on order, committed, available, and which shelves are under their minimum. **Two narrowings, both named at B5.10**: `stock_answer` is about *one product*, not about a supplier or a period ("what did we buy from them last quarter?" is a history fold and its own store query); and **demand notes from sales history are cut** — a forecast is a claim about the future, and the out-of-scope section refuses to make one from a machine. **Flagged**: two runs before lunch write two sets of drafts, because a draft is not on order; an idempotence guard is a real follow-up. |
+| Product catalog: SKU, barcode, unit, purchase/sale price, VAT, photos; services vs stocked goods | **Shipped** (B5.02, B5.09a) — one product record shared with Billing, SKU unique per tenant, GTIN check digit verified on write, purchase price beside the sale price, and `stocked` a one-way door once anything has moved. **One cut: the photo has no UI.** `photoNodeId` is on the wire and tenant-checked against the caller's own Drive, and the product form has no picker for it, because the Drive picker is not yet reusable outside Drive (same reason B4.06b's receipt upload has no button). |
+| Supplier records + per-supplier prices and lead times | **Shipped API-only** (B5.03). Suppliers, their addresses and VAT ids, and a per-supplier price list with lead time and minimum order quantity — all tested, all routed, and read by the reorder engine and the order editor's picker. **Cut: no supplier screens.** There is no list, no form and no price-list editor; a tenant creates a supplier through the API. This is the largest UI gap in the wave and the natural first item of any B5 follow-up. |
+| Purchase order: draft → sent (via alo Mail as PDF) → received; receiving updates stock and creates the bill (three-way match-lite) | **Shipped, whole chain** (B5.05a/a2/b, B5.09b). Placing an order is one act — number drawn from the gapless series, order frozen, covering letter with the printed PDF written to **Drafts** and never sent. Receiving opens on what is outstanding, writes the stock moves and raises a draft bill for what came. **The third leg stays cut** as the design note said: the supplier's own e-invoice (B1.24) is not reconciled against the receipt, and no payment is blocked on a discrepancy. |
+| Stock on hand per location (multi-warehouse), stock moves with full history — quantities never edited in place | **Shipped** (B5.04a, B5.09a) and it is the wave's central rule: no quantity is ever written, on-hand is the fold, the cached per-location balance is proven a fold of the moves by a test, and every row opens the history that says from where, to where, how many, why and which document. |
+| Manual adjustments with reason codes; stocktake (count sheet → variance) | **Shipped API-only** (B5.04b, B5.08a/b). Adjustments and transfers with a closed reason vocabulary, a count sheet snapshotted per place, variance worked out per row, and applying a count writing ordinary correction movements against **what is on the shelf at the moment of applying** rather than what the sheet said. **Cut: neither has a screen.** `parts.tsx` says so in a comment where the button would go — a door onto a screen that does not exist is worse than no door. |
+| Minimum-stock reorder rules feeding the agent's PO proposals | **Shipped API-only** (B5.07): min/target per product and place, the shortage query counting on-hand, on-order and committed separately, buy quantities rounded up to the supplier's minimum, CSV export. **Cut: no rules screen and no shortage screen.** Today the shortage report reaches a person only through the agent card or the API — which is exactly backwards for the buyer who wants to read the list on a Monday morning without asking a question. |
+| Sales order: order → delivery note → invoice chain (bridges B2 → B1) | **Shipped** (B5.06a/b, B5.09b) — draft, confirm (number drawn, no message written), a consignment at a time out of a named place, then a **draft** invoice for what has actually gone and never for what is still on order. **One narrowing: the delivery note is a record, not a document.** There is no printed delivery note to hand to a driver — `print`/`pdf` exist for the purchase order only, and generalising them to the outbound side was never a queue item. |
+| Barcode scanning via phone camera in the web app | **Shipped, and wider than promised** (B5.09c): the camera path where the browser has one, plus the keyboard-wedge path a handheld scanner uses, which needs no permission and works on the machine bolted to the packing bench. A misread code and a product you do not stock are told apart, and scanning finds the caller's own products only. |
+| `[B+]` Lot/serial tracking, expiry dates; landed costs; manufacturing-lite; POS | **Out of scope by the ADR and by this note's own cuts**, unchanged. |
+| ★ **Not on the features list, and the wave's largest cut** | **Stock is not valued and nothing posts to the ledger.** No inventory asset account, no cost of goods sold, no purchase-price variance — because a valuation needs a *method* (FIFO, weighted average, standard cost) which is a per-tenant accounting policy with tax consequences. The stock screen shows a **reference value at today's purchase price**, labelled as a reference figure and never called a balance. Its prerequisite, B4.11 (documents posting to the journal at all), is itself still open. |
+
+Two cross-cutting notes the reconciliation turned up, both belonging to a human
+rather than to this note:
+
+- **`/inventory` needs adding to the production Caddyfile** at the next deploy,
+  beside `/billing`, `/crm`, `/audit`, `/insights`, `/projects` and `/finance`.
+  The loop does not touch `deploy/`.
+- **Nothing in wave B5 is deployed.** Like B2, BI-1, B3 and B4, it is code,
+  migrations and tests behind a gate a human moves — and B5's own gate note at
+  the top of this file is still unanswered.

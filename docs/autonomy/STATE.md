@@ -16959,3 +16959,167 @@ POST /inventory/purchase-orders/{id}/send  → sent, PO-2026-00001, 2026-08-11
 Next item: B5.11 (wave review — fr/nl for the whole `inventory*` block, a
 CHANGELOG sweep, `docs/design/inventory.md` reconciled as-built, and every
 [B5] feature in `features.md` shipped or listed as a cut with a reason).
+
+## 2026-08-11 — B5.11 the wave review: the warehouse in three languages, and B5 reconciled
+
+Wave B5 closes. The module whose records are *not the truth* — a stock level is
+a claim about a shelf in a room — now reads in the language of whoever is
+holding the box, its design note describes what was actually built, the ROADMAP
+has the B5 slice list it never had, and every `[B5]` line of `docs/features.md`
+has an answer: shipped, or a cut with its reason. No Rust changed and nothing
+was deployed.
+
+**The interface — 251 keys, twice.** `fr.ts` and `nl.ts` gained the whole B5
+surface: `moduleInventory` and 223 `inventory*` keys (the catalog and the
+product form, the stock list with its counterparties note, the movement history,
+both order documents with every sentence that precedes an irreversible act, the
+two fulfilment dialogs, and the scanner) plus the 27 agent keys of B5.10
+(`agentActReorderProposals`, `agentReorder*`, `agentActStockAnswer`,
+`agentStock*`, and the three `agentField*` labels the cards read with). The
+words are a warehouse's: *en rayon*, *commande d'achat*, *démarque*, *douchette*;
+*op voorraad*, *inkooporder*, *derving*, *handscanner*.
+
+Three decisions worth recording:
+
+- **A French reason is a noun; a French status is a participle.** A movement's
+  reason and an adjustment's reason describe *goods*, and the sentence never
+  learns the gender of the goods — so *Réceptionné* / *Endommagé* would be right
+  only by luck. All eleven are nouns: *Réception*, *Livraison*, *Transfert*,
+  *Démarque*, *Comptage*; *Casse*, *Perte*, *Excédent*, *Péremption*. An order
+  **status** is the opposite case and agrees on purpose (*Passée*, *Reçue*,
+  *Livrée*, *Annulée*), because its subject is always *la commande*. Same split
+  B4.15 found in Finance, and both halves are now pinned by a test — including
+  a regex that fails any French reason label ending in an agreeing participle.
+  The one agent sentence interpolating a quantity is invariable for B4.15's
+  money reason: *12 pièces à commander*, never *nécessaires*.
+- **Dutch uses the warehouse's own verbs.** Goods are **ingeslagen** and
+  **uitgeslagen** — inslag/uitslag is what a Dutch or Flemish warehouse calls
+  receiving and issuing — where *gepickt* would be a loanword on the one screen
+  a warehouse worker has open all day. Shrinkage is **derving**, the retail
+  term. Exactly B4.15's *afletteren* finding, one module later.
+- **A word shared with Billing stays one word.** A sales order raises a *billing*
+  invoice and a receipt raises a *billing* bill, so a draft invoice is a
+  *facture en brouillon* / *conceptfactuur* here as it is there, the sentence
+  about a draft carrying no number names Billing by its own translated name
+  (*Facturation*), and `crmDocumentDraft("invoice")` and `inventoryDraftInvoice`
+  are asserted equal in Dutch.
+
+**A sixth completeness test** (`locale.test.ts`, "alo Inventory is fully
+translated (B5.11)"), mirroring billing's, CRM's, Insights', Projects' and
+Finance's: the B5 key set must exist in both catalogs, every interpolation must
+keep its arity, `agentReorderReason`'s **default** branch must have words in
+each language, the noun-vs-participle split is asserted both ways, the Dutch
+warehouse verbs are pinned, and the Billing↔Inventory shared words are asserted
+equal. A B5 key added later without fr/nl turns the suite red. `locale.test.ts`
+goes 41 → 51 tests.
+
+**Docs, as-built.** `docs/design/inventory.md` is now `Status: as built`; a new
+§ **Languages (B5.11)** records the three decisions, the one thing deliberately
+not translated (the shortage CSV's column headings, a contract read by a
+buyer's spreadsheet), and **two things that look like gaps and are not** —
+found by checking rather than assuming, and both had been guessed wrong in the
+first draft of this entry:
+
+- the **printed purchase order and its covering letter were already in three
+  languages**: `inventory_po_print.rs` reuses Billing's `strings_for` and
+  `inventory_po_send.rs` reuses `mail_strings_for`, both en/fr/nl, both taking
+  `?lang=` (B5.05a2 generalised B1.16/B1.17 to a party rather than a customer);
+- **seeded location names are written in the reader's language** by
+  `inventory_location_names.rs` (en/fr/nl/**de**), with `inv_locations.rs`
+  deliberately holding no English at all — B4.13c's chart-of-accounts split,
+  reused.
+
+A new § **"What B5 promised, and what B5 shipped (B5.11)"** answers every
+`[B5]` feature in a table. `docs/features.md` gains the pointer blockquote
+B1/B2/B3/B4/BI-1 have. `ROADMAP.md` gains the B5 slice list (B5.1–B5.9 ticked,
+B5.10–B5.11 left open with their reason inline) and the Languages paragraph.
+
+**The reconciliation's findings — what B5 did NOT ship:**
+
+- **★ Stock is counted, never valued, and nothing posts to the ledger.** No
+  inventory asset account, no cost of goods sold, no purchase-price variance.
+  Already the design note's largest declared cut, and correct: a valuation needs
+  a *method* (FIFO, weighted average, standard cost) which is a per-tenant
+  accounting policy with tax consequences. Its prerequisite — B4.11, documents
+  posting to the journal at all — is itself still open. The stock screen shows a
+  reference value at today's purchase price and refuses to call it a balance.
+- **★ Half the wave has no screen.** Suppliers and their price lists (B5.03),
+  manual adjustments and transfers (B5.04b), stocktakes (B5.08a/b), and the
+  reorder rules with their shortage report (B5.07) are all shipped, routed and
+  tested — and reachable only through the API or the agent card. Verified, not
+  assumed: `web/src/inventory` calls exactly `/inventory/{locations,moves,stock,
+  scan,suppliers,purchase-orders,sales-orders}`, and never `/inventory/counts`,
+  `/inventory/reorder-rules` or `/inventory/shortages`; the supplier call is a
+  read for a picker, not a CRUD screen. `parts.tsx` even says so in a comment
+  where the adjust button would go. The shortage case is the sharpest: a buyer
+  who wants Monday's list has to ask a question or call the API. Now on the
+  ROADMAP as B5.11 rather than only in this journal.
+- **No product photo picker** (`photoNodeId` is on the wire and tenant-checked;
+  the form has no Drive picker — same blocker as B4.06b's receipt upload), **no
+  printed delivery note** (`print`/`pdf` exist for the purchase order only), **no
+  third leg of the three-way match** (the supplier's own e-invoice from B1.24 is
+  never reconciled against the receipt), and **no demand notes from sales
+  history** — features.md promises them of the agent, and a forecast is a claim
+  about the future the out-of-scope section refuses to make from a machine.
+
+**The CHANGELOG sweep found no missing slice.** Every B5 item that changed
+behaviour already had a line in the house voice (B5.01 is a design note and
+correctly has none) — the first wave review where that was true. This item's own
+line was added.
+
+**How verified.**
+
+```
+npx tsc --noEmit                                    → clean
+npx eslint src/i18n/{fr,nl}.ts src/i18n/locale.test.ts → clean
+npx vitest run src/i18n/locale.test.ts              → 51 tests, green
+npm run build                                       → built in 13.64s
+key counts, per catalog: fr 223 inventory + 27 agent · nl 223 + 27
+```
+
+  the whole suite before and after, so the pre-existing red is not mistaken for
+  this item's:
+```
+at HEAD (changes stashed):  427 passed | 4 failed (431)  ·  17 errors
+with this item:             437 passed | 4 failed (441)  ·  17 errors
+```
+  the 4 failures are **`src/sites/Theme.test.tsx`** — `site.theme` undefined in
+  `ThemeDialog.tsx:114` — which is the **sites track's** file and identical in
+  both runs. Not this item's, and under LOOP.md's rule not this track's to
+  touch. Flagged for the sites loop below.
+
+**Cuts, named.**
+
+- **No fr/nl for the Mail agent's own card strings**, unchanged from B2.14,
+  B3.11 and B4.15: they are ADR 0034's mail wave, and the shared chrome keys the
+  inventory cards need were translated at B2.14.
+- **No Rust string table was added.** Inventory's two Rust-written documents
+  (the printed order, the covering letter) were already en/fr/nl, and the
+  seeded location names already have their own four-language table.
+- **No sweep of untranslated keys outside B1–B5** (Tasks, Drive, Base, Home,
+  Agenda, Sites). Other waves' surfaces; a review item translates its own wave.
+
+**Flags for the human.**
+
+- **★ The four missing screens are the largest open thing in Inventory** and are
+  now ROADMAP B5.11 rather than only in this journal. The shortage report is the
+  one to build first.
+- **★ `src/sites/Theme.test.tsx` is red on `main`** (4 tests), from the sites
+  track. Reported here because a business-track iteration cannot fix it: it is
+  another loop's file.
+- **The wave gate at the top of `docs/design/inventory.md` is still
+  unanswered** — B2 onward were all built ahead of "B1 live with ≥1 real
+  tenant", and B5 wrote migrations under that unresolved gate.
+- The server's refusal sentences are still English in every language — the same
+  cross-cutting `StoreError` vocabulary item flagged at B1.27, B2.14 and B4.15.
+  It bites hardest here, because this module deliberately shows the server's own
+  words verbatim rather than paraphrasing them.
+
+**HUMAN ACTION:** `/inventory` needs adding to the production Caddyfile at the
+next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`, `/projects` and
+`/finance`. (The vite dev proxy already lists it — checked.) No new top-level
+prefix this item.
+
+Next item: B6.01 (the alo HR design note — the employee model, leave policies
+and balances, approvals, the recruitment pipeline, and an explicit EU AI Act
+posture: screening is suggest-only with a logged human decision).

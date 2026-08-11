@@ -470,6 +470,23 @@ EU models, suggest-only where the EU AI Act calls a use high-risk.
 
 ### [B5] Purchasing & Inventory — things and stock
 
+> Wave B5 is built. `docs/design/inventory.md` § "What B5 promised, and what
+> B5 shipped" reconciles every `[B5]` line below against the code: each is
+> shipped, or a cut with its reason. Two are load-bearing enough to repeat
+> here. **Stock is counted, never valued**: no inventory asset account, no cost
+> of goods sold, nothing posted to the ledger at all — a valuation needs a
+> *method* (FIFO, weighted average, standard cost) which is a per-tenant
+> accounting policy with tax consequences, so the stock screen shows a
+> reference value at today's purchase price and refuses to call it a balance.
+> And **half the wave has no screen**: suppliers and their price lists, manual
+> adjustments and transfers, stocktakes, and the reorder rules with their
+> shortage report are all shipped, routed and tested but reachable only
+> through the API or the agent card. Those screens are the natural first items
+> of any B5 follow-up. Also cut, each named there: the photo on a product has
+> no picker, the delivery note is a record rather than a printed document, the
+> third leg of the three-way match is not reconciled, and the agent writes no
+> demand forecast from sales history.
+
 - [B5] ★ **Inventory agent** — "what needs reordering?", "draft POs for everything under minimum", demand notes from sales history — always draft-then-approve
 - [B5] Product catalog: SKU, barcode, unit, purchase/sale price, VAT, photos; services vs stocked goods
 - [B5] Supplier records + per-supplier prices and lead times

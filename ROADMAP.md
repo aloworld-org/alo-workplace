@@ -381,6 +381,34 @@ reconciliation screens, the chart, the four reports and the agent's cards
 read by an accountant's own tooling, not a sentence a person reads.
 
 ### Wave B5 — Purchasing & Inventory — products, stock, PO/SO chains
+
+Built on the same terms as B2, BI-1, B3 and B4: code, migrations and tests,
+none of it deployed. This is the first wave whose records are **not the
+truth** — a stock level is a claim about a shelf in a room, and the shelf does
+not read our database — so the module's job is not to hold the quantity but to
+explain it. Hence its one rule, from which everything else follows: *a quantity
+is never written, only movements are.*
+
+- [x] B5.1 The catalog as things rather than prices: the product Billing invoices from gains an SKU unique per tenant, a GTIN whose check digit is verified on write, a purchase price beside the sale price, a usual supplier, and a `stocked` flag that becomes a one-way door the moment anything has moved — one product record, never two that drift
+- [x] B5.2 Suppliers: the people you buy from kept the way customers are, each with their own price list, lead time and minimum order quantity, which is what a reorder proposal is priced from — *API-only: there is no supplier screen, and this is the wave's largest UI gap*
+- [x] B5.3 The move ledger: locations real and virtual, every movement naming where the goods came from and where they went, on-hand as the fold of them, and a cached per-location balance **proven** a fold by a test rather than trusted; stock never goes below zero, and manual adjustments and transfers carry a closed vocabulary of reasons — *the adjustment flow is API-only*
+- [x] B5.4 Purchase orders, whole: the draft, then one act that draws the number from a gapless series, freezes the order, and writes the covering letter with the printed order attached to **your Drafts** — never sending it for you; then booking an arrival, which opens on what is outstanding, writes the stock moves and raises a draft bill for what came
+- [x] B5.5 Sales orders, whole: draft, confirm (the number drawn, no message written, because the customer already has your answer), a consignment at a time out of a named place, then a **draft** invoice for what has actually gone and never for what is still on order — *the delivery note is a record, not a printed document*
+- [x] B5.6 Reorder rules and the shortage report: a minimum and a target per product and place, counting on hand, on order and promised out **separately** so ordering this morning takes the item off the list this afternoon; buy quantities rounded up to what the supplier will sell, priced and lead-timed from their own quote, with a CSV — *API-only, reachable through the agent card or the API but not from a screen*
+- [x] B5.7 Stocktake: a count sheet snapshotted per place, variance worked out per row, an uncounted row that stays uncounted rather than counting as zero, and an apply that corrects against **what is on the shelf at the moment of applying** — so a shipment that went out mid-count is never written over — writing ordinary movements, once, with no re-apply — *API-only*
+- [x] B5.8 The screens: the catalog and what is on the shelves with the movement history behind every row; both order documents with the sentence that says what placing or confirming will do before it happens; and barcode scanning — the phone camera where the browser has one, and the keyboard-wedge path a handheld scanner uses, which needs no permission and works on the machine bolted to the packing bench
+- [x] B5.9 ★ The inventory agent: `reorder_proposals`, which writes one draft purchase order per supplier and contacts nobody, and `stock_answer`, which reads one product back — on hand, on order, promised, and which shelves are under their minimum — and never guesses when you will run out
+- [ ] B5.10 ★ Stock valuation and the ledger: the inventory asset account, cost of goods sold, and a costing method — *the wave's largest cut, and a deliberate one: a method (FIFO, weighted average, standard cost) is a per-tenant accounting policy with tax consequences, and B4.11 (documents posting to the journal at all) is its unmet prerequisite. Until then the stock screen shows a reference value at today's purchase price and refuses to call it a balance*
+- [ ] B5.11 The screens the wave did not reach: suppliers and their price lists, adjustments and transfers, the stocktake, and the reorder rules with their shortage report — *all four are shipped, routed and tested behind the API; they are the natural first items of any B5 follow-up*
+
+Inventory is translated end to end in en/fr/nl — the catalog, the stock list
+and its history, both order documents with the sentences that precede an
+irreversible act, the scanner and the agent's cards (B5.11). The printed
+purchase order and its covering letter were already in three languages from
+B5.05a2, and a tenant's starting locations are seeded in the reader's own
+language. The shortage CSV's column headings stay English on purpose, for the
+same reason B4's do.
+
 ### Wave B6 — HR — records, leave, recruitment-lite (payroll calc = permanent non-goal)
 ### Wave BI-1 — alo Insights first slice ⇄ inserted after B2 (ADR 0037: zero-setup overview dashboard, tile gallery, ask-to-chart)
 

@@ -6,6 +6,24 @@ contracts.
 
 ## Unreleased
 
+- **alo Inventory now speaks French and Dutch, from the shelf to the order.**
+  The whole module reads in your own language: the catalog, what is on the
+  shelves and the movement history behind a row, both order documents with the
+  sentences that tell you exactly what placing or confirming one will do, the
+  barcode scanner, and the two things you can ask alo about your stock. The
+  words are a warehouse's — *en rayon*, *commande d'achat*, *démarque*; *op
+  voorraad*, *inkooporder*, *derving* — and goods are **ingeslagen** and
+  **uitgeslagen** in Dutch, because that is what a warehouse says. A word you
+  already know from Billing stays that word: a draft invoice raised from a
+  sales order is a *facture en brouillon* / *conceptfactuur* on both screens.
+  Two deliberate details: a movement's reason and an adjustment's reason are
+  written as **nouns** in French (*Réception*, *Casse*), because a participle
+  would have to agree with goods the sentence never sees, while an order's
+  state agrees with *la commande* as it should; and the refusals the server
+  sends — a quantity larger than what is owing, a barcode whose check digit is
+  wrong — are still in English in every language, as they are everywhere else
+  in alo.
+
 - **Ask alo what to reorder, and get the orders as drafts.** The assistant
   learns two things about your warehouse. Ask what is running low and it writes
   one **draft** purchase order per supplier for everything you are under your

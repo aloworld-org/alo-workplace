@@ -133,7 +133,7 @@ small, or a `[!]` note for the human if large.
 - [x] B5.09b Web inventory: PO + SO flow screens.
 - [x] B5.09c Web inventory: barcode scan input (camera + keyboard-wedge fallback).
 - [x] B5.10 ★ Inventory agent tools: `reorder_proposals` (draft POs), `stock_answer` — structural verify.
-- [ ] B5.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B5] reconciliation.
+- [x] B5.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B5] reconciliation.
 
 ## Wave B6 — alo HR
 
