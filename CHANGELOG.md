@@ -19,6 +19,18 @@ contracts.
   back is recorded as a copy of the version it came from, and the pages you
   are still working on are left exactly as you left them.
 
+- **You can now see that history, and roll back with one click.** Every
+  website has a Version history beside its publish button: the versions it has
+  published listed by date, the one that is online marked as such, and the
+  version you select shown exactly as visitors saw it — its own pages, its own
+  theme, its own languages, on a phone or a desktop width. Before you act, the
+  screen tells you what putting it back would change on the live site, and
+  reminds you that the pages you are editing stay untouched. Putting it back
+  online takes one click and no confirmation ceremony, because it is
+  reversible: the result names the version that is now live, links to your
+  address, and offers Undo, which puts back the version that was online
+  before.
+
 - **Meet now gives a clear, polished path through every call state.** A focused
   start-call hero and responsive live-meeting gallery replace the old utility
   list, with status, start time, and one-click joining visible on every card.

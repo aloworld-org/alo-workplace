@@ -183,6 +183,30 @@ the version a publish was copied from.
   internet serves; the editable pages remain the tenant's work in
   progress. Nothing in a rollback rewrites Base rows either — a
   collection snapshot comes back, its source table does not move.
+- **Previewing a version** — `GET /sites/{id}/publishes/{publish}/pages`
+  lists what that version froze (one entry per page *and* language), and
+  `GET /sites/{id}/publishes/{publish}/pages/{page}/preview?locale=`
+  renders one of them as a complete self-contained document through the
+  same renderer the public service uses, with the stylesheet and images
+  inlined (the draft preview's contract, for the same reason: public
+  asset paths do not resolve on the edit origin). It reads snapshot rows
+  only — that version's theme, that version's frozen Base rows — so what
+  the owner looks at is what restoring would put back. The one value taken
+  from the present is the site's *name*, which a publish does not freeze.
+  A language the version never froze for that page falls back to the
+  version's default language rather than refusing; history is read, not
+  edited.
+- **The screen** (`web/src/sites/HistoryView.tsx`, reached from the
+  publish bar) is the version history people already know from Docs and
+  from Wix: dates down the left — never publish ids, which nobody
+  recognises — the selected version rendered beside them, and one button
+  that puts it back. Restoring executes on the click rather than behind a
+  confirmation, because it is reversible by construction: the result
+  banner carries **Undo**, which restores the version that was live
+  before. Below the heading the screen states that the draft is untouched,
+  and against the live version it lists what would change (theme,
+  languages, pages coming back / going away / changing) from the compare
+  endpoint — the diff explains the preview rather than replacing it.
 
 ### Form flow
 
@@ -273,10 +297,9 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
 - Free-form design tools / pixel canvas, custom code injection,
   template marketplace, third-party embeds or trackers of any kind
   (ADR 0036 non-goals; the analytics promise depends on it).
-- Version history + rollback UI, scheduled publishing,
-  password-protected pages, whole-site AI translation, responsive
-  image derivatives (S2 — snapshots are already immutable so rollback
-  has its substrate).
+- Scheduled publishing, password-protected pages, responsive image
+  derivatives (S2 — later slices). Version history, rollback and
+  whole-site AI translation have since shipped and are described above.
 - CRM lead creation from form submissions (waits for business-track
   B2; the seam is the stored submission).
 - Production serving infrastructure: the public domain and wildcard DNS are

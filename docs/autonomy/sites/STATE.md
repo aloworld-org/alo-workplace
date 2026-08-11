@@ -2664,3 +2664,88 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     point of immutability.
 - **Next:** S2.04b, the visible history surface with preview and one-click
   rollback.
+
+## 2026-08-11 — S2.04b the version history you can see, preview and roll back
+
+- **Shipped:** a website's publish bar now carries **Version history**
+  (`web/src/sites/HistoryView.tsx`, route `/sites/{id}/history`): every
+  version listed by **date** — never by publish id, which nobody recognises —
+  with the live one chipped, and the selected version rendered beside the list
+  exactly as visitors saw it (its own pages, its own frozen theme, its own
+  languages, at desktop or phone width). Putting one back online is one click,
+  and the result banner names the version, links to the site's address and
+  offers **Undo**, which restores the version that was live before it.
+- **Preview needed a backend half, and it reads only frozen rows.** Two
+  additive routes: `GET /sites/{id}/publishes/{publish}/pages` (what that
+  version froze, one entry per page *and* language) and
+  `GET /sites/{id}/publishes/{publish}/pages/{page}/preview?locale=` (one
+  frozen page as a complete self-contained `text/html` document, stylesheet
+  and images inlined, `Cache-Control: no-store`). It renders through the same
+  library the public service uses, from that publish's theme and that
+  publish's frozen collection snapshots — never the draft and never today's
+  Base rows, so what the owner looks at is what restoring would put back. The
+  one present-tense value is the site's *name*, which a publish does not
+  freeze; recorded in the design note. Store addition: `site_publish(site,
+  publish)` — one version's frozen envelope, tenant+site scoped.
+- **New module, not a bigger one:** `alo-jmap/src/site_version_preview.rs`
+  renders history as a document; `site_versions.rs` stays the JSON history
+  surface. The page-list route guards on the version read first, so an unknown
+  or foreign version is a `404` rather than an empty list that reads like a
+  version with no pages.
+- **The screen obeys the interface laws.** Restore executes on the click
+  instead of behind a confirmation because it is reversible by construction
+  (law 7: undo over confirm) — the server appends a copy, so the
+  previously-live version is still there for Undo. Under the heading the
+  screen states the draft is untouched; against the live version it lists what
+  would change (theme, languages, pages coming back/going away/changing) from
+  the compare endpoint. Domain reference: Docs/Wix version history — dates
+  left, the version rendered right, restore on what you are looking at.
+- **Isolation proof:** store tests refuse the new envelope read to a foreign
+  tenant and to another site of the same tenant; the real-router suite proves
+  `401` on both new routes, one identical `404` for another tenant's version,
+  another site's version and an invented id, and that a refusal to an outsider
+  never carries the foreign id, the foreign content, or an HTML content-type.
+- **Real curl transcript** (fresh admins on the local docker Postgres,
+  `alo-jmap` on `127.0.0.1:8080`, `alo-sites` on `127.0.0.1:8081`,
+  `SITES_DOMAIN=alosites.test`): publish v1 (hero "Bread & butter") → edit the
+  hero to "Sourdough, daily", change the theme to `midnight`, publish v2 →
+  both versions' `/pages` list Home and About → **v1's preview renders "Bread
+  & butter" with the light frozen palette (`--bg: #ffffff`) while v2's renders
+  "Sourdough, daily" with the dark one (`--bg: #0f1a2b`)**, `content-type:
+  text/html; charset=utf-8`, `cache-control: no-store` → the draft preview
+  still reads "Sourdough, daily" → restore v1 → the public host serves "Bread
+  & butter" again and history reads three versions with `restoredFrom` on the
+  newest → the Undo click (restore v2) → the public host serves "Sourdough,
+  daily" again, the draft never moved. Negatives: no token → `401` on both
+  routes; other tenant, unknown version, unknown page → `404` with
+  "no such version of this website" / "no such page in this version" / "no
+  such site"; `?locale=fr` on a version that never froze French → `200`
+  rendering the frozen English page (`<html lang="en">`); `DELETE` on the page
+  list → `405`. `psql` after: 4 publishes, 2 carrying `restored_from`, 8
+  snapshot rows. Fixture site deleted (publishes cascaded to zero, the host
+  went off the air) and both servers stopped. No production, email, DNS or
+  external AI service was contacted.
+- **Verified:** `cargo fmt`; strict offline all-target Clippy for `alo-store`
+  and `alo-jmap`, zero warnings; **full unfiltered `cargo test -p alo-store`
+  and `cargo test -p alo-jmap`** green on the local docker Postgres; the web
+  gate clean (`npx tsc --noEmit`, `npx eslint` on every changed file, `npm run
+  build`) with the sites + i18n vitest suites green including the new
+  `SiteHistory.test.tsx` (list by date, preview of the selected version,
+  one-click restore, Undo restoring the *previously live* version and not the
+  copy, the never-published empty state, and a verbatim server refusal).
+- **Cuts/flags:**
+  - The preview shows one page at a time through a page picker rather than a
+    navigable mini-site: links inside the frozen document are not rewritten to
+    the preview route (the iframe is sandboxed without `allow-top-navigation`,
+    so a click simply does nothing). A version whose pages a person wants to
+    walk is one selection per page; noted rather than built.
+  - The compare summary is metadata (S2.04a's contract): it names pages that
+    would change, not which words. A visual before/after diff is not this
+    item's, and S3.01a's diff work is the natural place for it.
+  - A restricted site collaborator can open the history and restore, as they
+    could already publish (S2.03a) — the per-site grant middleware gates every
+    `/sites/{id}` route unchanged.
+  - fr/nl strings written with the English copy, as the parity test requires;
+    `UNTRANSLATED` stays empty.
+- **Next:** S2.05a, the scheduled-publishing model (tenant-scoped
+  schedule/cancel/claim with concurrency and wrong-tenant tests).
