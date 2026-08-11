@@ -208,6 +208,47 @@ the version a publish was copied from.
   languages, pages coming back / going away / changing) from the compare
   endpoint — the diff explains the preview rather than replacing it.
 
+### Scheduled publishing (S2.05)
+
+Going live at a chosen moment is a second *moment* to call the publish
+path, never a second way to freeze a site.
+
+- **`site_publish_schedules`** — an **intention**, not a version: site
+  ref, `publish_at` (UTC), status
+  `scheduled | publishing | published | cancelled | failed`, the user
+  whose account door the publish runs through, attempt count, and — once
+  it has run — the `site_publishes` row it produced or the reason it
+  refused. Terminal rows are kept, so a tenant reads "published on
+  Monday" or "it could not publish because …" instead of watching an
+  entry disappear.
+- **One future per website.** A partial unique index admits one
+  `scheduled`/`publishing` row per site, and scheduling takes the site
+  row's lock first: two editors scheduling at the same instant produce
+  one intention, and rescheduling moves that row (keeping its id) rather
+  than racing a second one into existence. A site being published right
+  now can neither be rescheduled nor cancelled — the version it makes can
+  be rolled back (S2.04), which is the honest remedy.
+- **At-most-once claiming.** `Store::claim_due_site_publishes` marks due
+  rows `publishing` in the statement that reads them, with
+  `FOR UPDATE SKIP LOCKED`, so a second sweeper walks past a claimed row
+  instead of publishing the same website twice. Rejected alternative:
+  deleting the row on claim, as the scheduled-*send* sweeper does
+  (`schedule.rs`) — a mail send is invisible until it lands, whereas a
+  website publish is something the owner watches for and asks about
+  afterwards, so the row has to survive its own execution.
+- **No silent stall, and no pointless retry.** A worker that dies leaves
+  a `publishing` row; the claim re-offers it once the claim is ten
+  minutes stale and, after three attempts, writes it off as `failed`
+  where the tenant can see it. A publish that *refuses* (no home page, a
+  collection that no longer resolves) is terminal on the first attempt:
+  ten minutes will not change the site's content, so the store keeps the
+  refusal verbatim for the owner to act on.
+- **Validation** — the moment must be in the future and at most a year
+  ahead; the site's *content* is deliberately not checked at scheduling
+  time, because the author has until that moment to finish it. Times are
+  stored in UTC; explaining them in the reader's own time is the
+  surface's job (S2.05b).
+
 ### Form flow
 
 ```

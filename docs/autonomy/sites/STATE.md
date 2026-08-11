@@ -2749,3 +2749,77 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     `UNTRANSLATED` stays empty.
 - **Next:** S2.05a, the scheduled-publishing model (tenant-scoped
   schedule/cancel/claim with concurrency and wrong-tenant tests).
+
+## 2026-08-11 — S2.05a the model behind "publish this on Monday at 09:00"
+
+- **Shipped:** scheduled publishing as a **model only** — migration
+  `0302_site_publish_schedules.sql` plus `platform/alo-store/src/site_publish_schedule.rs`
+  (new module, new `SitePublishScheduleId`). A row is an *intention*, never a
+  version: site ref, `publish_at` (UTC), status
+  `scheduled | publishing | published | cancelled | failed`, the user whose
+  account door the publish runs through, attempt count, and — once it has run
+  — the `site_publishes` row it produced or the verbatim reason it refused.
+  Terminal rows are retained, so the tenant reads "published on Monday" or
+  "it could not publish because …" instead of watching an entry vanish.
+- **Tenant surface** (`AccountStore`): `schedule_site_publish` (future-only,
+  at most a year ahead, unknown/foreign site → `NotFound`),
+  `site_publish_schedule` (the pending one), `site_publish_schedules`
+  (bounded history), `cancel_site_publish_schedule`. Rescheduling **moves the
+  same row** — the id survives, so a surface watching one schedule keeps
+  watching it — and the site row is locked first, so two editors scheduling at
+  the same instant produce one intention rather than colliding on the partial
+  unique index that admits a single `scheduled`/`publishing` row per site.
+- **Worker surface** (`Store`, cross-tenant like the form-notification sweep):
+  `claim_due_site_publishes` marks due rows `publishing` in the statement that
+  reads them (`FOR UPDATE SKIP LOCKED`), returning tenant + the scheduling
+  user's id so the publish runs through *their* account door and the resulting
+  version records them as its author; `finish_site_publish_schedule` (refuses a
+  version that is not that schedule's site's, tenant-scoped) and
+  `fail_site_publish_schedule` (reason bounded to 500 chars) close a claim.
+- **Two failure modes, deliberately different.** A worker that dies leaves a
+  `publishing` row: the claim re-offers it once the claim is ten minutes stale
+  and, after three attempts, writes it off as `failed` where the tenant can see
+  it. A publish that *refuses* (no home page, a collection that no longer
+  resolves) is terminal on the first attempt — ten minutes cannot change the
+  site's content, so the refusal is kept verbatim for the owner to act on.
+  Rejected alternative, recorded in `docs/design/sites.md`: deleting the row on
+  claim as the scheduled-*send* sweeper does — a mail send is invisible until
+  it lands, a website publish is something the owner watches for afterwards.
+- **Isolation proof:** another tenant cannot read the schedule (pending read
+  and history both empty), reschedule it, cancel it — including by naming the
+  foreign schedule under a site they do own — finish it, or fail it; every
+  refusal is the same `NotFound` an invented id gets. A version belonging to
+  another site (or another tenant) cannot be pinned onto a schedule. Deleting
+  the site cascades its schedules away.
+- **Concurrency proof:** four due schedules, two `claim_due_site_publishes`
+  calls issued with `tokio::join!` — the union is exactly four claims with no
+  id appearing twice. Then one claim is aged: attempt 2, aged again: attempt 3,
+  aged again: not re-offered, and the row now reads `failed` with the
+  interrupted message, which frees the site to be scheduled again.
+- **Verified:** `cargo fmt`; strict offline all-target Clippy for `alo-store`,
+  zero warnings; the new `site_publish_schedule_tenancy` suite (4 tests) green
+  on the local docker Postgres, inside the **full unfiltered `cargo test -p
+  alo-store`** — 115 suites, 1739 tests, zero failures. No web or HTTP code was
+  touched, so the web gate does not apply to this item. Mutation check: dropping the `tenant_id` predicate from
+  `fail_site_publish_schedule` turns the wrong-tenant test red ("expected
+  NotFound, got Ok(())") — the tests fail for the right reason. No production,
+  email, DNS or external AI service was contacted.
+- **Cuts/flags:**
+  - No HTTP, no worker loop, no UI: `/sites/{id}/schedule`, the sweep that
+    actually runs due publishes, and the visible schedule control with its
+    local-time explanation are all S2.05b, as the queue splits them. Nothing a
+    user can do changed yet, so no CHANGELOG line was written — it lands with
+    the screen in S2.05b, in the capability's voice.
+  - The scheduling user's account door is captured at schedule time. If that
+    user is deleted or loses their per-site grant before the moment arrives,
+    the publish will refuse and the reason lands on the row; S2.05b's worker
+    should surface it rather than retry.
+  - Attempts are consumed only by *interrupted* claims, so the visible
+    `attempts` on a schedule is a crash counter, not a retry-of-refusal
+    counter.
+  - The suite serializes its four tests behind a mutex and deletes its sites
+    afterwards: the claim is cross-tenant by design, so two tests sweeping at
+    once would steal each other's due rows.
+- **Next:** S2.05b, the scheduled-publishing service and UI (visible schedule
+  control, local-time explanation, cancel/reschedule, worker execution, wire
+  transcript).

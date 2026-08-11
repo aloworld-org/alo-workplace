@@ -74,7 +74,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.03b Site-editor UI: invite/revoke collaborators and exercise edit/publish access end to end without exposing workspace administration.
 - [x] S2.04a Version history API: list immutable publishes, compare metadata, and atomically republish a chosen version without mutating history; tenant tests and wire transcript.
 - [x] S2.04b Version history UI: visible history surface, preview, and one-click rollback with undo/result feedback.
-- [ ] S2.05a Scheduled publishing model: tenant-scoped schedule/cancel/claim semantics with concurrency and wrong-tenant tests.
+- [x] S2.05a Scheduled publishing model: tenant-scoped schedule/cancel/claim semantics with concurrency and wrong-tenant tests.
 - [ ] S2.05b Scheduled publishing service/UI: visible schedule control, local-time explanation, cancel/reschedule, worker execution, and wire transcript.
 - [ ] S2.06a Password-protected pages: strong password hashing, anonymous challenge/session gate, cache-safe responses, rate limiting, and security tests.
 - [ ] S2.06b Password UI: visible protect/remove controls, clear public-preview state, and accessible visitor unlock screen.
