@@ -148,7 +148,7 @@ small, or a `[!]` note for the human if large.
 - [x] B6.06b Recruitment, board: applicant pipeline board UI on the shared board pattern.
 - [x] B6.07 Approvals inbox: one manager view unifying leave/expenses/timesheets (B3/B4 hooks) with counts.
 - [x] B6.08a Web HR: directory + org chart.
-- [ ] B6.08b Web HR: leave request/approve screens + absence calendar.
+- [x] B6.08b Web HR: leave request/approve screens + absence calendar.
 - [ ] B6.08c Web HR: recruitment board screen + approvals-inbox integration.
 - [ ] B6.09 ★ HR agent tools: `who_is_off` (answer), `draft_letter_from_template` (draft) — screening explicitly absent per design note; structural verify.
 - [ ] B6.10 Payroll export: per-period CSV of salary-relevant data (no calculation) with a per-country column mapping config.

@@ -227,9 +227,11 @@ The module exists with **one** tab, `Hiring` (`HrModule.tsx`, `HiringView.tsx`,
 `hr.module.css`). The rail entry is every member's, as this section says — but
 the member-facing tabs were B6.08, so a member who opened People then was told
 in the module's own words what would live there rather than shown a tab that
-answers nothing. (**Superseded by B6.08a**: Directory is every member's tab and
-what they land on; the "coming soon" screen and its two strings are gone. My
-leave and Team remain B6.08b.) The Hiring tab itself is **hidden, not
+answers nothing. (**Superseded by B6.08a**: Directory is every member's tab; the
+"coming soon" screen and its two strings are gone. **And by B6.08b**: My leave
+is every member's tab *and* what a member lands on, Who's away is the absence
+calendar beside it, and the Team tab is deliberately not built — see § Time off,
+and who is away.) The Hiring tab itself is **hidden, not
 disabled**, for anybody who is
 not HR: the pattern Finance set for its bookkeeper tabs, and for the same
 reason — a tab that exists only to refuse advertises a door.
@@ -1282,6 +1284,72 @@ directory twice — once for the approvals resolver's *does anybody report to me
 (B6.07) and once for this screen. The honest fix is still the additive `manages`
 count on `/hr/me` flagged there; it is a server change, and this item is a web
 item.
+
+## Time off, and who is away
+
+### As built (B6.08b), and the six decisions the screens made
+
+Server routes added: **none**. All five reads and writes were shipped and
+wire-verified at B6.03b and B6.04 — `GET /hr/leave-balances`,
+`GET /hr/leave-requests?scope=`, `POST /hr/leave-requests` and its four verbs,
+`GET /hr/absences?from&to`, `GET /hr/holidays?year=` — and this item is the
+surface over them:
+
+```
+hr/leave.ts            the words, the grid arithmetic and which verbs a row
+                       offers — pure, and the whole of the screens' thinking
+hr/LeaveView.tsx       my leave, and (one scope wider) somebody else's
+hr/LeaveDialog.tsx     asking: the policy, two dates, and who else is off then
+hr/AwayView.tsx        the absence calendar, with the tenant's holidays behind it
+hr/leave.test.ts       the pure functions, at their edges
+hr/Leave.test.tsx      the promises, against a recorded network
+```
+
+1. **The clock is the server's.** `GET /hr/leave-balances` echoes the day it
+   folded to, and that day — not `new Date()` — decides whether a booked absence
+   has already begun and therefore whether *Cancel it* is drawn. It is the same
+   calendar the refusal would come from, so the control and the rule cannot
+   disagree. The device's day survives in exactly two places, both of them
+   defaults and neither of them a rule: which month the calendar opens on, and
+   the fallback clock for a login the tenant has no employee record for.
+2. **No figure is computed in a browser, and the working is always shown.** The
+   balance arrives in minutes *and* in tenths of a day, both folded server-side
+   over the person's own working pattern; the screen divides nothing and the
+   card carries entitlement, taken, booked and waiting under the figure. The
+   request form never asks for a number of days — it sends two dates, and the
+   cost comes back on the record.
+3. **The scope is a question, not a filter.** `mine`, `team` and `all` are three
+   server-side reads naming three different sets of people (`hr_leave_door.rs`),
+   and the switch is drawn from the same resolved door the approvals inbox uses
+   (`queues.ts`), so a tab and a badge can never disagree about who the reader
+   is. A stale `?scope=all` from somebody who has lost the HR role reads their
+   own leave rather than collecting a `403`.
+4. **The design note's separate *Team* tab is not built.** Both halves of it are
+   the same two screens asked differently — the reports' requests are the scope
+   switch, their booked absence is a calendar every member already has — and a
+   third place to decide leave is a third place to forget one. A leave row in
+   the approvals inbox now links to `/hr/leave?scope=…&request=…`, which marks
+   the row rather than filtering to it: the decision is easier beside the ones
+   around it.
+5. **Nobody is offered a decision on their own leave.** The row is in HR's list
+   like any other, with its own *Take it back* — the Approve control is simply
+   not drawn, because the server refuses it (`409`) for everyone but an admin
+   and a control that exists to be refused teaches nothing.
+6. **The absence calendar says a name and a day.** Not because it strips
+   anything, but because `hr_absences` does not select the policy, the kind or
+   the note — there is nothing here to forget to hide. Six weeks always, so
+   paging never moves the rows under the reader's eye; the tenant's public
+   holidays are drawn behind the same grid, one read per year the grid touches,
+   so a January calendar is marked on both sides of New Year.
+
+Cuts, recorded rather than left to be discovered: **editing a request's dates**
+(the `PATCH` route exists; taking it back and asking again is the same act in
+two presses and leaves an honest record); **HR filing leave for somebody else**
+(the route takes an `employeeId`; the form does not, and that is the screen for
+a person with no login, which this wave does not otherwise have); and **a
+person's balance shown to their manager** (the route allows it, the screen shows
+the reader their own — a manager deciding a request sees its cost, which is the
+figure the decision turns on).
 
 ## Errors
 

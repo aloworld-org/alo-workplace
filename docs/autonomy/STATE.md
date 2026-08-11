@@ -18699,3 +18699,116 @@ hold.
 
 Next item: B6.08b (Web HR — the leave request and approval screens, and the
 absence calendar).
+
+## B6.08b — time off, asked for and answered (web)
+
+**Item:** B6.08b Web HR: leave request/approve screens + absence calendar.
+
+**What shipped.** Two screens and the pure module under them, over five routes
+that already existed (B6.03b, B6.04) — **no server change, and none was owed**.
+
+- `web/src/hr/leave.ts` — the words for a state, the six-week grid arithmetic,
+  the absence/holiday indexes, and which of the four verbs a row may offer.
+  Pure, and the whole of the screens' thinking.
+- `web/src/hr/LeaveView.tsx` — *My leave*: the balance cards with their working,
+  the caller's requests, and — for anybody who decides leave — the same list one
+  relationship wider (mine / my team / everyone) with Approve and Send back on
+  the rows that are waiting.
+- `web/src/hr/LeaveDialog.tsx` — asking: the policy picker drawn from the
+  balance read, two `ds/DatePicker` dates, a note, and **who else is already off
+  between those dates**, read as they are chosen.
+- `web/src/hr/AwayView.tsx` — the absence calendar: six weeks always, names per
+  day, the tenant's public holidays behind the grid, month paging in the
+  address.
+- `api.ts`/`types.ts` — `leaveBalances`, `absences`, `holidays`,
+  `createLeaveRequest`, `withdrawLeaveRequest`, `cancelLeaveRequest`, and the
+  server shapes they answer.
+- `queues.ts` — the resolved door is now shared: `useLeaveScope()` reads the
+  same cached `Access` the inbox does, so the scope switch and the badge cannot
+  disagree about who the reader is.
+- `leaveApprovals.ts` — a leave row in the inbox finally has somewhere to go:
+  `/hr/leave?scope=…&request=…`, which **marks** the row rather than filtering
+  to it.
+- `HrModule.tsx` — two new tabs, and the member landing moved from Directory to
+  My leave: the design note's own reason for the rail entry being every
+  member's is "how much leave have I got left", and landing them elsewhere
+  contradicted it.
+- `hr.module.css`, the `hr*` strings in `i18n/en.ts` (67 new keys, English
+  only).
+
+**The six decisions**, recorded in `docs/design/hr.md` § "Time off, and who is
+away" rather than only here: the clock is the server's (`/hr/leave-balances`
+echoes the day it folded to, and that day decides whether an absence has begun);
+no figure is computed in a browser and the working is always shown; the scope is
+a server-side question and never a filter; the design note's separate **Team tab
+is deliberately not built**; nobody is offered a decision on their own leave;
+and the absence calendar says a name and a day because the route carries nothing
+else.
+
+**How it was verified.**
+
+- `npx tsc --noEmit` clean; `npx eslint src/hr src/i18n/en.ts` clean;
+  `npm run build` clean (14.2 s).
+- `src/hr/Leave.test.tsx`, **8 tests green** against a recorded network with the
+  real router, module routes, client, pure functions and screens running: a
+  member with all three doors shut lands on My leave and reads the balance with
+  its working; **the clock is the server's** — with the server's day set to
+  2030-06-01, a booked absence starting 2027-01-04 offers no *Cancel it* while
+  one starting 2030-07-20 does, which no machine's own clock could reproduce;
+  only the person who asked is offered *Take it back*; asking sends exactly
+  `{policyId, fromDay, toDay, note}` (asserted key-for-key — no day count) after
+  reading `/hr/absences` for exactly the window chosen and naming each person
+  once; a login with no employee record gets the server's `409` sentence and no
+  button; a manager's `?scope=team&request=…` asks the server `scope=team`
+  (never `mine` + a filter), marks the row `aria-current`, and Approve travels
+  `/approve` and re-reads; HR sees Everyone and is offered no decision on their
+  own row; and the calendar asks for the whole six-week window
+  (2026-07-27 → 2026-09-06 for August), draws the served names and the tenant's
+  holiday, and pages to the next window.
+- `src/hr/leave.test.ts`, **14 tests green** on the pure edges: the cancel
+  boundary is `>` and not `>=` (the first day of an absence is a day somebody
+  was away), a New Year grid spans two years so both years' holidays are asked
+  for, locale-written half-days, and a person off across a window named once.
+- **Mutation-checked**: replacing the server clock with `browserToday()` in
+  `LeaveView` fails **exactly** the one test that claims it and leaves the other
+  seven green.
+- Landing-dependent tests in three other files updated with the change:
+  `Directory.test.tsx` (6/6, now naming `/hr/directory` explicitly),
+  `HiringBoard.test.tsx` (6/6), `Approvals.test.tsx` (7/7 — its doorless-member
+  case now opens the directory deliberately, because My leave reads a queue of
+  its own and that test is about the ones it must not read).
+- Full HR suite **50 green**; full web suite **495 passed**. The 4 failures are
+  `src/sites/Theme.test.tsx`, **pre-existing and the sites track's** — untouched
+  here.
+
+**Cuts and flags.**
+
+- **No wire-verify, and none was owed**: the item adds no route. Every field
+  these screens draw comes from `request_json`, `balance_json`, `absence_json`
+  or the holidays route and is recorded in the test fixtures, so a server change
+  that drops one breaks a test.
+- **Editing a request's dates is cut.** `PATCH /hr/leave-requests/{id}` exists;
+  taking it back and asking again is the same act in two presses and leaves an
+  honest record instead of a silently rewritten one.
+- **HR filing leave for somebody else is cut.** The route takes an
+  `employeeId`; the form does not. That is the screen for a person with no
+  login, which this wave does not otherwise have.
+- **A person's balance is not shown to their manager.** The route allows it; the
+  screen shows the reader their own. A manager deciding a request sees its cost,
+  which is the figure the decision turns on.
+- **★ The double directory read is now paid by three readers** (the approvals
+  resolver, the directory screen, and this screen's door resolution — although
+  the third shares the resolver's cached answer rather than reading again). The
+  fix is still the additive `manages` count on `/hr/me`, standing since B6.07.
+- **Still English only** for the `hr*` block; fr/nl at the wave review, B6.11.
+- **★ `/hr` remains a new top-level prefix** needing the production Caddyfile at
+  the next deploy (standing since B6.02b).
+- **★ The pre-existing `snooze.rs` flake noted at B6.05 is untouched and still a
+  human's to fix.**
+
+CHANGELOG: one entry, in a person's voice, about checking a balance you can
+reproduce, asking for days without typing a number of them, and a calendar that
+says who is out and never why.
+
+Next item: B6.08c (Web HR — the recruitment board screen and the
+approvals-inbox integration).

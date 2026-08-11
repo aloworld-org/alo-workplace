@@ -6,6 +6,24 @@ contracts.
 
 ## Unreleased
 
+- **Time off, asked for and answered in the workspace.** People now opens on
+  *My leave*: what you have left on every kind of leave the company runs, with
+  the working under the figure — this year's entitlement, what you have taken,
+  what you already have booked and what is still waiting — so a balance is
+  something you can check rather than something you have to trust. *Ask for time
+  off* takes a first day, a last day and a sentence for whoever decides; you
+  never type a number of days, because the days are worked out from your own
+  working pattern and the company's public holidays. While you pick the dates,
+  the form tells you who else is already off then. A request you have made can
+  be taken back until somebody decides it, and leave that is booked can be given
+  back until the day it starts. Managers and HR get the same screen one
+  relationship wider — their team's, or everybody's — with Approve and Send back
+  on the rows that are waiting, and a leave row in the approvals inbox now opens
+  the decision here, beside its dates and its cost. Nobody is offered a decision
+  on their own leave. A new *Who's away* tab draws the month as a calendar: who
+  is out on which day, and the company's public holidays behind them. It says a
+  name and a day and nothing else — never why somebody is away.
+
 - **The company directory, and the org chart beside it.** People → Directory
   lists everybody who works here — their role, their team, how to reach them,
   who they report to and since when — and it is open to every member of the
