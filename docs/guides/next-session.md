@@ -159,6 +159,14 @@ screenshot**. This is the only verification that counts for UI.
    `undefined` must be typed `foo?: T | undefined`.
 9. **Read the whole gate output.** A commit went out on "✓ built" while the
    line above said `1 failed`.
+10. **Every new string needs Dutch and French in the same change.** The
+    catalogs are at full parity (3704 keys each) and `locale.test.ts` fails on
+    any English key missing a translation. If a change genuinely cannot carry
+    them, add the key to `web/src/i18n/untranslated.ts` — a deliberate
+    exemption, not a habit; that file is how 588 keys accumulated unnoticed,
+    because a missing key silently falls back to English at runtime. Both
+    languages address people formally (**u**, **vous**), and the product's own
+    type names — Space, Base, Sheet, Doc — are never translated.
 
 ---
 
