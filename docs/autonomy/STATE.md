@@ -17788,3 +17788,158 @@ ever stored.
 Next item: B6.03b (leave, the flow — the request table and its state machine,
 manager approval with the self-approval refusal, balances applied, the absence
 layer feeding Agenda, the `/hr/leave-*` routes, and the wire transcript).
+
+## 2026-08-11 — B6.03b leave, the flow: a request, a decision, and a company that can see who is away
+
+**What shipped.** Time off, end to end: asking for it, deciding it, the balance
+it moves, and the layer that says who is not here. Twelve routes, one new table,
+three new store modules, four new route modules.
+
+- **`hr_leave_requests` (migration `0202`)** — employee, policy, first day, last
+  day, status, the note somebody wrote, who asked, who decided and when, who
+  closed it and when. Foreign keys are tenant-qualified on both ends, so a row
+  pointing at another tenant's person or policy is unrepresentable rather than
+  merely refused. The state machine is in the CHECKs as well as in the store: an
+  undecided request names no decider, a decided one always does, a closed one
+  records who closed it.
+- **`hr_leave_requests.rs`** — the record and its machine
+  (`requested → approved | rejected | withdrawn`, `approved → cancelled`,
+  *taken* derived from the calendar), the cost fold, the overlap check that
+  names the dates already covered, and the overdraft refusal that names the
+  shortfall in minutes.
+- **`hr_leave_balances.rs`** — the five-step fold (scale → pro-rate → accrue →
+  charge → carry in) filling `hr_leave_math::LeaveLedger` out of Postgres and
+  calling the same `balance()` the property tests pin, so the figure a screen
+  shows and the figure an approval is checked against are one fold.
+- **`hr_absences.rs`** — the layer: per day, who is away, by name and employee
+  id. Its query selects four columns and none of them is the policy, the kind or
+  the note, so there is nothing downstream to forget to strip.
+- **HTTP** — `/hr/leave-policies` (+`/{id}`, `/{id}/archive`),
+  `/hr/leave-requests` (+`/{id}`, `/withdraw`, `/approve`, `/reject`,
+  `/cancel`), `/hr/leave-balances`, `/hr/absences`. Authorisation lives once in
+  `hr_leave_door.rs` — *mine*, *my team*, *HR* — rather than in six handlers.
+  `audit_action` learned one word (`leave-policies → leave-policy`) and the
+  seven new mutating routes joined the audit vocabulary.
+
+**The division of labour, stated once because it is what makes both halves
+reviewable.** The store refuses on the *record* (a decided request is not
+decided twice, an approved one is not edited, covered days are not booked twice,
+an overdraft is not approved) and would refuse the same way whoever asked. The
+door refuses on the *caller* (whose leave it is, who manages them, who holds HR,
+and that nobody approves their own). Neither can be bypassed by the other.
+
+**Decisions taken inside the item** (all seven are written into
+`docs/design/hr.md` § Leave → *As built (B6.03b)*): no stored cost — a request
+carries days and the cost is folded from the pattern in force on each of them;
+overlap is refused against `requested` as well as `approved`; a range that costs
+nothing is a `422`; leave cannot reach outside the employment; the balance is
+checked as at the day the leave **starts**, not today; carryover carries one
+year, not a chain; and reading the policies is every member's while writing them
+is HR's (the route table said HR for both — the request form proved it wrong).
+
+**Verified — gates.**
+
+```
+cargo fmt (alo-store, alo-jmap, the new files)
+SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap --all-targets → clean, zero warnings
+DATABASE_URL=…5432 cargo test -p alo-store → green (7 new tenancy/flow tests,
+                                             5 new balance folds, 5 new record tests)
+DATABASE_URL=…5432 cargo test -p alo-jmap  → green, incl. audit_routes with the
+                                             7 new actions in the vocabulary
+```
+
+Nothing under `web/` changed this iteration, so the web gates were not run;
+`/hr` was already in `web/vite.config.ts` from B6.02b.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants freshly bootstrapped with
+`identityctl bootstrap-admin`, and four ordinary users of tenant A — a manager, a
+worker who reports to them (Mon–Wed 8 h, Thu 4 h), an HR user, and a colleague
+with no employee record — so every door is exercised by a real token.
+
+```
+GET  /hr/leave-policies       no token             → 401
+GET  /hr/leave-policies       plain member         → 200 seeded annual policy, hr:false
+POST /hr/leave-policies       plain member         → 403 admin or hr only
+POST /hr/leave-policies       hr, sick, no approval→ 200   ·  kind "sabbatical" → 422 (lists four)
+POST /hr/leave-policies       same name twice      → 409   ·  cap > entitlement → 422
+PATCH …/{policy}              hr, 25 d + 5 d carry → 200   ·  tenant B → 404
+GET  /hr/leave-balances       worker, own          → 200 8 400 min (3/5 of 12 000), avg day 420
+GET  …?employeeId={worker}    their manager        → 200   ·  a colleague → 404  ·  upwards → 404
+GET  /hr/leave-balances       no employee record   → 409 "ask HR to link it"
+POST /hr/leave-requests       worker, Mon–Fri      → 200 costMinutes 1 680, workingDays 4
+POST /hr/leave-requests       overlapping days     → 409 names 2026-09-07 → 2026-09-11
+POST /hr/leave-requests       a weekend            → 422 "costs nothing"
+POST /hr/leave-requests       before the job       → 422 names 2025-01-01  ·  backwards → 422
+POST /hr/leave-requests       no policyId          → 422  ·  somebody else, not HR → 403
+POST /hr/leave-requests       HR, sick, for worker → 200 approved outright, decidedBy = HR
+GET  /hr/leave-balances       after the request    → 200 pending 1 680, remaining unchanged
+GET  /hr/leave-requests?scope=mine   worker → 200 (1)  ·  team → manager 200 (1), colleague []
+GET  …?scope=all              worker → 403  ·  hr → 200  ·  scope=sideways → 422
+GET  /hr/leave-requests/{id}  a colleague → 404  ·  tenant B → 404
+PATCH …/{id}                  their manager → 403 "reject it with a note instead"
+PATCH …/{id}                  the owner    → 200 shortened, cost re-folded 1 440
+POST …/{id}/approve           the owner    → 409 "goes to their manager or to HR"
+POST …/{id}/approve           a colleague  → 404  ·  their manager → 200 approved
+POST …/{id}/approve           again        → 409  ·  PATCH after → 409  ·  withdraw after → 409
+GET  /hr/leave-balances       after approve→ 200 booked 1 440 (3.4 days), remaining moved
+GET  /hr/absences?from&to     any member   → 200 Mon 7 – Wed 9 Sept, "Jonas Peeters", no reason
+GET  /hr/absences             backwards → 422  ·  over a year → 422  ·  tenant B → no days
+POST …/{id}/cancel            a colleague → 404  ·  the owner → 200, closedAt set
+GET  /hr/leave-balances       after cancel → 200 booked 0, back to full
+GET  /hr/absences             after cancel → 200 nobody away
+POST …/{id2}/reject           hr, "Te druk"→ 200 decisionNote kept
+POST …/{id3}/approve          8 months off → 409 "54 160 minutes more than the balance allows"
+POST …/{id3}/reject           the manager  → 200 (a refusal never consults the balance)
+GET  /audit?entity=hr.leave_request:{id}  hr → create/update/approve/cancel, actor named,
+                                              no note text in any entry  ·  tenant B → []
+```
+
+**Cuts and flags.**
+
+- **No web work.** Every leave screen — the request form, the approvals inbox,
+  the absence calendar — is B6.08b, and the Agenda *drawing* this layer is the
+  same item. What shipped is the layer it reads. Nothing under `web/` changed.
+- **Public holidays are still B6.04.** The day fold carries the `holiday` flag
+  and passes `false` for every day until the calendars exist, so today's
+  balances are computed on the working pattern alone — correct rather than
+  degraded, and the one place that will learn about holidays is
+  `hr_leave_requests::leave_days`.
+- **A request's JSON carries `costMinutes` and `workingDays`, not days-tenths.**
+  Converting to days needs the person's average working day, and computing it
+  per row would be one employment read per request in a manager's queue. The
+  balance route carries `averageDayMinutes` beside every figure, and a queue
+  says "4 working days".
+- **`PATCH`/withdraw are the owner's alone, HR included.** The design note is
+  explicit ("editable by its owner and by nobody else"), so a request HR filed
+  for somebody with no login is corrected by rejecting it and filing another,
+  not by editing it. If that proves wrong on a real screen it is a note change
+  first, not a quiet widening.
+- **A dev-machine repair, not a release note.** This machine's `alo` database
+  still held the pre-rename **checksum** for migration `201` (B6.03a renumbered
+  the *version* rows but not their checksums), so every suite failed
+  `VersionMismatch(201)` before a line of this item was tested. Fixed here with
+  `UPDATE _sqlx_migrations SET checksum = decode('<sha384 of the file>','hex')
+  WHERE version = 201`. A fresh database never sees it; a dev database that
+  applied `0171_hr_leave_policies.sql` under its old name will.
+- **Business migrations continue at `0203`.**
+
+**Flags for the human.**
+
+- **★ `/hr` is still a new top-level prefix** needing the production Caddyfile
+  at the next deploy (standing since B6.02b; already in `web/vite.config.ts`).
+- **★ LEGAL REVIEW, unchanged and now load-bearing:** `hr_statutory_leave.rs`'s
+  figures are what a seeded policy grants, and a seeded policy is now what real
+  requests are folded against. The B6.03a flag stands.
+- **The terms-change route is still a design-note question** (B6.02b's flag,
+  unanswered): a pay rise remains unrecordable through the API.
+- Refusal sentences remain English in every language — the standing
+  cross-cutting item from B1.27, B2.14, B4.15 and B5.11.
+
+CHANGELOG: one entry, in a person's voice, about asking for time off, what it
+costs before you ask, who decides it, the balance shown with its working, and a
+company that can see who is away without being told why.
+
+Next item: B6.04 (public-holiday calendars per country — seed data with its
+source named per country, computed movable feasts, per-tenant selection, and the
+`holiday` flag in `hr_leave_requests::leave_days` finally meaning something).

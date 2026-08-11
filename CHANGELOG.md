@@ -18,6 +18,25 @@ contracts.
   break the connection, invalid field types are rejected before anything is
   changed, and disconnecting the collection leaves the original Base intact.
 
+- **Ask for time off, and decide it.** People can now request leave against any
+  of the company's policies, see what it costs before they ask — the working
+  days it actually uses, at the hours they actually work — and take a request
+  back while nobody has decided it. Their manager, or HR, approves or rejects it
+  with a note; nobody approves their own leave. Approved leave that has not
+  started can be cancelled and the balance comes straight back. The balance
+  itself is shown with its whole working — granted, carried in, accrued, taken,
+  booked, and what is still awaiting a decision — so a figure somebody disagrees
+  with can be explained rather than asserted, and an approval that would take it
+  below zero is refused by how much on a policy that does not allow it. Days
+  another live request already covers are refused naming the dates, a weekend
+  nobody works is not a request, and leave cannot be booked outside the terms
+  somebody was employed on. Everybody in the company can see **who is away** on
+  any day in a range — a name and a day, never the reason — which is what the
+  Agenda will draw behind the week, and what the request form will show before
+  you pick your dates. A sick policy a company records rather than approves
+  lands as recorded, naming who wrote it down instead of pretending somebody
+  decided.
+
 - **alo HR learns how leave adds up.** A company can now set the leave it
   grants — annual, sick, unpaid, or anything else it gives time off for — with
   the entitlement for a full year, whether it lands on the first day or arrives

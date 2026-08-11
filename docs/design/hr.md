@@ -707,6 +707,70 @@ Three sharp cases, decided here rather than by whichever screen ships first:
   are created directly in `approved`, with `decidedBy` naming the requester —
   so the record does not pretend somebody decided.
 
+#### As built (B6.03b), and the seven decisions the code had to make
+
+The table is `hr_leave_requests` (migration `0202`), the record and its state
+machine are `platform/alo-store/src/hr_leave_requests.rs`, the fold is
+`hr_leave_balances.rs`, the layer is `hr_absences.rs`, and the surface is
+`products/mail/alo-jmap/src/hr_leave_{policies,requests,balances,door}.rs`.
+Seven things the note above left open were decided while building it:
+
+- **A request stores its days, never its cost.** There is no `cost_minutes`
+  column: what an absence consumes is folded at read time from the working
+  pattern of the employment in force on each of its days. A frozen figure would
+  be the `qty_on_hand` mistake one table further on — a corrected pattern, a
+  holiday added to a calendar or an employment ended early would each leave a
+  stored cost nothing can reconcile, and the person it is wrong for is the one
+  person guaranteed to check it by hand.
+- **Overlap is refused against `requested` as well as `approved`.** The note
+  says "overlap is a `409`", and the sharper question is *overlap with what*.
+  Two undecided requests for the same Tuesday are two answers to "am I off",
+  and the second one is always a mis-click; the refusal names the dates of the
+  request that already covers them. Rejecting or withdrawing frees the days
+  again, immediately.
+- **A range that costs nothing is a `422`, not an absence of zero minutes.** A
+  weekend booked on a Monday-to-Friday pattern is a mis-typed date, and a
+  zero-minute absence in the record would appear in the absence layer as a day
+  somebody was away.
+- **Leave cannot reach outside the employment**, on either side, naming the
+  bound it crossed. Somebody cannot take leave from a job they did not hold —
+  and an open period has no end to reach past, so a request for next year is
+  ordinary.
+- **The balance is checked as at the day the leave *starts***, not as at today.
+  A monthly accrual that has not arrived yet is not a balance somebody can
+  spend, and approving March's leave in January against December's accrual is
+  how a company ends a year owing days it never granted. A rejection never
+  consults the balance: saying no to leave somebody cannot afford must always
+  be possible.
+- **Carryover carries one year, not a chain.** Last year's remainder is folded
+  with nothing carried into *it*. A day granted in 2024, unused in 2025 and
+  still claimed in 2026 is exactly what the statutory expiry rules exist to
+  stop, and every member state alo has met caps carryover at 15 or 18 months.
+- **Reading the policies is every member's, writing them is HR's.** The route
+  table above says HR for both, and building the request form proved it wrong:
+  somebody asking for time off has to choose what kind, and a picker they may
+  not read is a form they cannot fill in. What a company grants is a rule it
+  publishes to its staff. `includeArchived` stays HR's, and `DELETE` on a
+  policy is still not implemented — the verb is
+  `POST /hr/leave-policies/{id}/archive`.
+
+**Who may do what**, resolved once in `hr_leave_door.rs` rather than spelled
+into six handlers: *mine* (the employee record linked to my login), *my team*
+(one level of `manager_id`), and *HR* (admin or the HR role). Editing and
+withdrawing belong to the person who asked and to nobody else — HR included,
+because editing somebody's request into a different request they did not make
+is not a thing this module does. Deciding is the manager's or HR's, never the
+requester's own unless they are the tenant's admin. Cancelling is any of the
+three, because it gives the balance back and takes nothing from anybody. A
+refusal about somebody else's record is a `404`, never a `403`, so no answer is
+an existence oracle.
+
+**Not yet, and deliberately.** Public holidays are B6.04: the day fold has the
+flag and passes `false` for every day until the calendars exist, so a tenant's
+balances today are computed on the working pattern alone — correct rather than
+degraded. The Agenda *drawing* the absence layer, and every leave screen, are
+B6.08b; this item ships the layer the Agenda reads.
+
 ### Public holidays (B6.04)
 
 A per-country (and where it matters, per-region) seed table of holidays,
