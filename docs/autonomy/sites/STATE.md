@@ -2555,3 +2555,37 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   giving ordinary workspace access requires removing the final site grant.
 - **Next:** S2.03b, visible invite/revoke controls inside Sites with no trip to
   workspace administration.
+
+## 2026-08-11 — S2.03b visible site collaborators
+
+- **Shipped:** site owners now manage collaborators from a visible panel on
+  the website itself: enter an email to invite, copy or refresh the one-time
+  setup link while it is pending, see when the collaborator becomes active,
+  and revoke access in one click with undo feedback. The collaborator accepts
+  through a public password-setup page and then signs in normally.
+- **Domain reflexes:** the surface follows Google Sites sharing by keeping
+  collaborators beside the website, and Webflow's scoped site roles by making
+  the grant belong to one site rather than the workspace. It never exposes an
+  employee directory or sends the owner through workspace administration.
+- **Security and isolation proof:** invite tokens are stored only as hashes,
+  expire, are single-use, and cannot be accepted by an existing workspace
+  account. Owner-only management, wrong-tenant invite/list/revoke refusal,
+  restricted-route denial, and final-revoke account cleanup are covered at
+  storage and real-router levels.
+- **Real curl transcript:** against a freshly migrated disposable database and
+  freshly built server on `127.0.0.1:8080`, the owner invited a collaborator,
+  the public setup succeeded once and refused reuse, the collaborator renamed
+  and published the granted website, workspace administration returned `403`,
+  the owner listed the active collaborator and revoked access, and the next
+  collaborator request returned `401`. The server was stopped afterward.
+- **Verified:** touched Rust formatting; strict offline all-target Clippy for
+  `alo-store`, `alo-identity`, and `alo-jmap`; full unfiltered tests for all
+  three crates; wrong-tenant storage tests; real-router and unauthenticated
+  route tests; two focused collaborator UI tests; TypeScript; focused ESLint;
+  the production Vite build; real curl; and `git diff --check`.
+- **Cuts/flags:** the invitation link is copied rather than emailed, so this
+  slice contacts no real mail service. Revoke undo creates a fresh one-time
+  link when needed; an already accepted collaborator gets a new restricted
+  account only after accepting it. No production, DNS, or external AI service
+  was contacted.
+- **Next:** S2.04a, immutable version history with an atomic republish path.

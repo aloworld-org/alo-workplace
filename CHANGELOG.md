@@ -37,6 +37,12 @@ contracts.
   quietly added to a total. And because this one file carries everybody's pay
   and bank details on one page, drawing it is written down: who drew which
   period, in which sheet, and when — visible to HR, and to nobody else.
+- **Invite somebody to work on one website, without opening the rest of your
+  workspace.** Site owners can now invite a collaborator by email directly
+  from the website, copy or refresh their one-time setup link, see whether
+  they have joined, and revoke access in one click with an undo opportunity.
+  The collaborator can edit and publish only that website; Mail, Drive,
+  Billing, CRM, administration, and every unrelated website remain closed.
 
 - **The letters your company writes, filled in for you.** HR can now write the
   letters this company is willing to put its name to — an employment
