@@ -41,11 +41,18 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
 
   git pull --rebase origin main >/dev/null 2>&1
 
+  # Anchored to the start of a line, because the journal is prose and quotes
+  # its own markers. The sites journal says "- **Next:** `LOOP COMPLETE` — every
+  # Sites queue item is checked" in the middle of a 2591-line file, describing
+  # the end of an earlier wave; an unanchored match found that and stopped the
+  # loop on its first iteration with 58 items still open, reporting success.
+  # The real marker is appended as its own line, so anchoring tells the record
+  # of a decision apart from the decision.
   state="$(cat "$STATE_FILE" 2>/dev/null || true)"
-  if grep -q "LOOP COMPLETE" <<<"$state"; then
+  if grep -qE '^LOOP COMPLETE' <<<"$state"; then
     echo "[loop] queue complete — stopping."; break
   fi
-  if grep -q "LOOP HALT" <<<"$state"; then
+  if grep -qE '^LOOP HALT' <<<"$state"; then
     echo "[loop] halted by the agent — fix the reason in STATE.md, remove the marker, restart."; break
   fi
 
