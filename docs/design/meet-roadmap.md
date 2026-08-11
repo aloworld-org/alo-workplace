@@ -48,7 +48,8 @@ Nothing here is a feature; each is a defect a first meeting would expose.
 | **Lobby / knock** | `[L]` in features. Anyone with a link joining a board meeting unannounced is a security incident |
 | **Background blur** | Every competitor has it; people work from kitchens |
 | **Speaker and layout choice** | Grid, speaker, sidebar |
-| **Meeting from a calendar invitation, for guests** | External participants without an alo account. This is the largest single design question in Meet and needs its own ADR: identity, admission, and abuse |
+| **A meeting on every invitation, by default** | Creating an event adds an alo Meet link without being asked — that is what Google and Microsoft do, and an invitation without a way to join is the commonest complaint about every other calendar. **With the escape hatch**: a field for a Zoom, Teams or Whereby URL instead, because a customer who insists on their tool will otherwise put it in the description where nothing can read it. Storing it as a field rather than prose is what lets the agenda say "join" at all |
+| **Guests without an alo account** | The largest design question in Meet, and it needs its own ADR before code. An external participant is invited to *one* meeting and must join without signing up — but the current admission model is "you are a member of this workspace", and a meeting token is minted only after the store has said so. Guests need a second path with its own rules: a per-invitee link that identifies the guest rather than the meeting, revocable, expiring with the event, never a bare room name. And a lobby, so a link that leaks does not mean a stranger in a board meeting — which is why lobby is listed above and not below this |
 
 ## Stage 3 — the differentiators, and the reason to choose alo
 
