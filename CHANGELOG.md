@@ -1,5 +1,7 @@
 # Changelog
 
+- HR teams can now create and maintain approved letter templates in the People module, using the server-provided placeholder vocabulary and clear safeguards around deletion and sending.
+
 User- and operator-visible changes, written when the knowledge is
 fresh (release skill). Versions follow SemVer against public
 contracts.
