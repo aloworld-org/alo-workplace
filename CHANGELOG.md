@@ -6,6 +6,15 @@ contracts.
 
 ## Unreleased
 
+- **Meet now gives a clear, polished path through every call state.** A focused
+  start-call hero and responsive live-meeting gallery replace the old utility
+  list, with status, start time, and one-click joining visible on every card.
+  Loading and failures
+  no longer look like blank or empty screens, starting and joining failures say
+  how to recover, and the device check has a visible way back. Join no longer
+  stays disabled behind LiveKit's hidden name field, controls use alo's visual
+  tokens, and one accessible Leave action remains visible throughout the call.
+
 - **People, in French and Dutch, and a promise about what it will never say.**
   alo HR is complete, and every word of it — the directory, asking for time off
   and answering it, the month that says who is away, the hiring board — reads in
