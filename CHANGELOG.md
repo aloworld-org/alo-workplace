@@ -6,6 +6,12 @@ contracts.
 
 ## Unreleased
 
+- **Published Base collections stay exactly as visitors saw them.** Website
+  owners can publish mapped Base rows as reusable cards with titles, paths,
+  summaries, images, links, and dates. Later Base edits remain drafts until
+  the site is published again, empty collections render a calm localized
+  message, and invalid rows leave the existing live site untouched.
+
 - **Turn an alo Base table into reusable website content safely.** Website
   owners can connect a table using stable columns for the title, path,
   summary, body, image, link, and publication date. Renaming a column does not

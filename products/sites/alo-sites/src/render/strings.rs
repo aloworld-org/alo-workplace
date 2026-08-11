@@ -78,6 +78,8 @@ pub struct UiStrings {
     pub blog_page: &'static str,
     /// Blog index: word between current and total page counts.
     pub blog_page_of: &'static str,
+    /// Collection section: stable message for a deliberately empty source.
+    pub collection_empty: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -114,6 +116,7 @@ pub const EN: UiStrings = UiStrings {
     blog_next: "Next",
     blog_page: "Page",
     blog_page_of: "of",
+    collection_empty: "Nothing to show yet.",
 };
 
 /// French renderer chrome.
@@ -150,6 +153,7 @@ pub const FR: UiStrings = UiStrings {
     blog_next: "Suivant",
     blog_page: "Page",
     blog_page_of: "sur",
+    collection_empty: "Rien à afficher pour le moment.",
 };
 
 /// Dutch renderer chrome.
@@ -186,6 +190,7 @@ pub const NL: UiStrings = UiStrings {
     blog_next: "Volgende",
     blog_page: "Pagina",
     blog_page_of: "van",
+    collection_empty: "Nog niets om te tonen.",
 };
 
 /// Renderer chrome for a normalized locale. Region variants inherit their

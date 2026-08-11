@@ -10,6 +10,7 @@ use alo_sites::render::{
 use alo_sites::stylesheet::stylesheet;
 use alo_store::site_theme::{SiteTheme, THEME_PRESETS};
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Renders arbitrary stored-sections JSON on a default-theme site.
 fn render(sections: &serde_json::Value) -> String {
@@ -31,12 +32,14 @@ fn render_with(
         strings: &EN,
         images: ImageSources::PublicPaths,
     };
+    let collections = HashMap::new();
     let page = PageRenderContext {
         path: "/about",
         title: "About",
         seo_title,
         seo_description,
         sections,
+        collections: &collections,
     };
     render_page(&site, &page)
 }
@@ -293,12 +296,14 @@ fn inline_image_sources_swap_srcs_per_id_and_never_touch_og_image() {
         strings: &EN,
         images: ImageSources::Inline(&map),
     };
+    let collections = HashMap::new();
     let page = PageRenderContext {
         path: "/about",
         title: "About",
         seo_title: None,
         seo_description: None,
         sections: &hero_page(),
+        collections: &collections,
     };
     let html = render_page(&site, &page);
     // The hero image is in the map: rendered inline.
@@ -329,12 +334,14 @@ fn preview_is_the_published_document_with_the_stylesheet_inlined() {
             strings: &EN,
             images: ImageSources::PublicPaths,
         };
+        let collections = HashMap::new();
         let page = PageRenderContext {
             path: "/about",
             title: "About",
             seo_title: None,
             seo_description: Some("Who we are."),
             sections: &hero_page(),
+            collections: &collections,
         };
         let css = stylesheet(&theme);
         let published = render_page(&site, &page);

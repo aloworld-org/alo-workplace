@@ -21,6 +21,7 @@ mod strings;
 
 pub use strings::{EN, FR, NL, UiStrings, strings_for};
 
+use alo_store::SiteCollectionSnapshot;
 use alo_store::site_model::{SECTIONS_SCHEMA_VERSION, Section};
 use alo_store::site_theme::SiteTheme;
 
@@ -88,6 +89,9 @@ pub struct PageRenderContext<'a> {
     pub seo_description: Option<&'a str>,
     /// The stored sections envelope (`{ "schema_version": …, "sections": … }`).
     pub sections: &'a serde_json::Value,
+    /// Immutable Base-backed collections frozen with this publish, keyed by
+    /// the stable id referenced by collection sections.
+    pub collections: &'a std::collections::HashMap<String, SiteCollectionSnapshot>,
 }
 
 /// One exact translation of the current stable page identity.
@@ -190,7 +194,7 @@ fn render_document(
         match section {
             Section::Nav(nav) => sections::nav(&mut header, site, nav, index),
             Section::Footer(f) => sections::footer(&mut footer, site, f),
-            other => sections::body_section(&mut main, site, other, index),
+            other => sections::body_section(&mut main, site, page, other, index),
         }
     }
 

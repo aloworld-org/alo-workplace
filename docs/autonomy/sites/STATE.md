@@ -2430,3 +2430,44 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   preserving alo Base as the single editable source of truth.
 - **Next:** S2.02b, immutable collection publish snapshots and deterministic
   public rendering.
+
+## 2026-08-11 — S2.02b immutable collection publishing
+
+- **Shipped:** a published site now freezes every referenced Base collection
+  into the same repeatable-read transaction as its pages. Only collections
+  used by a page are copied, records keep a deterministic order, blank rows
+  are skipped, and the mapped title, path, summary, body, image, link, and
+  date are normalized into an immutable snapshot before the live pointer
+  moves. Editing Base content therefore changes the next publish, never the
+  site visitors are already reading.
+- **Deterministic failure and empty behavior:** a row with content but no
+  title, an invalid or duplicate path, a stale field mapping, a lost Drive
+  permission, an unsupported value, or a missing image blob aborts the whole
+  publish and preserves the previous live version. A genuinely empty
+  collection renders the same localized empty state in English, French, and
+  Dutch. Public rendering reads only the frozen snapshot and never reaches
+  back into the mutable Base.
+- **Tenant proof:** the storage regression publishes owner content, edits the
+  source Base, proves the public snapshot is unchanged, republishes and sees
+  the new value, then proves another tenant receives no collection rows. It
+  also covers blank-row skipping, an empty collection, partial-row refusal,
+  and disconnected-binding refusal without moving the previous live publish.
+- **Real curl transcript:** a freshly started local `alo-sites` server used a
+  disposable migrated PostgreSQL database and filesystem blobs. A real Host
+  request to the published collection site returned `200` with the frozen
+  “Fresh from the roaster” heading, “Night Ferry” card, and “Cocoa and
+  blackberry” summary. The process was stopped afterward; no production,
+  email, DNS, or external AI service was contacted.
+- **Verified:** touched Rust formatting; strict offline all-target Clippy for
+  `alo-store`, `alo-sites`, and `alo-jmap`; complete unfiltered test suites for
+  all three crates (including 1,037 `alo-store` unit tests, every integration
+  and doc target, the public-render goldens, 608 `alo-jmap` unit tests, and all
+  Sites HTTP tests); focused zero-state storage tests; the real public curl;
+  and `git diff --check`.
+- **Cuts/flags:** the authenticated draft preview deliberately supplies no
+  collection rows in this storage/rendering slice; S2.02c will give the editor
+  an account-scoped collection preview and visible connect/map/disconnect
+  controls. The public section follows Webflow CMS and Contentful collection
+  card conventions, with semantic markup and no AI dependency.
+- **Next:** S2.02c, visible collection connection, mapping, preview,
+  disconnect, and empty-state controls.

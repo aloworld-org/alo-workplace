@@ -6,14 +6,15 @@
 //! `<img>` carries `alt` (empty means decorative, straight from the model).
 //! All text goes through [`esc`], every link target through [`safe_href`].
 
+use alo_store::SiteCollectionSnapshot;
 use alo_store::site_model::{
-    ContactFormSection, CtaSection, FaqSection, FeaturesSection, FooterSection, GallerySection,
-    HeroSection, ImageSide, Link, NavSection, PricingSection, Section, SiteImage, TeamSection,
-    TestimonialsSection, TextImageSection,
+    CollectionSection, ContactFormSection, CtaSection, FaqSection, FeaturesSection, FooterSection,
+    GallerySection, HeroSection, ImageSide, Link, NavSection, PricingSection, Section, SiteImage,
+    TeamSection, TestimonialsSection, TextImageSection,
 };
 
-use super::SiteRenderContext;
 use super::html::{esc, safe_href};
+use super::{PageRenderContext, SiteRenderContext};
 
 /// A `nav` section, rendered as a `<header>` landmark. The brand link shows
 /// the theme logo when one is set, the site name otherwise; the toggle
@@ -82,6 +83,7 @@ pub(super) fn footer(out: &mut String, site: &SiteRenderContext<'_>, s: &FooterS
 pub(super) fn body_section(
     out: &mut String,
     site: &SiteRenderContext<'_>,
+    page: &PageRenderContext<'_>,
     section: &Section,
     index: usize,
 ) {
@@ -98,7 +100,79 @@ pub(super) fn body_section(
         Section::Faq(s) => faq(out, s),
         Section::Cta(s) => cta(out, s),
         Section::ContactForm(s) => contact_form(out, site, s, index),
+        Section::Collection(s) => collection(out, site, s, page.collections),
     }
+}
+
+fn collection(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    section: &CollectionSection,
+    snapshots: &std::collections::HashMap<String, SiteCollectionSnapshot>,
+) {
+    out.push_str("<section class=\"s-collection\">\n");
+    push_opt_heading(out, section.heading.as_deref());
+    let Some(snapshot) = snapshots.get(section.collection_id.as_str()) else {
+        tracing::warn!(
+            collection = %section.collection_id,
+            "published page references a missing collection snapshot"
+        );
+        out.push_str(&format!(
+            "<p class=\"collection-empty\">{}</p>\n",
+            esc(site.strings.collection_empty)
+        ));
+        out.push_str("</section>\n");
+        return;
+    };
+    if snapshot.items.is_empty() {
+        out.push_str(&format!(
+            "<p class=\"collection-empty\">{}</p>\n",
+            esc(site.strings.collection_empty)
+        ));
+        out.push_str("</section>\n");
+        return;
+    }
+    out.push_str("<ul class=\"collection-grid\">\n");
+    for item in &snapshot.items {
+        out.push_str("<li class=\"collection-card\"");
+        if let Some(slug) = &item.slug {
+            out.push_str(&format!(" id=\"collection-{}\"", esc(slug)));
+        }
+        out.push_str(">\n");
+        if let Some(image) = &item.image {
+            out.push_str(&format!(
+                "<img src=\"{}\" alt=\"{}\">\n",
+                site.images.src(image.as_str()),
+                esc(&item.title)
+            ));
+        }
+        match &item.link {
+            Some(link) => out.push_str(&format!(
+                "<h3><a href=\"{}\">{}</a></h3>\n",
+                safe_href(link),
+                esc(&item.title)
+            )),
+            None => out.push_str(&format!("<h3>{}</h3>\n", esc(&item.title))),
+        }
+        if let Some(summary) = &item.summary {
+            out.push_str(&format!(
+                "<p class=\"collection-summary\">{}</p>\n",
+                esc(summary)
+            ));
+        }
+        if let Some(body) = &item.body {
+            out.push_str(&format!("<p class=\"collection-body\">{}</p>\n", esc(body)));
+        }
+        if let Some(date) = &item.published_at {
+            out.push_str(&format!(
+                "<time datetime=\"{}\">{}</time>\n",
+                esc(date),
+                esc(date)
+            ));
+        }
+        out.push_str("</li>\n");
+    }
+    out.push_str("</ul>\n</section>\n");
 }
 
 fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection) {

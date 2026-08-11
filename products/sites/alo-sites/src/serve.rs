@@ -174,12 +174,25 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                     return unavailable();
                 }
             };
-            let built = Arc::new(RenderedSite::build(&public_host, &resolved, &snapshots));
+            let collections = match state.store.published_collections(&resolved).await {
+                Ok(collections) => collections,
+                Err(error) => {
+                    tracing::error!(host = %public_host, %error, "collection snapshot read failed");
+                    return unavailable();
+                }
+            };
+            let built = Arc::new(RenderedSite::build(
+                &public_host,
+                &resolved,
+                &snapshots,
+                &collections,
+            ));
             tracing::info!(
                 host = %public_host,
                 site = %resolved.site,
                 publish = %resolved.publish,
                 pages = snapshots.len(),
+                collections = collections.len(),
                 "rendered publish into cache"
             );
             state.cache.put(&public_host, Arc::clone(&built));

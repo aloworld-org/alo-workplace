@@ -4,18 +4,20 @@
 //! review the diff like any code change.
 #![allow(clippy::unwrap_used)]
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
 use alo_sites::render::{EN, ImageSources, PageRenderContext, SiteRenderContext, render_page};
-use alo_store::id::BlobId;
+use alo_store::id::{BlobId, SiteCollectionId};
 use alo_store::site_model::{
-    ContactFormSection, CtaSection, FaqItem, FaqSection, FeatureItem, FeaturesSection,
-    FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection, PricingSection,
-    PricingTier, SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, SiteImage, TeamMember,
-    TeamSection, Testimonial, TestimonialsSection, TextImageSection,
+    CollectionSection, ContactFormSection, CtaSection, FaqItem, FaqSection, FeatureItem,
+    FeaturesSection, FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection,
+    PricingSection, PricingTier, SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, SiteImage,
+    TeamMember, TeamSection, Testimonial, TestimonialsSection, TextImageSection,
 };
 use alo_store::site_theme::SiteTheme;
+use alo_store::{SiteCollectionItem, SiteCollectionSnapshot};
 use serde_json::json;
 
 const SITE_NAME: &str = "Nordwind Coffee Roasters";
@@ -111,11 +113,32 @@ fn full_sections() -> Vec<Section> {
             form_id: Some("f4K9sL2wN7qR5tYx8vB1cA".to_owned()),
             success_message: Some("Thanks — talk soon.".to_owned()),
         }),
+        Section::Collection(CollectionSection {
+            collection_id: SiteCollectionId::new("seasonal-roasts"),
+            heading: Some("Seasonal roasts".to_owned()),
+        }),
         Section::Footer(FooterSection {
             text: Some("© Nordwind Coffee Roasters".to_owned()),
             links: vec![link("Imprint", "/imprint"), link("Privacy", "/privacy")],
         }),
     ]
+}
+
+fn collection_snapshots() -> HashMap<String, SiteCollectionSnapshot> {
+    let snapshot = SiteCollectionSnapshot {
+        collection_id: SiteCollectionId::new("seasonal-roasts"),
+        name: "Seasonal roasts".to_owned(),
+        items: vec![SiteCollectionItem {
+            title: "Harbour Blend".to_owned(),
+            slug: Some("harbour-blend".to_owned()),
+            summary: Some("Chocolate, hazelnut and red apple.".to_owned()),
+            body: Some("A balanced roast for espresso or filter.".to_owned()),
+            image: Some(BlobId::new("9hK3vQ2mR8pT1xWz4bC5dg")),
+            link: Some("/shop/harbour-blend".to_owned()),
+            published_at: Some("2026-08-11".to_owned()),
+        }],
+    };
+    HashMap::from([(snapshot.collection_id.as_str().to_owned(), snapshot)])
 }
 
 fn envelope_value(sections: Vec<Section>) -> serde_json::Value {
@@ -145,6 +168,7 @@ fn render_default(sections: Vec<Section>) -> String {
         seo_title: None,
         seo_description: None,
         sections: &value,
+        collections: &collection_snapshots(),
     };
     render_page(&site, &page)
 }
@@ -168,12 +192,44 @@ fn assert_golden(name: &str, actual: &str) {
 #[test]
 fn one_golden_per_section_type() {
     let sections = full_sections();
-    assert_eq!(sections.len(), 12, "corpus must cover every variant");
+    assert_eq!(sections.len(), 13, "corpus must cover every variant");
     for section in sections {
         let kind = section.kind();
         let html = render_default(vec![section]);
         assert_golden(&format!("section_{kind}.html"), &html);
     }
+}
+
+#[test]
+fn empty_collection_has_a_stable_public_golden() {
+    let theme = SiteTheme::new();
+    let value = envelope_value(vec![Section::Collection(CollectionSection {
+        collection_id: SiteCollectionId::new("seasonal-roasts"),
+        heading: Some("Seasonal roasts".to_owned()),
+    })]);
+    let site = SiteRenderContext {
+        name: SITE_NAME,
+        base_url: BASE_URL,
+        locale: "en",
+        theme: &theme,
+        strings: &EN,
+        images: ImageSources::PublicPaths,
+    };
+    let snapshot = SiteCollectionSnapshot {
+        collection_id: SiteCollectionId::new("seasonal-roasts"),
+        name: "Seasonal roasts".to_owned(),
+        items: Vec::new(),
+    };
+    let collections = HashMap::from([(snapshot.collection_id.as_str().to_owned(), snapshot)]);
+    let page = PageRenderContext {
+        path: "/",
+        title: "Home",
+        seo_title: None,
+        seo_description: None,
+        sections: &value,
+        collections: &collections,
+    };
+    assert_golden("section_collection_empty.html", &render_page(&site, &page));
 }
 
 #[test]
@@ -200,6 +256,7 @@ fn full_page_golden_with_theme_logo_and_seo() {
         seo_title: Some("Coffee roasted the morning it ships — Nordwind"),
         seo_description: Some("Small-batch coffee roastery on the harbour, shipping on roast day."),
         sections: &value,
+        collections: &collection_snapshots(),
     };
     let html = render_page(&site, &page);
     // The design note's byte budget for the golden site's page.
@@ -234,6 +291,7 @@ fn search_defaults_golden_uses_page_site_and_theme_logo() {
         seo_title: None,
         seo_description: None,
         sections: &value,
+        collections: &collection_snapshots(),
     };
     assert_golden("seo_defaults.html", &render_page(&site, &page));
 }

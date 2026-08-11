@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use alo_store::site_theme::SiteTheme;
-use alo_store::{PublishedSite, SitePageSnapshot, SitePublishId};
+use alo_store::{PublishedSite, SiteCollectionSnapshot, SitePageSnapshot, SitePublishId};
 
 use crate::render::{
     self, ImageSources, LanguageAlternate, PageRenderContext, SiteRenderContext, UiStrings,
@@ -41,9 +41,19 @@ impl RenderedSite {
     /// forms the canonical HTTPS origin used for canonical/OG URLs, whether
     /// it is a built-in subdomain or a connected custom domain.
     #[must_use]
-    pub fn build(public_host: &str, site: &PublishedSite, snapshots: &[SitePageSnapshot]) -> Self {
+    pub fn build(
+        public_host: &str,
+        site: &PublishedSite,
+        snapshots: &[SitePageSnapshot],
+        collection_snapshots: &[SiteCollectionSnapshot],
+    ) -> Self {
         let theme = SiteTheme::from_stored(site.theme.clone());
         let base_url = format!("https://{public_host}");
+        let collections: HashMap<String, SiteCollectionSnapshot> = collection_snapshots
+            .iter()
+            .cloned()
+            .map(|snapshot| (snapshot.collection_id.as_str().to_owned(), snapshot))
+            .collect();
         let mut variants: HashMap<String, Vec<(String, String)>> = HashMap::new();
         for snapshot in snapshots {
             variants
@@ -77,6 +87,13 @@ impl RenderedSite {
                 .flatten()
                 .map(|blob| blob.as_str().to_owned()),
         );
+        images.extend(
+            collection_snapshots
+                .iter()
+                .flat_map(|snapshot| &snapshot.items)
+                .filter_map(|item| item.image.as_ref())
+                .map(|blob| blob.as_str().to_owned()),
+        );
         for snapshot in snapshots {
             let path = localized_path(
                 &site.default_locale,
@@ -100,6 +117,7 @@ impl RenderedSite {
                 seo_title: snapshot.seo_title.as_deref(),
                 seo_description: snapshot.seo_description.as_deref(),
                 sections: &snapshot.sections,
+                collections: &collections,
             };
             let Some(translations) = variants.get(snapshot.page_id.as_str()) else {
                 tracing::warn!(
