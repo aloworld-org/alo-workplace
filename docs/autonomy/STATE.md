@@ -16812,3 +16812,150 @@ psql   inv_stock @ the chair           → ADJUST −5500 | MAIN 4000 | VAN1 150
 Next item: B5.10 (★ inventory agent tools — `reorder_proposals` drafting POs
 from the shortage query, and `stock_answer`; allowlist, executors, structural
 verify with no model calls).
+
+## B5.10 — the agent learns to read the shelf and raise the order (2026-08-11)
+
+**Shipped.** The Inventory tool set of the one agent (ADR 0034, ADR 0035 wave
+B5.10): two names, their words for a model, their executors, and the two cards
+the browser renders the results with.
+
+- `platform/alo-ai/src/agent_inventory.rs` — `INVENTORY_TOOLS`, the per-tool
+  descriptions and the product paragraph, on the seam `agent_billing` opened.
+  Registered in `lib.rs` and spliced into `system_prompt()` after Finance;
+  `is_agent_tool` now asks this list too. Seven unit tests hold the wording to
+  its three rules: the model is offered no quantity, no price and no category
+  of argument to fill; the words *SAVED AS A DRAFT*, *carries no order number*
+  and *sent to NOBODY* are present; nothing forecasts anything; and no name
+  that sends, receives, ships or adjusts is in the list or the prose.
+- `products/mail/alo-jmap/src/agent_inventory.rs` — the executors, dispatched
+  from `agent::execute_tool` (the one acting path, shared with chat approval).
+  `plan_orders` is pure and is where the decisions live: grouping, the
+  no-offer refusal, the line built out of the store's own rows. Nine unit
+  tests.
+- `platform/alo-store/src/inv_reorder.rs` — `inv_product_pipeline`, the
+  discovered prerequisite: what is on order and what is promised out for **one
+  product, watched or not**. It splices in `ON_ORDER_SQL` and `COMMITTED_SQL`
+  rather than restating them, so a second reading of "on order" cannot drift
+  from the buyer's report. A new integration test covers it, including
+  wrong-tenant both ways.
+- Web: `ReorderProposalsResultDto` / `StockAnswerResultDto`, the two cards in
+  `AgentResultCard.tsx`, the two approval previews in `AgentActionCard.tsx`,
+  and 24 new `agent*` strings in `i18n/en.ts`.
+
+**Verified.**
+
+```
+rustfmt on this item's own files (main is not rustfmt-clean on this machine)
+SQLX_OFFLINE=true cargo clippy -p alo-jmap -p alo-store -p alo-ai --all-targets
+                                     → clean, zero warnings
+DATABASE_URL=…5432 SQLX_OFFLINE=true cargo test -p alo-jmap -p alo-store -p alo-ai
+                                     → 159 suites ok, 2519 passed, 0 failed
+npx tsc --noEmit                     → clean
+npx eslint src/shell/AgentResultCard.tsx src/shell/AgentActionCard.tsx
+           src/jmap/types.ts src/jmap/index.ts src/i18n/en.ts → clean
+npm run build                        → built in 14.33s
+npx vitest run src/shell src/inventory → 30/30
+```
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`, two tenants bootstrapped with `identityctl bootstrap-admin`,
+real PKCE authorization-code tokens, rows read back in psql. Structural only —
+no model call was made anywhere (the loop's standing rail): every call below is
+a POST to `/ai/agent/execute` with the tool and args written by hand, which is
+exactly the path an approved proposal takes.
+
+```
+seed A  Blue chair CH-1 (vat 1900), Red stool ST-9, Assembly hour SV-1 (service)
+        supplier Hoffmann Möbel; they quote the CHAIR only: HM-4471, 3150 c,
+        min order 10 000 milli. Watched: chair min 4 000 → 20 000, stool 2 000
+        → 6 000
+seed B  Blue chair CH-1 — THE SAME name and SKU, vat 2100, watched min 100 000
+
+POST /ai/agent/execute            no token  → 401
+  {"tool":"stock_count"}                    → 400 unknown tool
+  stock_answer {}                           → 422 which product this is about is
+                                                  required
+  stock_answer {"product":"Hovercraft"}     → 422 no product of yours is called
+                                                  Hovercraft
+  reorder_proposals {"supplier":"Nobody"}   → 422 no supplier of yours is called
+                                                  Nobody
+  reorder_proposals {"location":"Mars"}     → 422 no location of yours is called
+                                                  Mars
+  reorder_proposals {"location":"SUPPLIER"} → 422 …called SUPPLIER — a virtual
+                                                  counterparty is not a place
+                                                  anything is short at
+
+  stock_answer {"product":"Blue chair"} as A
+        → 200 onHand 0, onOrder 0, committed 0, available 0, stock [],
+              watched[MAIN] min 4 000 target 20 000 belowMinimum true
+  stock_answer {"product":"CH-1"}     as A  → 200 byte-identical: an SKU is
+                                                  matched exactly, before names
+  stock_answer {"product":"Assembly hour"}  → 200 stocked false, stock [],
+                                                  watched [] — a service has no
+                                                  shelf
+  stock_answer {"product":"Blue chair"} as B
+        → 200 THEIR id, vat 2100, their min 100 000. Never ours.
+
+  reorder_proposals {"qtyMilli":999999,"unitPriceCents":1,"price":1} as A
+        → 200 shortages 2, ordered 1
+              drafted[0]: status draft, number null, orderedDate null,
+                          Hoffmann Möbel, EUR, 1 line: Blue chair 20 000 milli
+                          @ 3 150 c, vat 1900, net 63 000, gross 74 970
+              skipped[0]: Red stool, buyQtyMilli 6 000, reason noSupplier
+              — the smuggled 999 999 and the smuggled price of 1 reached
+                NOTHING: 20 000 is target − available, 3 150 is the offer, 1900
+                is the catalog's rate
+  reorder_proposals {} as B
+        → 200 shortages 1, ordered 0, drafted [], skipped[0] noSupplier — a
+              tenant nobody quotes gets no order placed blind
+  reorder_proposals {"supplier":"Hoffmann","location":"MAIN"} as A
+        → 200 both echoed resolved; shortages 1 (the stool is not theirs to
+              sell), ordered 1
+  reorder_proposals {"location":"Main warehouse"} as A
+        → 200 the same place, resolved by NAME this time
+
+psql (tenant-scoped)  A: one draft row, number IS NULL, EUR, one line
+                         Blue chair 20 000 / 3 150 / 1900
+                      B: 0 purchase orders — A's whole run is invisible to them
+GET /inventory/purchase-orders?status=draft as A
+        → the same draft, read back through the ordinary route: number null,
+          orderedDate null, gross 74 970
+POST /inventory/purchase-orders/{id}/send  → sent, PO-2026-00001, 2026-08-11
+  stock_answer {"product":"Blue chair"} again
+        → onOrder 20 000, available 20 000, watched[MAIN].belowMinimum STILL
+          true — the shelf is still empty, and the two verdicts are the two
+          different questions the design note now spells out
+  reorder_proposals {} again
+        → shortages 1: the chair has dropped out of the report because it is on
+          order, and only the stool is left
+```
+
+**Cuts and flags.**
+
+- **`stock_answer` is about one product, not about a supplier or a period.**
+  The design note's example questions included "when is the Hoffmann order
+  due?" and "what did we buy from them last quarter?". Those are a different
+  grain — a document read and a history fold — and each is its own store query.
+  What shipped answers "how many are left, and is more coming" completely, for
+  any product in the catalog. Recorded in `docs/design/inventory.md` § As built
+  (B5.10) as a deliberate cut.
+- **Two runs write two sets of drafts.** A draft is not on order, so the second
+  run still sees the shortage — consistent with the whole model, and the reason
+  the report stays honest, but a tenant who asks twice before lunch has two
+  orders and must throw one away. An idempotence guard ("a draft for this
+  supplier already covers it") is a real follow-up; **flagged for the human**
+  and written into the design note rather than guessed at here.
+- **No fr/nl.** The 24 new `agent*` strings are English only; B5.11.
+- **No new route prefix.** Both tools run through `/ai/agent/execute`, which
+  has been proxied since the Mail agent. Nothing for the Caddyfile.
+- **`cargo test` needs `DATABASE_URL` on this machine.** Unchanged environment
+  trap, first noted at B1.16: the suites default to `…@127.0.0.1:5433` and the
+  `alo-pg` container publishes 5432.
+- **`head -N` on a piped verification script kills it.** The first wire run
+  ended silently at section eleven of sixteen because `| tee out | head -90`
+  SIGPIPE'd the whole pipeline. Redirect to a file and read the file; never
+  pipe a long verification into `head`.
+
+Next item: B5.11 (wave review — fr/nl for the whole `inventory*` block, a
+CHANGELOG sweep, `docs/design/inventory.md` reconciled as-built, and every
+[B5] feature in `features.md` shipped or listed as a cut with a reason).

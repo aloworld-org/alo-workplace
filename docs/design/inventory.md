@@ -1350,6 +1350,53 @@ act on, and the only honest version of it needs seasonality, lead-time
 variance and a stated confidence. What the tool says is what is true today:
 you are under your own minimum by this much.
 
+### As built (B5.10)
+
+Both tools shipped as described. Five decisions the build settled, each of
+which the design note left open:
+
+- **`reorder_proposals` takes two narrowings and no numbers at all.** A
+  supplier, a place, and nothing else. The executor has no code that reads a
+  quantity, a price or a supplier's terms out of the arguments, so a model that
+  states one changes no outcome — proven by test rather than by intention
+  (`agent_inventory.rs`, and on the wire with `qtyMilli` and `unitPriceCents`
+  smuggled into a real call).
+- **A place is resolved by code first, then by name.** `MAIN` is what a
+  warehouse says out loud, and it is short enough to appear inside somebody
+  else's location *name*; an exact case-insensitive code therefore wins before
+  the shared containment rule ([`agent_args`]) runs. Only real stock locations
+  are candidates: nothing is ever short at a virtual counterparty, and naming
+  one is `422 no location of yours is called SUPPLIER`.
+- **A product is resolved by SKU or barcode first, then by name.** Both are
+  machine-readable identifiers somebody may have read off a box, and neither is
+  a name to match loosely.
+- **Drafts are grouped by supplier *and* by currency.** A supplier who quotes
+  us in two currencies is two drafts. One order whose lines are priced in two
+  currencies has a total in neither, and the header states the offer's currency
+  rather than the supplier's default so the header and the lines cannot
+  disagree.
+- **`stock_answer`'s per-shelf verdict is not the report's verdict.** The
+  `watched` rows compare **that shelf** against its minimum, because the answer
+  is read by somebody standing in a warehouse. The report's own test — the one
+  that decides whether to buy — is `on hand + on order − committed`, stated
+  separately in the same answer as `availableQtyMilli`. A product with twenty on
+  order and an empty shelf therefore reads as available and still `belowMinimum`
+  at that place, which is both facts and neither guess.
+
+The pipeline behind one product — what is on order, what is promised out — is
+read by `AccountStore::inv_product_pipeline`, added in this item and splicing
+in the shortage query's own two folds rather than restating them. It exists
+because the shortage query only reports on products somebody happens to be
+watching, and "how many are left" is asked about the rest of the catalog too.
+
+**Known and left for the human:** two runs over the same shelves write two sets
+of drafts. A draft is not on order — that is the whole point of it, and it is
+what keeps the shortage report honest — so the second run still sees the
+shortage. This is consistent rather than wrong, but a tenant who asks twice on
+one morning gets two orders to throw one of away. An idempotence guard ("a
+draft for this supplier already covers it") is a real follow-up and is not in
+this item.
+
 ## Errors
 
 One map, `billing::map_store_err`, used and not copied — the call CRM,

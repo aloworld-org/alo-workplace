@@ -6,6 +6,21 @@ contracts.
 
 ## Unreleased
 
+- **Ask alo what to reorder, and get the orders as drafts.** The assistant
+  learns two things about your warehouse. Ask what is running low and it writes
+  one **draft** purchase order per supplier for everything you are under your
+  own minimum on — quantities from the minimums you set, prices from what that
+  supplier already quotes you. Nothing is sent and no order number is drawn:
+  each draft waits in Purchasing for you to check and send, the same as one you
+  raised yourself. Something you are short of that nobody has quoted you for is
+  never ordered from a supplier the assistant picked; it comes back on the list
+  as "ordered nothing for", so you can see it and act on it. You can narrow a
+  run to one supplier or one place. Ask instead how many of something you have
+  left and it reads that one product back: what is on each shelf, what is on
+  order, what is promised to customers, what that leaves you, and whether any
+  shelf is under the minimum you set for it. That answer changes nothing, orders
+  nothing and sets nothing aside — and it never guesses when you will run out.
+
 - **Scan a barcode to find the thing.** The catalog and the stock list gain a
   **Scan** button. A handheld scanner needs nothing set up: it is a keyboard, so
   it types the code into the field and presses Enter for you, and the answer
