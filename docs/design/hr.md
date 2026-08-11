@@ -890,6 +890,78 @@ The account-creation steps ("create the mailbox", "grant the Spaces") are
 capability that turns a badly-scoped HR write into a security incident, and it
 is named in the cuts.
 
+#### As built (B6.05), and the six decisions the code had to make
+
+The templates are `platform/alo-store/src/hr_checklists.rs` over migration
+`0204` (`hr_checklist_templates` + `hr_checklist_steps`), and the surface is
+`products/mail/alo-jmap/src/hr_checklists.rs` — `GET`/`POST
+/hr/checklist-templates`, `GET`/`PATCH`/`DELETE /hr/checklist-templates/{id}`,
+and `GET`/`POST /hr/employees/{id}/checklists`. Six things the note above left
+open were decided while building it:
+
+- **The steps are rows, not a JSON column.** Every step has the same four
+  fields, so four columns say what a schema-in-a-string would only imply. (The
+  typed-JSON shape used for insight tiles and site sections earns its keep where
+  the shape varies by kind.) An edit rewrites them as a block: a checklist is a
+  short ordered list, and a per-step diff would be a reordering protocol between
+  two screens to save writing sixty rows nobody is racing over.
+- **No instance table at all, not even a link row.** A run's *only* record is
+  the task board it created, found through the source link the tasks already
+  carry — so a person's checklists are folded from `tasks` grouped by project,
+  and a board that lost its link row is impossible because there is no link row
+  to lose. Progress is `count(done)/count(*)`, never a stored figure: the
+  `qty_on_hand` refusal (B5.01), here with somebody's first week in it.
+- **DELETE, not archive** — the one place this module departs from the leave
+  policies beside it. A balance is only explicable beside the policy that
+  produced it; a checklist template explains nothing after the fact, because an
+  instance is a *copy*. Deleting a template leaves every board it ever produced
+  untouched, and a test says so.
+- **A fourth owner role, `employee`, and `it` without a tenant role.** The note
+  named manager/HR/IT; reading the handbook and returning the laptop are the
+  arriving and leaving person's own steps, so the vocabulary is
+  `hr | manager | it | employee`. `it` deliberately has no counterpart in
+  `tenant_user_roles`: in a company this size "IT" is often the same person as
+  "HR". It is resolved from what the caller states, falling back to whoever drew
+  the checklist.
+- **Every role falls back to the person drawing the checklist**, and the
+  resolution is returned with the run. On the day an onboarding is drawn the
+  newcomer usually has no login (that is one of the steps) and their manager may
+  be a record without an account. A task assigned to nobody is a task nobody
+  does; one on the desk of the person who just drew the checklist is one they
+  hand on in a gesture — and they are looking at the screen where a wrong
+  assignment is obvious, because the answer names each assignee.
+- **A run is refused for an archived record, and never refused for being the
+  second one.** Archiving is the *last* act of an employment, after the
+  offboarding has been worked through, so drawing a checklist for an archived
+  person is either a mistake or work landing on a record nobody opens again. A
+  repeat run of the same template for the same person, by contrast, is a rehire
+  or a moved start date — refusing it would mean deleting a board to be allowed
+  to draw it again.
+
+The kind is not editable after creation: turning an onboarding into an
+offboarding silently reverses what every offset in it means. Reading a person's
+runs is the leave door (`hr_leave_door.rs`) rather than a second spelling of
+"whose record is this?" — HR, their manager, or the newcomer looking at their
+own first week.
+
+**Not built here:** the seeded starter templates. A tenant's first template is
+created by the client from its own i18n catalogue, because step titles are
+strings a person reads and the store must not carry English ones; the
+empty-state that offers them belongs to the HR screens (B6.08).
+
+**★ The consequence a human should weigh: a checklist board is a `team` board,
+and a team board is visible tenant-wide in v1.** That is right for an
+onboarding — the point is that the whole company can see somebody is arriving
+and who owes what — and it is a **disclosure for an offboarding**, whose board
+name says a named colleague is leaving before anybody has been told. Neither
+this module nor Tasks has a narrower shared visibility to put it on today: the
+alternatives are a personal board (visible to one of the four people who owe
+steps, so the checklist stops working) or per-board membership in Tasks, which
+is a Tasks-module change with its own design. Until that exists, the honest
+mitigations are the ones a client can apply: name an offboarding board
+neutrally, and draw it when the departure is known. Recorded here rather than
+solved quietly.
+
 ## Recruitment-lite (B6.06)
 
 ```

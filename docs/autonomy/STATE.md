@@ -18078,3 +18078,168 @@ said out loud rather than answered with silence.
 Next item: B6.05 (onboarding/offboarding checklists — template → instance per
 employee, over the existing task projects, with admin account creation as
 explicit manual steps).
+
+## B6.05 — the checklist that is not a checklist: a first week that arrives as work
+
+**What shipped.** What a company does when somebody joins or leaves, written
+down once and then *run* — as tasks, on a board, with dates and names on them.
+
+- **`hr_checklists.rs` (store) over migration `0204`.** Two tables:
+  `hr_checklist_templates` (name, kind `onboarding | offboarding`) and
+  `hr_checklist_steps` (position, title, detail, owner *role*, `day_offset`).
+  Steps are rows rather than a JSON column — every step has the same four
+  fields, so four columns say what a schema-in-a-string would only imply — and
+  an edit rewrites them as a block. Offsets are days either side of an anchor
+  (−365..=365): ordering a laptop happens *before* the first day, and a template
+  that could only describe the days after it would push every preparation step
+  into the week it was meant to prepare.
+- **There is no instance table, not even a link row.** Running a template writes
+  nothing in this module: it creates a `team` task project and inserts the steps
+  as tasks, each assigned, dated from the anchor, and carrying the source link
+  every task already has (`source_kind = 'hr_employee'`, ADR 0021). A person's
+  checklists are folded back out of `tasks` grouped by project; progress is
+  `count(done)/count(*)`. A board that lost its link row is impossible, because
+  there is no link row to lose — the `qty_on_hand` refusal (B5.01), this time
+  with somebody's first week in it.
+- **Roles resolved late, and visibly.** `hr | manager | it | employee` resolve at
+  the moment the checklist is drawn: what the caller stated wins, then the
+  person's manager link and their own login, then — always — whoever drew it.
+  The run's answer names every assignee, so the resolution is seen rather than
+  discovered on somebody else's board. `it` deliberately has no tenant role: in
+  a company this size "IT" is often the same person as "HR", and a tenant that
+  grows an IT team states a different user without a migration.
+- **Routes.** `GET`/`POST /hr/checklist-templates`,
+  `GET`/`PATCH`/`DELETE /hr/checklist-templates/{id}` (HR both ways — a shape
+  nobody may run is of no use to read), and
+  `GET`/`POST /hr/employees/{id}/checklists`. Running is HR's; reading the runs
+  back is the leave door (`hr_leave_door.rs`) — HR, their manager, or the
+  newcomer looking at their own first week. Four actions joined the audit
+  vocabulary: `hr.checklist_template.{create,update,delete}` and
+  `hr.employee.checklist.create` (filed against the *person*, which is the
+  record the act is about).
+- **DELETE, not archive** — the one place this module departs from the leave
+  policies beside it. An instance is a *copy*, so deleting a template leaves
+  every board it ever produced untouched. A test says so, and so does the wire.
+- **Nothing here provisions an account.** "Create the mailbox" is a step somebody
+  does and ticks; an HR write that creates accounts turns a badly-scoped HR role
+  into a security incident. The capability is absent rather than guarded.
+
+**Decisions taken inside the item** (all six written into `docs/design/hr.md`
+§ Onboarding and offboarding checklists → *As built (B6.05)*): steps as rows,
+not JSON; no instance table at all; DELETE rather than archive; a fourth owner
+role (`employee`) and an `it` role with no tenant role behind it; every role
+falling back to the person drawing the checklist; and a run refused for an
+archived record but never refused for being the second one (a rehire, or a
+moved start date, is a real thing — refusing it would mean deleting a board to
+be allowed to draw it again).
+
+**Verified — gates.**
+
+```
+cargo fmt (alo-store, alo-jmap)
+SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap --all-targets → clean, zero warnings
+DATABASE_URL=…5432 cargo test -p alo-store → 1 564 passed; one PRE-EXISTING
+                                   unrelated flake (below), green in isolation
+DATABASE_URL=…5432 cargo test -p alo-jmap  → 918 passed, 0 failed, incl. the
+                                   audit-vocabulary suite with the 4 new actions
+```
+
+Nothing under `web/` changed this iteration, so the web gates were not run;
+`/hr` was already in `web/vite.config.ts` from B6.02b.
+
+**Verified — on the wire.** Local debug `alo-jmap` on `127.0.0.1:8080` against
+docker `alo-pg`; two tenants freshly bootstrapped (`wireb605a`, `wireb605b`);
+in tenant A an admin (the HR door), a manager, the newcomer who reports to them,
+and an unrelated colleague — so every door is exercised by a real token.
+
+```
+GET  /hr/checklist-templates          no token       → 401  (POST too, and the run)
+GET  /hr/checklist-templates          a member       → 403 admin or hr only
+POST /hr/checklist-templates          a member       → 403
+POST /hr/checklist-templates          HR, 4 steps    → 200 ids, order preserved,
+                                                       detail on step 1
+POST …  the same name, same kind      → 409 "a checklist of this kind already has…"
+POST …  kind "probation"              → 422 (lists onboarding, offboarding)
+POST …  steps []                      → 422 "needs at least one step"
+POST …  owner "facilities"            → 422 (lists hr, manager, it, employee)
+POST …  dayOffset 400                 → 422 "between 365 days before and 365 after"
+POST …  name "  "                     → 422 "must not be empty"
+POST …  the same name, offboarding    → 200 — a kind is a separate namespace
+GET  /hr/checklist-templates          HR             → 200 both, each with steps
+PATCH …/{id}  steps restated, kind "offboarding"     → 200 kind still onboarding,
+                                                       step ids all new (replaced)
+POST /hr/employees ×2 (manager, then the newcomer with managerId + userId) → 200
+POST /hr/employees/{new}/checklists   a member       → 403
+POST /hr/employees/{new}/checklists   HR, 2026-09-01 → 200 board "Nieuwe collega —
+                                   Ada Byron"; dueOn 08-27 / 08-31 / 09-01 / 09-03;
+                                   assignees: it→admin, hr→admin, manager→the
+                                   manager's login, employee→the newcomer's
+POST …  anchorOn "1 September 2026"   → 422 names YYYY-MM-DD
+POST …  templateId "no-such-template" → 404   ·  employee "no-such-person" → 404
+POST …  owners.it = tenant B's user   → 404 (a task nobody can see is never filed)
+POST …  anchorOn 9999-12-31           → 422 "moves a step outside the calendar"
+GET/PATCH/DELETE …/{template}         tenant B       → 404 · GET list → 200 []
+POST /hr/employees/{new}/checklists   tenant B       → 404
+GET  /tasks?project={board}           HR             → 200 4 tasks, todo, position
+                                   1..4, sourceKind hr_employee, sourceId the
+                                   employee, dueAt midnight of each day
+GET  /hr/employees/{new}/checklists   the newcomer   → 200 total 4, done 0,
+                                                       27 Aug → 3 Sep, hr:false
+GET  …                                their manager  → 200  ·  HR → 200 hr:true
+GET  …                                a colleague    → 404 "no such employee"
+GET  …                                tenant B       → 200 [] (their own tenant)
+POST /tasks/{step1}/move  done        → 200  →  GET … → done 1, complete false
+POST /hr/employees/{new}/archive      → 200 → a run → 422 "record is archived;
+                                                       restore it before drawing"
+DELETE …/{template}                   HR             → 200 · again → 404 · GET → 404
+GET  /hr/employees/{new}/checklists   after both deletes → 200 still 4 steps, done 1
+GET  /tasks?project={board}           after deletes  → 200 the 4 tasks, untouched
+psql audit_log                        hr.checklist_template.create ×2, .update,
+                                   .delete ×2 and hr.employee.checklist.create —
+                                   each with its record's id and the actor; the
+                                   refused attempts filed nothing
+```
+
+**Cuts and flags.**
+
+- **No seeded starter templates.** A tenant's first template is created by the
+  client from its own i18n catalogue: step titles are strings a person reads and
+  the store must not carry English ones (unlike the leave-policy seed, whose one
+  string the route passes in the reader's language — eight of them per template
+  is a different proposition). The empty state that offers them belongs to the
+  HR screens, B6.08.
+- **No web work.** Every checklist screen — the template editor, the "draw a
+  checklist" dialog, the progress bar on a person's record — is B6.08. What
+  shipped is the layer they read.
+- **★ A checklist board is a `team` board, and a team board is visible
+  tenant-wide in v1.** Right for an onboarding — the point is that the company
+  can see somebody is arriving and who owes what — and a **disclosure for an
+  offboarding**, whose board name says a named colleague is leaving before
+  anybody has been told. Neither this module nor Tasks has a narrower shared
+  visibility today: the alternatives are a personal board (visible to one of the
+  four people who owe steps, so the checklist stops working) or per-board
+  membership in Tasks, which is a Tasks-module change with its own design. Until
+  that exists the honest mitigations are the client's: name an offboarding board
+  neutrally, draw it when the departure is known. Recorded in the design note
+  rather than solved quietly.
+- **★ A pre-existing, unrelated test flake found while gating**:
+  `platform/alo-store/tests/snooze.rs` asserts `sweep_snoozes() == 1`, but the
+  sweeper is deployment-global by design (it selects every due message in the
+  database, no tenant predicate). Run alone it passes; run in the full suite it
+  saw another test binary's due message and returned 2. Nothing in B6.05 touches
+  snoozing. The fix is the test's — count only its own tenant's wake, or serialise
+  it — and it is left for a human because changing another item's test to make a
+  gate green is exactly the move this loop must not make.
+- **★ `/hr` is still a new top-level prefix** needing the production Caddyfile at
+  the next deploy (standing since B6.02b; already in `web/vite.config.ts`).
+- Refusal sentences remain English in every language — the standing
+  cross-cutting item from B1.27, B2.14, B4.15 and B5.11.
+- **Business migrations continue at `0205`.**
+
+CHANGELOG: one entry, in a person's voice, about a first week that arrives as
+work rather than as a wiki page — and about the mailbox that still gets created
+by a person on purpose.
+
+Next item: B6.06a (recruitment, the model — openings + applicants with CVs in
+Drive, notes and stages, routes and scoping tests; screening stays absent by
+design, `docs/design/hr.md` § The EU AI Act posture).

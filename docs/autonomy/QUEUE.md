@@ -143,7 +143,7 @@ small, or a `[!]` note for the human if large.
 - [x] B6.03a Leave, the math: policies (annual/sick/unpaid, accrual per year) + balance computation property-tested.
 - [x] B6.03b Leave, the flow: request→manager approval + balances applied + team absence feed into Agenda; routes + wire.
 - [x] B6.04 Public-holiday calendars per country (seed data + per-tenant selection) affecting balance math.
-- [ ] B6.05 Onboarding/offboarding checklists (template → instance per employee, ties to admin account creation as manual steps).
+- [x] B6.05 Onboarding/offboarding checklists (template → instance per employee, ties to admin account creation as manual steps).
 - [ ] B6.06a Recruitment, model: openings + applicants (CV in Drive, notes, stages) + routes + scoping tests.
 - [ ] B6.06b Recruitment, board: applicant pipeline board UI on the shared board pattern.
 - [ ] B6.07 Approvals inbox: one manager view unifying leave/expenses/timesheets (B3/B4 hooks) with counts.

@@ -6,6 +6,23 @@ contracts.
 
 ## Unreleased
 
+- **A new colleague's first week arrives as work, not as a wiki page.** A
+  company can write down what it does when somebody joins or leaves — order the
+  laptop five days before they start, countersign the contract the day before,
+  walk them round on the first morning — saying for each step who does it (HR,
+  their manager, whoever sets up accounts, or the person themselves) and how many
+  days from their start or last day it falls. Running that checklist for somebody
+  creates a real shared board: every step becomes a task, dated from their date
+  and assigned to the person the role resolves to, so it turns up where its
+  owner already looks instead of on a list somebody has to remember to read.
+  Steps for a newcomer with no login yet, or a manager without an account, land
+  on the desk of whoever drew the checklist, and the assignment is shown at the
+  moment it is drawn rather than discovered later. Progress is counted from the
+  cards themselves — tick one, the checklist moves — and the newcomer can see
+  their own. Editing or deleting a template never disturbs a checklist somebody
+  is working through. Creating the mailbox and granting the Spaces stay steps a
+  person does deliberately: nothing here provisions an account.
+
 - **Public holidays now count, so a week off over Christmas costs four days.**
   A company sees the public holidays of the country it invoices under from the
   first time it opens the leave screens — fifteen European calendars, each
