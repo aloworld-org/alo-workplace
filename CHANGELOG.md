@@ -95,6 +95,11 @@ contracts.
   the admin's, and each decision still goes to the module that holds the record.
   If one of the three cannot be reached, the list says so rather than quietly
   looking empty.
+- **Invite a website editor without handing over the workplace.** A restricted
+  site collaborator can now open, edit, and publish only the websites they
+  were invited to. Other websites and the surrounding Mail, Drive, Calendar,
+  Tasks, Contacts, Billing, CRM, and administration surfaces stay closed.
+  Removing their final website grant removes the restricted role with it.
 
 - **A People module, opening on the hiring board.** The workspace has a People
   entry of its own, and everybody has it: the screens most of us open here are

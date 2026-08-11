@@ -2519,3 +2519,39 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   source rows. No external AI, production service, email, or DNS was used.
 - **Next:** S2.03a, a tenant-safe per-site editor grant that exposes no other
   site or workspace data.
+
+## 2026-08-11 — S2.03a per-site editor boundary
+
+- **Shipped:** alo Sites now has an explicit restricted `site_editor` role and
+  tenant-owned grants naming each website the collaborator may edit. Granting
+  a site and the restricted role is one transaction; revoking the final site
+  removes the role in the same transaction. Repeating either intent is safe.
+- **One central door:** the router's scoped-role middleware refuses every
+  non-Sites route for a non-admin site editor and proves a per-site grant before
+  any `/sites/{id}` handler runs. `GET /sites` is filtered to granted records;
+  creation and AI generation stay owner-only, while the visible theme/config
+  references remain available. Admins remain admins even if a role row exists.
+- **Isolation proof:** storage tests refuse both a foreign user and a foreign
+  site, keep foreign grant reads empty, and prove deletion/revocation cannot
+  cross tenants. The real-router matrix proves read/write access on the granted
+  site, the same non-oracular `403` for another real site and a made-up id, and
+  closed Contacts, Drive, Calendar, Tasks, Billing, CRM, Admin, and JMAP doors.
+- **Real curl transcript:** a fresh local database and server on
+  `127.0.0.1:8080` created two sites and a collaborator, then the collaborator
+  listed exactly the granted site, renamed it, and published its home page.
+  The unrelated site and every surrounding workspace surface returned the
+  human `403`; `/sites/config` remained readable. The server was stopped and
+  no production, email, DNS, or external AI service was contacted.
+- **Verified:** touched Rust formatting; strict offline all-target Clippy for
+  `alo-store` and `alo-jmap`; focused storage and real-router suites run more
+  than once; full unfiltered `alo-store` (1,122 unit tests plus every
+  integration/doc target) and `alo-jmap` (641 unit tests plus every
+  integration/doc target) suites on a freshly migrated disposable PostgreSQL
+  database; the real curl matrix; and `git diff --check`.
+- **Cuts/flags:** this storage/authorization slice intentionally exposes no
+  collaborator-management API or workspace administration. S2.03b owns the
+  visible invite/revoke surface and its end-to-end browser exercise. A site
+  editor is deliberately a restricted account rather than an additive role;
+  giving ordinary workspace access requires removing the final site grant.
+- **Next:** S2.03b, visible invite/revoke controls inside Sites with no trip to
+  workspace administration.

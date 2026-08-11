@@ -70,7 +70,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.02a Collections model: tenant-owned site collection binding to an alo Base table plus validated field mapping; wrong-tenant and missing-table tests.
 - [x] S2.02b Collection publishing: resolve Base rows into immutable publish snapshots with deterministic empty/error behavior; public render goldens.
 - [x] S2.02c Collections UI: visible connect-table, field mapping, preview, disconnect, and empty-state controls; AI remains optional.
-- [ ] S2.03a Site-editor grants: per-site editor role that cannot read Mail, Drive, CRM, Billing, or unrelated sites; storage and wrong-tenant authorization matrix.
+- [x] S2.03a Site-editor grants: per-site editor role that cannot read Mail, Drive, CRM, Billing, or unrelated sites; storage and wrong-tenant authorization matrix.
 - [ ] S2.03b Site-editor UI: invite/revoke collaborators and exercise edit/publish access end to end without exposing workspace administration.
 - [ ] S2.04a Version history API: list immutable publishes, compare metadata, and atomically republish a chosen version without mutating history; tenant tests and wire transcript.
 - [ ] S2.04b Version history UI: visible history surface, preview, and one-click rollback with undo/result feedback.
