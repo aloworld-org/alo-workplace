@@ -19566,3 +19566,204 @@ Caddyfile at the next deploy, beside `/billing`, `/crm`, `/audit`, `/insights`,
 Next item: B6.12a (the FINAL arc, money — quote→invoice→payment→ledger and
 deal→won→invoice, wire-verified end to end against the local backend, with the
 transcript here).
+
+## 2026-08-11 — B6.12a the final arc, money: the offer, the money, and the one door that opens the books
+
+The first of the two closing items. Nothing was built: this is the arc a company
+actually walks — an offer accepted, an invoice issued, money received, the books
+moved, and a deal that became an invoice — driven over HTTP against the local
+backend and read back out of Postgres. No Rust, no TypeScript, no migration; one
+sentence added to `docs/design/finance.md`. What it produced is a transcript and
+one finding that was already written down, now proved on the wire.
+
+**The finding, first, because it is the point of the item.** The money arc has
+four hops and **the fourth has exactly one door, and it is not in billing**.
+Issuing an invoice over HTTP posts nothing to the journal; recording a payment
+over HTTP posts nothing either. The books open only when somebody **confirms a
+bank-statement match** (B4.09a) — that confirmation books the invoice's issue if
+it is not in the books yet *and* the payment that relieves it, in one act. So:
+
+- A tenant who invoices and is paid, and never imports a bank statement, has an
+  **empty journal**: P&L zero, balance sheet zero, `/finance/reports/vat` zero
+  — while `/billing/reports/vat` (which reads the documents, not the journal)
+  reports €1 606,50 of output VAT for the same two invoices. **Two VAT reports
+  that disagree by construction**, and the one an accountant would file from is
+  the empty one. Proved below on the same tenant, in the same minute.
+- **A credit note has no door at all.** `post_credit_note_issue` is written and
+  golden-tested and has *no caller anywhere in the product*: not billing, not
+  reconciliation (which books invoices only). INV-2026-00003 below is a
+  correction that can never enter any tenant's books by any sequence of HTTP
+  requests.
+- The machinery itself is **green, not missing**: `cargo test -p alo-store
+  --test fin_invoice_posting --test fin_payment_posting` → **12 tests, all
+  passing**, including the golden entry, idempotency and the wrong-tenant
+  refusal. The gap is a *call*, not a rule.
+
+This is not new — `docs/design/finance.md` names it as "the wave's largest gap"
+and flags it for a human. What is new is that it is now demonstrated end to end
+rather than read off the source, and that the credit-note leg is named. A
+sentence was added to that table cell pointing here.
+
+**Setup.** Local debug `alo-jmap` on `127.0.0.1:8080`, docker `alo-pg` → a fresh
+`alo_b612a`, two tenants from `identityctl bootstrap-admin` (`acme`, `globex`),
+real PKCE tokens. Nothing external, no mail sent, no model called, production
+untouched.
+
+**Leg 1 — quote → invoice → payment.**
+
+```
+POST /billing/customers  vatId NL123456789B01 → 422 "the check digit of this NL
+                                                 VAT id does not match; check
+                                                 for a typo"   (the shape guard
+                                                 earning its keep on a typo I
+                                                 actually made)
+POST /billing/customers  NL004495445B01       → Bouwbedrijf De Vries BV, terms 30
+POST /billing/quotes     12h @ €125,00 + 3 @ €450,00, both 21%
+                                              → draft, no number, net €2 850,00,
+                                                VAT €598,50, gross €3 448,50
+POST …/quotes/{id}/send                       → QUO-2026-00001, sent 2026-08-11,
+                                                validUntil 2026-09-01 (21 days)
+POST …/quotes/{id}/accept                     → the closed offer AND the draft
+                                                invoice it raised, in one answer
+POST /billing/invoices/{id}/issue             → INV-2026-00001, issued 2026-08-11,
+                                                due 2026-09-10, fx snapshot
+                                                EUR→EUR rate 1.0 frozen on the
+                                                document
+POST …/invoices/{id}/payments €1 000,00 bank  → settlement partiallyPaid,
+                                                paid €1 000,00, outstanding
+                                                €2 448,50 — computed, never sent
+GET  /finance/reports/pl / balance             → all zero.  ← the fourth hop
+```
+
+**Leg 2 — deal → won → invoice.** The CRM seeds a Sales pipeline with a stage
+flagged `isWon`; the deal was a *lead* (a company name and a contact, no
+customer record).
+
+```
+POST /crm/deals            Hoveniers Janssen VOF, €4 800,00, stage New
+POST /crm/deals/{id}/invoice   (still open)   → 200 — invoicing is not gated on
+                                                won, the same rule quoting has;
+                                                only a lost deal is refused
+POST /crm/deals/{id}/stage → Won              → state won, closedAt stamped
+POST /crm/deals/{id}/invoice                  → draft invoice, one line from the
+                                                deal's value @21% = €5 808,00,
+                                                and the lead became a customer:
+                                                Hoveniers Janssen VOF, NL,
+                                                piet@janssen.test — the deal card
+                                                now carries customerId
+POST /billing/invoices/{id}/issue             → INV-2026-00002 — the gapless
+                                                sequence continues across the
+                                                two doors
+POST …/payments €5 808,00                     → paid, outstanding 0
+POST /crm/deals/{id2}/quote  vatRateBp 900    → draft quote €1 308,00 (9%)
+```
+
+**Leg 3 — the links, the guards, the receipts.**
+
+```
+GET /billing/quotes/{q}   → invoiceId of the invoice its acceptance raised
+GET /billing/invoices/{i} → quoteId of the offer it came from   (the round trip)
+accept an accepted quote          → 409 "…it is closed and cannot change again"
+send an accepted quote            → 409 (same sentence, different verb)
+pay 0                             → 422 "a payment amount must be greater than zero"
+pay a draft invoice               → 409 "a draft invoice is owed by nobody; issue
+                                     it before recording money against it"
+void an invoice that was paid     → 409 "only an issued invoice can be voided;
+                                     this one is paid"
+PATCH an issued invoice           → 409 "an invoice can only be changed while it
+                                     is a draft; this one is paid"
+issue an issued invoice           → 409
+credit-note the paid INV-…-00002  → mirror draft, every line negated, links
+                                     creditsInvoiceId; issued → INV-2026-00003,
+                                     −€5 808,00, and the original lists it
+audit_log                         → billing.customer.create ×2, quote.create ×2,
+                                     quote.send ×2, quote.accept ×2,
+                                     invoice.create, invoice.issue ×3,
+                                     invoice.payment.create ×4,
+                                     invoice.credit_note, crm.deal.create ×2,
+                                     crm.deal.stage, crm.deal.quote,
+                                     crm.deal.invoice ×2
+fin_entries / fin_postings        → 0 / 0
+```
+
+**Tenant isolation, on every object of the arc.** Tenant B (globex), with a real
+token of their own, against tenant A's ids:
+
+```
+GET  /billing/invoices/{i}        A=200  B=404
+GET  /billing/quotes/{q}          A=200  B=404
+GET  /billing/customers/{c}       A=200  B=404
+GET  /crm/deals/{d}               A=200  B=404
+POST /billing/invoices/{i}/issue          B=404   (A, already issued: 409)
+POST /billing/invoices/{i}/payments       B=404
+POST /crm/deals/{d}/invoice               B=404
+no token, either route            → 401
+lists: A 4 invoices / 2 deals · B 0 / 0
+```
+
+Not-found and not-yours are the same answer, which is the rule.
+
+**Leg 4 — the ledger, through the door that exists.** A clean offer (€2 000,00 +
+21% = €2 420,00) accepted, issued as INV-2026-00004, then a Dutch bank CSV —
+semicolons, `dd-mm-yyyy`, decimal commas — for the exact gross, remittance
+`Betaling INV-2026-00004`.
+
+```
+POST /finance/imports/bank/preview  → 1 line read, mapping echoed back, nothing
+                                      written (committed:false)
+POST /finance/imports/bank          → staged 1, 0 errors, 0 duplicates
+POST the same bytes again           → 409
+GET  /finance/bank/suggestions      → exact: INV-2026-00004, €2 420,00,
+                                      daysAfterIssue 0 (matched on the number in
+                                      the remittance) — likely: none needed
+POST /finance/bank/lines/{l}/match  → invoiceBookedNow TRUE, invoiceEntryId,
+                                      entryId, paymentId — one confirmation,
+                                      three things
+GET  /billing/invoices/{i}          → paid, outstanding 0
+fin_entries                         → invoice|issue|2026-08-11|INV-2026-00004
+                                      payment|settle|2026-08-11|INV-2026-00004
+fin_postings                        → 1000 Bank        +242000
+                                      1100 Receivables +242000 / −242000
+                                      2100 VAT payable  −42000
+                                      4000 Sales       −200000
+GET /finance/reports/pl             → income Sales €2 000,00, result €2 000,00
+GET /finance/reports/balance        → assets €2 420,00 = liabilities €420,00 +
+                                      result €2 000,00, balances:true,
+                                      difference 0
+GET /finance/reports/vat            → output €420,00 @2100 on €2 000,00 base,
+                                      netPayable €420,00   (zero before this)
+```
+
+The arc closes. It closes *through the bank*, and only through the bank.
+
+**Cuts and flags.**
+
+- **★ The gap above is not fixed here, deliberately.** Wiring `post_invoice_issue`
+  and `post_payment_settle` into the issue and payment routes is a B4 item, not a
+  side effect of a verification item: the design note requires the posting to
+  share the document's own transaction ("a posting failure fails the document"),
+  which means changing the store's issue path, not adding a call at the edge. A
+  best-effort post from the route would leave invoices silently unbooked — a
+  half-measure in a tenant's *books*, which the hard rails forbid me to guess at
+  unattended. **HUMAN ACTION:** the first item of any B4 follow-up, as
+  `docs/design/finance.md` already says; this entry adds that the credit-note leg
+  has no door either, and that the two VAT reports disagree until it is done.
+- **An overpayment is accepted and is meant to be.** €10 001,00 recorded against
+  a €3 448,50 invoice left `outstandingCents −655250` and state `paid`; the store
+  documents this as recording a duplicate transfer honestly rather than refusing
+  the bank's reality. Noted because it makes the aged-receivables total negative
+  on the tenant I overpaid on, which is arithmetic, not a bug. **A payment with
+  an empty `method` is also accepted** — harmless in billing, but the method is
+  what picks `bank` vs `cash` when a payment is booked, so it resolves by the
+  default rather than by what the person meant.
+- **Invoicing an *open* deal is allowed** (only a lost deal is refused). It reads
+  deliberate — the same rule as quoting — but it is not stated in the handoff's
+  rustdoc the way the quote route states it. A one-line doc fix for whoever
+  touches that file next; not touched here to keep this item to zero code.
+- **No UI walk.** This is the wire arc; the screens are B1/B3/B4's own items and
+  the Playwright pass is a human's.
+- The four `src/sites/Theme.test.tsx` failures the last two entries recorded are
+  the sites track's and are untouched: no web file changed in this item.
+
+Next item: B6.12b (the FINAL arc, operations — hours→invoice line,
+PO→receive→bill→reconcile, leave→Agenda; then `LOOP COMPLETE`).
