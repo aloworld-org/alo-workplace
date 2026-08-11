@@ -625,6 +625,42 @@ dates and leaving dates:
   separately cost the same, which is the one arithmetic surprise employees
   actually notice.
 
+#### As built (B6.03a), and the five decisions the code had to make
+
+The table is `hr_leave_policies` (migration `0201`), the arithmetic is
+`platform/alo-store/src/hr_leave_math.rs`, the CRUD is
+`hr_leave_policies.rs`, and the country figures are `hr_statutory_leave.rs`.
+Five things the note above left open were decided while building it:
+
+- **A leave year starts on a day-of-month 1..=28**, refused above that by both
+  the store and a CHECK. 29 February is a date three years in four cannot
+  construct, and a balance fold must never guess one; every national start we
+  have met (1 January, 1 April, 1 May, 1 July, 1 October) is inside the bound.
+- **The seed reads the country from the tenant's billing settings** — the
+  identity they invoice under is the only country the workspace knows — and
+  falls back to the Directive's four weeks for a country the table does not
+  carry. The seeded policy's **name comes from the caller**, so an HTTP route
+  passes the reader's language rather than the store hardcoding an English
+  string; a caller with no locale gets `Annual leave`.
+- **Deleting a policy is not implemented; archiving is.** The note's `DELETE`
+  is "only while no employment has ever been on it", and *ever been on it* is
+  not answerable until leave requests exist (B6.03b). A rule that cannot bind
+  yet would be a rule that silently permits everything, so the door is
+  archive-and-restore until the tables that record use are there.
+- **A carryover cap may not exceed the entitlement it carries, and an expiry
+  needs a cap** (1..=24 months). Both are typos rather than policies, and both
+  would otherwise produce a balance nobody can explain.
+- **An archived policy is not editable** (`409`, naming restore). It exists to
+  explain balances already folded from it; editing it would restate them
+  silently. Its name is freed for a live policy the moment it is archived, and
+  restoring it is refused while that name is in use.
+
+The cost function takes **resolved days** — one entry per day carrying the
+pattern minutes, the holiday flag and the already-covered flag — rather than a
+range plus one pattern. It is what makes a request that spans a change of terms
+(or a cross-border employee's own holiday calendar) fold correctly, and it keeps
+the module pure.
+
 ### The request, and its state machine
 
 ```

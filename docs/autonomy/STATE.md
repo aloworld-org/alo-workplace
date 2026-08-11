@@ -17603,3 +17603,188 @@ screens follow.
 
 Next item: B6.03a (leave, the math — policies and the accrual/balance
 computation, property-tested; no routes).
+
+## 2026-08-11 — B6.03a the arithmetic of leave: minutes, remainders, and one policy a tenant did not have to invent
+
+**Shipped.** The rule a leave balance is folded from, and the arithmetic that
+folds it — as a pure module that can be checked by hand, and a policy table that
+holds no balance at all.
+
+```
+platform/alo-store/migrations/0201_hr_leave_policies.sql  the policy: entitlement, accrual,
+                                                          leave year, carryover, approval, paid
+platform/alo-store/src/hr_leave_math.rs        pure: entitlement, accrual, request cost, balance
+platform/alo-store/src/hr_leave_policies.rs    HR-door CRUD + archive/restore + the seed
+platform/alo-store/src/hr_statutory_leave.rs   15 member states, each with its instrument named
+platform/alo-store/src/id.rs                   HrLeavePolicyId
+platform/alo-store/src/lib.rs                  three modules, the ids and types re-exported
+platform/alo-store/tests/hr_leave_policies_tenancy.rs  6 tests: tenant, round trip, lifecycle,
+                                                       the seed twice, the floor, the fold
+docs/design/hr.md                              § Leave → "As built (B6.03a)": five decisions
+```
+
+**The arithmetic, and the two properties that make it trustworthy.**
+`hr_leave_math.rs` is pure — no database, no clock, no tenant — like
+`billing_totals.rs`, `time_hours.rs` and `fin_rules.rs`, and everything in it is
+integer minutes. It answers four questions: what somebody's entitlement is (the
+policy's full-year figure scaled by their working pattern and pro-rated by the
+days they were employed inside the leave year), how much of it has arrived by a
+date, what a request costs (per day: the pattern's minutes, less a public
+holiday, less a day another approved request already covers, with the overlap
+measured so a refusal can say by how much), and the balance
+(`carried_in + accrued − taken − booked`, with pending reported beside it and
+never inside it).
+
+Both places where a whole is cut into parts compute **cumulatively** — part *n*
+is `whole × n / parts − whole × (n−1) / parts` — so the remainder integer
+division drops is carried by the next part instead of vanishing. That is what
+the property tests assert, over 20 000 generated cases each:
+
+- the twelve monthly accruals sum **exactly** to the year's entitlement, and the
+  accrual on each month start is their running total;
+- a leaver and a joiner whose employments partition a leave year get two
+  entitlements that sum **exactly** to one full year's (the figure a final
+  payslip depends on) — the naive `12 000 × 184 / 365` is a minute short, and the
+  test says so out loud;
+- accrual is monotone and never exceeds the entitlement, on any day of any leave
+  year, on either accrual mode;
+- a range costs exactly what its days cost one at a time, and what its two
+  halves cost split at any point — a week booked at once and five days booked
+  separately are the same number;
+- every generated leave year is a contiguous 365 or 366 days whose successor
+  starts the day after it ends;
+- the module's **own source contains no fractional type** (`include_str!` on
+  itself, scanning everything above the test module) — the trick `docs/design/hr.md`
+  said `billing_totals` used, which it turned out not to; it does now exist, here.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+--all-targets` clean; `cargo test -p alo-store` **green in full** — 102 suites,
+EXIT=0, including the 29 new pure-arithmetic tests and the 6 new DB ones. No web
+and no routes were touched, so no `tsc`/`eslint`/`build` and no wire transcript:
+this item is a schema, an arithmetic and a store door, exactly as B6.02b's
+journal planned it.
+
+Wrong-tenant proof (`hr_leave_policies_tenancy.rs`), all through the real
+Postgres:
+
+```
+hr_b.hr_leave_policy(A's id)                → None          (no existence oracle)
+hr_b.hr_leave_policies(false | true)        → empty ×2
+hr_b.update_hr_leave_policy(A's id, …)      → NotFound      A's entitlement unchanged after
+hr_b.set_hr_leave_policy_archived(A's, T/F) → NotFound ×2   A's row still live
+hr_a.<the same three> on a guessed id       → None/NotFound ×3  (same answers as next door)
+hr_b.create_hr_leave_policy("Vakantiedagen")→ Ok            uniqueness is per tenant
+each tenant's list                          → exactly 1 policy, their own
+```
+
+Lifecycle, seed and fold, on the wire of the store:
+
+```
+create → read back all 12 fields incl. April-6 leave year, 15-month expiry, created_by
+duplicate name (and "VAKANTIEDAGEN")   → 409 "a leave policy with this name already exists"
+entitlement 527 041 / expiry 25 months → 422 naming "entitlement" / "expire"
+update  → name, accrual, leave year, carryover all move; updated_at >= created_at
+archive → live list empty, include_archived shows it with archived_at set
+edit an archived policy                → 409 "restore it first"
+create with the freed name             → Ok (the name is free once archived)
+restore the old one while it is taken  → 409 (two live policies of one name are two answers)
+archive twice                          → archived_at not re-stamped
+seed (tenant with billing country FR)  → 1 policy "Congés payés", 25 × 480 = 12 000 minutes,
+                                         monthly, 1 Jan, no carryover, requires approval
+seed again with a different name        → the same policy, unchanged
+seed a tenant whose only policy is archived → nothing created (they retired it on purpose)
+seed with no stated country             → "Annual leave", 20 × 480 (Directive 2003/88/EC Art. 7)
+stored policy → scaled(three-day week) 5 760 → pro-rated from 1 July → accrued in June = 6/12
+```
+
+**The migration-number collision, twice in one iteration, and the durable fix.**
+The sites track's `0169_site_post_locales.sql` landed first (409e22a); this
+track's `0169_hr_documents.sql` was then minted at the same number (4a7b636),
+which makes `sqlx` fail **every** migration run on **both** tracks with
+`VersionMismatch(169)` — every DB-backed test on `main` was red before this
+iteration wrote a line. It was fixed here the way the identical 161 collision was
+on 2026-08-10 (rename **this** track's file, content byte-identical so the
+checksum still matches wherever it was applied) — and then the rebase before the
+push showed the sites track had, in parallel, renumbered *their* file to **0170**
+and minted `0171_site_collections.sql`, colliding with both of this track's
+numbers all over again. Two tracks renumbering into the same block at the same
+hour is not a mistake either of them made; it is the block being shared.
+
+So the fix is a **separation, not a third rename into the same range**:
+
+> **The business track mints migrations from `0200` upward. Everything below
+> `0200` belongs to the sites track.**
+
+This iteration's two files are therefore `0200_hr_documents.sql` (the previous
+item's, renamed a second time, still byte-identical) and
+`0201_hr_leave_policies.sql`; the sites files keep 0170 and 0171. Business
+migrations continue at **0202**.
+
+Any dev database that applied either file under an older number needs one line
+before it will migrate again — this machine's was corrected with:
+
+```sql
+UPDATE _sqlx_migrations SET version = 200 WHERE version = 170 AND description = 'hr documents';
+UPDATE _sqlx_migrations SET version = 201 WHERE version = 171 AND description = 'hr leave policies';
+UPDATE _sqlx_migrations SET version = 170 WHERE version = 169 AND description = 'site post locales';
+```
+
+No deploy has carried any of the three, so this is a dev-machine note, not a
+release note. **Proven rather than assumed:** the whole migration set — both
+tracks' files together — was applied to a brand-new database
+(`alo_fresh_b603a`) and all three HR suites (17 tests) passed against it, which
+is the check a mutated dev DB cannot give you; the corrected dev DB then
+migrated and passed too.
+
+**Cuts and flags.**
+
+- **No `DELETE` on a policy — archive and restore only.** The design note's rule
+  is "delete only while no employment has ever been on it", and *ever been on it*
+  is unanswerable until leave requests exist (B6.03b). A rule that cannot bind
+  yet would silently permit everything, so the door is not opened. Recorded in
+  `docs/design/hr.md` § Leave → As built.
+- **No routes and no screens.** `/hr/leave-policies` and `/hr/leave-balances` are
+  in the design's route table; the flow item (B6.03b) registers them together
+  with the requests they operate on, which is where a balance read has something
+  to read. Nothing in `web/` or `products/mail/` changed this iteration.
+- **The employment ↔ policy link is deliberately not minted yet.** The design's
+  employment sketch lists `leave_policy_ids`; adding the column now would be a
+  column no route can write until B6.03b, and expand-only migrations are cheap —
+  it arrives in the item that needs it.
+- **A balance is not yet computable from the database**, only from the pure
+  module given a ledger. B6.03b's store query fills `LeaveLedger` from the
+  requests table and calls `balance()`, so the figure a screen shows and the
+  figure an approval is checked against stay one fold.
+- **The seeded policy's name comes from the caller**, not from the store: an
+  HTTP route passes the reader's language and a caller with no locale gets
+  `Annual leave`. That keeps the i18n rule intact without the store knowing
+  about locales.
+
+**Flags for the human.**
+
+- **★ LEGAL REVIEW: `hr_statutory_leave.rs` carries statutory minimums for 15
+  member states**, each normalised to a five-day week with its instrument named
+  (BUrlG §3, Code du travail L3141-3, Semesterlagen 4 §, …). They are *defaults a
+  tenant edits*, and the module says so twice — but they are compliance-adjacent
+  figures written by an agent from memory, and a human should check the table
+  before any screen shows them as "the statutory minimum". A country not in the
+  table gets the Directive's four-week floor, which is the safest wrong answer
+  available. Seniority-based and age-based uplifts (PL's 26 days after ten years,
+  several states' rules for under-18s) are **not** modelled anywhere.
+- **★ `/hr` is still a new top-level prefix** needing the production Caddyfile at
+  the next deploy (unchanged from B6.02b; already in `web/vite.config.ts`).
+- **The terms-change route is still a design-note question** (B6.02b's flag,
+  unanswered): a pay rise remains unrecordable through the API until either
+  `POST /hr/employees/{id}/employments` is added to the note's route table or the
+  note says `PATCH` may append terms.
+- Refusal sentences remain English in every language — the standing
+  cross-cutting item from B1.27, B2.14, B4.15 and B5.11.
+
+CHANGELOG: one entry, in a person's voice, about setting the leave a company
+grants, the policy a company that sets nothing still gets (with the law named
+beside the figure), why everything is counted in minutes, and why no balance is
+ever stored.
+
+Next item: B6.03b (leave, the flow — the request table and its state machine,
+manager approval with the self-approval refusal, balances applied, the absence
+layer feeding Agenda, the `/hr/leave-*` routes, and the wire transcript).

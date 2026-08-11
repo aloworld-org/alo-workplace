@@ -12,6 +12,22 @@ contracts.
   break the connection, invalid field types are rejected before anything is
   changed, and disconnecting the collection leaves the original Base intact.
 
+- **alo HR learns how leave adds up.** A company can now set the leave it
+  grants — annual, sick, unpaid, or anything else it gives time off for — with
+  the entitlement for a full year, whether it lands on the first day or arrives
+  a twelfth at a time, when the leave year begins, and how much may be carried
+  into the next one. A company that sets nothing still gets one workable annual
+  policy, from the statutory minimum of the country it invoices from, with the
+  law that sets the figure named beside it: a starting point to edit, not legal
+  advice. Everything is counted in **minutes**, not days, so a four-hour Friday
+  costs a four-hour Friday and a move from five days to four does not quietly
+  restate last spring's balance; the screens will show days, and the minutes
+  behind them. No balance is ever stored: it is always recomputed from the
+  policies, the working patterns and the absences that produced it, so a figure
+  somebody disagrees with can be shown its working. Retiring a policy archives
+  it rather than deleting it, because a balance is only explicable beside the
+  policy that produced it. Requesting and approving leave follows next.
+
 - **Translate a whole website, then decide.** Website owners can prepare one
   translation proposal for every page and blog post, compare the original and
   translated titles, paths, excerpts, SEO copy, and page sections, and approve
