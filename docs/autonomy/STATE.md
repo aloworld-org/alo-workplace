@@ -19766,4 +19766,12 @@ The arc closes. It closes *through the bank*, and only through the bank.
   the sites track's and are untouched: no web file changed in this item.
 
 Next item: B6.12b (the FINAL arc, operations — hours→invoice line,
-PO→receive→bill→reconcile, leave→Agenda; then `LOOP COMPLETE`).
+PO→receive→bill→reconcile, leave→Agenda), the last item in the queue.
+
+<!-- The end-of-queue marker is deliberately NOT spelled out above. The wrapper
+greps this file for that literal phrase, so naming it in prose — even to say
+what comes next — stops the loop as though the queue were finished. That is
+exactly what happened on 2026-08-11: the run halted with B6.12b still open and
+had to be restarted by hand. Refer to it as "the end-of-queue marker" in prose;
+write the phrase itself only to fire it. -->
+
