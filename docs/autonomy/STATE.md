@@ -16545,3 +16545,128 @@ npx vitest run (whole web suite)         → 405 passed, 4 failed — all four i
   recorded here only so the next iteration does not re-diagnose it.
 
 Next item: B5.09b (web inventory — purchase-order and sales-order flow screens).
+
+## B5.09b — purchasing and sales orders get their screens
+
+**What shipped.** The two order documents, end to end, on the workspace surface:
+Inventory now has four tabs, and the two new ones are the life of an order in
+each direction. Purchasing: a list filtered by the server's own state
+vocabulary, a draft editor (supplier, expected day, reference, note, a line grid
+fed by the catalog), placing the order, booking what arrives, cancelling, and
+the printed order. Sales: the same list and editor pointed at a customer, plus
+confirming, booking a consignment out, and raising a draft invoice for what has
+gone. Both documents show what has already moved against them, line by line,
+with the arrival's drafted bill named where there is one.
+
+**The files.**
+
+- **`web/src/inventory/orders.ts`** (new) — the client for both documents: 20
+  methods over the fourteen routes B5.05–B5.06 already served. Its own file
+  rather than more methods on `api.ts`, which reads places, stock and the ledger
+  and writes nothing; this one raises, edits and advances documents. Both share
+  `InventoryError`, so a refusal reaches a person the same way from either door.
+- **`web/src/inventory/orderRows.ts`** + **`orderRows.test.ts`** (new) — the pure
+  row model. It **imports Billing's rules** (`blankRow`, `isBlankRow`,
+  `rowProblem`, `rowDraft`) rather than restating them, and adds only what is
+  genuinely new: the catalog link on a row, the price side a picked product is
+  copied at, and the consignment sheet's own draft.
+- **`web/src/inventory/OrderLines.tsx`** (new) — one grid for both documents,
+  with the fulfilment columns handed in already formatted.
+- **`web/src/inventory/FulfilDialog.tsx`** (new) — one sheet for booking an
+  arrival and booking a consignment; they are one act in two directions.
+- **`web/src/inventory/Fulfilments.tsx`** (new) — the read-only list of what has
+  already moved, shared the same way.
+- **`web/src/inventory/PurchaseOrdersView.tsx`**, **`PurchaseOrderEditor.tsx`**,
+  **`SalesOrdersView.tsx`**, **`SalesOrderEditor.tsx`** (new) — the four screens.
+- **`web/src/inventory/types.ts`** — the two documents, their lines, receipts,
+  deliveries and raised invoices; totals and the outbound line are imported from
+  Billing rather than re-declared.
+- **`web/src/inventory/format.ts`** / **`parts.tsx`** / **`InventoryModule.module.css`**
+  — the two status vocabularies, a day formatter over Billing's rule, the chip
+  and the field, and the styles for a document page.
+- **`web/src/billing/index.ts`** — additive exports only (`blankRow`,
+  `isBlankRow`, `rowDraft`, `rowProblem`, `LineRow`, `RowProblem`,
+  `milliToInput`, `parseMilli`, `TotalsPanel`, `printSheet`, `DocumentTotals`,
+  `LineDraft`). No Billing behaviour changed.
+- **`web/src/i18n/en.ts`** — the `inventory*` order block (fr/nl at B5.11).
+- **`web/src/inventory/Orders.test.tsx`** (new) — eight screen tests.
+
+**The decisions, and why.**
+
+1. **Placing an order is one button and the words say all three things it
+   does.** `POST …/send` draws the number, freezes the document *and* writes the
+   covering letter with the printed order attached to the caller's Drafts. The
+   dialog says exactly that — number, freeze, letter, nothing sent — because the
+   series is gapless and there is no undo. A test asserts the sentence appears
+   before anything is written, and that the notice afterwards names the
+   recipient and the file.
+2. **Picking a catalog item on a purchase order copies what we *pay*.** The
+   price side is a property of the direction the goods go, not a preference, and
+   it is a prop on the grid rather than two grids. A test pins it: the fixture's
+   sale price and purchase price differ, and 99 must appear nowhere on an order
+   we are placing.
+3. **The consignment sheet opens on what is outstanding.** The ordinary delivery
+   is then one click and a short one is a number somebody typed on purpose. The
+   sheet holds nothing against what is owing — that rule is the store's, under
+   the row lock that books the movement — so a refusal arrives verbatim with the
+   sheet still open and still holding what was typed. Also tested.
+4. **"To bill" is the server's `invoiceableQtyMilli`, never delivered minus
+   invoiced.** The store computes what an invoice raised now would carry, so what
+   a screen offers and what the button bills are the same number. The test
+   fixture is built so a browser doing its own subtraction would print a
+   different figure.
+5. **A document is a page, not a drawer.** `/inventory/purchase-orders/:id` — it
+   is long, it is printed, and a person sends its address to a colleague.
+6. **Billing's rules are imported, not copied.** Everything about turning typed
+   text into a line was settled in B1; a second idea of what a usable row is
+   would show as an order and its invoice disagreeing about a third of a kilo.
+
+**Verified.**
+
+```
+npx tsc --noEmit                     → clean
+npx eslint src/inventory src/billing/index.ts src/i18n/en.ts → clean
+npm run build                        → built in 14.13s
+npx vitest run src/inventory         → 23/23 (8 new screen tests + 7 new row
+                                       tests + the 8 from B5.09a)
+npx vitest run (whole web suite)     → 420 passed, 4 failed — all four in
+                                       src/sites/Theme.test.tsx, the sites
+                                       track's file, failing identically before
+                                       this item (recorded at B5.09a). Not
+                                       touched: never the other track's areas.
+```
+
+**Cuts and flags.**
+
+- **No wire-verify against a running backend, and none was owed.** This item adds
+  no route: every path the client calls was shipped and wire-verified in
+  B5.05a/a2/b and B5.06a/b, and the shapes read here were taken from the `json!`
+  bodies in `inventory_po.rs`, `inventory_po_send.rs`, `inventory_po_receipts.rs`,
+  `inventory_so.rs`, `inventory_so_deliveries.rs` and `inventory_so_invoice.rs`.
+  The two test files record those exact shapes, so a server change that broke one
+  breaks a test. `/inventory` has been in the vite proxy list since B5.04b.
+- **No supplier screen.** The purchase order picks a supplier from
+  `/inventory/suppliers`, but there is nowhere to create or edit one: suppliers
+  were shipped as a store and a route at B5.03 and never got a screen. A tenant
+  with no suppliers therefore cannot raise their first purchase order from the
+  browser at all. **This is the largest gap left in the module** and it is not in
+  the queue — flagged here for the human: it wants either its own item or a slot
+  in B5.11.
+- **No locations screen either**, same shape of gap: the consignment sheet offers
+  the tenant's places, which are seeded on first read and can only be renamed
+  through the API.
+- **Orders write no audit entries in practice.** `inventory` is an audited module
+  (`audit_action.rs`) and the derivation gives `inventory.purchase_order` /
+  `inventory.sales_order`, so the `RecordHistory` panel on each document is
+  correct by construction — but it will be empty until a mutating order route is
+  actually exercised through the audited middleware. Nothing to fix; noted so the
+  next reader does not diagnose it as a bug.
+- **The draft saves when a person says so**, not on a debounce like Billing's
+  editor. Deliberate for this wave: an order's autosave would need Billing's
+  `useDocumentDraft` generalised over two party types, which is a refactor of
+  another wave's code and not what "PO + SO flow screens" buys. An unsaved
+  document says so, and the totals beside it are dimmed.
+- **Still no fr/nl.** The whole `inventory*` block is English only; B5.11.
+
+Next item: B5.09c (web inventory — barcode scan input: camera plus the
+keyboard-wedge fallback).

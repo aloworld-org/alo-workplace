@@ -130,7 +130,7 @@ small, or a `[!]` note for the human if large.
 - [x] B5.08a Stocktake, counting: count-sheet snapshot + variance list; tests.
 - [x] B5.08b Stocktake, applying: variance → adjustment batch (B5.04b moves); wire.
 - [x] B5.09a Web inventory: catalog + stock-by-location screens.
-- [ ] B5.09b Web inventory: PO + SO flow screens.
+- [x] B5.09b Web inventory: PO + SO flow screens.
 - [ ] B5.09c Web inventory: barcode scan input (camera + keyboard-wedge fallback).
 - [ ] B5.10 ★ Inventory agent tools: `reorder_proposals` (draft POs), `stock_answer` — structural verify.
 - [ ] B5.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B5] reconciliation.

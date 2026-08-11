@@ -6,6 +6,25 @@ contracts.
 
 ## Unreleased
 
+- **Purchasing and sales orders, with the paperwork attached.** Inventory gains
+  two tabs. On the purchasing side you raise a draft order for a supplier, fill
+  it from your catalog — where picking an item copies **what you pay**, not what
+  you charge — and place it when you are ready. Placing it is one act, and the
+  button says all three parts of it before it happens: the order draws its
+  number, it is frozen for good, and the covering letter with the printed order
+  attached is written to **your Drafts**. Nothing is ever sent for you. When the
+  goods turn up, "Book arrival" opens on exactly what is still outstanding, so
+  the ordinary delivery is one click and a short one is a number you typed on
+  purpose; booking it writes the stock movements and raises a draft bill for
+  what came. The sales side mirrors it: draft, confirm — which draws the number
+  and writes no message, because your customer already has your answer — then a
+  consignment at a time out of the place you picked from. "Invoice what has
+  gone" raises a **draft** invoice for the quantity the server says is still
+  billable, so what the screen offers and what the button bills are the same
+  number. Every order shows what has already moved against it, line by line,
+  and every refusal — a quantity larger than what is owing, an edit to an order
+  the supplier already holds — arrives in the server's own words with your work
+  still on screen.
 - **Inventory has screens: a catalog, and what is on the shelves.** A new
   Inventory tab in the workspace opens on your catalog — the same products you
   invoice from, seen as things rather than as prices: your own code, the barcode
