@@ -19775,3 +19775,355 @@ exactly what happened on 2026-08-11: the run halted with B6.12b still open and
 had to be restarted by hand. Refer to it as "the end-of-queue marker" in prose;
 write the phrase itself only to fire it. -->
 
+
+## 2026-08-11 — B6.12b the final arc, operations: the hour, the goods, the day off
+
+The last item in the queue. Nothing was built here either: three operational
+arcs walked over HTTP against the local backend and read back out of Postgres —
+an hour worked becoming a line on an invoice, an order becoming stock and a
+bill, and a day off becoming a fact a colleague can see. No Rust, no
+TypeScript, no migration; two sentences added to two design notes. What it
+produced is a transcript and three findings, one of which was already written
+down and two of which are new.
+
+**The three findings, first, because they are the point of the item.**
+
+1. **A payable has no settlement door.** The purchasing arc runs cleanly to the
+   SEPA file — order, receipt, stock, bill, approval, `pain.001` — and then
+   stops. `POST /finance/bank/lines/{id}/match` books **receivables only**: the
+   bank line that pays a supplier is money leaving the account, and the route
+   says so in as many words (`422`, quoted below). There is no other verb: bills
+   have `import`/`get`/`approve`/`reject`/`sepa.xml` and nothing that records
+   money against one. So an approved, exported, actually-paid bill stays open
+   forever — `/finance/reports/aged?side=payable` below shows €952,00 across
+   three bills the tenant has no way to clear — and nothing ever posts to `ap`.
+   The only honest resting place for the debit line is `ignore`, with a reason,
+   which is what the transcript does. `docs/design/finance.md` already said "a
+   payable stays open until reconciliation can settle it"; the wire says
+   reconciliation *cannot*, and the sentence has been corrected.
+2. **Employment terms can be stated only when a person is created.** The store
+   is built for the opposite — `append_hr_employment` exists precisely to close
+   the outgoing period and open the next one, which is the design note's whole
+   argument for two tables ("a promotion, a move to four days a week, a pay rise
+   … so employments are appended") — but its only caller is
+   `POST /hr/employees`. `PATCH /hr/employees/{id}` refuses terms in a sentence
+   that reads as a rule rather than a gap: *"terms are appended, not edited:
+   this route changes the person only."* There is no route that appends. The
+   consequences on the wire: a person created without terms **cannot book any
+   leave** ("this person has no recorded terms of employment"), and a working
+   pattern typed in wrong can only be corrected by archiving the record,
+   unlinking the user (an archived record still holds the user link — a second
+   record on the same user is a `409`) and creating the person again, losing
+   their history. I hit this twice below, the second time by my own typo, which
+   is how the escape route got wire-verified.
+3. **The Agenda still does not draw the absence layer** — known, recorded at
+   B6.11, and now confirmed from both ends: `GET /hr/absences` answers nine days
+   for the approved request, `web/src/agenda/` makes no HR call at all
+   (`grep -rn "hr/absences\|/hr/" web/src/agenda/` → nothing), and the layer
+   surfaces only on **People → Who's away**. The route's own rustdoc and
+   `docs/design/hr.md` § *The absence layer* both say "the Agenda draws it as a
+   layer"; today that is a plan, not a fact. Not fixed here: it is a screen, and
+   the design note already lists it as an open decision for the owner.
+
+**Setup.** Local debug `alo-jmap` on `127.0.0.1:8080`, docker `alo-pg` → a
+fresh `alo_b612b`, two tenants from `identityctl bootstrap-admin` (`acme`,
+`globex`), real PKCE tokens. Nothing external, no mail sent, no model called,
+production untouched.
+
+**Leg 1 — the hour → the invoice line.** A law firm's engagement, priced at
+€125,00/hour with a 40-hour budget.
+
+```
+POST /tasks/projects        "Dijkstra — merger due diligence"
+PUT  /projects/clients/{p}  customer, EUR, rate €125,00, budget 2400 min /
+                            €5 000,00
+POST /projects/timer/start  → running, billable by default
+POST /projects/timer/start  → 409 "a timer is already running; stop it before
+                              starting another" — and the refusal carries the
+                              running timer, so the UI never has to guess
+POST /projects/timer/stop   → 1 min, workDate 2026-08-10, rateCents 12500
+                              snapshotted onto the entry from the engagement
+POST /projects/time         239 min · 300 min · 60 min non-billable
+POST /projects/time         minutes 0 → 422 "a day is the most one entry can
+                              hold, and work over midnight is two entries"
+GET  /projects/unbilled?customerId=…  → EMPTY. Approved hours only.
+POST /projects/weeks/2026-08-10/submit → submitted, locked
+PATCH /projects/time/{id}   → 409 "the week of 2026-08-10 is submitted and its
+                              hours are locked; withdraw it or ask an approver
+                              to reopen it"
+GET  /projects/approvals    → 600 min, 540 billable, admin@acme.test
+POST /projects/approvals/{w}/approve
+GET  /projects/unbilled     → 540 min, €1 125,00 net, grouped by engagement and
+                              rate — minutes and money, never who worked when
+POST /projects/invoices     no vatRateBp → 422 "a line is billed at a rate
+                              somebody stated"
+POST /projects/invoices     incl. the non-billable hour → 422 "1 of the selected
+                              hours are not billable"
+POST /projects/invoices     the three approved hours → draft, 1 line, 540 min
+GET  /billing/invoices/{i}  → qty 9.000 hour × €125,00 = €1 125,00 net,
+                              21% = €236,25, gross €1 361,25
+GET  /projects/time/{e}     → billed:true, invoiceId set
+POST /projects/invoices     the same hour again → 409 "already on a document;
+                              void or delete it to release them"
+GET  /projects/reports/profitability → 22,5% of the money budget (2250 bp),
+                              25% of the hours (2500 bp), 0 unbilled
+```
+
+The client never computes money: 540 minutes leave the timesheet and arrive as
+`qtyMilli 9000` at a unit price the engagement set months earlier.
+
+**Leg 2 — the order → the goods → the bill → the bank.** 40 boxes of A4 paper
+at €16,00, 19% German VAT.
+
+```
+POST /inventory/suppliers          Nordic Papier GmbH, DE811907980, 5 days
+POST /billing/products             PAP-A4-80, stocked, barcode, purchase €16,00
+GET  /inventory/locations          → MAIN + four system locations, seeded
+POST /inventory/purchase-orders    draft: net €640,00, VAT €121,60, €761,60
+POST …/{po}/receipts               on a draft → 422 (locationId first: "a
+                                     receipt says where the goods were put")
+POST …/{po}/send                   → PO-2026-00001, status sent, AND a mail
+                                     draft to the supplier with
+                                     Purchase-order-PO-2026-00001.pdf (6 145 B)
+                                     — drafted, never sent
+POST …/receipts 41 boxes           → 409 naming the arithmetic: "40000 were
+                                     ordered and 0 have already arrived, so
+                                     41000 more would make 41000; receive what
+                                     was ordered and record the rest as an
+                                     adjustment with a reason"
+POST …/receipts 25 boxes           → move written, status partially_received,
+                                     billId returned in the same answer
+GET  /inventory/stock              → MAIN 25 boxes, valued €400,00
+GET  /billing/bills/{b}            → PO-2026-00001/R1, €400,00 + €76,00 VAT,
+                                     due 2026-09-10, status received
+POST …/receipts 15 boxes           → outstanding 0, status received, closed
+                                     2026-08-11, second bill R2 €285,60
+GET  /inventory/stock              → 40 boxes, €640,00 — the order's own net
+bills R1 + R2                      → €476,00 + €285,60 = €761,60 = the PO gross
+                                     (the three-way-lite tie, on the wire)
+POST /billing/bills/{b}/approve    ×2
+POST /billing/bills/sepa.xml       → 422 "your own name is not stated in Billing
+                                     settings, and a payment file has to say
+                                     whose account the money leaves"
+PATCH /billing/settings            legal name, address, IBAN, BIC
+POST /billing/bills/sepa.xml       → 422 "bill … states no IBAN to pay into;
+                                     ask the supplier for one"   ← see below
+```
+
+**The IBAN snapshot has no correction door.** A bill copies its supplier's
+banking details at the moment of receipt (the same snapshot rule as the FX rate
+and the hourly rate — correct, and the design note argues for it). But the
+supplier had no IBAN when the goods arrived, and a bill has no `PATCH`: those
+two bills can never be put in a payment run. Adding the IBAN to the supplier
+fixes only what is received *after*. Verified by doing exactly that:
+
+```
+PATCH /inventory/suppliers/{s}     iban DE89370400440532013000
+PO-2026-00002 → send → receive 10  → bill PO-2026-00002/R1, €190,40, and the
+                                     covering draft's subject now carries the
+                                     tenant's legal name from settings
+POST /billing/bills/sepa.xml       before approval → 409 "only an approved bill
+                                     is paid"
+POST /billing/bills/sepa.xml       after → 200, pain.001.001.03,
+                                     Content-Disposition attachment,
+                                     NbOfTxs 1 · CtrlSum 190.40 ·
+                                     InstdAmt 190.40 · debtor NL91ABNA0417164300
+                                     · creditor DE89370400440532013000 ·
+                                     EndToEndId PO-2026-00002/R1
+```
+
+Then the bank, with a Dutch/German CSV — semicolons, `dd-mm-yyyy`, decimal
+commas — carrying **both directions**: the €190,40 that left for Nordic Papier
+and the €1 361,25 that arrived for the hours invoice (issued as INV-2026-00001
+first: `qtyMilli 9000`, fx EUR→EUR 1.0 frozen on the document).
+
+```
+POST /finance/imports/bank/preview → 2 lines, mapping echoed, committed:false
+POST /finance/imports/bank         → staged 2, 0 errors, 0 duplicates
+POST the same bytes again          → 409 "already imported, as the statement of
+                                     2026-08-11 to 2026-08-11"
+GET  /finance/bank/suggestions     → the CREDIT: exact, INV-2026-00001,
+                                     €1 361,25, daysAfterIssue 0
+                                   → the DEBIT: exact [] , likely [] — nothing,
+                                     because there is nothing to find
+match the debit → the bill it paid → 404 (a bill id is not an invoice id)
+match the debit → a sales invoice  → 422 "this bank line is money leaving the
+                                     account, and an invoice is settled by money
+                                     arriving"                    ← finding 1
+match the credit, wrong amount     → 422 "one line settles one document in full,
+                                     and splitting a transfer across several is
+                                     not supported yet"
+match the credit                   → 422 "this chart of accounts has no active
+                                     account for the role 'ar'; set one on the
+                                     Accounts screen before booking documents"
+GET  /finance/accounts             → 20 accounts seeded on first read
+match the credit                   → invoiceBookedNow TRUE, invoiceEntryId,
+                                     entryId, paymentId
+POST /finance/bank/lines/{d}/ignore  the debit, with the reason — its only
+                                     resting place
+```
+
+The books, and what they do and do not contain:
+
+```
+fin_entries/postings   invoice|issue    1100 +136125 · 2100 −23625 · 4000 −112500
+                       payment|settle   1000 +136125 · 1100 −136125
+                       (nothing on 2000 `ap`. Nothing ever posts there.)
+GET /finance/reports/pl        → Sales €1 125,00, result €1 125,00
+GET /finance/reports/balance?on= → assets €1 361,25 = liabilities €236,25 +
+                                 result €1 125,00, balances:true, difference 0
+GET /finance/reports/vat       → output €236,25 @2100 on €1 125,00; input 0
+GET /finance/reports/aged?side=receivable → €0, nothing open
+GET /finance/reports/aged?side=payable    → €952,00 over 3 documents, all of
+                                 them "d90_plus" at the 2026-12-31 reading —
+                                 including the one whose SEPA file was drawn
+                                 and whose money left the account above
+```
+
+The hour reaches the ledger. The box does not.
+
+**Leg 3 — the day off → the layer a colleague reads.**
+
+```
+GET  /hr/me                        → employee null, isHr true
+POST /hr/employees                 fullName → 422 "given name must not be empty"
+POST /hr/employees                 Sanne de Groot, linked to the admin user
+POST /hr/leave-policies            Annual leave, 12 000 min (25 days), monthly
+                                   accrual, carryover cap 2 400
+POST /hr/leave-requests            → 422 "this person has no recorded terms of
+                                     employment, so no leave can be booked
+                                     against them"
+PATCH /hr/employees/{e}            {"employment":{…}} → 422 "terms are appended,
+                                     not edited: this route changes the person
+                                     only"                        ← finding 2
+POST /hr/employees (again)         → 409 "that user already has an employee
+                                     record" — and archiving the first one does
+                                     not release the link
+POST …/archive → PATCH userId:null → recreate WITH terms → 200, weeklyMinutes
+                                     2400
+```
+
+Then the leave itself, over the Dutch Christmas week — and the second time,
+because I first typed the working pattern Sunday-first when it is
+**Monday..Sunday**, which cost 21–31 December six days instead of eight and
+could only be corrected by walking the escape route above a second time. The
+arithmetic under both readings was right; the input was mine.
+
+```
+GET  /hr/leave-balances            → entitlement 25,0 d, carried in 2 400 min,
+                                     accrued 8 000 (monthly, August), remaining
+                                     10 400 min = 21,7 d
+GET  /hr/holidays?year=2026        → NL: Nieuwjaarsdag, Tweede Paasdag,
+                                     Koningsdag, Hemelvaartsdag, Tweede
+                                     Pinksterdag, Eerste + Tweede Kerstdag
+POST /hr/leave-requests 21→31 Dec  → workingDays 8, holidayMinutes 480,
+                                     costMinutes 3840 — nine weekdays minus
+                                     Christmas Day, which the calendar relieved
+                                     (26 Dec is a Saturday in 2026 and costs
+                                     nothing to a Mon–Fri pattern; under the
+                                     mistyped Tue–Sat pattern it correctly
+                                     relieved a day)
+GET  /hr/leave-balances            → pending 3 840, booked 0
+GET  /hr/absences 20 Dec → 2 Jan   → EMPTY. A request is not an absence.
+POST …/{r}/approve                 → decided, note recorded
+GET  /hr/leave-balances            → booked 3 840, pending 0, remaining 6 560
+                                     min = 13,7 d
+GET  /hr/absences 20 Dec → 2 Jan   → 9 days: 21–25 and 28–31 December, each
+                                     carrying a name and an employee id and
+                                     nothing else — no policy, no kind, no note
+web/src/agenda/                    → no HR call anywhere            ← finding 3
+```
+
+**The undo paths, taken and measured** (they fell out of the isolation sweep,
+so they are reported rather than assumed):
+
+```
+POST /hr/leave-requests/{r}/cancel → absences EMPTY again, booked 0, remaining
+                                     back to 10 400 — the day off leaves the
+                                     layer the moment it is cancelled
+POST /finance/bank/lines/{l}/unmatch → invoice unpaid, 0 payments, and the
+                                     journal grows a REVERSAL entry
+                                     (kind=reversal, source_event=void,
+                                     reverses_entry_id set) rather than losing
+                                     a row; balance sheet still balances,
+                                     difference 0
+re-match, re-request, re-approve   → paid again (invoiceBookedNow FALSE the
+                                     second time — the issue entry was already
+                                     there and is not booked twice), 9 days away
+                                     again, remaining 13,7 d again
+```
+
+**Tenant isolation, on every object of the three arcs.** Tenant B (globex), with
+a real token of their own, against tenant A's ids:
+
+```
+GET  /projects/{p}                        A=200  B=404
+GET  /projects/time/{e}                   A=200  B=404
+GET  /billing/invoices/{i}                A=200  B=404
+GET  /inventory/purchase-orders/{po}      A=200  B=404
+GET  /billing/bills/{b}                   A=200  B=404
+GET  /hr/employees/{emp}                  A=200  B=404
+GET  /hr/leave-requests/{r}               A=200  B=404
+POST /projects/approvals/{w}/reopen       A=409  B=404
+POST /inventory/purchase-orders/{po}/cancel A=409  B=404
+POST /billing/bills/{b}/reject            A=409  B=404
+POST /hr/leave-requests/{r}/cancel        A=200  B=404
+POST /finance/bank/lines/{l}/unmatch      A=200  B=404
+no token                                  → 401
+```
+
+Not-found and not-yours are the same answer, and B's own lists stayed empty
+throughout. The audit log for the whole session reads as the arcs do:
+`projects.timer.start/stop`, `projects.time.create ×3`, `projects.week.submit`,
+`projects.approval.approve`, `projects.invoice.create`,
+`inventory.supplier.create/update`, `inventory.purchase_order.create ×2`,
+`.send ×2`, `.receipt.create ×3`, `billing.bill.approve ×3`,
+`billing.bill.sepa_xml`, `billing.invoice.issue`, `billing.setting.update`,
+`finance.import.bank`, `finance.bank.lines.match ×2`, `.unmatch`, `.ignore`,
+`hr.employee.create ×3`, `.archive ×2`, `.update ×2`,
+`hr.leave_policy.create`, `hr.leave_request.create ×3`, `.withdraw`,
+`.approve ×2`, `.cancel`.
+
+**Cuts and flags.**
+
+- **No code changed**, so no code gate ran: no Rust, no TypeScript, no
+  migration, no i18n key. Two design notes gained one sentence each
+  (`finance.md` on the payable side, `hr.md` on the employee record), pointing
+  here — the shape B6.12a used.
+- **★ Finding 1 is a human's**, and it is a *pair* of gaps, not one: a bill
+  needs a settlement (a payment row, or a match verb that accepts a payable),
+  and `ap` needs a posting rule — `docs/design/finance.md` already flags that
+  nothing posts to `ap`. Until both exist, aged payables is a list a tenant can
+  only ever add to. Not attempted here: it is a model change to `billing_bills`
+  plus a posting rule, which is a queue item, not a side effect of a
+  verification item.
+- **★ Finding 2 is a human's**: `POST /hr/employees/{id}/employments` (HR door,
+  `hr.employee.employment.create`) over the store function that already exists.
+  Small, and it unblocks every promotion, part-time move and contract renewal —
+  the exact events the two-table model was built for.
+- **★ The IBAN snapshot** needs a decision, not a route, first: whether a
+  received bill's banking details may be corrected at all (an argument that they
+  are the supplier's fact, not the document's) or whether the bill must be
+  deleted and re-raised. Flagged, not guessed.
+- **`GET /hr/absences` with no token and no query answers `400`, not `401`** —
+  the query extractor runs before authentication. With valid `from`/`to` it is
+  `401`. No content leaks either way; it is a code, not a hole. Worth one line
+  from whoever touches that handler next.
+- **No UI walk.** This is the wire arc; the screens are B3/B4/B5/B6's own items
+  and the Playwright pass is a human's.
+- The four `src/sites/Theme.test.tsx` failures earlier entries recorded are the
+  sites track's and are untouched: no web file changed in this item.
+
+**HUMAN ACTION, carried forward and unchanged:** `/hr`, `/projects`,
+`/inventory` and `/finance` need adding to the production Caddyfile at the next
+deploy, beside `/billing`, `/crm`, `/audit` and `/insights`. No new route prefix
+this item.
+
+The queue is finished. Every item of waves B1–B6 and BI-1 is `[x]`, none is
+`[!]`, and the two closing arcs have been walked end to end on the wire. What
+remains is written down: the ledger's missing calls (B6.12a), the payable's
+missing settlement and the employment append route (here), the five HR screens
+(B6.11), and the wave-review flags each entry above names. A human picks the
+next queue.
+
+LOOP COMPLETE

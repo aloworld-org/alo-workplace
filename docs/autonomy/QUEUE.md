@@ -155,4 +155,4 @@ small, or a `[!]` note for the human if large.
 - [x] B6.10 Payroll export: per-period CSV of salary-relevant data (no calculation) with a per-country column mapping config.
 - [x] B6.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B6] reconciliation.
 - [x] B6.12a FINAL arc, money: quote→invoice→payment→ledger and deal→won→invoice, wire-verified end-to-end on local; transcript in STATE.md.
-- [ ] B6.12b FINAL arc, operations: hours→invoice line, PO→receive→bill→reconcile, leave→Agenda — transcripts; then `LOOP COMPLETE`.
+- [x] B6.12b FINAL arc, operations: hours→invoice line, PO→receive→bill→reconcile, leave→Agenda — transcripts; then `LOOP COMPLETE`.

@@ -1568,6 +1568,14 @@ manual entry.
   `ap` at all today, so the payable side has no ledger counterpart to tie to yet.
   A bill also has no payment rows of its own — a SEPA export is an instruction,
   not a payment — so a payable stays open until reconciliation can settle it.
+  **B6.12b proved on the wire that reconciliation cannot** (`docs/autonomy/STATE.md`):
+  `POST /finance/bank/lines/{id}/match` takes an `invoiceId` and refuses a
+  money-out line outright ("an invoice is settled by money arriving"), and bills
+  carry no other settling verb — so an approved, SEPA-exported, actually-paid
+  bill ages forever, and the payable side is a list a tenant can only add to.
+  **Flagged for a human beside the posting gap above**: a bill needs a
+  settlement of its own *and* an `ap` posting rule; neither is a rule that is
+  wrong, both are calls that do not exist.
 - **VAT return figures** — output VAT per rate, input VAT per rate,
   the net payable, from postings carrying `vat_rate_bp`. It reconciles
   against `billing_vat_report` (B1.20), which reads documents; the two are
