@@ -225,9 +225,12 @@ The module exists with **one** tab, `Hiring` (`HrModule.tsx`, `HiringView.tsx`,
 `HiringBoard.tsx`, `ApplicantDrawer.tsx`, `OpeningDialog.tsx`,
 `ApplicantDialog.tsx`, `parts.tsx`, `api.ts`, `types.ts`, `format.ts`,
 `hr.module.css`). The rail entry is every member's, as this section says — but
-the member-facing tabs are B6.08, so a member who opens People today is told in
-the module's own words what will live there rather than shown a tab that
-answers nothing. The tab itself is **hidden, not disabled**, for anybody who is
+the member-facing tabs were B6.08, so a member who opened People then was told
+in the module's own words what would live there rather than shown a tab that
+answers nothing. (**Superseded by B6.08a**: Directory is every member's tab and
+what they land on; the "coming soon" screen and its two strings are gone. My
+leave and Team remain B6.08b.) The Hiring tab itself is **hidden, not
+disabled**, for anybody who is
 not HR: the pattern Finance set for its bookkeeper tabs, and for the same
 reason — a tab that exists only to refuse advertises a door.
 
@@ -1217,6 +1220,68 @@ not a decision, and it stays on Finance's own screen beside what is owed); the
 row links to the owning module rather than opening a record in place, because
 the member-facing leave screens are B6.08b; and the badge re-reads rather than
 decrements, so it can never disagree with the list it links to.
+
+## The directory and the org chart
+
+### As built (B6.08a), and the six decisions the screen made
+
+Server routes added: **none**. The two reads were shipped and wire-verified at
+B6.02b — `GET /hr/employees` (the public projection, every member's, HR's by one
+flag wider) and `GET /hr/org` (the tenant's reporting tree, roots first) — and
+this item is the surface over them:
+
+```
+hr/directory.ts        the search, the manager lookup, the tree narrowing —
+                       pure, and the whole of the screen's thinking
+hr/DirectoryView.tsx   the screen: toolbar, the people table, the reads
+hr/OrgChart.tsx        the tree, drawn — presentational, recursive, no HTTP
+hr/directory.test.ts   the pure functions, at their edges
+hr/Directory.test.tsx  the promises, against a recorded network
+```
+
+1. **It is every member's, and no door is asked for it.** The tab is drawn for
+   everybody, the reads carry no role, and the screen is the same screen for a
+   warehouse operative and the managing director. This is the tab that ends the
+   module's "coming soon" state: somebody with no board and no inbox now lands
+   here rather than on a promise.
+2. **The projection is the server's, not a filter.** Nothing is stripped in the
+   browser, because nothing private is sent: `directory_json` is folded from a
+   type that has no home address, no birthday and no IBAN on it. What HR sees
+   extra is exactly one thing — the people who have left — and the control for
+   it is drawn only when the answer says `hr`, because a control that exists to
+   be ignored teaches the wrong thing about what you can see.
+3. **The chart is the server's tree, never a fold of `managerId` done here.**
+   Somebody whose manager has left is served as a root; re-deriving that in a
+   browser is how a branch quietly disappears. The test proves it by serving a
+   three-level tree the rows alone would not produce.
+4. **One search box over both readings.** The list narrows to the people who
+   match; the chart keeps a match **with everybody beneath them** and **with the
+   line of managers above them**, because a tree filtered like a list would hang
+   somebody under the wrong person and say something false about who they work
+   for. Both narrowings are local: the people are read once and typing asks the
+   server nothing.
+5. **Where somebody sits is a place in the chart, not a filtered chart.**
+   Pressing *Where they sit* opens the tree with that person marked and scrolled
+   to, among the people around them — the address carries it (`?view=org&person=`)
+   so it is a link a colleague can send, and the whole of it is one write to the
+   address, because two writes in one act lose each other.
+6. **The chart does not collapse.** A company this suite is built for reads its
+   structure in one screen, and a chart that opens folded makes finding somebody
+   a series of guesses. Depth is a rule down the left of each level, which
+   survives a wide branch without becoming a diagram.
+
+Cuts, recorded: **no photos** (the record carries `photoNodeId`; the screen
+draws initials, and fetching a Drive blob per row is a screen's worth of
+requests for a decoration); **no record opens from a row** — the full record is
+the People tab, admin-or-HR, a later item, and this screen deliberately shows
+only what a colleague may see; **no export**; and **the leavers view is the
+people list only**, because `/hr/org` is the people who are here.
+
+One cost, unchanged and now paid by two readers: a member opening HR reads the
+directory twice — once for the approvals resolver's *does anybody report to me*
+(B6.07) and once for this screen. The honest fix is still the additive `manages`
+count on `/hr/me` flagged there; it is a server change, and this item is a web
+item.
 
 ## Errors
 

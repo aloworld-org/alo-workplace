@@ -6,6 +6,20 @@ contracts.
 
 ## Unreleased
 
+- **The company directory, and the org chart beside it.** People → Directory
+  lists everybody who works here — their role, their team, how to reach them,
+  who they report to and since when — and it is open to every member of the
+  workspace, because looking a colleague up should not be a question you ask a
+  person. The same screen draws the reporting tree: press *Where they sit* on
+  anybody's row and the chart opens on them, in among the people they work with.
+  One search box narrows both, matching names, roles, teams, addresses and
+  numbers in any order; searching the chart keeps the managers above a match, so
+  a narrowed tree never says the wrong thing about who somebody works for. Only
+  the details a colleague may see are here — never an address, a birthday or a
+  bank account. HR alone can add the people who have left, and they are marked
+  as such rather than quietly listed. People now opens on the directory for
+  anybody without a board or an inbox of their own.
+
 - **One inbox for everything waiting on you.** Time off, expense claims and
   timesheet weeks used to wait in three different modules, which meant the one
   you opened least was the one that kept somebody waiting longest. They now

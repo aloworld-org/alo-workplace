@@ -18605,3 +18605,97 @@ CHANGELOG: one entry, in a person's voice, about one inbox for everything
 waiting on you — and about the count that shows nothing when nothing is.
 
 Next item: B6.08a (Web HR — the directory and the org chart).
+
+---
+
+## B6.08a — the directory and the org chart (web)
+
+**What shipped.** People → **Directory**, the module's first screen with no door
+on it: the tenant's people as a table (their mark, their name, role, team, the
+two ways to reach them, who they report to, since when) and the reporting tree
+beside it, both narrowed by one search box, both read from routes that were
+shipped and wire-verified at B6.02b. Server routes added: **none**.
+
+- `web/src/hr/directory.ts` — the whole of the screen's thinking, pure: the
+  search (every typed word must match somewhere, any field, any order), the
+  manager-name lookup over the same answer the rows came from, and the tree
+  narrowing.
+- `web/src/hr/DirectoryView.tsx` — the screen and its three reads.
+- `web/src/hr/OrgChart.tsx` — the tree, drawn; nested lists, no HTTP, no fold.
+- `HrModule.tsx` — the Directory tab (everybody's, drawn first) and the landing:
+  HR → Hiring, an approver → Approvals, **everybody else → Directory**. The
+  member "coming soon" screen and its two strings are gone; the module no longer
+  promises a screen it does not have.
+- `api.ts`/`types.ts` — `directory(includeArchived)` now answers `{employees,
+  hr}` (the flag that draws HR's one wider control), plus `orgChart()`; the
+  directory entry type grew the public fields the server was already sending.
+- `hr.module.css`, the `hr*` strings in `i18n/en.ts`, and `queues.ts` updated for
+  the changed client shape.
+
+**The six decisions**, in `docs/design/hr.md` § "The directory and the org
+chart" rather than only here: it is every member's and asks no door; the
+projection is the server's and not a filter (nothing private is *sent*); the
+chart is the server's tree and never a fold of `managerId` done in a browser; one
+search narrows both, keeping a match's whole team **and** the managers above it;
+"where they sit" marks a person in the chart rather than filtering it down to
+them; and the chart does not collapse.
+
+**How it was verified.**
+
+- `npx tsc --noEmit` clean; `npx eslint` clean over all twelve changed files;
+  `npm run build` clean (12.7 s).
+- `src/hr/Directory.test.tsx`, **6 tests green** against a recorded network with
+  the real router, module routes, client, filters and screens running: a member
+  with all three doors shut lands here, reads no queue at all, and gets a row
+  that resolves the manager's *name*, a `mailto:` for the address and their own
+  row marked from `/hr/me`; one search box narrows in any order across fields and
+  **asks the server nothing** (the read count is unchanged after three searches);
+  the chart drawn is the three-level tree the server served — deliberately not
+  the shape the rows alone would give — and searching the deepest person keeps
+  Ada and Bram above her; *Where they sit* opens the chart with that person
+  marked, in one write to the address; leavers are HR's read alone (no control
+  and no `includeArchived` request without the flag, then the row with "Left" and
+  no way into the chart); and a `403` shows the server's own sentence rather than
+  an empty company.
+- `src/hr/directory.test.ts`, **9 tests green** on the pure functions at the
+  edges a screen makes awkward: an empty box is not a filter (identity, not a
+  copy), two words that each match somebody but nobody who matches both, a
+  manager id we hold no row for reading as unknown rather than as an id.
+- **Mutation-checked**: replacing `kept.push({...node, reports})` with
+  `kept.push(...reports)` — i.e. dropping the managers above a match — fails
+  exactly the two tests that claim that rule and leaves the other thirteen
+  green, so they are testing the narrowing and not the fixtures.
+- The two tests that asserted the old member landing were updated with it:
+  `HiringBoard.test.tsx` (6/6) and `Approvals.test.tsx` (7/7).
+- Full web suite: **473 passed**. The 4 failures are `src/sites/Theme.test.tsx`,
+  **pre-existing and the sites track's** (re-verified on a clean tree last
+  iteration; untouched here — this item changes no sites file).
+
+**Cuts and flags.**
+
+- **No wire-verify, and none was owed**: the item adds no route. Both reads were
+  wire-verified at B6.02b, and every field this screen draws is taken from
+  `directory_json`/`node_json` and recorded in the test fixtures, so a server
+  change that drops one breaks a test.
+- **No photos.** The record carries `photoNodeId` and the screen draws initials:
+  a Drive blob per row is a screen's worth of requests for a decoration.
+- **No record opens from a row.** The full record is the People tab (admin or
+  HR), a later item; this screen shows only what a colleague may see.
+- **The chart does not collapse and has no leavers** — `/hr/org` is the people
+  who are here, and a folded chart makes finding somebody a series of guesses.
+- **★ The double directory read is now paid by two readers**: the approvals
+  resolver's *does anybody report to me* (B6.07) and this screen. The fix is
+  still the additive `manages` count on `/hr/me` flagged at B6.07 — a server
+  change, and this was a web item. Re-flagged for whoever does B6.08b.
+- **Still English only** for the `hr*` block; fr/nl at the wave review, B6.11.
+- **★ `/hr` remains a new top-level prefix** needing the production Caddyfile at
+  the next deploy (standing since B6.02b).
+- **★ The pre-existing `snooze.rs` flake noted at B6.05 is untouched and still a
+  human's to fix.**
+
+CHANGELOG: one entry, in a person's voice, about looking a colleague up without
+having to ask a person — and about what the directory deliberately does not
+hold.
+
+Next item: B6.08b (Web HR — the leave request and approval screens, and the
+absence calendar).
