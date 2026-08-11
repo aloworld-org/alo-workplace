@@ -2353,3 +2353,39 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   are removed after the slice lands.
 - **Next:** S2.01e, deterministic whole-site translation proposals with
   before/after review and approve-only writes.
+
+## 2026-08-11 — S2.01e reviewed whole-site translation
+
+- **Shipped:** every non-default language now has a visible **Translate whole
+  site** action beside the existing manual translation path. It prepares one
+  deterministic proposal spanning page content and site-facing blog metadata,
+  then shows each original and translated title/path in a review surface.
+  Preparing never writes. Approval rechecks every source snapshot and applies
+  every target page and post in one transaction, so stale or invalid output
+  changes nothing. Non-home translated pages cannot acquire an empty path.
+- **Tenant proof:** storage tests cover atomic page/post writes, exact localized
+  post reads, stale-source rejection, invalid translated paths, and a foreign
+  tenant receiving `NotFound` without changing owner data. The real-router test
+  repeats proposal-without-write, approval, stale rejection, and foreign-tenant
+  `404` behavior against PostgreSQL with a scripted localhost model.
+- **Real curl transcript:** after killing the stale process, a freshly built
+  `alo-jmap` used a disposable migrated database, filesystem blobs, two real
+  PKCE logins, and a localhost-only OpenAI-compatible fixture. Preparing an
+  English-to-French proposal returned the visible `Home` → `Accueil` review
+  while the French page still resolved as fallback; approval returned `200`
+  and the exact French page then read `Accueil`. The other tenant received
+  `404` from both prepare and approve. The site, server, fixture, blobs, and
+  disposable databases were removed; no external AI, production, DNS, or mail
+  service was contacted.
+- **Verified:** touched Rust formatting; strict offline all-target clippy for
+  `alo-ai`, `alo-store`, and `alo-jmap`; their complete test suites plus the
+  focused translation storage and real-router regressions; `npx tsc --noEmit`;
+  focused Sites/i18n ESLint; 30 focused Sites UI tests; `npm run build`; and
+  `git diff --check`.
+- **Cuts/flags:** blog title, slug, and excerpt are translated and stored, but
+  blog bodies remain alo Docs content and public locale-aware blog routing is
+  a later publishing slice. The migration is `0169` after Inventory claimed
+  `0166` and HR claimed `0167`–`0168` during the final rebases. The UI follows Wix/Squarespace's visible
+  language workspace and a Google-Translate-style review-before-apply flow;
+  AI is optional and never gatekeeps the manual path.
+- **Next:** S2.02a, tenant-owned collection bindings to alo Base tables.

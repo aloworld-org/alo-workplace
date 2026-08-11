@@ -6,6 +6,13 @@ contracts.
 
 ## Unreleased
 
+- **Translate a whole website, then decide.** Website owners can prepare one
+  translation proposal for every page and blog post, compare the original and
+  translated titles, paths, excerpts, SEO copy, and page sections, and approve
+  the complete result only when it is ready. Preparing and reviewing changes
+  nothing; approval writes the reviewed language atomically, and manual
+  translation remains available when AI is not configured.
+
 - **alo Inventory now speaks French and Dutch, from the shelf to the order.**
   The whole module reads in your own language: the catalog, what is on the
   shelves and the movement history behind a row, both order documents with the
