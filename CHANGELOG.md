@@ -8,6 +8,18 @@ contracts.
 
 ## Unreleased
 
+- **A website can now publish itself at a moment you choose.** Beside the
+  publish button, every website has a schedule: pick a date and time — the
+  field already proposes tomorrow morning rather than waiting empty — and the
+  site goes live by itself, whether or not you are at your desk. The moment is
+  always shown in your own time, with your time zone named beside the picker,
+  so the nine o'clock you pick is the nine o'clock you meant. Everything you
+  save until then goes live with it. You can move the moment or call it off at
+  any point, and nothing that is already online changes when you do. When the
+  moment arrives, the screen says the site published itself — and if it could
+  not (a website with no pages yet, for instance), it says so in plain words
+  and keeps them until you have fixed it, instead of quietly doing nothing.
+
 - **Every version of a website is kept, and an earlier one can go back
   online.** Publishing a website has always frozen exactly what visitors see.
   alo now keeps those versions as a history you can read — when each went

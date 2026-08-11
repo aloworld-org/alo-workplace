@@ -2823,3 +2823,88 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.05b, the scheduled-publishing service and UI (visible schedule
   control, local-time explanation, cancel/reschedule, worker execution, wire
   transcript).
+
+## 2026-08-12 — S2.05b the website that publishes itself at the chosen moment
+
+- **Shipped:** the visible half of scheduled publishing, on top of S2.05a's
+  model. Two new alo-jmap modules and one new web surface, with no store
+  changes at all: `site_schedule.rs` (routes) is the *intention* surface,
+  `site_publish_worker.rs` (the sweep) is its execution, and
+  `web/src/sites/SchedulePublish.tsx` is the control, mounted directly under
+  the publish bar because publishing later is the same decision as publishing
+  now with a moment attached.
+- **Routes** (`/sites/{id}/schedule`, registered in `server.rs`, covered by the
+  existing per-site-grant middleware because the template starts with
+  `/sites/{id}`): `GET` answers `{schedule, history}` — the pending intention
+  or `null`, plus a bounded history; `POST {"publishAt"}` both schedules and
+  reschedules (the store moves the same row, so the id survives); `DELETE
+  /sites/{id}/schedule/{schedule}` calls one off. `publishAt` is an RFC 3339
+  **instant** in both directions: a caller may send `+02:00` and every answer
+  reports UTC, so no wall-clock string ever travels without its zone.
+- **The sweep** runs every 30 seconds from `main.rs`, the form-notification
+  posture: claim due rows, then publish each **through the scheduling user's
+  own account door**, so a scheduled publish has the same tenant scope and the
+  same recorded author as the editor's button. It splits the two failure modes
+  deliberately — a store *refusal* (`Conflict`/`Validation`/`NotFound`) is
+  written to the row verbatim and is terminal, while an *infrastructure*
+  failure (`Db`/`Blob`/`Migrate`/`Crypto`) leaves the claim standing so
+  S2.05a's stale-claim path retries it and, after three attempts, fails it
+  visibly. Only the coarse error reaches a log; no site content, no addresses.
+- **The screen** states the moment in the reader's own time (`Intl`, `dateStyle
+  full`) and **names their time zone beside the picker**, because someone
+  scheduling a launch from another country has to see which nine o'clock they
+  picked. The `datetime-local` field is pre-filled with tomorrow at 09:00
+  rather than left empty (the S1.30b lesson: never a blank field with a
+  disabled button), and what is sent is `new Date(value).toISOString()`, so the
+  clock the browser showed and the instant the server stores cannot disagree.
+  Scheduling, moving and calling off are one click each with no confirmation —
+  none of them touches what is online (ux law 7) — and while an intention is
+  pending the panel polls once a minute, so "publishes on …" becomes "published
+  itself on …" without a reload. A refusal is shown in the server's own words.
+- **Real curl transcript** (fresh admin on the local docker Postgres,
+  `alo-jmap` on `127.0.0.1:8080`, `SITES_DOMAIN=alosites.test`): no token →
+  `401 missing or invalid bearer token` on all three routes and `405` on `PUT`
+  → nothing scheduled reads `{"schedule": null, "history": []}` → a past moment
+  → `422 a scheduled publish must be in the future`; `"next monday"` → `422
+  publishAt must be a date and time with a time zone, for example
+  2026-09-01T09:00:00+02:00` → **`publishAt=2026-08-13T09:00:00+02:00` comes
+  back as `2026-08-13T07:00:00Z`** (`status: scheduled`, `attempts: 0`) → moved
+  a day later, **same id**, `updatedAt` moved → `psql`: one row, `scheduled` →
+  `DELETE` → `cancelled` with `finishedAt`, a second `DELETE` → `422 this
+  scheduled publish has already finished`, an invented id → `404 no such
+  scheduled publish for this website`, and the site is still `draft` (an
+  intention is not a publish) → then two sites scheduled 20 seconds out and
+  **the server's own sweep left alone to run**: `INFO scheduled publish sweep
+  published=1`, the site with a home page reads `live` with the version the
+  schedule names (`publishId` on the row, `attempts: 1`), and the site with no
+  pages reads `failed` with `lastError: "site has no pages to publish"`,
+  `attempts: 1`, still `draft`. Outsider tenant: `404 no such site` on both the
+  read and the write. Fixture sites deleted; `psql` after: zero schedule rows
+  left. No production, email, DNS or external AI service was contacted.
+- **Verified:** `cargo fmt`; strict offline all-target Clippy for `alo-jmap`,
+  zero warnings; the new `site_schedule_http` suite (4 tests) green — 401s,
+  the schedule/move/cancel arc, the cross-tenant matrix, and the sweep test
+  that publishes one site and refuses another — inside the **full unfiltered
+  `cargo test -p alo-jmap`**; the web gate clean (`npx tsc --noEmit`, `npx
+  eslint` on every changed file, `npm run build`) with the sites + i18n vitest
+  suites green including the new `SchedulePublish.test.tsx` (the proposal in
+  the field, the instant that is sent, the zone that is named, the pending
+  sentence, the call-off, the verbatim refusal, and the "it published itself"
+  outcome). `alo-store` was not touched, so its suite is unchanged.
+- **Cuts/flags:**
+  - The panel polls once a minute rather than holding a live connection: a
+    website going live is not a chat message, and a minute of latency on a
+    screen the person may not even be looking at buys nothing worth a socket.
+  - There is no "publish these pages only" scheduling: a scheduled publish is
+    the same whole-site freeze the button makes, which is why everything saved
+    before the moment goes live with it — the screen says so.
+  - The sweep is a per-process tick. Two alo-jmap replicas are safe (the claim
+    is `FOR UPDATE SKIP LOCKED`), but a deployment that is down over a chosen
+    moment publishes late, not never: the first tick after it comes back
+    claims the overdue row. Worth stating in operations docs at the wave
+    review.
+  - fr/nl written with the English copy, as the parity test requires.
+  - No new route *prefix* (`/sites` is already proxied), so the production
+    Caddyfile needs nothing for this item.
+- **Next:** S2.06a, password-protected pages (hashing, the anonymous
+  challenge/session gate, cache-safe responses, rate limiting, security tests).

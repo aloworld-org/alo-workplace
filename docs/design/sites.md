@@ -248,6 +248,39 @@ path, never a second way to freeze a site.
   time, because the author has until that moment to finish it. Times are
   stored in UTC; explaining them in the reader's own time is the
   surface's job (S2.05b).
+- **Routes** (`site_schedule.rs`, S2.05b) — `GET /sites/{id}/schedule`
+  answers `{schedule, history}` (the pending intention, `null` when there
+  is none, plus what previous ones did); `POST` with `{"publishAt"}` both
+  schedules and reschedules; `DELETE /sites/{id}/schedule/{schedule}`
+  calls one off. `publishAt` is an RFC 3339 **instant** in both
+  directions — a caller may send any offset and every answer reports UTC,
+  so no wall-clock string ever travels without its zone. Same guards and
+  error contract as the rest of `/sites/{id}`: the per-site grant
+  middleware, `404` for anything outside the caller's tenant, `422`
+  carrying the store's own sentence.
+- **The sweep** (`site_publish_worker.rs`, S2.05b) — a 30-second tick in
+  `alo-jmap` claims due intentions and publishes each **through the
+  scheduling user's own account door**, so a scheduled publish has the
+  same tenant scope and the same recorded author as the button in the
+  editor. It answers the two failures differently: a store *refusal* is
+  written to the row verbatim and is terminal, while an *infrastructure*
+  failure (database, blob backend) leaves the claim standing so the
+  stale-claim path retries it and, after three attempts, fails it
+  visibly. Nothing but the coarse error reaches a log.
+- **The surface** (`SchedulePublish.tsx`, S2.05b) — a panel directly
+  under the publish bar, because publishing later is the same decision as
+  publishing now with a moment attached. The picker is a
+  `datetime-local`, pre-filled with tomorrow at 09:00 rather than left
+  empty, and beside it the screen states the moment in full and **names
+  the reader's own time zone** — the person scheduling a launch from
+  another country has to be able to see which nine o'clock they picked.
+  What is sent is `new Date(value).toISOString()`, so the wall clock the
+  browser showed and the instant the server stores cannot disagree.
+  Scheduling, moving and calling off are one click each with no
+  confirmation, since none of them touches what is online; the panel
+  polls once a minute while an intention is pending, so "publishes on …"
+  becomes "published itself on …" without a reload, and a refusal is
+  shown in the server's own words.
 
 ### Form flow
 
