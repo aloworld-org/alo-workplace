@@ -61,6 +61,30 @@ Nothing here is a feature; each is a defect a first meeting would expose.
 | **Live captions** | Accessibility, and a legal requirement for some customers |
 | **★ Live translated captions** | A Flemish/Walloon/German meeting where everyone reads their own language. The most European feature in the product |
 
+## Stage 3b — the ones only alo can build
+
+Everything in Stage 3 above is a feature Zoom could ship next quarter. These
+cannot be copied by anybody who does not already hold the calendar, the CRM,
+the tasks, the files and the mail — which is the whole argument for one
+product. Each is small on its own; together they are the reason to switch.
+
+| | |
+|---|---|
+| **The agenda is in the call** | The invitation already has a description and a duration. Show it, tick items off, and the meeting knows it is a 30-minute meeting with four things to cover. Nobody else has the invitation |
+| **Who you are talking to** | On a customer call, the participant panel shows the deal, the last invoice, and what was agreed last time — from CRM and Billing, beside their face. This is the single most valuable thing on this list for a business, and Teams cannot do it because it does not know who your customers are |
+| **Decisions become tasks, with owners** | Not "action items in a summary" — real Tasks in alo, assigned, due, appearing on somebody's board before they have left the call. The summary is the by-product; the task is the point |
+| **The follow-up writes itself** | A draft email to the attendees, in Mail, with what was decided. Proposed and approved like everything else — never sent by a machine |
+| **The room's files are at hand** | A meeting started from a chat room can offer what was shared in that room, so nobody hunts through Drive while eleven people watch |
+| **"What have I missed?"** | Joining late, ask the agent. It has the transcript so far and the room's history. Every other product makes you interrupt |
+| **Consent as a record, not a checkbox** | Recording in the EU is a legal act. Who consented, when, and to what, stored as an artefact somebody can produce later. Zoom shows a banner; a European product should keep evidence |
+| **Notes in a real document** | Shared notes during the call are an alo Doc from the start, so they survive in Drive rather than in a panel nobody opens again |
+| **Meeting templates** | A "customer demo" that always brings the deck, the CRM card and the agenda. Templates work here because the meeting can reach the things it needs |
+
+Two more, honestly labelled as table stakes rather than differentiators, and
+both genuinely expected in 2026: **noise suppression**, and **speaking-time
+balance** shown privately to the host — the second costs almost nothing and
+changes how meetings run.
+
 ## Stage 4 — scale and the long tail
 
 Webinar mode, breakout rooms, polls, whiteboard, dial-in by phone, hardware
