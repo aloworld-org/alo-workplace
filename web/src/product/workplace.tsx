@@ -6,7 +6,7 @@
 // This is the ONE file that imports the suite-only areas (`../control`,
 // `../authoring`). alomails ships the `mail` surface instead and deletes this
 // file together with those areas — nothing else in the web app references them.
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, type ComponentType } from "react";
 import {
   BarChart3,
   Boxes,
@@ -25,18 +25,8 @@ import {
 } from "lucide-react";
 
 import { strings } from "../i18n";
-import { BillingModule } from "../billing";
-import { ChatModule } from "../chat";
-import { MeetModule } from "../meet";
-import { CrmModule } from "../crm";
-import { FinanceModule } from "../finance";
-import { ApprovalsWidget, HrModule } from "../hr";
-import { InsightsModule } from "../insights";
-import { InventoryModule } from "../inventory";
-import { ProjectsModule, TimerWidget } from "../projects";
-import { SitesModule } from "../sites";
-import { ControlConsole } from "../control";
-import { DriveModule } from "../drive";
+import { ApprovalsWidget } from "../hr/ApprovalsWidget";
+import { TimerWidget } from "../projects/TimerWidget";
 import type { ComposeInsert, ProductModule, ProductSurface } from "./types";
 import { adminConsole, defaultPath, sharedModules } from "./shared";
 
@@ -45,6 +35,25 @@ import { adminConsole, defaultPath, sharedModules } from "./shared";
 // mail. (The full Docs surface now lives inside Drive as a file type.)
 const AuthoringInsertModal = lazy(() =>
   import("../authoring").then((m) => ({ default: m.AuthoringInsertModal })),
+);
+
+const DriveModule = lazy(() => import("../drive").then((m) => ({ default: m.DriveModule })));
+const BillingModule = lazy(() => import("../billing").then((m) => ({ default: m.BillingModule })));
+const ChatModule = lazy(() => import("../chat").then((m) => ({ default: m.ChatModule })));
+const MeetModule = lazy(() => import("../meet").then((m) => ({ default: m.MeetModule })));
+const CrmModule = lazy(() => import("../crm").then((m) => ({ default: m.CrmModule })));
+const FinanceModule = lazy(() => import("../finance").then((m) => ({ default: m.FinanceModule })));
+const HrModule = lazy(() => import("../hr").then((m) => ({ default: m.HrModule })));
+const InsightsModule = lazy(() => import("../insights").then((m) => ({ default: m.InsightsModule })));
+const InventoryModule = lazy(() => import("../inventory").then((m) => ({ default: m.InventoryModule })));
+const ProjectsModule = lazy(() => import("../projects").then((m) => ({ default: m.ProjectsModule })));
+const SitesModule = lazy(() => import("../sites").then((m) => ({ default: m.SitesModule })));
+const ControlConsole = lazy(() => import("../control").then((m) => ({ default: m.ControlConsole })));
+
+const deferred = (Component: ComponentType) => () => (
+  <Suspense fallback={null}>
+    <Component />
+  </Suspense>
 );
 
 /** A compose-insert Modal that reuses the shared authoring modal for `kind`. */
@@ -77,7 +86,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleDrive,
     Icon: HardDrive,
     enabled: true,
-    element: () => <DriveModule />,
+    element: deferred(DriveModule),
   },
   // Billing is a workspace module only (ADR 0035): the business suite is what
   // aloworkplace.com sells, and it has no place in the standalone mail app.
@@ -87,7 +96,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleBilling,
     Icon: Receipt,
     enabled: true,
-    element: () => <BillingModule />,
+    element: deferred(BillingModule),
   },
   // CRM is a workspace module only (ADR 0035), beside Billing and for the same
   // reason: the business suite is what aloworkplace.com sells. It sits next to
@@ -98,7 +107,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleCrm,
     Icon: Handshake,
     enabled: true,
-    element: () => <CrmModule />,
+    element: deferred(CrmModule),
   },
   // Projects is a workspace module only (ADR 0035, wave B3), beside Billing
   // and CRM: client work, the hours worked on it, and the invoice those hours
@@ -114,7 +123,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleProjects,
     Icon: Briefcase,
     enabled: true,
-    element: () => <ProjectsModule />,
+    element: deferred(ProjectsModule),
   },
   // Finance is a workspace module only (ADR 0035, wave B4): the books behind
   // the documents Billing raises. It sits after Projects and before Insights,
@@ -131,7 +140,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleFinance,
     Icon: Landmark,
     enabled: true,
-    element: () => <FinanceModule />,
+    element: deferred(FinanceModule),
   },
   // Inventory is a workspace module only (ADR 0035, wave B5): what a business
   // buys, keeps and ships. It sits after Finance and before Insights because it
@@ -147,7 +156,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleInventory,
     Icon: Boxes,
     enabled: true,
-    element: () => <InventoryModule />,
+    element: deferred(InventoryModule),
   },
   // HR is a workspace module only (ADR 0035, wave B6): the people a business
   // employs, and the people applying to join it. Unlike the business modules before
@@ -160,7 +169,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleHr,
     Icon: Users,
     enabled: true,
-    element: () => <HrModule />,
+    element: deferred(HrModule),
   },
   // Insights is a workspace module only (ADR 0037), and it sits after the
   // modules whose records it reads: a chart here is billing's and CRM's own
@@ -171,7 +180,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleInsights,
     Icon: BarChart3,
     enabled: true,
-    element: () => <InsightsModule />,
+    element: deferred(InsightsModule),
   },
   // Sites is a workspace module only (ADR 0036): the public website a business
   // publishes belongs to the suite, not to the standalone mail app.
@@ -181,7 +190,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleSites,
     Icon: Globe,
     enabled: true,
-    element: () => <SitesModule />,
+    element: deferred(SitesModule),
   },
   // Chat is live as of ADR 0038 — built on alo's own store, not Matrix.
   {
@@ -190,7 +199,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleChat,
     Icon: MessagesSquare,
     enabled: true,
-    element: () => <ChatModule />,
+    element: deferred(ChatModule),
   },
   {
     id: "meet",
@@ -198,7 +207,7 @@ const suiteModules: ProductModule[] = [
     label: strings.moduleMeet,
     Icon: Video,
     enabled: true,
-    element: () => <MeetModule />,
+    element: deferred(MeetModule),
   },
 ];
 
@@ -208,7 +217,7 @@ export const surface: ProductSurface = {
     adminConsole,
     {
       path: "/control/*",
-      element: () => <ControlConsole />,
+      element: deferred(ControlConsole),
       menu: {
         to: "/control",
         label: strings.controlOpen,
