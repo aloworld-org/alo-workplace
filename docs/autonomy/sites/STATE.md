@@ -2384,8 +2384,49 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   `git diff --check`.
 - **Cuts/flags:** blog title, slug, and excerpt are translated and stored, but
   blog bodies remain alo Docs content and public locale-aware blog routing is
-  a later publishing slice. The migration is `0169` after Inventory claimed
-  `0166` and HR claimed `0167`–`0168` during the final rebases. The UI follows Wix/Squarespace's visible
+  a later publishing slice. The migration is `0170` after Inventory claimed
+  `0166` and HR claimed `0167`–`0169` during rebases. The UI follows Wix/Squarespace's visible
   language workspace and a Google-Translate-style review-before-apply flow;
   AI is optional and never gatekeeps the manual path.
 - **Next:** S2.02a, tenant-owned collection bindings to alo Base tables.
+
+## 2026-08-11 — S2.02a tenant-owned Base collection bindings
+
+- **Shipped:** Sites can now connect one named reusable content collection to
+  an alo Base table. A binding keeps stable table and field ids rather than
+  mutable display names and exposes a compact semantic mapping for title,
+  slug, summary, body, image, link, and publication date. Title is required;
+  richer roles remain optional so a two-column Base works immediately.
+  Create, read, list, replace, and disconnect operations are tenant/site
+  scoped, and disconnecting never removes the source Base or its records.
+- **Validation proof:** every write resolves the selected Base through the
+  caller's Drive access, proves the table belongs to that Base, proves every
+  mapped field belongs to that table, and enforces role-compatible Base types
+  (`text`, `attachment`, `link`, and `date`). The storage regression covers a
+  missing table, a field from another table, an image mapped to text, atomic
+  rejection that preserves the previous mapping, and a successful lifecycle.
+- **Tenant proof:** a second tenant sees an empty collection list and no
+  collection detail, receives `NotFound` for create/update/delete against the
+  owner's site, cannot bind the owner's Base or inject its own Base into the
+  owner's site, and leaves the owner's mapping unchanged. Composite foreign
+  keys reinforce the tenant/site and tenant/Base-table ownership boundaries.
+- **Verified:** `cargo fmt -p alo-store`; strict offline all-target
+  `cargo clippy -p alo-store --all-targets --jobs 1 -- -D warnings`; focused
+  collection compilation and the two focused collection tenancy tests; full
+  `cargo test -p alo-store --jobs 1 -- --test-threads=1 --format terse` against
+  a freshly migrated disposable PostgreSQL database (1,030 unit tests plus
+  every integration/doc target); post-rebase strict Clippy and both focused
+  tests on a second zero-state database after migration renumbering; and
+  `git diff --check`. No web file or HTTP
+  route changed, so TypeScript/ESLint/build and real-curl gates are not
+  applicable to this storage-only slice.
+- **Cuts/flags:** the first full-suite invocation reached the terminal's
+  two-minute wrapper timeout without a test failure; the authoritative rerun
+  used the required long foreground timeout and completed green. Collection
+  row snapshotting and public rendering deliberately remain S2.02b. This
+  collection migration is `0171`; the previously shipped Sites locale
+  migration moved to `0170` when HR claimed `0169` during the final rebase. The model
+  follows Webflow CMS and Contentful's structured-field convention while
+  preserving alo Base as the single editable source of truth.
+- **Next:** S2.02b, immutable collection publish snapshots and deterministic
+  public rendering.

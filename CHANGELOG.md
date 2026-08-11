@@ -6,6 +6,12 @@ contracts.
 
 ## Unreleased
 
+- **Turn an alo Base table into reusable website content safely.** Website
+  owners can connect a table using stable columns for the title, path,
+  summary, body, image, link, and publication date. Renaming a column does not
+  break the connection, invalid field types are rejected before anything is
+  changed, and disconnecting the collection leaves the original Base intact.
+
 - **Translate a whole website, then decide.** Website owners can prepare one
   translation proposal for every page and blog post, compare the original and
   translated titles, paths, excerpts, SEO copy, and page sections, and approve
