@@ -17123,3 +17123,212 @@ prefix this item.
 Next item: B6.01 (the alo HR design note — the employee model, leave policies
 and balances, approvals, the recruitment pipeline, and an explicit EU AI Act
 posture: screening is suggest-only with a logged human decision).
+
+## 2026-08-11 — B6.01 the last wave opens with a refusal: `docs/design/hr.md`
+
+Wave B6 begins, and alo HR is the first module whose records are **about people
+who have rights over them**. Every other module stores facts the tenant owns
+outright — an invoice is ours to issue, a stock move is ours to explain, a
+journal entry is an accounting fact because we posted it. An employee record is
+different in kind: the person it describes can demand a copy of it, demand it be
+corrected, and separately the law tells us to keep parts of it for years after
+they leave. Two obligations pulling opposite ways on the same row. Hence the
+module's central rule, from which most of the 1 096-line note follows:
+
+> A person's record is readable by them, by the people who must act on it, and
+> by nobody else — and every act on it is recorded. "Everyone in the tenant" is
+> never the answer to who can see an HR field.
+
+The rejected alternative is stated once at the top so the rest can lean on it:
+**HR as an ordinary tenant-wide module like Billing**, any member reading the
+directory and an admin flag guarding the writes. It is what the five modules
+before this one do and it would be half the code. It is wrong for a reason that
+has nothing to do with taste — a tenant-wide read of `hr_employees` is a
+tenant-wide read of everybody's date of birth, home address, pay and sickness
+pattern. The blast radius of a forgotten `WHERE` in Billing is a customer list;
+here it is the workforce's private lives.
+
+**Three doors, because two were not enough.** B3 established the doctrine (own
+data on `AccountStore`, cross-user reads on `TenantStore` behind a role) and B6
+needs a third, because the person who must decide your leave is neither you nor
+an admin: it is your manager, and *manager* is not a role anybody grants — it is
+a shape in the org chart. So: the **own** door (`/hr/me`, your balance, your
+requests — and, not incidentally, the subject-access answer: an employee asking
+what we hold about them opens a screen instead of writing to a controller); the
+**manager** door, a `TenantStore` read narrowed by `manager_id` to direct
+reports only; and the **HR** door behind `require_hr`. A field-by-field table
+says what each door sees, and the projection is chosen in the store by which
+function was called — a filter at the edge is a filter somebody forgets on the
+second route.
+
+**The HR role is exactly the one the code predicted.**
+`platform/alo-store/src/tenant_roles.rs` says "the second role — B6's HR role is
+the likely one — adds a value to `TenantRole` and the CHECK in migration 0149,
+and widens the gates by a word", and migration `0149`'s own comment says the
+same. The note takes them at their word: `TenantRole::Hr`, an expand-only
+migration widening the CHECK to `('accountant','hr')`, and `require_hr` beside
+`require_finance`. **`scoped_roles`' middleware is untouched — checked, not
+assumed:** it keys on *holding the accountant role while not admin*, not on
+"holds some scoped role", so an HR holder who is also an ordinary employee keeps
+every ordinary capability. Two consequences recorded on purpose: an accountant
+may **not** read `/hr/*` (the role is "the books and none of the mail", and an
+external bookkeeper reading everyone's contract is the failure that role exists
+to prevent), and a person may hold both roles and then holds the union.
+
+**A constraint discovered by reading rather than guessing.** The obvious route
+spelling groups leave under a segment — `/hr/leave/requests/{id}/approve` — and
+it would break the audit trail. `audit_action::event_for` derives a record's
+history mechanically: module is the first segment, **collection the second**,
+record id the third. That spelling files every approval in the tenant against a
+nameless `hr.leave` pile with no id, and "who approved *my* leave, and when"
+becomes unanswerable. `tests/audit_routes.rs` would catch it — after the routes
+were written, which is the mistake B3 paid to undo. So the grouping is in the
+name: `leave-requests`, `leave-policies`, `leave-balances`,
+`checklist-templates`, `holiday-calendars`. Verified against the real
+`singular`/`is_plural`/`name_of`: `hr.leave_request.approve` against the
+request's own id, `hr.employee.document.create` against the employee.
+
+**The payroll export is a `POST`.** Every other export in the product is a `GET`
+with a `.csv` twin. This one creates an `hr_payroll_exports` row and answers
+with the file, because the audit trail records only mutations and *this*
+particular read — every employee's pay in one response — deserves a line more
+than most writes do. Making the export a record is the smallest honest way into
+the log that already exists; a general read-audit for `/hr/*` was rejected as
+noise that would bury the fourteen lines that matter.
+
+**Decisions with their rejected alternatives, eleven in all.** The ones worth
+naming here:
+
+- **Minutes, never days-as-a-decimal.** The rule money has had since B1, applied
+  to the second quantity people check by hand. A day is not a fixed quantity —
+  it is whatever that person normally works on that weekday — so a seven-integer
+  `pattern_minutes` converts, read from the employment **in force on the day in
+  question**. Rejected: days with a half-day flag, which cannot express a 4-hour
+  Friday, a 30-hour contract, or a mid-year move to four days.
+- **Employees and employments are two tables.** A balance computed last March
+  must still be explicable next March, which needs the pattern that was in force
+  *then*. Employments are appended, never edited — the same shape as B1's FX
+  snapshot and B3's rate on a time entry.
+- **No `balance_minutes` column.** It is B5's `qty_on_hand` mistake applied to
+  time off: two sources of truth that drift, found out by an employee who counts
+  their own days. A balance is always a fold of requests × policies ×
+  employments.
+- **The absence layer is not a calendar.** Writing approved leave as events was
+  rejected on three grounds, one of them structural and checked in the schema:
+  every calendar has an `owner_user_id`, so the absence calendar would belong to
+  a *person*, who could delete an approved absence they never decided. Also a
+  second source of truth, and events have titles — the field most likely to end
+  up saying "Sick — hospital".
+- **Checklists are task projects.** Instantiating an onboarding template creates
+  real tasks with the source link ADR 0021 already gives every task. Rejected: a
+  fifth board in a product that has one.
+- **The approvals inbox adds no server route.** The web composes three existing
+  queues; a server-side aggregate would hold three different role gates in one
+  handler and gain a reason to change whenever any of the three does. The honest
+  cost — the three lists page independently — is named rather than discovered.
+  It would also be a fourth place where "who may decide this" is decided, and
+  there are already exactly three, each next to the data it governs.
+- **Sickness is health data (GDPR Art. 9).** The type is stored; a reason, a
+  diagnosis or a doctor's words are not. There is no free-text reason field on a
+  sick request. The **manager door does not return the leave type** — a manager
+  sees that you are away, not what is wrong with you; the policy the request
+  draws on is the operational fact, and it is what they get.
+
+**★ The wave's largest decision is a decision not to build a feature.**
+`docs/features.md` promises CV screening "suggest-only with mandatory human
+decision". This note declines screening in any form — no ranking, scoring,
+shortlisting, matching or "fit" assessment, not even suggest-only; nothing reads
+a CV's contents; the two HR agent tools cannot reach the applicant tables at
+all. The reasoning, at length in § *The EU AI Act posture*: Regulation (EU)
+2024/1689 Art. 6(2) with Annex III point 4(a) makes "analyse and filter job
+applications, and evaluate candidates" high-risk, and those obligations apply
+from **2 August 2026** under Art. 113 — already. Art. 6(3)'s derogation does not
+rescue it: its final subparagraph makes a system *always* high-risk when it
+performs profiling of natural persons, and ranking candidates against a job
+description is profiling in the plain sense of GDPR Art. 4(4); and a provider
+who believed the derogation applied would still owe a documented assessment and
+EU-database registration (Art. 6(4), Art. 49(2)). Being the **provider** of a
+high-risk system means Arts. 9–17, 43, 49 and 72 — a compliance programme, not a
+feature flag. CLAUDE.md requires this loop to implement the strict reading of a
+cited spec and flag the ambiguity rather than guess loosely, so: we do not build
+it, and the tenant reads the CVs. Two adjacent lines are recorded so a future
+reader draws the right boundary — **the kanban board itself is not an AI
+system** (Art. 3(1): it infers nothing), and **emotion inference in the
+workplace is prohibited outright** by Art. 5(1)(f), so no future item in this
+module may add sentiment on interview notes or engagement scoring.
+
+The two tools that do ship at B6.09 are `who_is_off` (an answer from the absence
+layer, with the layer's discretion) and `draft_letter_from_template` (a draft
+from a **tenant-authored** template into Drafts; a template the tenant has not
+written is a `422`, not an improvisation).
+
+**How verified.** Docs only — no Rust, no web, no migration, so no compile gate
+applies (the B5.01 precedent). What was verified is that the note's claims about
+this codebase are true rather than plausible, because a design note that
+misdescribes the code it plans against is worse than none:
+
+```
+audit_action.rs      collection-is-second-segment + singular/is_plural/name_of
+                     → `leave-requests` derives `hr.leave_request` + the path id
+scoped_roles.rs      gate is `!is_admin && has_role(Accountant)` — not "any
+                     scoped role", so adding `Hr` changes nothing there
+tenant_roles.rs      + migration 0149 both name B6's HR role as the second value
+calendar.rs          every calendar has `owner_user_id`; grants are user|group;
+                     there is no tenant-owned calendar → the absence-layer decision
+drive.rs             `DriveLocation` is `Personal | Space` (closed)
+tasks.rs             `source_kind`/`source_id` on every task → the checklist reuse
+iban.rs              `canonicalize` exists → the IBAN field's validator
+vite.config.ts       `API_PATHS` has no `/hr` yet → the B6.02a reminder
+migrations/          highest is 0166 → the next free number is 0167
+```
+
+**Cuts, named.** Twelve, each with its reason, in § *Out of scope for B6*. The
+two that are refusals rather than deferrals are payroll calculation (a permanent
+non-goal already in `ROADMAP.md`) and screening. The rest are the manager
+*chain* as an approval path (direct reports only; escalation is HR), performance
+management, time-and-attendance rotas, automated account provisioning from an HR
+record (a write path from HR into identity would make a badly-scoped HR
+permission into an account-creation capability), absence notifications, scheduled
+erasure of expired records, working-time compliance checking, and every HRIS /
+payroll-bureau / job-board integration — the CSV is the integration.
+
+**Flags for the human.**
+
+- **★ `docs/features.md` and this note now disagree, and the note is the
+  conservative one.** The `[B6]` screening line needs amending to say what we
+  actually build. It is a product decision with legal consequences and the loop
+  does not make product decisions — so the line is left standing and flagged
+  here rather than edited.
+- **★ The seeded statutory leave entitlements and retention defaults will be
+  research, not advice.** Each seed row will carry its source in a comment; a
+  human with an employment lawyer should confirm the countries alo sells into
+  before a tenant relies on a default.
+- **★ The wave gate is still unanswered, and it matters more here than in
+  B2–B5.** The first migration of this wave creates the table holding home
+  addresses, national ids and pay. A tenant who has never agreed to that being
+  in our database should not have it created for them by a loop.
+- **Works councils** (Germany's *Betriebsrat*, the Netherlands' *OR*) must often
+  be consulted before software that processes employee data is introduced. That
+  is our customer's obligation, not ours, but it is a sales fact and a
+  documentation obligation.
+- Whether an employee may see their whole pay history, and whether the HR role
+  should also open the expense and timesheet approval queues, are two questions
+  about how a customer's company is organised rather than about our code.
+- The server's refusal sentences are still English in every language — the
+  standing cross-cutting `StoreError` vocabulary item from B1.27, B2.14, B4.15
+  and B5.11. This module makes it sharpest: the refusals an employee reads are
+  about their own leave.
+
+**HUMAN ACTION:** `/hr` will be a **new top-level route prefix** and needs
+adding to the production Caddyfile at the next deploy, beside `/billing`,
+`/crm`, `/audit`, `/insights`, `/projects`, `/finance` and `/inventory`. It also
+needs adding to `API_PATHS` in `web/vite.config.ts` in the same item that
+registers the first route (B6.02b), or every call 404s into the dev SPA — the
+lesson S1.11, BI1.04, B3.04, B4.05b and B5.04a have each paid for. The loop
+never edits `deploy/`.
+
+No CHANGELOG line: a design note changes no behaviour (the B5.01 precedent).
+
+Next item: B6.02a (employees, the records — the migration and the store, with
+the HR-role access scoping tests: wrong tenant, wrong user, wrong role with its
+field-by-field absence assertions, and wrong manager on a three-level chart).
