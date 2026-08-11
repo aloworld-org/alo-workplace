@@ -8,6 +8,17 @@ contracts.
 
 ## Unreleased
 
+- **Every version of a website is kept, and an earlier one can go back
+  online.** Publishing a website has always frozen exactly what visitors see.
+  alo now keeps those versions as a history you can read — when each went
+  live, who published it, how many pages and which languages it carried — and
+  can say what changed between any two of them: the theme, the languages, the
+  pages added, removed or edited, and the collections whose rows moved.
+  Putting an earlier version back online publishes it again instead of
+  rewriting the past: every version you had is still there, the one you put
+  back is recorded as a copy of the version it came from, and the pages you
+  are still working on are left exactly as you left them.
+
 - **Meet now gives a clear, polished path through every call state.** A focused
   start-call hero and responsive live-meeting gallery replace the old utility
   list, with status, start time, and one-click joining visible on every card.

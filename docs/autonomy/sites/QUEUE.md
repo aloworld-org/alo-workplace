@@ -72,7 +72,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.02c Collections UI: visible connect-table, field mapping, preview, disconnect, and empty-state controls; AI remains optional.
 - [x] S2.03a Site-editor grants: per-site editor role that cannot read Mail, Drive, CRM, Billing, or unrelated sites; storage and wrong-tenant authorization matrix.
 - [x] S2.03b Site-editor UI: invite/revoke collaborators and exercise edit/publish access end to end without exposing workspace administration.
-- [ ] S2.04a Version history API: list immutable publishes, compare metadata, and atomically republish a chosen version without mutating history; tenant tests and wire transcript.
+- [x] S2.04a Version history API: list immutable publishes, compare metadata, and atomically republish a chosen version without mutating history; tenant tests and wire transcript.
 - [ ] S2.04b Version history UI: visible history surface, preview, and one-click rollback with undo/result feedback.
 - [ ] S2.05a Scheduled publishing model: tenant-scoped schedule/cancel/claim semantics with concurrency and wrong-tenant tests.
 - [ ] S2.05b Scheduled publishing service/UI: visible schedule control, local-time explanation, cancel/reschedule, worker execution, and wire transcript.

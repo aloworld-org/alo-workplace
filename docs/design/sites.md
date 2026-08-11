@@ -157,6 +157,33 @@ Dependency direction stays legal: `products/sites` depends on
 `platform/alo-store` and never on another product; the web editor
 talks only to `alo-jmap`.
 
+### Version history and rollback (S2.04)
+
+Every publish already is a version — an immutable `site_publishes` row
+with its frozen page and collection snapshots. The history surface only
+reads them, plus one addition: `site_publishes.restored_from`, naming
+the version a publish was copied from.
+
+- **Reading** — `GET /sites/{id}/publishes` lists the versions newest
+  first with what each froze (page count, languages, collections, who
+  published it, whether it is the live one).
+  `GET /sites/{id}/publishes/compare?from=&to=` answers what a visitor
+  would see differently: theme, language contract, pages added /
+  removed / changed (naming the frozen fields that differ), and
+  collections by name and size. **Metadata only** — the section content
+  itself belongs to a preview, not a diff.
+- **Restoring** — `POST /sites/{id}/publishes/{publish}/restore`
+  appends a NEW publish holding a copy of the chosen one and flips the
+  published-set pointer to it, in one transaction. Rejected
+  alternative: pointing the site back at the old publish id — cheaper,
+  but two versions would then share one identity (the public cache key
+  and visitor `ETag` are `<publish_id>:<path>`), "live" would appear in
+  the middle of the list, and a rollback would leave no trace.
+- **The draft is not touched.** Restoring is a statement about what the
+  internet serves; the editable pages remain the tenant's work in
+  progress. Nothing in a rollback rewrites Base rows either — a
+  collection snapshot comes back, its source table does not move.
+
 ### Form flow
 
 ```

@@ -2589,3 +2589,78 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   account only after accepting it. No production, DNS, or external AI service
   was contacted.
 - **Next:** S2.04a, immutable version history with an atomic republish path.
+
+## 2026-08-11 — S2.04a immutable version history with an atomic restore
+
+- **Shipped:** every publish a website has ever had is now readable as a
+  version history, two versions can be compared, and an earlier one can be put
+  back on the internet. Storage: one expand-only migration adding
+  `site_publishes.restored_from` (composite FK, same-tenant only) and a new
+  `site_versions` store module — history newest-first with what each version
+  froze (pages, languages actually frozen, collections, who published it,
+  whether it is live), a single-version read, a metadata comparison, and the
+  restore. Routes: `GET /sites/{id}/publishes`,
+  `GET /sites/{id}/publishes/compare?from=&to=`, and
+  `POST /sites/{id}/publishes/{publish}/restore`.
+- **Restoring appends, it never re-points.** A restore copies the chosen
+  publish — theme, language contract, every page snapshot, every collection
+  snapshot — into a NEW publish recording where it came from, and flips the
+  published-set pointer in one transaction. The rejected alternative (pointing
+  the site back at the old publish id) is recorded in the module doc and the
+  design note: two versions would share one identity, and the public cache key
+  and visitor `ETag` are `<publish_id>:<path>`. The wire pass shows exactly
+  that — each restore produced a new `ETag`.
+- **The draft is never touched**, and neither is Base: a rollback of the
+  website is not a rollback of the tenant's work in progress or of the rows a
+  collection reads. Both are proved by test and on the wire.
+- **Comparison is metadata only** — theme, default language, languages added
+  or removed, pages added/removed/changed (naming which frozen fields differ,
+  per page *and* language), and collections by name and row count. Section
+  content belongs to a preview, which is S2.04b's.
+- **Isolation proof:** storage tests refuse a foreign tenant and a foreign
+  site on every path (history reads empty, version reads `None`, compare and
+  restore are `NotFound`), prove an outsider cannot move a live site, and
+  prove a real version id addressed through another site is invisible. The
+  real-router suite proves `401` on all three routes and one identical `404`
+  for another tenant's version, another site's version, and an invented id —
+  with the refusal never echoing the foreign id.
+- **Real curl transcript** (fresh admin on a local database, `alo-jmap` on
+  `127.0.0.1:8080`, `alo-sites` on `127.0.0.1:8081`): publish v1 (hero
+  "Bread & butter") → history of one, `current` naming it → edit the hero, add
+  an About page, change the theme, publish v2 → history of two, newest first →
+  compare v1→v2 = theme changed, home page `["sections"]`, About `added` →
+  restore v1 → new id with `restoredFrom` = v1, history of three, compare v1
+  vs the copy `identical: true`, the draft still reading "Sourdough, daily" →
+  **the public host serves "Bread & butter" again and `/about` is 404**, then
+  restoring v2 brings both back, each restore with a fresh `ETag`. Negatives:
+  no token → `401` + `WWW-Authenticate`; unknown site, unknown version, and a
+  compare end that does not resolve → `404`; a compare missing an end → `400`
+  with this surface's own Problem detail; `?limit=abc` → the default list;
+  `DELETE` on the list → `405`. `psql` after: four publish rows, two carrying
+  `restored_from`, snapshot counts 1/2/1/2 as published. Fixture site deleted
+  (cascade left zero publishes, the host went off the air) and both servers
+  stopped. No production, email, DNS, or external AI service was contacted.
+- **Verified:** `cargo fmt`; strict offline all-target Clippy for `alo-store`
+  and `alo-jmap`, zero warnings; **full unfiltered `cargo test -p alo-store`
+  and `cargo test -p alo-jmap`** green on the local docker Postgres (including
+  the new 5 storage tests and 4 real-router tests, and the touched
+  `sites_http` / `site_editor_role_http` suites re-run after the error-shape
+  change); the curl matrix above; `git diff --check`.
+- **Cuts/flags:**
+  - No UI: the history surface, preview and one-click rollback are S2.04b's.
+    The CHANGELOG line is written in the capability's voice because the API is
+    the contract that shipped; the screen entry lands with S2.04b.
+  - A restore is available to a restricted site collaborator, because the
+    existing scoped-role middleware gates every `/sites/{id}` route on the
+    per-site grant and a collaborator may already publish (S2.03a).
+  - Comparison loads both versions' frozen sections to diff them (bounded by
+    the 200-page cap × languages); a digest column would avoid it and is not
+    worth a schema change until a real history gets slow.
+  - Restoring copies snapshot rows rather than referencing them — deliberate,
+    for the identity/cache reason above; snapshot retention stays unbounded,
+    as it has been since S1.08.
+  - The defensive "version with nothing frozen" refusal is driven by a raw
+    SQL delete in its test: no store call can reach that state, which is the
+    point of immutability.
+- **Next:** S2.04b, the visible history surface with preview and one-click
+  rollback.
