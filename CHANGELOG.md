@@ -9,6 +9,16 @@ contracts.
 
 ## Unreleased
 
+- **Your website statistics now also say how long people read, and where they
+  went next.** Published pages carry a small script that reports two things a
+  server cannot see for itself: roughly how long the page stayed open, as a
+  bucket ("under ten seconds", "one to three minutes") rather than a stopwatch
+  reading, and the domain of any link a visitor followed off your site. It
+  reports nothing else — no page, no identifier, no cookie, nothing that could
+  be joined back to a person, and the exact number of seconds is thrown away
+  before anything is stored. Visitors who block scripts still count as visits
+  exactly as before; only these two numbers go unreported for them.
+
 - **Your website statistics now answer where visitors came from and what they
   read first.** Alongside visits and pages, alo counts the campaign a link
   carried (`utm_campaign`), the country the connection was reported from, the

@@ -1,7 +1,7 @@
 //! Behavioral rules of the renderer: head metadata, landmark structure,
 //! lenient reads (skip-with-log), and the escaping/href defenses that must
 //! hold even for stored values the write gate would never have admitted.
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use alo_sites::render::{
     EN, FR, ImageSources, NL, PageRenderContext, SiteRenderContext, render_page,
@@ -134,7 +134,11 @@ fn script_content_renders_escaped_never_live() {
         "sections": [{"type": "hero", "heading": "<script>alert(1)</script>"}]
     });
     let html = render(&stored);
-    assert!(!html.contains("<script"));
+    // The only script a published page carries is the static beacon; a
+    // heading that spells one renders as text.
+    assert_eq!(html.matches("<script>").count(), 1);
+    assert!(html.contains("navigator.sendBeacon"));
+    assert!(!html.contains("<script>alert(1)"));
     assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
 }
 
@@ -175,8 +179,10 @@ fn contact_form_without_form_id_renders_text_only() {
     let html = render(&stored);
     assert!(html.contains("<h2>Write us</h2>"));
     assert!(!html.contains("<form"));
-    // A form with no submit is nothing for the script to do.
-    assert!(!html.contains("<script"));
+    // A form with no submit is nothing for the behavior script to do; the
+    // beacon is unconditional and is the only script left.
+    assert!(!html.contains("form[action^=\"/f/\"]"));
+    assert_eq!(html.matches("<script>").count(), 1);
 }
 
 #[test]
@@ -189,13 +195,14 @@ fn contact_form_without_custom_message_gets_the_default_data_success() {
     assert!(html.contains("data-success=\"Thanks — your message has been sent.\""));
 }
 
-/// The page's entire JavaScript is one static inline block, present only
-/// when there is a menu to toggle or a form to submit — a page with neither
-/// ships zero JS.
+/// The page's entire JavaScript is two static inline blocks: the behavior
+/// script, present only when there is a menu to toggle or a form to submit,
+/// and the beacon, present on every published page. A page with neither a
+/// menu nor a working form ships only the beacon.
 #[test]
 fn behavior_script_is_included_exactly_when_needed() {
     let with_nav = render(&hero_page());
-    assert_eq!(with_nav.matches("<script>").count(), 1);
+    assert_eq!(with_nav.matches("<script>").count(), 2);
     let script_at = with_nav.find("<script>").unwrap();
     assert!(script_at > with_nav.find("</footer>").unwrap());
     assert!(script_at < with_nav.find("</body>").unwrap());
@@ -211,13 +218,18 @@ fn behavior_script_is_included_exactly_when_needed() {
         "schema_version": 1,
         "sections": [{"type": "contact_form", "form_id": "f4K9sL2wN7qR5tYx8vB1cA"}]
     }));
-    assert_eq!(with_form.matches("<script>").count(), 1);
+    assert_eq!(with_form.matches("<script>").count(), 2);
 
     let static_only = render(&json!({
         "schema_version": 1,
         "sections": [{"type": "hero", "heading": "Quiet"}]
     }));
-    assert!(!static_only.contains("<script"));
+    assert_eq!(static_only.matches("<script>").count(), 1);
+    assert!(
+        !static_only.contains("classList.add(\"js\")"),
+        "a page with nothing to toggle or submit ships no behavior script"
+    );
+    assert!(static_only.contains("navigator.sendBeacon"));
 }
 
 #[test]
@@ -317,10 +329,16 @@ fn inline_image_sources_swap_srcs_per_id_and_never_touch_og_image() {
     ));
 }
 
-/// The draft preview is the published document with the stylesheet inlined —
-/// byte-for-byte, for every shipped preset. This is the no-drift pin: if the
-/// two ever diverge beyond the stylesheet reference, editing would preview
-/// something publishing does not produce.
+/// The draft preview is the published document with the stylesheet inlined
+/// and the analytics beacon left off — byte-for-byte, for every shipped
+/// preset. This is the no-drift pin: if the two ever diverge beyond those two
+/// serving concerns, editing would preview something publishing does not
+/// produce.
+///
+/// The beacon is the second exception for the same reason as the first: both
+/// address the published origin, and neither resolves behind the editor's
+/// sandboxed iframe. An editor moving sections around must never be counted
+/// as somebody reading the site.
 #[test]
 fn preview_is_the_published_document_with_the_stylesheet_inlined() {
     for preset in THEME_PRESETS {
@@ -346,12 +364,33 @@ fn preview_is_the_published_document_with_the_stylesheet_inlined() {
         let css = stylesheet(&theme);
         let published = render_page(&site, &page);
         let preview = render_page_preview(&site, &page, &css);
-        let expected = published.replace(
-            "<link rel=\"stylesheet\" href=\"/assets/site.css\">\n",
-            &format!("<style>\n{css}</style>\n"),
+        assert!(
+            published.contains("navigator.sendBeacon(\"/_alo/collect\""),
+            "{}: a published page must carry the beacon",
+            preset.id
         );
+        let beacon_start = published
+            .find("<script>(function () {\n  \"use strict\";\n  var since")
+            .expect("the published document must carry exactly one beacon block");
+        let beacon = &published[beacon_start..];
+        assert!(
+            beacon.ends_with("</script>\n</body>\n</html>\n"),
+            "{}: the beacon must be the last thing before </body>",
+            preset.id
+        );
+        let expected = published
+            .replace(
+                "<link rel=\"stylesheet\" href=\"/assets/site.css\">\n",
+                &format!("<style>\n{css}</style>\n"),
+            )
+            .replace(&beacon[..beacon.len() - "</body>\n</html>\n".len()], "");
         assert_eq!(preview, expected, "{}: preview drifted", preset.id);
         assert!(!preview.contains("/assets/site.css"), "{}", preset.id);
+        assert!(
+            !preview.contains("/_alo/collect"),
+            "{}: the draft preview must not count itself as traffic",
+            preset.id
+        );
     }
 }
 

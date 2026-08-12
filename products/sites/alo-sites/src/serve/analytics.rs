@@ -172,8 +172,10 @@ fn campaign(uri: &Uri) -> String {
 }
 
 /// Percent- and plus-decoding for one query value. Invalid escapes are kept
-/// literally; [`safe_label`] removes whatever they turn out to be.
-fn decode_form_value(value: &str) -> String {
+/// literally; [`safe_label`] removes whatever they turn out to be. Shared
+/// with the beacon's collect endpoint ([`super::beacon`]), whose payload is
+/// encoded exactly like a query value and must be read exactly as strictly.
+pub(super) fn decode_form_value(value: &str) -> String {
     let bytes = value.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
     let mut index = 0;

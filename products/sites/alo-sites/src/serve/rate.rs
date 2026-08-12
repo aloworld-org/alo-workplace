@@ -1,7 +1,8 @@
-//! Per-visitor rate limiting for the two things an anonymous visitor may
-//! *do* — submit a contact form (`docs/design/sites.md`, form flow) and try a
-//! password on a protected page ([`super::unlock`]) — as an in-memory sliding
-//! window keyed by the client address. The key is used **transiently**: it
+//! Per-visitor rate limiting for the three things an anonymous visitor may
+//! *do* — submit a contact form (`docs/design/sites.md`, form flow), try a
+//! password on a protected page ([`super::unlock`]), and report a page
+//! beacon ([`super::beacon`]) — as an in-memory sliding window keyed by the
+//! client address. The key is used **transiently**: it
 //! exists only in this process's map while inside the window and is never
 //! persisted, logged, or attached to a submission (the privacy model stores no
 //! connection data).
@@ -34,6 +35,16 @@ const MAX_TRACKED_KEYS: usize = 4096;
 pub const UNLOCK_MAX_PER_WINDOW: usize = 8;
 /// The sliding window password guesses are counted in.
 pub const UNLOCK_WINDOW: Duration = Duration::from_secs(600);
+
+/// How many analytics beacons one client key may send per [`BEACON_WINDOW`].
+/// The loosest of the three budgets on purpose: a beacon is what a *reader*
+/// produces — roughly one per page read plus one per outbound click — and a
+/// whole office behind one address reading the same site must never start
+/// losing aggregates. It is still a ceiling: a script cannot turn one address
+/// into a traffic report.
+pub const BEACON_MAX_PER_WINDOW: usize = 120;
+/// The sliding window beacons are counted in.
+pub const BEACON_WINDOW: Duration = Duration::from_secs(600);
 
 /// The in-memory sliding-window limiter, shared across request tasks. A
 /// poisoned lock is taken anyway — the map holds only timestamps, and the

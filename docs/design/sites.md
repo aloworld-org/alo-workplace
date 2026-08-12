@@ -156,8 +156,48 @@ store's tenancy doors; ids are newtypes; timestamps are
   journey; it reveals no more than the per-day visitor set above, and dies
   with the day's token. Values are bounded and lowercased into a small ASCII
   label at the boundary, so a hostile link cannot invent dimensions.
-  Read-time and outbound clicks are *not* here: they need a page beacon, and
-  a beacon is a different privacy argument (see the collection boundary).
+  Two further dimensions live in the same table but arrive by a different
+  road, because no request carries them: `read_time` (one of six fixed
+  buckets — `0-10s`, `10-30s`, `30-60s`, `1-3m`, `3-10m`, `10m+` — computed
+  from a number of seconds the collect endpoint then discards) and `outbound`
+  (the DNS host a visitor followed a link to). Both are reported by the
+  published page's own beacon; see **The page beacon** below for what that
+  script may say and what the endpoint refuses. `outbound` is the one
+  dimension a *visitor's browser* names rather than the site, so distinct
+  values per site and day are capped at 200 — past that, new destinations
+  are counted under the literal bucket `other`, which cannot be mistaken for a
+  domain because a stored domain always contains a dot.
+
+### The page beacon
+
+Two numbers an owner asks for are invisible to a server: how long a page was
+read, and which outside link a visitor took. They exist only in the browser,
+so they need a script on the page and a public endpoint to report to — an
+unauthenticated write with no page load behind it, which is a different
+argument from every other collection above and gets its own bounds.
+
+- **What the script may say.** Two payloads, `t=<seconds>` and
+  `o=<hostname>`, at most one per request. It carries **no identity of any
+  kind** — no cookie, no storage, not even the day-scoped visitor token page
+  views are counted with — and **names no page**, so a read time is a fact
+  about the site's day rather than about `/prices` at 14:03. It reports the
+  read time once, when the page is first hidden or unloaded.
+- **What the endpoint refuses.** Tenant scope is the `Host` and never the
+  payload (there is no field to put one in); an unresolvable Host is the same
+  terse `404` a page request gets, so the endpoint cannot enumerate sites. The
+  body is capped at 512 bytes, seconds become a bucket server-side, and a
+  hostname that is not a bounded lowercase DNS host is refused outright rather
+  than repaired into a storable label. Every answer is a bare status with no
+  body — `204` on success — because `sendBeacon` cannot read a response and a
+  chatty endpoint would only help someone probing.
+- **Its own rate limit**, separate from the form and unlock budgets, so page
+  analytics can never spend the budget standing between a guesser and a
+  protected page.
+- **The no-script path is unaffected.** Page views, referrers, campaigns,
+  countries, devices and entry/exit are all still derived from the request at
+  the door. A visitor who runs no scripts is a fully counted visit; only these
+  two dimensions go unreported. The beacon is therefore never on the draft
+  preview either — an editor moving sections around is not a reader.
 
 ### Render pipeline
 
@@ -227,7 +267,8 @@ from.
   indexed lookup (subdomain of `SITES_DOMAIN`, or a verified custom
   domain), then serves **published snapshots only**, with an in-memory
   cache + correct cache headers, a branded 404 page, and `/healthz`.
-  It accepts form POSTs and the analytics tick — nothing else writes.
+  It accepts form POSTs and page-beacon POSTs (`/_alo/collect`) plus the
+  analytics tick — nothing else writes.
   Host isolation (site A's host can never serve site B's content) is
   an in-process integration test, not an assumption.
 
@@ -569,7 +610,7 @@ feature is silently absent: each is shipped or names its explicit dependency.
 | Contact forms | **Shipped**, one stated dependency | Contact sections create their form records; public submit has caps, honeypot and rate limiting; submissions are reviewable/exportable CSV; internal notifications are claimed at most once. Notification server copy is English in S1. **CRM lead creation remains intentionally deferred to B2**, exactly as the feature line states. |
 | ★ Blog written in alo Docs | **Shipped** | Tenant-owned Docs become draft/published posts; the public index paginates, post HTML is sanitized, and RSS is served. |
 | SEO | **Shipped** | Per-page overrides, Open Graph, canonical URLs, sitemap and robots are rendered from published state. |
-| ★ Privacy-first analytics | **Shipped** | Daily path/referrer aggregates and exact day-scoped uniques use opaque HMAC tokens, plus campaign, country, device-class and entry/exit aggregates derived at the door. No cookies, raw IP, UA, query, full referrer, or cross-day visitor identity is stored. Read-time and outbound clicks await a page beacon. |
+| ★ Privacy-first analytics | **Shipped** | Daily path/referrer aggregates and exact day-scoped uniques use opaque HMAC tokens, plus campaign, country, device-class and entry/exit aggregates derived at the door, and read-time buckets and outbound domains reported by the page beacon. No cookies, raw IP, UA, query, full referrer, exact durations, or cross-day visitor identity is stored; a scriptless visitor is still a counted visit. |
 | ★ AI copy tools per section | **Shipped** | Exact-field and whole-page proposals show reviewable before/after content; approve is the sole write and selecting a different field cannot silently retarget a proposal. |
 
 **Languages.** The complete Sites surface is translated in English, French,

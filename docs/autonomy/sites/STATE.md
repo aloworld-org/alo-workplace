@@ -3519,3 +3519,110 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.08b, the analytics UI — a calm overview and drill-down for the
   new aggregates, with the privacy explanation and useful empty states
   (including the honest "no edge reports countries yet" case).
+
+## 2026-08-12 — S2.08a2 the two numbers a server cannot see
+
+- **Item:** S2.08a2, page-beacon dimensions. The published page now reports
+  how long it stayed readable and which outside domain a visitor left for, to
+  a new public collect endpoint on `alo-sites`. Both land in the existing
+  bounded dimension table as `read_time` and `outbound`; the owner report and
+  `/sites/{id}/analytics` gained the two lists additively.
+- **No new table, and no new privacy argument in storage.** Migration 0305
+  widens exactly one CHECK constraint. The shape of 0304 holds: a bucket
+  label and a hit count, no visitor token, nothing that can be joined to a
+  person. A beacon writes into `site_analytics_dimension_daily` and nowhere
+  else — a test asserts both visitor tables stay empty after four reports.
+- **The endpoint carries no identity, in either direction.** It sets no
+  cookie, reads none, and derives no visitor token — not even the day-scoped
+  HMAC page views are counted with. That is deliberate rather than
+  incidental: nothing a browser says about itself is trusted with an
+  identity, which is why these aggregates have a hit count and no unique
+  count, and why two beacons from one browser are unlinkable by construction.
+- **The script names no page and reports once.** A read time is a fact about
+  the site's day, not about `/prices` at 14:03, and the payload has no field
+  to put a path in. It reports when the page is first hidden or unloaded —
+  "how long they read before looking away". Payload is `t=<seconds>` or
+  `o=<hostname>`, one per request, ≤512 bytes; 914 bytes of script, pinned by
+  a byte-budget test beside the behavior script's.
+- **The seconds are thrown away at the door.** The endpoint maps them to one
+  of six fixed buckets (`0-10s` … `10m+`) and stores only that: "between one
+  and three minutes" says something about a page, "137 seconds" starts to say
+  something about a reader. `u64::MAX` is a bucket, not an error.
+- **A hostname is not repaired, unlike a campaign label.** A campaign gets
+  folded into a storable label because a mail-out's label is *meant* to be
+  stored; a value that is not a hostname is not a hostname, and inventing a
+  bucket out of an injected document would create a dimension nobody asked
+  for. Markup, a path, a whole URL, an address, a bare word, non-ASCII: all
+  `400`. Punycode is what a browser's `link.hostname` already gives.
+- **Outbound is the one dimension a visitor's browser names**, so distinct
+  values per site-day are capped at 200; past that new destinations count
+  under the literal bucket `other`, which cannot be confused for a domain
+  because a stored domain always contains a dot. Known destinations keep
+  counting past the cap.
+- **Tenant scope is the Host, never the payload** — there is no field to put
+  one in — and an unresolvable Host is the same terse `404` a page gets, so
+  the endpoint cannot enumerate sites. Its rate limit is its own (120 per 10
+  minutes per client, the loosest of the three because a beacon is what a
+  *reader* produces), so page analytics can never spend the budget standing
+  between a guesser and a protected page.
+- **The no-script path is untouched and now tested as such**: views,
+  referrers, campaigns, countries, devices and entry/exit are all still
+  derived from the request. The draft preview gets no beacon either — an
+  editor moving sections around is not a reader — and the preview-has-no-drift
+  test now pins that as its second deliberate exception beside the stylesheet.
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-sites -p alo-jmap --all-targets` — zero warnings from this change (the
+  pre-existing `meet.rs:430` `unused_variable` on `main` is the other track's
+  area, untouched). `cargo test -p alo-store -p alo-sites -p alo-jmap` green
+  in full (exit 0), including the new `alo-sites` `beacon` suite (4 tests),
+  the two script unit tests, the six beacon-parsing unit tests, the extended
+  `site_analytics_tenancy` (beacon dimensions in bucket order, wrong-tenant in
+  both directions, and the 320-destination cap test), and the re-blessed blog
+  goldens.
+- **Wire-verified with real curl**, both binaries running locally against
+  docker `alo-pg` (killed before and after): a site published through
+  `alo-jmap`, then on the public Host — the page carries
+  `navigator.sendBeacon("/_alo/collect", body)`; `t=137` and `t=4` and
+  `o=News.Example` each `204` with `no-store`; the stored rows are exactly
+  `read_time 1-3m 1`, `read_time 0-10s 1`, `outbound news.example 1`. A
+  garbage body, `o=%3Cscript%3E`, an unknown Host, a 2 KB body and a `GET` are
+  `400 / 400 / 404 / 413 / 405`. The 121st beacon from one address is `429`
+  with `retry-after: 599` while another address is still `204`. A `psql` scan
+  for `137`, `198.51.100`, `curl` and `script` in the site's dimension rows
+  returned zero. The owner report answered `readTime` in bucket order and
+  `outboundDomains`; `401` unauthenticated, `422` for `days=0`, `404` for a
+  site id that is not the caller's. The single page GET stayed one visit —
+  beacons add no page views.
+- **Cuts/flags:**
+  - **Read time is per site-day, not per page.** The dimension table is
+    (dimension, value) and a path would have to become the value, which both
+    doubles the cardinality a browser can name and makes the read time a fact
+    about a page a named visitor was on. Per-page reading time is a real
+    product want; it needs its own privacy argument and its own item, and
+    S2.08b should show the site-wide histogram rather than imply a per-page
+    one.
+  - **The read time is reported once**, at the first hide or unload. A visitor
+    who looks away, comes back and reads for another ten minutes contributes
+    only the first stretch, so the histogram skews short. Sending deltas would
+    fix the number and would also be the first step towards a session — the
+    trade was made in favour of the privacy shape.
+  - **A beacon cannot be tied to a page view**, by design, so the counts are
+    not comparable: 40 views and 12 read times does not mean 28 people left
+    instantly, it means 28 browsers did not report (no script, no
+    `sendBeacon`, a tab killed by the OS). S2.08b must say so on the screen
+    rather than let an owner read a bounce rate out of it.
+  - **Nothing is verified as coming from a real page load.** The endpoint is
+    anonymous by necessity; the rate limit is the whole defence, and a
+    determined script can add up to 120 events per address per ten minutes.
+    Acceptable for an aggregate an owner reads as a shape, not as a number to
+    invoice on.
+  - **Bot traffic still counts here too.** A crawler that runs no scripts
+    reports nothing (so read time is quietly reader-only), but the wire run
+    shows curl counted as a `bot` page view exactly as before.
+  - No new top-level route prefix in production: `/_alo/collect` is served by
+    `alo-sites` on the site's own Host, which the front proxy already routes
+    wholesale. The production Caddyfile needs nothing.
+- **Next:** S2.08b, the analytics UI — a calm overview and drill-down for all
+  the aggregates now collected, with the privacy explanation, the honest "no
+  edge reports countries yet" empty state, and the beacon caveats above made
+  visible rather than left for an owner to misread.

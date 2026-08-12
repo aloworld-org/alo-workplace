@@ -22,5 +22,32 @@
 <figure><img src="/assets/img/9hK3vQ2mR8pT1xWz4bC5dg" srcset="/assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w480 480w, /assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w960 960w, /assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w1440 1440w" sizes="(min-width: 70rem) 67.5rem, 100vw" alt="Roasting drum mid-batch"></figure>
 </section>
 </main>
+<script>(function () {
+  "use strict";
+  var since = Date.now();
+  var read = 0;
+  var reported = false;
+  function send(body) {
+    if (navigator.sendBeacon) { navigator.sendBeacon("/_alo/collect", body); }
+  }
+  function record() {
+    read += Date.now() - since;
+    since = Date.now();
+    if (reported) { return; }
+    reported = true;
+    send("t=" + Math.round(read / 1000));
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { record(); } else { since = Date.now(); }
+  });
+  window.addEventListener("pagehide", record);
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var link = target && target.closest ? target.closest("a[href]") : null;
+    if (link && link.hostname && link.hostname !== location.hostname) {
+      send("o=" + encodeURIComponent(link.hostname));
+    }
+  }, true);
+})();</script>
 </body>
 </html>

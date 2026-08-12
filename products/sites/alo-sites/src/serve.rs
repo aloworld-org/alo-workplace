@@ -1,6 +1,7 @@
 //! The public HTTP surface (ADR 0036, `docs/design/sites.md`): resolve the
 //! Host header to one tenant's live site, serve its published snapshots, and
 //! accept contact-form submissions (`POST /f/{form_id}`, the [`forms`]
+//! module) and page-beacon reports (`POST /_alo/collect`, the [`beacon`]
 //! module) — nothing else. The service holds no session — its whole tenant
 //! scope is the [`host`] lookup's result (or, for a submission, the posted
 //! form id's own resolution) — and it is deliberately terse on the wire:
@@ -31,13 +32,17 @@
 //! - Database trouble → `503` with a static line, `Retry-After: 10`.
 
 mod analytics;
+mod beacon;
 mod blog;
 mod cache;
 pub mod config;
 pub mod derivative;
 mod forms;
 mod host;
-mod rate;
+/// The public surface's anti-abuse budgets. Public because they are an
+/// operational contract — an operator sizing a proxy, and the tests that pin
+/// each budget, both need the numbers.
+pub mod rate;
 mod rendered;
 mod unlock;
 
@@ -69,6 +74,9 @@ pub struct AppState {
     derivatives: cache::DerivativeCache,
     /// Per-client budget on the form-submit path (in-memory, transient).
     rate: rate::RateLimiter,
+    /// The beacon's own budget ([`beacon`]), separate so a page's analytics
+    /// traffic can never spend a visitor's form or unlock budget.
+    beacon_rate: rate::RateLimiter,
     /// The separate, tighter budget on password guesses at protected pages.
     unlock_rate: rate::RateLimiter,
     /// Signs and checks visitor sessions on protected pages. Holds a derived
@@ -98,6 +106,10 @@ impl AppState {
             derivatives: cache::DerivativeCache::default(),
             unknown_host: rendered::unknown_host_not_found(&EN),
             rate: rate::RateLimiter::default(),
+            beacon_rate: rate::RateLimiter::with_budget(
+                rate::BEACON_MAX_PER_WINDOW,
+                rate::BEACON_WINDOW,
+            ),
             unlock_rate: rate::RateLimiter::with_budget(
                 rate::UNLOCK_MAX_PER_WINDOW,
                 rate::UNLOCK_WINDOW,
@@ -108,8 +120,11 @@ impl AppState {
     }
 }
 
-/// The service router: `/healthz`, the form-submit POST (with its own tight
-/// body cap), and the catch-all site path.
+/// The service router: `/healthz`, the two POSTs an anonymous visitor may
+/// make off a page path — a form submission and a page beacon, each with its
+/// own tight body cap — and the catch-all site path. Both POST paths carry a
+/// character no page slug or locale tag can (`/f/…`, `/_alo/…`), so neither
+/// can ever shadow a page a tenant published.
 pub fn app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
@@ -117,6 +132,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/f/{form_id}",
             post(forms::submit).layer(DefaultBodyLimit::max(forms::FORM_BODY_MAX_BYTES)),
+        )
+        .route(
+            "/_alo/collect",
+            post(beacon::collect).layer(DefaultBodyLimit::max(beacon::BEACON_BODY_MAX_BYTES)),
         )
         .fallback(serve_site)
         .with_state(state)

@@ -15,7 +15,7 @@
 //! for assistive technology, which outranks literal ordering.
 
 pub(crate) mod html;
-mod script;
+pub(crate) mod script;
 mod sections;
 mod strings;
 
@@ -240,6 +240,14 @@ fn render_document(
     out.push_str(&footer);
     if wants_script(&parsed) {
         out.push_str(script::BEHAVIOR_SCRIPT);
+    }
+    // The beacon belongs to *serving*, not to rendering a page: it reports to
+    // a public endpoint that exists only on the published origin. The linked
+    // stylesheet is exactly the same distinction, so it is what decides —
+    // the authenticated draft preview inlines its sheet and gets no beacon,
+    // and there is no second flag to forget to set.
+    if matches!(stylesheet, StylesheetRef::Linked) {
+        out.push_str(script::BEACON_SCRIPT);
     }
     out.push_str("</body>\n</html>\n");
     out

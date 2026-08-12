@@ -30,5 +30,32 @@
 <a rel="prev" href="/blog">Previous</a><span>Page 2 of 3</span><a rel="next" href="/blog?page=3">Next</a>
 </nav>
 </main>
+<script>(function () {
+  "use strict";
+  var since = Date.now();
+  var read = 0;
+  var reported = false;
+  function send(body) {
+    if (navigator.sendBeacon) { navigator.sendBeacon("/_alo/collect", body); }
+  }
+  function record() {
+    read += Date.now() - since;
+    since = Date.now();
+    if (reported) { return; }
+    reported = true;
+    send("t=" + Math.round(read / 1000));
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { record(); } else { since = Date.now(); }
+  });
+  window.addEventListener("pagehide", record);
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    var link = target && target.closest ? target.closest("a[href]") : null;
+    if (link && link.hostname && link.hostname !== location.hostname) {
+      send("o=" + encodeURIComponent(link.hostname));
+    }
+  }, true);
+})();</script>
 </body>
 </html>

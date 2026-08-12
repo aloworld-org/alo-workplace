@@ -68,7 +68,9 @@ pub fn render_blog_index(
         out.push_str("</div>\n");
     }
     push_pagination(&mut out, site, pagination);
-    out.push_str("</main>\n</body>\n</html>\n");
+    out.push_str("</main>\n");
+    out.push_str(crate::render::script::BEACON_SCRIPT);
+    out.push_str("</body>\n</html>\n");
     out
 }
 
@@ -147,7 +149,9 @@ pub fn render_blog_post(site: &SiteRenderContext<'_>, article: &BlogArticle<'_>)
     }
     out.push_str("<div class=\"blog-body\">\n");
     out.push_str(article.body_html);
-    out.push_str("</div>\n</article>\n</main>\n</body>\n</html>\n");
+    out.push_str("</div>\n</article>\n</main>\n");
+    out.push_str(crate::render::script::BEACON_SCRIPT);
+    out.push_str("</body>\n</html>\n");
     out
 }
 
