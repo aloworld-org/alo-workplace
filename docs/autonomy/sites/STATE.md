@@ -4040,3 +4040,88 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   its unavailable/dependency states, reading `GET /sites/{id}/attribution` and
   `GET /sites/{id}/leads` and handing off through
   `POST /sites/{id}/submissions/{submission}/lead`.
+
+## 2026-08-12 — S2.10c the screen that reads the whole arc, and the button that starts it
+
+- **Shipped:** the funnel UI, entirely in `web/src/sites` (no Rust, no new
+  route, nothing outside this track's areas). New: `FunnelView.tsx` at
+  `/sites/:siteId/funnel` reading `GET /sites/{id}/attribution?days=`;
+  `HandoffDialog.tsx` posting `POST /sites/{id}/submissions/{submission}/lead`;
+  `funnelReading.ts` (the pure reading — stage derivation, per-currency money,
+  the deleted-form label); `Funnel.test.tsx` (15 tests). Changed:
+  `SubmissionsView.tsx` (the sales half of the inbox — `GET /sites/{id}/leads`,
+  the chip, the standing of the opportunity, `DELETE .../leads/{link}`),
+  `api.ts` + `types.ts` (six methods, seven types), `SiteView.tsx` (a Results
+  button beside Analytics), `SitesModule.tsx` (the route), the stylesheet, and
+  the en/fr/nl catalogs (62 keys in each of the three).
+- **The screen's whole job is to not round off the arithmetic.** Four
+  properties of S2.10b's report would each have been a lie if the interface had
+  smoothed them, so each is carried in the interface itself: every step of the
+  chain is labelled **reported by the browser** or **counted when it was
+  saved**, with a note that a rate crossing that line is a floor; the bars are
+  drawn against the **largest** step, not the first, because the counters are
+  independent and `starts > views` is a real outcome (a test pins it); the
+  per-form table carries the sentence that says its columns are a reading per
+  form and do not add up to the totals; and two currencies are two lines with
+  the stated reason there is no total. `invoiceRule` is shown as a sentence
+  ("invoices raised for the customer an enquiry became, after it was handed
+  over") rather than left for a reader to hear as "revenue this page earned".
+- **Three different absences, three different answers.** A `403` on the
+  attribution read is not an error banner — it is a stated refusal carrying the
+  **server's own sentence verbatim** plus the way forward ("everything else
+  about this website is still yours"); `billingVisible: false` **drops the
+  invoice step** and shows "not shown" with the reason, never a zero; and a
+  site with no contact form gets the onboarding empty state pointing at the
+  page editor. In the inbox the same `403` simply removes the sales half: a
+  site editor's contact inbox is unchanged and shows no error at all.
+- **Nothing the workspace knows is asked twice** (ux law 11b). The handoff
+  dialog shows the enquirer, the form and the moment as *facts*, with the line
+  "the name, the address and the message travel with the handoff"; there is no
+  field to mistype them into, because the server takes them from the stored
+  row. What remains is what only a person can decide — board, column, the card's
+  name (pre-filled "Website enquiry — <who>", never blank), and an optional
+  value. The column defaults to the first one **still in play**, so a handoff
+  never lands in "Won" because it happened to be first in the list. Boards come
+  from CRM's own `/crm/pipelines?lang=`, which also means a tenant that has
+  never opened CRM has its first board seeded rather than meeting a dead end.
+- **Verified:** `npx tsc --noEmit` clean; `npx eslint` clean on all twelve
+  changed/added files; `npm run build` clean (16 s); `npx vitest run` —
+  **709 tests, 709 passed, 77 files**, including the 15 new ones and the
+  three-language parity test (`locale.test.ts`) with no new entry in
+  `UNTRANSLATED`. The new tests pin the four honesty properties, the three
+  absences, the money-in-cents conversion of a typed decimal (`2500,50` →
+  `250050`), the default column, the verbatim `422`, and the optimistic unlink
+  putting the link back when the server refuses.
+- **Cuts/flags:**
+  - **No wire run this iteration, deliberately.** This item added no HTTP
+    route: all four endpoints it consumes were wire-verified against the local
+    backend on 2026-08-11/12 (S2.10a/b entries above), and the CRM board reads
+    are the two routes the CRM module has used since B-wave. The response
+    shapes were re-read from `sites_attribution.rs`, `crm_pipelines.rs` and
+    `crm_stages.rs` rather than assumed, and the client is pinned against
+    fixtures of exactly those shapes.
+  - **The handoff to an opportunity that already exists is not in the UI.** The
+    route takes either `dealId` or `pipelineId`+`stageId`; the screen offers
+    only the second. Picking an existing card needs a deal search (CRM has no
+    typeahead route Sites may read yet) and would have doubled this item —
+    listed for the S2.16 wave review rather than half-built here.
+  - **`companyName` is always sent empty.** A contact form does not ask for a
+    company, so the card carries the person's name; a field asking a colleague
+    to guess one would be a re-entry of something nobody knows.
+  - **Handing over does not mark the enquiry handled.** They are two decisions
+    by two different people as often as not, and a silent side effect on
+    somebody else's queue is worse than a second click.
+  - **`sitesFunnelPeriod` and `sitesAnalyticsDays` share the period control's
+    vocabulary** with the analytics screen on purpose: the same three windows,
+    the same words, so the two screens are read as one surface.
+  - **Pre-existing, outside this item:** `Theme.test.tsx` renders `SiteView`
+    with a mock that omits `translationReadiness`, so a full-suite run prints
+    three React `reduce` stderr traces and one unhandled rejection from
+    `ThemeDialog.tsx:114`. All tests pass; it is Theme's fixture, not this
+    item's, and it predates it.
+  - **No new top-level route prefix**: `/sites/funnel` is a client-side path
+    inside the SPA and every call goes to `/sites/*` or `/crm/*`, both already
+    proxied. The production Caddyfile needs nothing at the next deploy.
+- **Next:** S2.11a, the template catalog — curated, versioned templates for
+  common site types with preview and deterministic instantiate tests (the
+  manual, AI-off sibling of the generate-my-site path).

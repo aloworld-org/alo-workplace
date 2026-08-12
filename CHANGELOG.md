@@ -9,6 +9,23 @@ contracts.
 
 ## Unreleased
 
+- **Your website now has a Results screen, and handing an enquiry to sales is a
+  button in the contact inbox.** Results sits beside Analytics on the website
+  page and reads the whole arc over 7, 30 or 90 days: how many people saw a
+  contact form, started filling it in, sent it, how many of those enquiries were
+  handed to your sales board, how many were won, and what has since been
+  invoiced — with the same reading again per form. It says which numbers come
+  from the visitor's browser and which were counted when a record was written,
+  so you know a rate across that line is a floor rather than a measurement; it
+  shows money per currency and never adds two currencies together; and it says
+  in one sentence what the invoice figure counts. The handoff itself is one
+  click on the enquiry you are already reading: pick the board and column, and
+  the card is raised with the sender's name and address carried over, nothing
+  retyped. An enquiry already handed over shows how its opportunity stands and
+  offers to unlink it — which withdraws the claim and leaves the opportunity
+  untouched. If CRM or Billing is not open for your account, the screen says so
+  in its own words instead of showing zeros, and your contact inbox keeps
+  working exactly as before.
 - **Mail's controls no longer run off the edge of a narrow window, and its
   toolbars say what they are.** The row above a conversation and the formatting
   bar in compose now wrap onto a second line when the pane is too narrow for
