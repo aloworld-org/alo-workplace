@@ -653,3 +653,135 @@ completes the item commits it with the implementation.
 **Next:** D2.03, unchanged.
 
 LOOP HALT: a second, orphaned loop worker (PID 25244) owns this checkout and is mid-D2.03; the previous halt marker was a markdown heading, so run-loop.sh's anchored `^LOOP HALT` never matched it and the wrapper restarted anyway.
+
+## D2.03 — shell
+
+Seven stylesheets off the ratchet in one commit: `AgentActionCard`,
+`AgentResultCard`, `ComingSoon`, `FiltersSection`, `SearchOverlay`,
+`SettingsModal`, `SharingSection`. `ds/redefined.ts` is down from 29 files to
+22, and the whole `shell/` block is gone from it. Net −259 lines across 21
+files, which is what a migration should look like.
+
+**The tree was clean when this started.** `git status` after the pull showed
+one untracked file and no modifications, so the orphan described in the two
+halt entries above (PID 25244, still listed in the process table, last write
+recorded at 00:53) had left nothing behind: its D2.03 was discarded by the
+wrapper exactly as the headless-discipline section warns. Every modified file
+below was written by this invocation, and nothing appeared in the tree between
+reads at any point during it.
+
+Adopted:
+
+- **`SettingsModal`** → `ds/Modal` (`wide`, `tall="page"`), `ds/IconButton`,
+  `ds/Toggle`, `ds/Field` + `ds/Input`, `ds/Button`. This was the largest
+  single deletion of the item — 186 lines of the stylesheet, most of it the
+  overlay, the panel, the head, the footer row and a second hand-built switch.
+  What it gained is the behaviour: **no key handler existed anywhere in the
+  file**, so the only way out of Settings was the mouse, and Tab walked
+  straight out of the panel onto the mailbox behind it.
+- **`FiltersSection`** → `ds/Select` ×3, `ds/Input` ×2, `ds/Checkbox` ×4,
+  `ds/IconButton` ×2, `ds/Button`. It also stopped importing
+  `admin/admin.module.css` for two classes — a cross-module stylesheet import
+  for `.input` and `.error`, which is the duplication problem wearing a
+  different hat. `.error` is now local, byte-for-byte what admin drew.
+- **`SharingSection`** → `ds/Input`, `ds/Select` ×2, `ds/Checkbox` ×3,
+  `ds/Button` ×3, `ds/IconButton` ×2.
+- **`AgentActionCard`** and **`AgentResultCard`** → `ds/Card`
+  (`pad="sm" flat`) and `ds/Button`. The result card draws that surface in ten
+  places, so it is named once as a local `ResultCard` rather than repeated ten
+  times.
+
+Renamed, with the argument in the file:
+
+- `SearchOverlay.input` → `.query`. Deliberately **not** a `ds/Input`: the
+  field there is the whole row — magnifier, text and close button sharing one
+  border — and a bordered 40px control dropped into the middle of it draws a
+  second field inside the first. Same argument as `mail/RecipientInput.entry`
+  at D2.02 and `authoring/ParagraphBlock.textArea` at D2.01. It is also the
+  only text entry in the product set at `--text-lg`, because a command
+  palette's query is the thing you are looking at.
+- `ComingSoon.badge` → `.plate`. A badge states a fact in words and is read;
+  this is a 56px decoration above a heading that already says what the screen
+  is, so it is now `aria-hidden`. `ModuleSwitchedOff` shares the stylesheet and
+  moved with it.
+- `AgentActionCard.field` → `.fact` (a label beside a value that cannot be
+  edited, not a labelled control), `.buttons` → `.decide`, `.card` → `.stack`.
+
+**One widening, stated in `ds/Modal.tsx` and in its stylesheet.** `tall` gained
+a `"page"` value: a dialog that is a *place* rather than a question — its own
+navigation, its own sections. It takes `min(720px, 86vh)` instead of its
+content's height, so moving from General to Filters does not resize the panel
+under the pointer, and its body is flush, because a two-pane layout draws its
+own edges and padding there would push the nav column off the panel's side.
+Settings was the only one of the sixteen `.modal` declarations that was a
+place; `tall`'s existing 620px boolean is unchanged and its two authoring
+callers are untouched.
+
+**Visible changes, recorded rather than softened.** Settings is 60px narrower
+(780 → `wide`'s 720) and its height is capped at 720px rather than 86vh of a
+tall display — one width instead of a seventeenth one. Its header glyph loses
+the 32px accent plate and becomes the shared accent mark. Close and Cancel, in
+Settings and in the rule editor, become outlined `ghost` buttons where they
+were borderless text — the same change mail took at D2.02. The out-of-office
+subject box gains a visible label and loses its placeholder. Every select in
+the shell moves from 34px to the shared 40px and gains a real focus ring and a
+readable disabled state, where sharing's dimmed the whole control to
+`opacity: 0.55` and took its text under the contrast floor. Filter checkboxes
+get `accent-color`, so the one place in the product drawing Chrome's blue tick
+now draws ours.
+
+Verified: 17 behaviour tests in `shell/adoption.test.tsx`, each naming what the
+hand-built version did instead — Escape closing Settings, the focus trap
+returning Tab from the last control to the first, the out-of-office switch
+announced as a switch with its hint described, a rule's box saying which rule
+it belongs to (and an unnamed rule named by what it does), each condition's
+three controls numbered, the folder picker out of the checkbox's label, both
+sharing buttons naming the colleague, the folder button's `aria-expanded`,
+`ds/Button`'s `type="button"` default not silently breaking the Add form, the
+placeholder plate hidden from assistive technology, and a running agent action
+refusing both decisions. `npx tsc --noEmit`, `npx eslint src/shell src/ds
+src/i18n --max-warnings 0`, `npm run build` and `npx vitest run src` (79 files,
+733 tests) all green. A dangling-class check both ways across the seven files
+found no `styles.x` pointing at a deleted rule and no rule left behind with no
+caller. The 4 unhandled rejections from `sites/Theme.test.tsx` are still there:
+pre-existing, another track's area, non-failing.
+
+**The test file arrived as inherited work**, the third time in three items:
+`shell/adoption.test.tsx` was sitting untracked at the start, written as a
+D2.03 specification by an earlier attempt whose implementation was discarded.
+It was treated as the spec and the implementation written to meet it; all 17
+pass. Several of its assertions name strings that did not exist yet, so eight
+keys were added to all three catalogs (`UNTRANSLATED` is empty and must stay
+that way): `filterConditionField/Op/Value`, `filterRemoveConditionAt`,
+`filterRuleEnabled`, `filterFolderLabel`, `delegateRemoveFor`,
+`delegateFoldersFor`. `filterRemoveCondition` is now unused; it stays, because
+en/fr/nl are shared files that only take additive lines.
+
+**Cut: no screenshot, the same cut as D2.01 and D2.02.** There is still no
+browser and no screenshot tool in this environment — no Playwright or Puppeteer
+in `web/`, checked again this iteration — so the queue's "look at it" step
+cannot be done as written. What replaced it: the 17 DOM-level assertions above,
+the two-way dangling-class check, and a production build.
+
+**For D3.01, a reproducible CSS number.** `ls dist/assets/*.css` after
+`npm run build` totals **932,239 bytes across 27 files**. D2.02 recorded
+"909.8 KB across four files", which cannot be the same measurement — four files
+is not what this build emits — and the queue's 252 KB matches nothing measured
+here. D3.01 should re-derive the baseline with a stated method rather than
+compare these three numbers to each other.
+
+**Still flagged for D3.01, carried forward from D2.01 and D2.02:** the design
+system has no multi-line text control. Settings' out-of-office message is now a
+`<textarea>` inside a `ds/Field` — labelled and described correctly, but drawn
+by a local rule, which is the honest shape of the gap.
+
+**The halt marker above is deliberately left in place.** D2.03 is done and
+committed, but neither cause of the race is fixed: PID 25244 is still in the
+process table, and both `run-loop.sh` bugs (the `EXIT` trap that frees the lock
+without killing its worker, and stale-lock takeover that does not look for a
+surviving one) are untouched. Removing the marker would restart a wrapper
+beside a process it cannot see, which is exactly what the last two entries
+document. For the human: fix those two, confirm 25244 is gone, then delete the
+marker and restart.
+
+**Next:** D2.04, migrate drive (3 stylesheets — chip, dialog, input).

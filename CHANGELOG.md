@@ -9,6 +9,25 @@ contracts.
 
 ## Unreleased
 
+- **Settings can now be closed with Escape, and every box in it says what it
+  is for.** The Settings panel keeps the keyboard inside it while it is open —
+  before, Tab walked straight out onto the mailbox behind — and Escape closes
+  it. Out-of-office is now a real switch, announced as on or off with the
+  sentence under it read out rather than only shown, and its Subject and
+  Message boxes have proper labels instead of grey hint text that vanished the
+  moment you typed. In Filters & rules, each rule's on/off box now says which
+  rule it belongs to, each condition's three controls are numbered ("Condition
+  2: field") instead of being announced as whatever they currently say, and the
+  folder picker beside "Move to folder" is its own control — clicking its words
+  no longer ticks the box next to it. On the Sharing tab, the two buttons on
+  each row name the colleague they act on ("Remove ben@example.com's access")
+  rather than repeating "Remove access" once per person, the folder button says
+  whether its list is open, and each folder box carries its folder's name. Some
+  of this looks slightly different: Settings is a little narrower and sits on
+  the same panel as every other dialog in alo, Cancel and Close are now
+  outlined buttons rather than plain text, and the search box, the switches and
+  the dropdowns throughout are the shared ones — same height, same focus ring,
+  visible when they are switched off.
 - **Your website can now show what you actually sell.** A site holds a catalog
   — the dishes, rooms, services or courses you offer — in one currency, grouped
   into categories you name, with a price, a description and a picture per item.
