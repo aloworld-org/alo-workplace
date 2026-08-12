@@ -9,6 +9,21 @@ contracts.
 
 ## Unreleased
 
+- **Your website statistics screen now shows everything it counts, grouped so
+  it can be read at a glance.** Under the visit chart there are now three
+  groups — how people found you (referrers, campaigns, countries), what they
+  looked at (most-opened pages, the page each day started on, and the last one
+  seen), and how they read it (a reading-time histogram, the websites visitors
+  left for, and the kind of device). Each panel shows its top five with the
+  rest one click away, and says in a line where its numbers come from, because
+  a number read as something it is not is worse than no number: reading times
+  are only reported by browsers that report them, so they never add up to your
+  visit count, and a stored bucket like "1-3m" or "phone" is now written out in
+  your language. A panel with nothing in it explains how something gets there —
+  including the honest case of countries, which stay empty until your site is
+  served through a network that resolves them, with every other figure on the
+  screen unaffected.
+
 - **Your website statistics now also say how long people read, and where they
   went next.** Published pages carry a small script that reports two things a
   server cannot see for itself: roughly how long the page stayed open, as a

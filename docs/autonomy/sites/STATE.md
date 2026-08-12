@@ -3626,3 +3626,72 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   the aggregates now collected, with the privacy explanation, the honest "no
   edge reports countries yet" empty state, and the beacon caveats above made
   visible rather than left for an owner to misread.
+
+## 2026-08-12 — S2.08b nine aggregates that read as three questions
+
+- **Item:** S2.08b, the analytics UI. Everything S2.08a and S2.08a2 collect is
+  now on the owner's screen: campaigns, countries, devices, first/last pages,
+  the reading-time histogram and the domains visitors left for, beside the
+  visits, chart, pages and referrers that were already there.
+- **Three groups, not nine panels.** The screen asks three questions in the
+  owner's words — *how people found you*, *what they looked at*, *how they read
+  it* — and each answers with three panels. A ninth panel dropped into a flat
+  grid is a data dump; a group heading is what makes a number findable without
+  a legend.
+- **Every panel says where its numbers come from**, in one line under its
+  title, because the caveats journaled in S2.08a2 are only honest if the owner
+  reads them at the number rather than in a changelog: reading times come only
+  from browsers that report them and never add up to the visit count; a country
+  is resolved by the network in front of the site and never from a stored
+  address; `other` in the outbound list is the day's overflow past 200
+  destinations, not a domain; a device class is coarse and is all that is kept.
+  The privacy note gained a second paragraph naming the page script and saying
+  it carries no identity at all, so two reports from one browser are unlinkable.
+- **The stored tokens are named in the reader's language** in one pure module
+  (`analyticsLabels.ts`): `1-3m` → "1–3 minutes", `phone` → "Phone", `NL` →
+  "Netherlands" via `Intl.DisplayNames`, `""` → "Not reported"/"No
+  campaign"/"Direct" depending on which dimension is empty-labelled, `other` →
+  "Other domains". An unknown token is shown verbatim rather than dropped: a
+  server that grows a seventh bucket must not vanish from the histogram.
+- **The reading-time panel never collapses and is never re-sorted.** Every
+  other panel shows its top five with "Show all (N)"; the histogram shows all
+  six buckets in duration order, because a histogram truncated to its top five
+  or sorted by count is a different claim about the same data.
+- **Each panel has its own empty state**, since a dimension can be empty while
+  the rest of the screen is full — most of all countries, which stay empty
+  until an edge reports them and say exactly that, plus "every other number
+  here is unaffected". The whole-site "no visits yet" onboarding is unchanged
+  and still draws no panels at all.
+- **Verified:** `npx tsc --noEmit -p tsconfig.json` clean; `npx eslint` on all
+  eight changed/new files with `--max-warnings 0` clean; `npm run build` clean
+  (only the pre-existing chunk-size advisories). `npx vitest run
+  src/sites/Analytics.test.tsx src/i18n/locale.test.ts` — 73 green, including
+  the new 8-test `Analytics.test.tsx` (groups render, buckets named, histogram
+  order pinned, panel notes present, per-dimension empty states, show-all
+  expansion 5→9→5, no-visit onboarding, failed report surfaced) and the i18n
+  parity suite, which passes because the 40 new keys were written in fr and nl
+  in the same change — `untranslated.ts` stays empty.
+- **Cuts/flags:**
+  - **The drill-down is "show all", not "filter by".** The API answers one
+    period with ten values per dimension and has no filter parameter, so
+    "campaigns → which pages that campaign landed on" is not implementable
+    without new server surface and a new privacy argument (a cross-dimension
+    filter is the first step towards a session). The item's "drill-down" is
+    therefore the honest one available: top five, then all ten, per dimension.
+  - **No per-page reading time**, as S2.08a2 flagged: the panel is explicitly
+    titled and noted as a whole-site histogram so nothing on the screen implies
+    a per-page number the store cannot answer.
+  - **Countries will be empty in production today.** Nothing in the current
+    deployment sets `cf-ipcountry`, so the panel shows its explainer rather
+    than a chart until an edge does. That is a deployment fact, not a gap.
+  - **Rust untouched**, no new route, no storage change, so no wrong-tenant
+    test applies to this item and the production Caddyfile needs nothing.
+  - **Pre-existing failure, other track's area (not touched):**
+    `web/src/chat/ChatModule.test.tsx` fails in a full `npx vitest run` ("a
+    colleague is searched for, never listed" → `agents.map` of undefined at
+    `ChatModule.tsx:753`) and passes when run alone. Reproduced on a clean
+    stash of this checkout before any of my changes, so it is the chat/meet
+    track's flake to fix.
+- **Next:** S2.09a, aggregate heatmap collection — bounded click coordinates
+  and scroll-depth buckets with no visitor or session identity, with the schema
+  privacy proof and the abuse caps.
