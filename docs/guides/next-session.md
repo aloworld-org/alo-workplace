@@ -84,6 +84,33 @@ npx vitest run src            # READ THE TEST LINE, not just "✓ built"
 npm run build
 ```
 
+### Ports and databases — allocated, not first-come
+
+Two streams run a full stack on this machine, and both default to Vite `5173`
+and `alo-jmap` `8080`. Whoever starts first takes the port and the other
+silently lands somewhere else, which on 2026-08-12 produced forty minutes of
+"my correct password stopped working": the browser was on `5173`, served by the
+*other* checkout's Vite, proxying to the *other* backend, against the *other*
+database — where that account does not exist.
+
+| Stream | Checkout | Vite | alo-jmap | Database |
+|---|---|---|---|---|
+| Claude | `C:\dev\Ficina-loop` | **5174** | **8080** | `alo_loop` |
+| Codex | `C:\dev\Ficina` | **5173** | **8082** | `alo_ficina` |
+
+Shared on purpose, because they hold no per-stream state worth splitting:
+Postgres on `5432` (separate databases inside it) and LiveKit on `7880`.
+
+**Separate stacks are deliberate.** Each stream builds its own Rust binary, so
+one shared backend could only ever run one stream's code; every Rust change
+needs a restart, which would interrupt whoever else was mid-test; and one
+stream's new migration against another's older binary is a `VersionMismatch`
+that stops it dead.
+
+**Before believing a bug, check which stack answered.** `netstat -ano | grep
+5173` and `Get-CimInstance Win32_Process` name the process and its executable
+path, which is the fastest way to find out whose app you are looking at.
+
 ### The local stack
 
 ```bash
@@ -97,6 +124,8 @@ export DATABASE_URL="postgres://alo:alo-dev-only@localhost:5432/alo_loop" \
 export ALO_MEET_URL="ws://localhost:7880" ALO_MEET_API_KEY="devkey" \
   ALO_MEET_API_SECRET="devsecretdevsecretdevsecretdevsecret"
 nohup ./target/debug/alo-jmap.exe > /tmp/jmap.log 2>&1 &
+# Dropping the three ALO_MEET_* variables does not fail — Meet just reports
+# itself unconfigured, which reads as a bug in Meet. Keep them on the line.
 
 cd web && nohup env VITE_DEV_API=http://localhost:8080 npm run dev > /tmp/vite.log 2>&1 &
 ```

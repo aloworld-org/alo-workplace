@@ -35,3 +35,8 @@ custom media UI. That would duplicate engine behavior and contradict ADR 0003;
 alo instead owns the framing, recovery paths, visual tokens, and guaranteed exit.
 
 No API, persistence, tenancy, or admission contract changed in this audit.
+# Interaction follow-up
+
+The room now keeps the meeting identifier in the URL, exposes the platform share sheet (with clipboard fallback), and synchronizes raised hands and ephemeral reactions over LiveKit's reliable data channel. Microphone, camera, screen share, chat, and device selection remain LiveKit-backed rather than simulated.
+
+Anonymous guests, email delivery, lobby admission, and authoritative host moderation remain Stage 2 server work. They must follow the per-invitee, revocable, expiring-link ADR required by `docs/design/meet-roadmap.md`; a bare meeting URL is intentionally limited to authenticated people who already have access.
