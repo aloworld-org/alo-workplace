@@ -8,6 +8,20 @@ contracts.
 
 ## Unreleased
 
+- **A page can now be published behind a password.** Some pages are meant for
+  the internet and some are meant for the people you gave the address to: a
+  dealer price list, a rehearsal programme, a page shared with one client. Put
+  a password on any page and visitors see your own site's unlock screen instead
+  of the page — in the page's own language, with nothing of the page showing
+  through, not even its title. Get the password right and the page opens and
+  stays open on that browser for the rest of the day. The rest of the website is
+  untouched and stays public, and a protected page is kept out of the sitemap so
+  search engines are not pointed at it. Change the password and everyone who was
+  let in with the old one is asked again — which is what makes handing it out
+  safe. Lift it and the page is public again on the next visit. Guessing gets
+  nowhere: attempts from one visitor are limited, and the password itself is
+  never stored — if you forget it, you set a new one.
+
 - **A website can now publish itself at a moment you choose.** Beside the
   publish button, every website has a schedule: pick a date and time — the
   field already proposes tomorrow morning rather than waiting empty — and the

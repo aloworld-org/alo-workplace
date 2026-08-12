@@ -2908,3 +2908,115 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     Caddyfile needs nothing for this item.
 - **Next:** S2.06a, password-protected pages (hashing, the anonymous
   challenge/session gate, cache-safe responses, rate limiting, security tests).
+
+## 2026-08-12 — S2.06a the page that is online, but only for people with the password
+
+- **Shipped:** the whole gate behind "publish this page, but not to everybody"
+  — model, edit routes, and the anonymous challenge on the public service.
+  Migration `0303_site_page_passwords.sql` plus a new store module
+  (`site_page_protection.rs`, the tenant door) and its public counterpart
+  (`site_public_protection.rs`, the two questions `alo-sites` may ask), the new
+  `site_protection.rs` routes in alo-jmap, and `serve/unlock.rs` in alo-sites.
+  No web work: the protect/remove screen is S2.06b.
+- **Two design decisions carry the item, both recorded in
+  `docs/design/sites.md`.** First, **protection is live state, not part of a
+  publish**: a password set, changed or lifted takes effect on the very next
+  request. Rejected alternative — freezing it into `site_page_snapshots` with
+  everything else a publish freezes: consistent with the rest of the model, but
+  it would leave a leaked password working until the owner happened to
+  republish, which is the wrong failure direction for a security control.
+  Second, the row hangs off the **site**, not the page, because deleting a
+  draft page does not unpublish its snapshot: cascading the protection away
+  with the draft would silently open a page the internet is still being served.
+  One password covers a page in every language, since every locale snapshot
+  shares the page identity.
+- **The secret's whole life.** The plaintext is hashed with argon2id
+  (`$argon2id$v=19$m=19456,t=2,p=1$…`, on a blocking thread) and never stored,
+  never logged, and never returned by any read on any door: a forgotten
+  password is replaced, not recovered. From the hash the store derives an
+  opaque `version`; that — never the hash — is what the public service holds.
+- **Sessions are signatures, not rows.** A correct password mints an
+  HMAC-signed cookie over *(public host, page id, protection version, expiry)*,
+  twelve hours, `HttpOnly; Secure; SameSite=Lax`. Nothing about the visitor is
+  stored anywhere — no session table, no identifier — and each of the three
+  bindings has a test: another host cannot present it, another page cannot be
+  opened with it, and changing the password rotates the version, which is what
+  makes "change the password" a real revocation (the dead cookie is cleared on
+  the way out). The signing key is derived from the existing sites secret under
+  a fixed label, so unlock signatures and analytics visitor hashes cannot be
+  confused and no new deployment secret is needed.
+- **Cache-safe by construction.** The `401` unlock screen is `no-store`,
+  `Vary: Cookie`, no `ETag`, `noindex`, and carries the site's theme but none
+  of the page's content — not even its title. The unlocked page is `private,
+  no-store` with `Vary: Cookie` and, deliberately, no validator: the ordinary
+  `public, max-age=60` answer would invite a shared cache to hand one visitor's
+  copy to the next person. Protected pages are also left out of `sitemap.xml`.
+  The `401` carries `WWW-Authenticate: Form` — RFC 9110 requires the header,
+  and no browser prompts for an unknown scheme, so the visitor sees our screen
+  rather than a native credential dialog.
+- **Guessing costs.** The unlock `POST` is the only write a page path accepts
+  (anything else is still `405 Allow: GET, HEAD`), and it is rate-limited on
+  its own budget — eight tries per ten minutes, a second limiter instance so
+  contact-form traffic cannot spend the budget standing between a guesser and a
+  page. An unprotected or unknown page pays the same argon2 cost on the verify
+  path and the result is discarded, so timing says nothing about which pages
+  carry a password.
+- **Real curl transcript** (fresh admin on docker `alo-pg`, real PKCE token,
+  debug `alo-jmap` on `127.0.0.1:8080` and debug `alo-sites` on
+  `127.0.0.1:8081`, `SITES_DOMAIN=alosites.test`): no token → `401` on all
+  three routes → `{"pages":[]}` and `{"protected":false}` → `"short"` → `422 a
+  page password must be at least 8 characters`; `{"secret":…}` → `422 password
+  must be a string, for example {"password": "…"}` (never echoing the body);
+  `"          "` → `422 a page password must be more than spaces`; an unknown
+  page → `404` → the good password → `{"protected":true,"pageId":…}`, listed
+  once, home page still `{"protected":false}` → publish → **the public side**:
+  `/` → `200 public, max-age=60` with an `ETag`; `/prices` → `401`,
+  `www-authenticate: Form`, `cache-control: no-store`, `vary: Cookie`, **no
+  ETag**, `<title>This page is protected — Wire Roastery</title>`, zero
+  occurrences of the page's own heading → wrong password → `401` with *"That
+  password does not open this page."* and no cookie → right password → `303
+  location: /prices` + `alo_site_unlock_<page>=…; Max-Age=43200; Path=/;
+  HttpOnly; Secure; SameSite=Lax` → the page with that cookie → `200 private,
+  no-store`, `vary: Cookie`, no ETag, the heading present → tampered cookie →
+  `401` → `sitemap.xml` lists only `/` → `POST /` → `405 allow: GET, HEAD` →
+  password changed → the old cookie → `401` + `Max-Age=0` clearing → eight
+  guesses `401` then `429 retry-after: 598`, and the *right* password from the
+  same address still `429` while another visitor gets `303` → password lifted →
+  `/prices` → `200 public, max-age=60` with its ETag back. `psql`: the stored
+  row is an argon2id hash containing no fragment of the password. Fixture site
+  deleted; the host answers `404` after. No production, email, DNS or external
+  AI service was contacted.
+- **Verified:** `cargo fmt` (only this item's files moved — the rustfmt-version
+  delta that plagued S1.10–S1.14 is gone); strict offline all-target Clippy for
+  `alo-store`, `alo-sites` and `alo-jmap`, zero warnings; **full unfiltered
+  suites green** — `cargo test -p alo-store` (every suite, including the new
+  3-test `site_page_protection_tenancy`), `cargo test -p alo-sites` (14 crate
+  tests incl. the new `unlock` session suite, the new 3-test `protected_pages`
+  integration suite, and `render_rules` extended with the unlock screen in en/
+  fr/nl), and `cargo test -p alo-jmap` (63 suites, incl. the new 3-test
+  `site_protection_http`). Two mutation checks, both red for the right reason:
+  dropping the protection version from the session signature turns "changing
+  the password ends the session" red, and opening the gate unconditionally
+  turns the two gate tests red. No web code was touched, so the web gate does
+  not apply to this item.
+- **Cuts/flags:**
+  - Protection is read once per page request (an indexed primary-key-prefix
+    read on the resolved site) rather than cached with the publish — the price
+    of "a password holds on the next request". If page traffic ever makes that
+    read visible, the answer is a short-TTL cache keyed by publish, not moving
+    protection back into the snapshot.
+  - Only whole pages can be protected, not blog posts or the site as a whole; a
+    site-wide password would be S2.06b+ if anyone asks, and posts have no
+    protection model yet.
+  - There is no "share this link and skip the password" token: a page is either
+    public or asks. That is deliberate — a second secret with different
+    revocation rules is a second thing to get wrong.
+  - The unlock screen deliberately shows no page title and no navigation, so a
+    visitor who lands there by accident cannot tell what the page is about.
+    S2.06b's UI copy has to explain that to the owner, who might expect the
+    page's own name.
+  - fr/nl chrome strings ship with the English ones, as the parity rule
+    requires. No new route *prefix* (`/sites` is already proxied), so the
+    production Caddyfile needs nothing for this item.
+- **Next:** S2.06b, the password UI (visible protect/remove controls, the clear
+  public-preview state, and the accessible visitor unlock screen).

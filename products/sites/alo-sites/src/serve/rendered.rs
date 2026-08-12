@@ -13,6 +13,8 @@ use crate::render::{
 };
 use crate::stylesheet;
 
+use super::unlock::UnlockNotice;
+
 /// The servable output of one publish of one site.
 pub struct RenderedSite {
     /// The publish these bytes were rendered from — the cache-validity key
@@ -25,6 +27,19 @@ pub struct RenderedSite {
     page_paths: Vec<String>,
     /// Exact sibling-language paths for each canonical page path.
     page_alternates: HashMap<String, Vec<(String, String)>>,
+    /// The page identity behind each canonical path. Every language of a page
+    /// shares it, which is what makes one password protect the page in all of
+    /// them ([`super::unlock`]).
+    page_ids: HashMap<String, String>,
+    /// The exact language of each canonical path, so an unlock screen speaks
+    /// the language of the page it is standing in front of.
+    page_locales: HashMap<String, String>,
+    /// The site's name, theme, and origin, kept for documents that are
+    /// rendered per request rather than per publish — currently the unlock
+    /// screen, which depends on live protection state, not on the publish.
+    name: String,
+    base_url: String,
+    theme: SiteTheme,
     /// The one stylesheet, served at `/assets/site.css`.
     pub css: String,
     /// The site's themed not-found document (status 404, any unknown path).
@@ -80,6 +95,8 @@ impl RenderedSite {
         let mut pages = HashMap::with_capacity(snapshots.len());
         let mut page_paths = Vec::with_capacity(snapshots.len());
         let mut page_alternates = HashMap::with_capacity(snapshots.len());
+        let mut page_ids = HashMap::with_capacity(snapshots.len());
+        let mut page_locales = HashMap::with_capacity(snapshots.len());
         let mut images = HashSet::new();
         images.extend(
             [theme.logo.as_ref(), theme.favicon.as_ref()]
@@ -148,6 +165,8 @@ impl RenderedSite {
                 render_localized_page(&ctx, &page, &alternates),
             );
             page_alternates.insert(path.clone(), translations.clone());
+            page_ids.insert(path.clone(), snapshot.page_id.as_str().to_owned());
+            page_locales.insert(path.clone(), snapshot.locale.clone());
             page_paths.push(path);
         }
         let default_strings = strings_for(&site.default_locale);
@@ -164,9 +183,14 @@ impl RenderedSite {
             pages,
             page_paths,
             page_alternates,
+            page_ids,
+            page_locales,
             css: stylesheet::stylesheet(&theme),
             not_found: render::render_not_found(&default_ctx),
             images,
+            name: site.name.clone(),
+            base_url,
+            theme,
         }
     }
 
@@ -184,6 +208,32 @@ impl RenderedSite {
     /// Exact translations of `path`, in the site's frozen language order.
     pub fn page_alternates(&self, path: &str) -> &[(String, String)] {
         self.page_alternates.get(path).map_or(&[], Vec::as_slice)
+    }
+
+    /// The page identity served at `path`, if the publish has a page there.
+    /// Every language of a page answers the same id.
+    #[must_use]
+    pub fn page_id(&self, path: &str) -> Option<&str> {
+        self.page_ids.get(path).map(String::as_str)
+    }
+
+    /// The unlock screen for the page at `path`, in that page's own language.
+    /// Rendered per request rather than frozen with the publish because
+    /// protection is live state: a password can be set, changed, or lifted
+    /// between two requests of the same publish.
+    #[must_use]
+    pub fn challenge(&self, path: &str, notice: UnlockNotice) -> String {
+        let locale = self.page_locales.get(path).map_or("", String::as_str);
+        let strings = strings_for(locale);
+        let ctx = SiteRenderContext {
+            name: &self.name,
+            base_url: &self.base_url,
+            locale,
+            theme: &self.theme,
+            strings,
+            images: ImageSources::PublicPaths,
+        };
+        render::render_password_challenge(&ctx, path, notice.text(strings))
     }
 
     /// Whether this publish references `blob_id` — the gate on the public

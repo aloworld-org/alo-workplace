@@ -259,6 +259,72 @@ pub fn render_not_found(site: &SiteRenderContext<'_>) -> String {
     out
 }
 
+/// Renders the unlock screen of a password-protected page (S2.06a): the
+/// site's own chrome around one password field, posting back to the page's
+/// own URL — so a visitor who gets the password simply lands on the page.
+///
+/// It carries the site's theme but none of the page's content, not even its
+/// title: everything behind the password stays behind it, including the fact
+/// that the page is called "Prices for Acme". Marked `noindex`, and no
+/// JavaScript — the form works with scripting switched off.
+///
+/// `notice` is the one-line message above the field (a wrong password, too
+/// many attempts) or `None` on the first ask; `path` is the page's own path,
+/// which is the form's action and is always one of this publish's canonical
+/// paths (never visitor input).
+#[must_use]
+pub fn render_password_challenge(
+    site: &SiteRenderContext<'_>,
+    path: &str,
+    notice: Option<&str>,
+) -> String {
+    let title = format!("{} — {}", site.strings.protected_title, site.name);
+    let mut out = String::with_capacity(2 * 1024);
+    out.push_str("<!doctype html>\n");
+    out.push_str(&format!("<html lang=\"{}\">\n", esc(site.locale)));
+    out.push_str("<head>\n<meta charset=\"utf-8\">\n");
+    out.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+    out.push_str(&format!("<title>{}</title>\n", esc(&title)));
+    out.push_str("<meta name=\"robots\" content=\"noindex\">\n");
+    if let Some(favicon) = &site.theme.favicon {
+        out.push_str(&format!(
+            "<link rel=\"icon\" href=\"{}\">\n",
+            site.images.src(favicon.as_str())
+        ));
+    }
+    out.push_str("<link rel=\"stylesheet\" href=\"/assets/site.css\">\n</head>\n<body>\n");
+    out.push_str("<main id=\"main\">\n<section class=\"s-contact_form\">\n");
+    out.push_str(&format!("<h1>{}</h1>\n", esc(site.strings.protected_title)));
+    out.push_str(&format!(
+        "<p class=\"subheading\">{}</p>\n",
+        esc(site.strings.protected_text)
+    ));
+    if let Some(notice) = notice {
+        out.push_str(&format!(
+            "<p class=\"form-error\" role=\"alert\">{}</p>\n",
+            esc(notice)
+        ));
+    }
+    out.push_str(&format!(
+        "<form method=\"post\" action=\"{}\">\n",
+        esc(path)
+    ));
+    out.push_str(&format!(
+        "<p><label for=\"site-password\">{}</label>\n",
+        esc(site.strings.protected_password)
+    ));
+    out.push_str(
+        "<input id=\"site-password\" name=\"password\" type=\"password\" \
+         autocomplete=\"current-password\" required autofocus></p>\n",
+    );
+    out.push_str(&format!(
+        "<p><button type=\"submit\">{}</button></p>\n",
+        esc(site.strings.protected_open)
+    ));
+    out.push_str("</form>\n</section>\n</main>\n</body>\n</html>\n");
+    out
+}
+
 /// Whether the page has anything for the behavior script to do: a nav (menu
 /// toggle) or a form with a working submit. A page without either ships zero
 /// JavaScript.

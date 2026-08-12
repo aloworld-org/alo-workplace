@@ -80,6 +80,18 @@ pub struct UiStrings {
     pub blog_page_of: &'static str,
     /// Collection section: stable message for a deliberately empty source.
     pub collection_empty: &'static str,
+    /// Protected page: heading of the unlock screen (and its `<title>`).
+    pub protected_title: &'static str,
+    /// Protected page: explanation above the password field.
+    pub protected_text: &'static str,
+    /// Protected page: label of the password field.
+    pub protected_password: &'static str,
+    /// Protected page: submit button text.
+    pub protected_open: &'static str,
+    /// Protected page: shown after a password that did not open the page.
+    pub protected_wrong: &'static str,
+    /// Protected page: shown when too many attempts came from one visitor.
+    pub protected_rate_limited: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -117,6 +129,12 @@ pub const EN: UiStrings = UiStrings {
     blog_page: "Page",
     blog_page_of: "of",
     collection_empty: "Nothing to show yet.",
+    protected_title: "This page is protected",
+    protected_text: "Enter the password to open this page.",
+    protected_password: "Password",
+    protected_open: "Open page",
+    protected_wrong: "That password does not open this page.",
+    protected_rate_limited: "Too many attempts. Please wait a few minutes and try again.",
 };
 
 /// French renderer chrome.
@@ -154,6 +172,12 @@ pub const FR: UiStrings = UiStrings {
     blog_page: "Page",
     blog_page_of: "sur",
     collection_empty: "Rien à afficher pour le moment.",
+    protected_title: "Cette page est protégée",
+    protected_text: "Saisissez le mot de passe pour ouvrir cette page.",
+    protected_password: "Mot de passe",
+    protected_open: "Ouvrir la page",
+    protected_wrong: "Ce mot de passe n’ouvre pas cette page.",
+    protected_rate_limited: "Trop de tentatives. Patientez quelques minutes et réessayez.",
 };
 
 /// Dutch renderer chrome.
@@ -191,6 +215,12 @@ pub const NL: UiStrings = UiStrings {
     blog_page: "Pagina",
     blog_page_of: "van",
     collection_empty: "Nog niets om te tonen.",
+    protected_title: "Deze pagina is beveiligd",
+    protected_text: "Voer het wachtwoord in om deze pagina te openen.",
+    protected_password: "Wachtwoord",
+    protected_open: "Pagina openen",
+    protected_wrong: "Dit wachtwoord opent deze pagina niet.",
+    protected_rate_limited: "Te veel pogingen. Wacht een paar minuten en probeer opnieuw.",
 };
 
 /// Renderer chrome for a normalized locale. Region variants inherit their

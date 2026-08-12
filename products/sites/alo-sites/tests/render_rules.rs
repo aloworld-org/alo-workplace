@@ -4,8 +4,8 @@
 #![allow(clippy::unwrap_used)]
 
 use alo_sites::render::{
-    EN, ImageSources, PageRenderContext, SiteRenderContext, render_page, render_page_preview,
-    sections_lenient,
+    EN, FR, ImageSources, NL, PageRenderContext, SiteRenderContext, render_page,
+    render_page_preview, render_password_challenge, sections_lenient,
 };
 use alo_sites::stylesheet::stylesheet;
 use alo_store::site_theme::{SiteTheme, THEME_PRESETS};
@@ -352,5 +352,76 @@ fn preview_is_the_published_document_with_the_stylesheet_inlined() {
         );
         assert_eq!(preview, expected, "{}: preview drifted", preset.id);
         assert!(!preview.contains("/assets/site.css"), "{}", preset.id);
+    }
+}
+
+/// The unlock screen of a protected page (S2.06a): the site's own chrome, one
+/// password field posting back to the page, nothing about the page itself, and
+/// the visitor's own language.
+#[test]
+fn the_unlock_screen_asks_for_a_password_and_reveals_nothing_else() {
+    let theme = SiteTheme::new();
+    for (strings, locale, heading, notice) in [
+        (
+            &EN,
+            "en",
+            "This page is protected",
+            "does not open this page",
+        ),
+        (
+            &FR,
+            "fr",
+            "Cette page est protégée",
+            "n’ouvre pas cette page",
+        ),
+        (
+            &NL,
+            "nl",
+            "Deze pagina is beveiligd",
+            "opent deze pagina niet",
+        ),
+    ] {
+        let site = SiteRenderContext {
+            name: "Nordwind & Co",
+            base_url: "https://nordwind.alosites.com",
+            locale,
+            theme: &theme,
+            strings,
+            images: ImageSources::PublicPaths,
+        };
+        let asked = render_password_challenge(&site, "/prices", None);
+        assert!(
+            asked.contains(&format!("<html lang=\"{locale}\">")),
+            "{asked}"
+        );
+        assert!(asked.contains(heading), "{asked}");
+        assert!(
+            asked.contains("<meta name=\"robots\" content=\"noindex\">"),
+            "an unlock screen is not content to index: {asked}"
+        );
+        assert!(
+            asked.contains("<form method=\"post\" action=\"/prices\">"),
+            "the form posts back to the page it stands in front of: {asked}"
+        );
+        assert!(
+            asked.contains("name=\"password\"") && asked.contains("type=\"password\""),
+            "{asked}"
+        );
+        assert!(
+            asked.contains("Nordwind &amp; Co"),
+            "the site name is escaped like everywhere else: {asked}"
+        );
+        assert!(
+            !asked.contains("<script") && !asked.contains("data-success"),
+            "the screen works without scripting: {asked}"
+        );
+        assert!(
+            !asked.contains(notice),
+            "no notice on the first ask: {asked}"
+        );
+
+        let refused = render_password_challenge(&site, "/prices", strings.protected_wrong.into());
+        assert!(refused.contains(notice), "{refused}");
+        assert!(refused.contains("role=\"alert\""), "{refused}");
     }
 }

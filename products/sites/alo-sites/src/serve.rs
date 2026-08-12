@@ -18,6 +18,12 @@
 //! - Unknown host → the generic not-found (identical for unknown and
 //!   unpublished — no existence leak). Unknown path on a live site → the
 //!   site's themed not-found. Both `404`, `no-cache`.
+//! - A page carrying a password ([`unlock`]) is answered by the gate instead:
+//!   `401` with the site's unlock screen until a signed session opens it, then
+//!   the page itself as `private, no-store` with `Vary: Cookie` and no `ETag`.
+//!   Protection is live state, read per request, so a password set or lifted a
+//!   moment ago holds now rather than at the next publish — and the one `POST`
+//!   this surface accepts is that page's own unlock form.
 //! - Database trouble → `503` with a static line, `Retry-After: 10`.
 
 mod analytics;
@@ -28,6 +34,7 @@ mod forms;
 mod host;
 mod rate;
 mod rendered;
+mod unlock;
 
 use std::sync::Arc;
 
@@ -54,6 +61,11 @@ pub struct AppState {
     unknown_host: String,
     /// Per-client budget on the form-submit path (in-memory, transient).
     rate: rate::RateLimiter,
+    /// The separate, tighter budget on password guesses at protected pages.
+    unlock_rate: rate::RateLimiter,
+    /// Signs and checks visitor sessions on protected pages. Holds a derived
+    /// key only — no session is ever stored.
+    unlock: unlock::UnlockSessions,
     /// Secret-keyed visitor hashing. Raw identifiers never cross storage.
     analytics: analytics::VisitorHasher,
 }
@@ -61,11 +73,15 @@ pub struct AppState {
 impl AppState {
     /// Wires the service state: the public store door and the apex domain
     /// (already lowercase, from [`ServeConfig`]).
+    ///
+    /// `secret` is the deployment's sites secret. Two independent keys are
+    /// derived from it — daily visitor hashes for analytics and unlock-session
+    /// signatures — so neither can be produced from the other.
     #[must_use]
     pub fn new(
         store: SitePublicStore,
         sites_domain: String,
-        analytics_secret: impl AsRef<[u8]>,
+        secret: impl AsRef<[u8]>,
     ) -> Arc<Self> {
         Arc::new(Self {
             store,
@@ -73,7 +89,12 @@ impl AppState {
             cache: cache::SiteCache::default(),
             unknown_host: rendered::unknown_host_not_found(&EN),
             rate: rate::RateLimiter::default(),
-            analytics: analytics::VisitorHasher::new(analytics_secret),
+            unlock_rate: rate::RateLimiter::with_budget(
+                rate::UNLOCK_MAX_PER_WINDOW,
+                rate::UNLOCK_WINDOW,
+            ),
+            unlock: unlock::UnlockSessions::new(&secret),
+            analytics: analytics::VisitorHasher::new(secret),
         })
     }
 }
@@ -135,14 +156,13 @@ async fn resolve_scope(
 }
 
 /// Serves one public request: Host → current publish → bytes.
+///
+/// `POST` is accepted on exactly one kind of path — a protected page, posting
+/// its own unlock form ([`unlock`]). Everywhere else it is the same
+/// method-not-allowed as any other verb.
 async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Response {
-    if req.method() != Method::GET && req.method() != Method::HEAD {
-        return (
-            StatusCode::METHOD_NOT_ALLOWED,
-            [(header::ALLOW, HeaderValue::from_static("GET, HEAD"))],
-            "method not allowed\n",
-        )
-            .into_response();
+    if req.method() != Method::GET && req.method() != Method::HEAD && req.method() != Method::POST {
+        return method_not_allowed();
     }
 
     let Some(scope) = req
@@ -202,9 +222,32 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
 
     // `/about/` serves `/about` (the canonical URL in the document keeps
     // search engines on the slash-less form); everything else is exact.
-    let raw = req.uri().path();
+    let raw = req.uri().path().to_owned();
     let trimmed = raw.trim_end_matches('/');
     let path = if trimmed.is_empty() { "/" } else { trimmed };
+
+    // The one write an anonymous visitor may make on a page path: trying the
+    // password of a protected page. Anything else posted here is a 405.
+    if req.method() == Method::POST {
+        let Some(page_id) = site.page_id(path).map(str::to_owned) else {
+            return method_not_allowed();
+        };
+        let protections = match state.store.published_page_protections(&resolved).await {
+            Ok(protections) => protections,
+            Err(error) => {
+                tracing::error!(host = %public_host, %error, "page protection read failed");
+                return unavailable();
+            }
+        };
+        if !protections
+            .iter()
+            .any(|protection| protection.page.as_str() == page_id)
+        {
+            return method_not_allowed();
+        }
+        return unlock::attempt(&state, &resolved, &site, &public_host, path, &page_id, req).await;
+    }
+
     let analytics_visit = analytics::capture(&state, &req);
 
     let base_url = format!("https://{public_host}");
@@ -212,7 +255,27 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
         return dynamic_text(render_robots(&base_url));
     }
     if path == "/sitemap.xml" {
-        let page_count = site.page_paths().len();
+        // A protected page is not a page search engines may be pointed at:
+        // the sitemap is the site telling the internet what to come and read.
+        let protected = match state.store.published_page_protections(&resolved).await {
+            Ok(protections) => protections
+                .into_iter()
+                .map(|protection| protection.page.as_str().to_owned())
+                .collect::<std::collections::HashSet<_>>(),
+            Err(error) => {
+                tracing::error!(host = %public_host, %error, "page protection read failed");
+                return unavailable();
+            }
+        };
+        let public_paths: Vec<&String> = site
+            .page_paths()
+            .iter()
+            .filter(|path| {
+                site.page_id(path)
+                    .is_none_or(|page_id| !protected.contains(page_id))
+            })
+            .collect();
+        let page_count = public_paths.len();
         let post_limit = SITEMAP_URL_LIMIT.saturating_sub(page_count + 1);
         let posts = if post_limit == 0 {
             Vec::new()
@@ -226,10 +289,9 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                 }
             }
         };
-        let mut urls: Vec<SitemapUrl> = Vec::with_capacity(
-            site.page_paths().len() + usize::from(!posts.is_empty()) + posts.len(),
-        );
-        urls.extend(site.page_paths().iter().map(|path| {
+        let mut urls: Vec<SitemapUrl> =
+            Vec::with_capacity(page_count + usize::from(!posts.is_empty()) + posts.len());
+        urls.extend(public_paths.into_iter().map(|path| {
             SitemapUrl {
                 location: format!("{base_url}{path}"),
                 alternates: site
@@ -300,6 +362,42 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
         .await;
         return analytics::record_html_view(&state, &resolved, path, analytics_visit, response)
             .await;
+    }
+
+    // A page carrying a password is answered by the gate, not by the cache:
+    // protection is live state (`alo_store::site_page_protection`), so it is
+    // read per request rather than frozen with the publish, and the bytes
+    // behind it never get a cacheable answer.
+    if let Some(page_id) = site.page_id(path) {
+        let protections = match state.store.published_page_protections(&resolved).await {
+            Ok(protections) => protections,
+            Err(error) => {
+                tracing::error!(host = %public_host, %error, "page protection read failed");
+                return unavailable();
+            }
+        };
+        if let Some(protection) = protections
+            .iter()
+            .find(|protection| protection.page.as_str() == page_id)
+        {
+            let cookies = req
+                .headers()
+                .get(header::COOKIE)
+                .and_then(|value| value.to_str().ok());
+            let now = time::OffsetDateTime::now_utc().unix_timestamp();
+            if !state
+                .unlock
+                .opens(cookies, &public_host, page_id, &protection.version, now)
+            {
+                // A session that no longer opens the page is cleared, so a
+                // password change does not leave a dead cookie in flight.
+                let stale = unlock::carries_session(cookies, page_id).then_some(page_id);
+                return unlock::challenge(&site, path, unlock::UnlockNotice::None, stale);
+            }
+            let response = unlock::unlocked(site.page(path).unwrap_or_default().to_owned());
+            return analytics::record_html_view(&state, &resolved, path, analytics_visit, response)
+                .await;
+        }
     }
 
     let (content_type, body) = if path == "/assets/site.css" {
@@ -414,6 +512,18 @@ fn cacheable(status: StatusCode, content_type: &'static str, etag: &str, body: S
         HeaderValue::from_static("nosniff"),
     );
     response
+}
+
+/// The method policy of every public path: read it, or — on a protected page
+/// only — post its unlock form. `Allow` names the verbs that work everywhere,
+/// so it says nothing about which pages carry a password.
+fn method_not_allowed() -> Response {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        [(header::ALLOW, HeaderValue::from_static("GET, HEAD"))],
+        "method not allowed\n",
+    )
+        .into_response()
 }
 
 /// A 404 carrying the given document (generic or site-themed).

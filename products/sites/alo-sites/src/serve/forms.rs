@@ -114,8 +114,9 @@ pub(super) async fn submit(
 /// The rate-limit key for this request: the last `X-Forwarded-For` entry —
 /// the one appended by our own proxy, the only hop we trust — falling back
 /// to the peer address when the service is reached directly. Used only
-/// in-memory by the limiter; deliberately never logged.
-fn client_key(request: &Request) -> String {
+/// in-memory by the limiter; deliberately never logged. Shared with the
+/// unlock gate ([`super::unlock`]), which limits password guesses the same way.
+pub(super) fn client_key(request: &Request) -> String {
     if let Some(client) = request
         .headers()
         .get("x-forwarded-for")

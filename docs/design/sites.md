@@ -109,6 +109,11 @@ store's tenancy doors; ids are newtypes; timestamps are
   action promotes an exact TXT proof directly to `live`; public Host serving
   and the Caddy on-demand-TLS "ask" endpoint require `live`, so a pending or
   otherwise non-serveable claim never earns a certificate.
+- **`site_page_passwords`** — one row per password-protected page:
+  site ref, the page identity, an argon2id hash of the password, and an
+  opaque session `version` derived from it. Deliberately *not* part of a
+  publish snapshot, and hanging off the site rather than the page — see
+  **Password-protected pages** below for why both are load-bearing.
 - **`site_analytics_daily`** — (tenant, site, date, path, referrer
   domain, hit count, unique count), plus
   **`site_analytics_daily_visitors`**, which stores only an opaque 32-byte
@@ -282,6 +287,66 @@ path, never a second way to freeze a site.
   becomes "published itself on …" without a reload, and a refusal is
   shown in the server's own words.
 
+### Password-protected pages (S2.06)
+
+A page that is published but only for people who have the password — a
+price list for dealers, a rehearsal programme, a page shared with one
+client. The gate is the only place on the public service where bytes are
+withheld from an anonymous visitor, so it is deliberately narrow.
+
+- **`site_page_passwords`** (migration `0303`) — one row per protected
+  page: tenant, site, the page identity the snapshots also carry, an
+  argon2id PHC hash, and an opaque `version` derived from that hash. The
+  plaintext is never stored and no read on any door returns it: an owner
+  who has forgotten the password replaces it.
+- **Live, not frozen.** Protection is deliberately kept *out* of the
+  immutable publish: setting a password, changing it, or lifting it takes
+  effect on the very next request. Rejected alternative: freezing it into
+  `site_page_snapshots` like everything else a publish freezes —
+  consistent with the rest of the model, but it would leave a leaked
+  password working until the owner happened to republish, which is the
+  wrong failure direction for a security control.
+- **Fail-closed on a deleted page.** Deleting a draft page does not
+  unpublish its snapshot, so the row hangs off the *site*, not the page:
+  the still-served snapshot stays closed until somebody lifts the
+  protection or the site goes. One password covers a page in every
+  language, because every locale snapshot shares the page identity.
+- **Sessions are signatures, not rows** (`serve/unlock.rs`). A correct
+  password mints an HMAC-signed cookie over *(public host, page id,
+  protection version, expiry)*, valid twelve hours,
+  `HttpOnly; Secure; SameSite=Lax`. Nothing about the visitor is stored —
+  no session table, no identifier — and the three bindings each carry a
+  test: another host cannot present it, another page cannot be opened
+  with it, and changing the password rotates the version, which is what
+  makes "change the password" a real revocation. The signing key is
+  derived from the deployment's existing sites secret under a fixed
+  label, so unlock signatures and analytics visitor hashes cannot be
+  confused and no new secret has to be deployed.
+- **Cache-safe answers.** The `401` unlock screen is `no-store` with
+  `Vary: Cookie` and no `ETag`; the unlocked page is `private, no-store`
+  with `Vary: Cookie` and, again, no validator — a shared cache must
+  never be able to hand one visitor's unlocked copy to the next person,
+  which is exactly what the ordinary `public, max-age=60` answer would
+  invite. The screen carries the site's theme but none of the page's
+  content, not even its title, and is marked `noindex`; protected pages
+  are also left out of `sitemap.xml`.
+- **Guessing costs.** The unlock `POST` is the only write the page path
+  accepts, is rate-limited per client key on its own budget (eight tries
+  per ten minutes, separate from the contact-form limiter so form traffic
+  cannot spend it), and answers `429` with `Retry-After` when the budget
+  is gone. Verification runs argon2 on a blocking thread; an unprotected
+  or unknown page pays the same cost and is discarded, so timing says
+  nothing about which pages carry a password.
+- **Routes** (`site_protection.rs`) — `GET /sites/{id}/passwords` lists
+  the protected pages of a site in one read (for a page list to mark
+  them); `GET/PUT/DELETE /sites/{id}/pages/{pid}/password` reads whether
+  a page is protected, sets or changes the password, and lifts it.
+  `PUT` takes `{"password"}` and answers `{protected, pageId, createdAt,
+  updatedAt}` — never the password, and never echoing the body on a
+  refusal. Same guards as the rest of `/sites/{id}`: the per-site grant
+  middleware, `404` outside the caller's tenant, `422` carrying the
+  store's own sentence.
+
 ### Form flow
 
 ```
@@ -371,9 +436,9 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
 - Free-form design tools / pixel canvas, custom code injection,
   template marketplace, third-party embeds or trackers of any kind
   (ADR 0036 non-goals; the analytics promise depends on it).
-- Scheduled publishing, password-protected pages, responsive image
-  derivatives (S2 — later slices). Version history, rollback and
-  whole-site AI translation have since shipped and are described above.
+- Responsive image derivatives (S2 — a later slice). Version history,
+  rollback, whole-site AI translation, scheduled publishing and
+  password-protected pages have since shipped and are described above.
 - CRM lead creation from form submissions (waits for business-track
   B2; the seam is the stored submission).
 - Production serving infrastructure: the public domain and wildcard DNS are
