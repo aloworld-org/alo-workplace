@@ -84,6 +84,27 @@ pub struct UiStrings {
     pub catalog_empty: &'static str,
     /// Catalog item: label on an item that is currently unavailable.
     pub catalog_sold_out: &'static str,
+    /// Order form: per-item quantity field label.
+    pub order_quantity: &'static str,
+    /// Order form: optional phone field label.
+    pub order_phone: &'static str,
+    /// Order form: optional note field label.
+    pub order_note: &'static str,
+    /// Order form: the sentence that says an order is a request, not a
+    /// purchase — nothing is paid on this page.
+    pub order_no_payment: &'static str,
+    /// Order form: submit button.
+    pub order_send: &'static str,
+    /// Order result page: title after an order was recorded.
+    pub order_sent_title: &'static str,
+    /// Order result page: body after an order was recorded.
+    pub order_success: &'static str,
+    /// Order result page: title when the order was refused.
+    pub order_not_sent_title: &'static str,
+    /// Order result page: title under the per-client rate limit.
+    pub order_rate_limited_title: &'static str,
+    /// Order result page: body under the per-client rate limit.
+    pub order_rate_limited_text: &'static str,
     /// Catalog price: what this language writes between whole and decimals.
     pub decimal_separator: &'static str,
     /// Catalog price: what this language writes between thousands.
@@ -142,6 +163,16 @@ pub const EN: UiStrings = UiStrings {
     collection_empty: "Nothing to show yet.",
     catalog_empty: "Nothing on offer yet.",
     catalog_sold_out: "Unavailable",
+    order_quantity: "Quantity",
+    order_phone: "Phone (optional)",
+    order_note: "Note (optional)",
+    order_no_payment: "Nothing is paid here — we read every order and get back to you to confirm it.",
+    order_send: "Place order",
+    order_sent_title: "Order received",
+    order_success: "Thanks — we have your order and will be in touch to confirm it.",
+    order_not_sent_title: "Order not received",
+    order_rate_limited_title: "Too many orders",
+    order_rate_limited_text: "Please wait a few minutes before sending another order.",
     decimal_separator: ".",
     group_separator: ",",
     price_symbol_leads: true,
@@ -190,6 +221,16 @@ pub const FR: UiStrings = UiStrings {
     collection_empty: "Rien à afficher pour le moment.",
     catalog_empty: "Rien à proposer pour le moment.",
     catalog_sold_out: "Indisponible",
+    order_quantity: "Quantité",
+    order_phone: "Téléphone (facultatif)",
+    order_note: "Remarque (facultatif)",
+    order_no_payment: "Aucun paiement ici — nous lisons chaque commande et vous recontactons pour la confirmer.",
+    order_send: "Commander",
+    order_sent_title: "Commande reçue",
+    order_success: "Merci — nous avons votre commande et vous recontactons pour la confirmer.",
+    order_not_sent_title: "Commande non reçue",
+    order_rate_limited_title: "Trop de commandes",
+    order_rate_limited_text: "Patientez quelques minutes avant d’envoyer une autre commande.",
     decimal_separator: ",",
     group_separator: "\u{202f}",
     price_symbol_leads: false,
@@ -238,6 +279,16 @@ pub const NL: UiStrings = UiStrings {
     collection_empty: "Nog niets om te tonen.",
     catalog_empty: "Nog niets in het aanbod.",
     catalog_sold_out: "Niet beschikbaar",
+    order_quantity: "Aantal",
+    order_phone: "Telefoon (optioneel)",
+    order_note: "Opmerking (optioneel)",
+    order_no_payment: "Hier wordt niets betaald — we lezen elke bestelling en nemen contact op om te bevestigen.",
+    order_send: "Bestelling plaatsen",
+    order_sent_title: "Bestelling ontvangen",
+    order_success: "Bedankt — we hebben je bestelling en nemen contact op om te bevestigen.",
+    order_not_sent_title: "Bestelling niet ontvangen",
+    order_rate_limited_title: "Te veel bestellingen",
+    order_rate_limited_text: "Wacht een paar minuten voordat je nog een bestelling verstuurt.",
     decimal_separator: ",",
     group_separator: ".",
     price_symbol_leads: true,

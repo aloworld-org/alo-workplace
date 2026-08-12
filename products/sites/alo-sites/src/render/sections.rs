@@ -104,7 +104,7 @@ pub(super) fn body_section(
         Section::Cta(s) => cta(out, s),
         Section::ContactForm(s) => contact_form(out, site, s, index),
         Section::Collection(s) => collection(out, site, s, page.collections),
-        Section::Catalog(s) => catalog(out, site, s, page.catalogs),
+        Section::Catalog(s) => catalog(out, site, s, page.catalogs, index),
     }
 }
 
@@ -113,11 +113,18 @@ pub(super) fn body_section(
 /// order, and the items belonging to no category close the list. A section may
 /// name one category, in which case only that group renders — a menu page can
 /// show starters and mains as two sections without duplicating the catalog.
+///
+/// When the catalog was published with ordering switched on, the whole section
+/// is one `POST` form: each available item carries a quantity field, and the
+/// contact fields close it. It works with no JavaScript at all — the browser
+/// posts it and lands on the service's own result page — because an order
+/// nobody can place is worse than no order form.
 fn catalog(
     out: &mut String,
     site: &SiteRenderContext<'_>,
     section: &CatalogSection,
     snapshots: &std::collections::HashMap<String, SiteCatalogSnapshot>,
+    index: usize,
 ) {
     out.push_str("<section class=\"s-catalog\">\n");
     push_opt_heading(out, section.heading.as_deref());
@@ -169,6 +176,19 @@ fn catalog(
         push_catalog_empty(out, site);
         return;
     }
+    // Ordering needs something orderable: a catalog published with ordering on
+    // but every item sold out renders as a plain list rather than a form the
+    // visitor could only submit empty.
+    let ordering = snapshot.orders_enabled
+        && groups
+            .iter()
+            .any(|(_, items)| items.iter().any(|item| !item.sold_out));
+    if ordering {
+        out.push_str(&format!(
+            "<form class=\"catalog-order\" action=\"/o/{}\" method=\"post\">\n",
+            esc(snapshot.catalog_id.as_str())
+        ));
+    }
     for (name, items) in groups {
         out.push_str("<div class=\"catalog-group\">\n");
         if let Some(name) = name {
@@ -176,11 +196,58 @@ fn catalog(
         }
         out.push_str("<ul class=\"catalog-list\">\n");
         for item in items {
-            catalog_item(out, site, item, &snapshot.currency);
+            catalog_item(
+                out,
+                site,
+                item,
+                &snapshot.currency,
+                ordering.then_some(index),
+            );
         }
         out.push_str("</ul>\n</div>\n");
     }
+    if ordering {
+        push_order_fields(out, site, index);
+        out.push_str("</form>\n");
+    }
     out.push_str("</section>\n");
+}
+
+/// The contact half of an order form: the honeypot no human fills, who to
+/// answer, an optional note — and, above the button, the sentence that says
+/// this is a request and not a purchase.
+fn push_order_fields(out: &mut String, site: &SiteRenderContext<'_>, index: usize) {
+    let t = site.strings;
+    out.push_str("<div class=\"order-details\">\n");
+    out.push_str(&format!(
+        "<p class=\"hp\" aria-hidden=\"true\"><label for=\"order-{index}-website\">{}</label><input id=\"order-{index}-website\" name=\"website\" type=\"text\" tabindex=\"-1\" autocomplete=\"off\"></p>\n",
+        esc(t.form_website)
+    ));
+    out.push_str(&format!(
+        "<p><label for=\"order-{index}-name\">{}</label><input id=\"order-{index}-name\" name=\"name\" type=\"text\" required maxlength=\"200\" autocomplete=\"name\"></p>\n",
+        esc(t.form_name)
+    ));
+    out.push_str(&format!(
+        "<p><label for=\"order-{index}-email\">{}</label><input id=\"order-{index}-email\" name=\"email\" type=\"email\" required maxlength=\"254\" autocomplete=\"email\"></p>\n",
+        esc(t.form_email)
+    ));
+    out.push_str(&format!(
+        "<p><label for=\"order-{index}-phone\">{}</label><input id=\"order-{index}-phone\" name=\"phone\" type=\"tel\" maxlength=\"40\" autocomplete=\"tel\"></p>\n",
+        esc(t.order_phone)
+    ));
+    out.push_str(&format!(
+        "<p><label for=\"order-{index}-note\">{}</label><textarea id=\"order-{index}-note\" name=\"note\" maxlength=\"2000\"></textarea></p>\n",
+        esc(t.order_note)
+    ));
+    out.push_str(&format!(
+        "<p class=\"order-no-payment\">{}</p>\n",
+        esc(t.order_no_payment)
+    ));
+    out.push_str(&format!(
+        "<p><button type=\"submit\">{}</button></p>\n",
+        esc(t.order_send)
+    ));
+    out.push_str("</div>\n");
 }
 
 fn catalog_item(
@@ -188,6 +255,9 @@ fn catalog_item(
     site: &SiteRenderContext<'_>,
     item: &SiteCatalogSnapshotItem,
     currency: &str,
+    // The section index when this item can be ordered — it prefixes the field
+    // ids so two catalog sections on one page never collide.
+    ordering: Option<usize>,
 ) {
     out.push_str(&format!(
         "<li class=\"catalog-item\" id=\"item-{}\">\n",
@@ -221,6 +291,16 @@ fn catalog_item(
         out.push_str(&format!(
             "<p class=\"catalog-description\">{}</p>\n",
             esc(description)
+        ));
+    }
+    // A sold-out item carries no quantity field: the public order door refuses
+    // it anyway, so offering the field would be a promise the page cannot keep.
+    if let Some(index) = ordering.filter(|_| !item.sold_out) {
+        let slug = esc(&item.slug);
+        out.push_str(&format!(
+            "<p class=\"catalog-qty\"><label for=\"order-{index}-qty-{slug}\">{}</label><input id=\"order-{index}-qty-{slug}\" name=\"qty-{slug}\" type=\"number\" min=\"0\" max=\"{max}\" step=\"1\" value=\"0\" inputmode=\"numeric\"></p>\n",
+            esc(site.strings.order_quantity),
+            max = alo_store::ORDER_MAX_QUANTITY
         ));
     }
     out.push_str("</li>\n");

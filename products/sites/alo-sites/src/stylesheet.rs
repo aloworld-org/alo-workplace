@@ -418,6 +418,37 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   font-size: 0.9375rem;
 }
 .catalog-description { margin-top: 0.5rem; color: var(--muted); }
+.catalog-qty { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; }
+.catalog-qty label { font-weight: 600; }
+.catalog-qty input { width: 5rem; }
+.catalog-order input,
+.catalog-order textarea {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+}
+.order-details {
+  max-width: 36rem;
+  margin-top: 2.5rem;
+}
+.order-details label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+.order-details input,
+.order-details textarea { width: 100%; }
+.order-details textarea { min-height: 6rem; resize: vertical; }
+.order-no-payment { color: var(--muted); }
+.order-details button {
+  background: var(--primary);
+  color: var(--on-primary);
+  border: 1px solid var(--primary);
+  border-radius: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
 .catalog-empty {
   max-width: 38rem;
   padding: 1.5rem;

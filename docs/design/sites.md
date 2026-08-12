@@ -686,6 +686,60 @@ every other Sites object, and the tenant edits them here. Both exist on purpose
   reads only this copy; the draft preview resolves through the same function
   without writing, so the editor sees what the next publish would freeze.
 
+### Order forms (S2.12b)
+
+A catalog carries `orders_enabled`, and the flag is **frozen into the
+snapshot** with everything else. What the published page offers and what the
+public door accepts are therefore the same fact, and switching ordering on or
+off takes effect at the next publish — exactly like a price. A rendered
+catalog with the flag set becomes one `<form method="post" action="/o/{catalog
+id}">`: a quantity field per available item (`qty-<handle>`), then name, email,
+optional phone and note, the same visually-hidden honeypot the contact form
+uses, and the sentence saying nothing is paid here. There is no JavaScript
+behind it — the browser posts and lands on the service's own result page — so
+an order can be placed with scripts off entirely.
+
+An order is a **request**, not a sale. It is the deliberate no-checkout half of
+ADR 0041: no payment, no reservation, no stock. `site_orders` /
+`site_order_lines` record who asked, for what, at which price, and the owner
+moves it through `new → confirmed → fulfilled → cancelled` (and back — a
+mistaken press is corrected, not re-typed). Three properties are structural
+rather than checked:
+
+- **Prices come from the publish.** The door
+  (`site_public_orders::place_public_order`) resolves the catalog id to the
+  snapshot of the site's *current* publish and reads names and unit prices
+  there; the request carries handles and quantities only, so a posted price is
+  unrepresentable. An unpriced item is ordered as "price on request" and its
+  line total stays NULL — never zero, which would read as free.
+- **The tenant is never named from outside.** It comes out of the resolving
+  read and is what the insert scopes itself to, the same construction the
+  public form write uses. An unknown id, a draft site, an unpublished site and
+  a catalog published with ordering off are all one `Ok(None)` → one uniform
+  `404`.
+- **An item that is not on the published page cannot be ordered.** An unknown
+  handle and a sold-out item are refused with a sentence the visitor can act
+  on ("reload the page and try again"), because a stale page is a real and
+  recoverable situation.
+
+Abuse controls are the contact form's, reused: the per-client rate limiter
+(shared budget with `/f/…`), a body cap on the route, the honeypot's silent
+success, and caps in the write gate (50 distinct items, 999 of one item, a
+2 000-character note). Nothing about the connection is stored — an order is
+what was typed into it plus what the publish said it costs.
+
+New orders reach the owner the way submissions do: `notified_at` is claimed
+at-most-once by a sweep (`claim_order_notifications`) and delivered
+**internally** to the site creator's inbox, listing the lines and the total,
+with `Reply-To` set to the customer. Nothing is ever sent outbound. The
+tenant-side routes are `GET /sites/{id}/orders`, `PUT /sites/{id}/orders/{o}`
+(status), `DELETE /sites/{id}/orders/{o}` (a customer's erasure request takes
+the lines with it) and `GET /sites/{id}/orders.csv` — one CSV row per ordered
+line, so the numbers can be summed, with the same spreadsheet-formula
+neutralisation the submissions export uses. There is deliberately **no
+tenant-side create route**: the only writer of an order is the public door,
+which prices it from the publish.
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):

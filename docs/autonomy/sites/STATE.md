@@ -4408,3 +4408,130 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.12b, order forms — public order submission with validation,
   abuse controls, and the owner inbox/review/export flow, with no checkout
   dependency.
+
+## 2026-08-13 — S2.12b an order form over the catalog, priced by the publish
+
+- **Item:** S2.12b — order forms: public order submission with validation,
+  abuse controls, the owner inbox/review/export flow, and no checkout
+  dependency.
+- **Shipped:**
+  - **Migration `0311_site_orders.sql`** — `orders_enabled` on
+    `site_catalogs` *and* on `site_catalog_snapshots` (what the published page
+    offers and what the public door accepts must be the same frozen fact),
+    plus `site_orders` (site-scoped, catalog id + the catalog's name at the
+    time, currency, customer name/email/optional phone/optional note,
+    `total_cents`, `status`, `received_at`, `notified_at`) and
+    `site_order_lines` (position, item handle, item name, quantity, unit price,
+    line total). Neither references the catalog: an order is a record of what
+    happened and must survive deleting the catalog it came from. A CHECK keeps
+    unit price and line total NULL together — an unpriced item is quoted by
+    hand, never sold for zero.
+  - **`site_orders.rs`** — the owner's door: list newest-first, read one, read
+    its lines, `site_all_order_lines` (one query for a whole inbox rather than
+    one per order), status in both directions (`new | confirmed | fulfilled |
+    cancelled`), delete. Plus the shared write gate:
+    `normalize_order_contact` (name and email required, phone/note optional and
+    collapsing to `None`) and `normalize_order_lines` (zero quantities drop
+    out, a repeated handle merges in page order rather than refusing an order
+    the visitor cannot fix, 50 distinct items, 999 of one item).
+  - **`site_public_orders.rs`** — the anonymous door. It resolves the bare
+    catalog id to the snapshot of the site's **current** publish and reads
+    names and unit prices from there; the request carries handles and
+    quantities only, so a posted price is unrepresentable and a rewritten page
+    cannot buy a loaf for a cent. The tenant comes out of the resolving read.
+    Unknown id, draft site, unpublished site and ordering-off publish are one
+    `Ok(None)`; an unknown handle or a sold-out item is a `Validation` sentence
+    a visitor can act on. Header and lines are one transaction.
+  - **`site_order_notify.rs` (store) + `site_order_notify.rs` (jmap)** — the
+    at-most-once claim sweep and the internal message: the lines, the total in
+    the catalog's own currency (integer arithmetic through
+    `currency_exponent`), the phone and note, `Reply-To` the customer, and the
+    line saying nothing has been paid. Wired into `main.rs` beside the
+    form-notification sweep. Nothing outbound, ever.
+  - **Renderer** — a catalog published with ordering on renders as one
+    scriptless `POST` form to `/o/{catalog_id}`: a quantity field per available
+    item (`qty-<handle>`, ids prefixed by the section index so two catalog
+    sections never collide), the honeypot, name/email/phone/note, the
+    "nothing is paid here" sentence, and the button. A sold-out item gets no
+    quantity field — the door would refuse it, so the page must not offer it —
+    and a catalog whose every item is sold out renders as a plain list. New
+    `UiStrings` in en/fr/nl; new `.catalog-qty` / `.catalog-order` /
+    `.order-details` rules in the stylesheet.
+  - **`serve/orders.rs`** — `POST /o/{catalog_id}` with its own 64 KB body cap,
+    the shared per-client rate limiter, the honeypot's silent success, and the
+    form's wire contract (200 / 400 / 404 / 413 / 429 + `Retry-After`). The
+    body is decoded as ordered pairs rather than a struct because the field
+    names are data; an unknown field is ignored (a page from an older publish
+    may carry one), a non-numeric quantity is refused.
+  - **`sites_orders.rs` (jmap)** — `GET /sites/{id}/orders` (headers with their
+    lines, two reads), `PUT /sites/{id}/orders/{order}` `{status}`,
+    `DELETE /sites/{id}/orders/{order}`, `GET /sites/{id}/orders.csv` (one row
+    per ordered line so the numbers sum, with the submissions export's
+    spreadsheet-formula neutralisation). No create route by design.
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-sites -p alo-jmap --all-targets` — clean for all three (the only warning
+  in the workspace is the pre-existing `meet.rs:430` unused `guest`, the
+  business track's file); `cargo nextest run -p alo-store -p alo-sites -p
+  alo-jmap` — **2 914 tests, all passing** (72 s), including the new
+  `tests/site_orders.rs` (six: the rival tenant refused at every door and
+  leaving no mark; only a live catalog published with ordering on takes orders,
+  including the frozen-toggle case where the flag flips only on republish;
+  prices from the publish rather than the editor, and sold-out/hidden/unknown
+  handles refused; the notification claim carrying its own tenant, site and
+  lines with no cross-tenant mixing and no second offer; the shared write gate;
+  a deleted order never notified) and `tests/order_submit.rs` (six in-process
+  HTTP: the happy path priced from the publish and visible only to its owner,
+  the one clean 404 for unknown/draft/ordering-off ids, the honeypot, the six
+  refusal bodies, 413, and the rate limit). Goldens:
+  `section_catalog_orders.html` (new) and a re-blessed `site.css`.
+- **Wire-verified with real curl**, both debug binaries against docker `alo-pg`
+  (killed before starting and after finishing), two fixture tenants
+  bootstrapped for the run and deleted afterwards: all four jmap routes
+  unauthenticated → `401`; unknown site → `404`; empty inbox → `{"orders":[]}`.
+  The published page at `wire-orders-….alosites.test` carried
+  `<form class="catalog-order" action="/o/wirecat…">`, a quantity input for
+  `sourdough` and `wedding-cake`, **none** for the sold-out `focaccia`, and the
+  no-payment sentence. `POST /o/{catalog}` → `200 "Order received"`; sold-out →
+  `400 "Focaccia is not available at the moment."`; unknown handle → `400
+  "…please reload the page and try again"`; nothing ordered → `400 "choose at
+  least one item before ordering"`; blank email → `400 "email must not be
+  empty"`; honeypot → `200 "Order received"` with no row; unknown catalog →
+  `404`. `psql`: exactly **one** `site_orders` row after all of it. The owner's
+  inbox returned the order with both lines (2 × Sourdough at 450 = 900, wedding
+  cake `null`/`null`), `totalCents: 900`, `status: new`; the rival got `404` on
+  list, status and delete. `PUT {"status":"confirmed"}` → confirmed;
+  `{"status":"paid"}` → `422 "paid is not an order status"`; `{nope` → `400`;
+  unknown order → `404`. `orders.csv` → the 13-column header, one row per line,
+  the phone written `'+32 2 555 01` (formula-neutralised),
+  `content-disposition: attachment; filename="orders-wire-orders-….csv"`,
+  `no-store`. The sweep logged `catalog-order notification sweep delivered=1`
+  and the message **"New order from Ada Lovelace (Wire Bakery)"** was in the
+  owner's tenant. `DELETE` → `204`, again → `404`, and `psql` showed 0 order
+  rows and 0 line rows.
+- **Cuts/flags:**
+  - **No web UI in this item**, as the queue splits it: the order inbox,
+    the ordering switch on the catalog, and the item management screens are
+    **S2.12c**, which also brings the catalog CRUD routes S2.12a deferred. The
+    fixture catalog for the wire pass was therefore seeded with `psql`, because
+    no HTTP route creates a catalog yet. Nothing under `web/` was touched, so
+    `tsc`/`eslint`/`build` were not part of this gate.
+  - **No new route prefix**: `/sites/*` on alo-jmap and `/o/…` on alo-sites are
+    both inside prefixes the production Caddyfile already proxies, so nothing
+    is needed at the next deploy.
+  - **The notification message is English-only**, like the form notification
+    and the calendar RSVP mail — the web i18n catalogs do not reach that
+    process. Already flagged for the wave review; this item does not widen the
+    gap, and the visitor-facing *page* strings are in en/fr/nl.
+  - **The result pages of `/o/…` are English**, exactly as `/f/…` is: the
+    endpoint holds a bare id, not a locale, so it cannot know the page's
+    language. Fixing it means carrying the locale in the form, which is a
+    change to both endpoints and belongs to the wave review rather than here.
+  - **Ordering is a catalog-level switch, not a section-level one.** A section
+    prop would have meant a schema version bump and a template rule for a
+    choice that belongs to the thing being sold, not to one page that shows it.
+  - **No stock, no capacity, no payment** — deliberately. ADR 0041's
+    hold-with-expiry and hosted payment handoff are S3.04b/c and read stock
+    through Inventory's seam; this record is what they will be built on.
+- **Next:** S2.12c, catalog/order UI — visible item management, section
+  mapping, the order inbox, and useful empty states (and the `/sites/*` catalog
+  routes it needs).

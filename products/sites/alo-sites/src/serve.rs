@@ -1,7 +1,8 @@
 //! The public HTTP surface (ADR 0036, `docs/design/sites.md`): resolve the
 //! Host header to one tenant's live site, serve its published snapshots, and
 //! accept contact-form submissions (`POST /f/{form_id}`, the [`forms`]
-//! module) and page-beacon reports (`POST /_alo/collect`, the [`beacon`],
+//! module), catalog orders (`POST /o/{catalog_id}`, the [`orders`] module)
+//! and page-beacon reports (`POST /_alo/collect`, the [`beacon`],
 //! [`heatmap`] and [`conversion`] modules) — nothing else. The service holds no session — its whole tenant
 //! scope is the [`host`] lookup's result (or, for a submission, the posted
 //! form id's own resolution) — and it is deliberately terse on the wire:
@@ -41,6 +42,7 @@ pub mod derivative;
 mod forms;
 mod heatmap;
 mod host;
+mod orders;
 /// The public surface's anti-abuse budgets. Public because they are an
 /// operational contract — an operator sizing a proxy, and the tests that pin
 /// each budget, both need the numbers.
@@ -122,11 +124,11 @@ impl AppState {
     }
 }
 
-/// The service router: `/healthz`, the two POSTs an anonymous visitor may
-/// make off a page path — a form submission and a page beacon, each with its
-/// own tight body cap — and the catch-all site path. Both POST paths carry a
-/// character no page slug or locale tag can (`/f/…`, `/_alo/…`), so neither
-/// can ever shadow a page a tenant published.
+/// The service router: `/healthz`, the three POSTs an anonymous visitor may
+/// make off a page path — a form submission, a catalog order, and a page
+/// beacon, each with its own tight body cap — and the catch-all site path.
+/// Every POST path carries a shape no page slug or locale tag can (`/f/…`,
+/// `/o/…`, `/_alo/…`), so none can ever shadow a page a tenant published.
 pub fn app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
@@ -134,6 +136,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/f/{form_id}",
             post(forms::submit).layer(DefaultBodyLimit::max(forms::FORM_BODY_MAX_BYTES)),
+        )
+        .route(
+            "/o/{catalog_id}",
+            post(orders::place).layer(DefaultBodyLimit::max(orders::ORDER_BODY_MAX_BYTES)),
         )
         .route(
             "/_alo/collect",

@@ -179,6 +179,7 @@ fn catalog_snapshots() -> HashMap<String, SiteCatalogSnapshot> {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         name: "Harbour menu".to_owned(),
         currency: "EUR".to_owned(),
+        orders_enabled: false,
         categories: vec![
             SiteCatalogSnapshotCategory {
                 slug: "brews".to_owned(),
@@ -352,6 +353,7 @@ fn empty_catalog_has_a_stable_public_golden() {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         name: "Harbour menu".to_owned(),
         currency: "EUR".to_owned(),
+        orders_enabled: false,
         categories: Vec::new(),
         items: Vec::new(),
     };
@@ -366,6 +368,60 @@ fn empty_catalog_has_a_stable_public_golden() {
         catalogs: &catalogs,
     };
     assert_golden("section_catalog_empty.html", &render_page(&site, &page));
+}
+
+/// A catalog published with ordering switched on renders the whole section as
+/// one scriptless `POST` form: a quantity field on every available item, the
+/// contact fields once, the honeypot, and the sentence saying nothing is paid
+/// here. The sold-out item carries no quantity field — the public door would
+/// refuse it, so the page must not offer it.
+#[test]
+fn an_orderable_catalog_renders_a_scriptless_order_form() {
+    let theme = SiteTheme::new();
+    let value = envelope_value(vec![Section::Catalog(CatalogSection {
+        catalog_id: SiteCatalogId::new("harbour-menu"),
+        heading: Some("Order for Saturday".to_owned()),
+        category: None,
+    })]);
+    let site = SiteRenderContext {
+        name: SITE_NAME,
+        base_url: BASE_URL,
+        locale: "en",
+        theme: &theme,
+        strings: &EN,
+        images: ImageSources::PublicPaths,
+    };
+    let mut catalogs = catalog_snapshots();
+    for snapshot in catalogs.values_mut() {
+        snapshot.orders_enabled = true;
+    }
+    let page = PageRenderContext {
+        path: "/",
+        title: "Home",
+        seo_title: None,
+        seo_description: None,
+        sections: &value,
+        collections: &HashMap::new(),
+        catalogs: &catalogs,
+    };
+    let html = render_page(&site, &page);
+    assert!(
+        html.contains("<form class=\"catalog-order\" action=\"/o/harbour-menu\" method=\"post\">"),
+        "the section posts to its own catalog: {html}"
+    );
+    assert!(
+        html.contains("name=\"qty-filter\""),
+        "an available item is orderable: {html}"
+    );
+    assert!(
+        !html.contains("name=\"qty-cold-brew\""),
+        "a sold-out item offers no quantity field: {html}"
+    );
+    assert!(
+        html.contains("Nothing is paid here"),
+        "the page says what an order is: {html}"
+    );
+    assert_golden("section_catalog_orders.html", &html);
 }
 
 /// One category of a catalog, shown on its own — the second page of a menu

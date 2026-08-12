@@ -92,7 +92,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.11a Template catalog: curated, versioned templates covering common site types with preview and deterministic instantiate tests.
 - [x] S2.11b Template gallery UI: visual, keyboard-accessible manual creation path beside AI generation; one-click preview and create.
 - [x] S2.12a Catalog sections: tenant-owned catalog/category/item model, Base import seam, publish snapshots, and public render goldens.
-- [ ] S2.12b Order forms: public order submission with validation, abuse controls, owner inbox/review/export flow, and no checkout dependency.
+- [x] S2.12b Order forms: public order submission with validation, abuse controls, owner inbox/review/export flow, and no checkout dependency.
 - [ ] S2.12c Catalog/order UI: visible item management, section mapping, order inbox, and useful empty states.
 - [ ] S2.13a Booking section model: availability source binding and booking-field schema that references Agenda through a Sites-owned seam.
 - [ ] S2.13b Public booking flow: availability read, race-safe reservation, internal notification, privacy/security tests, and real-process transcript.

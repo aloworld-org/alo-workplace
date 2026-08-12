@@ -28,6 +28,22 @@ contracts.
   outlined buttons rather than plain text, and the search box, the switches and
   the dropdowns throughout are the shared ones — same height, same focus ring,
   visible when they are switched off.
+- **Visitors can now order from your catalog, without a checkout.** Switch
+  ordering on for a catalog and every published page showing it becomes an
+  order form: a quantity beside each available item, then a name, an email, an
+  optional phone number and a note. It works without JavaScript, it says
+  plainly above the button that nothing is paid there, and a sold-out item
+  offers no quantity at all. What an order costs is read from the publish the
+  visitor is looking at, never from what their browser sent, so a rewritten
+  page cannot buy a loaf for a cent; an item you published without a price is
+  ordered "price on request" and quoted by hand. Each order arrives in your
+  inbox as an ordinary message listing what was asked for, with a reply that
+  goes straight to the customer — nothing is ever sent out on your behalf. The
+  same orders are listed for the site with the workflow you would expect (new,
+  confirmed, fulfilled, cancelled, and back again if you press the wrong one),
+  can be deleted when a customer asks you to erase their details, and export as
+  a spreadsheet with one row per ordered item. Bots meet the same silent
+  honeypot and per-visitor rate limit as the contact form.
 - **Your website can now show what you actually sell.** A site holds a catalog
   — the dishes, rooms, services or courses you offer — in one currency, grouped
   into categories you name, with a price, a description and a picture per item.
