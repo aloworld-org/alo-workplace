@@ -53,7 +53,7 @@ trap.
 - [x] D1.03 `Table` — ten copies. Header, zebra or not, alignment, and the empty state. Keyboard and screen-reader semantics matter here more than the styling.
 - [x] D1.04 `Toolbar` — eleven copies. The row of controls above a list or an editor; the interesting part is how it wraps at narrow widths.
 - [x] D1.05 `Select` — seven copies. A native `<select>` styled to match `Input`, not a bespoke listbox; a custom one is a large accessibility liability for no gain here.
-- [ ] D1.06 `Toggle` — seven copies. A checkbox that looks like a switch, with the label bound and the state announced.
+- [x] D1.06 `Toggle` — seven copies. A checkbox that looks like a switch, with the label bound and the state announced. Shipped as `Toggle` **and** `Checkbox`: only two of the seven drew a switch, four drew a checkbox row under the same name.
 
 ## Migrate, area by area
 

@@ -198,3 +198,78 @@ The taller selects become user-visible at D2, and D3.01 is where the wave is
 written up.
 
 **Next:** D1.06 `Toggle`.
+
+## D1.06 — `Toggle` and `Checkbox`
+
+The seven copies were not seven copies of one thing. Two of them — `admin` and
+`shell/SettingsModal` — drew a switch: a visually-hidden checkbox, a
+`--radius-full` track, a `::after` knob, `translateX(16px)`. The other five put
+the same class name on a row holding an ordinary checkbox and, in three of
+them, on a row holding a `<select>`. `.toggle` had stopped meaning anything,
+which is why the item ships two components and states the split in both files:
+
+**A toggle is a setting; a checkbox is one option among several.** A toggle
+applies itself and is announced on/off — "give this person admin access". A box
+beside a search field that narrows a list is a checkbox. The `.toggle` rules
+wrapping a `<select>` (billing/InvoicesView, hr/LeaveView, hr/HiringView,
+crm/ReportView, billing/VatReportView) are neither: they are a labelled inline
+field, and D2 resolves them with `Select` rather than a third primitive.
+
+The two switches agreed on almost everything, including the 16px of travel they
+had each derived independently, so the larger geometry (40×24, 18px knob) is the
+base — 24px is the short side of the smallest target WCAG 2.5.8 accepts. The
+four checkbox rows agreed on `inline-flex`, `--text-sm`, `--text-secondary` and
+a gap of 6/8/8px; crm and hr were byte-identical, again.
+
+What none of them had:
+
+- **A focus ring on the switch.** The input is `opacity: 0` and neither copy
+  styled `:focus-visible`, so tabbing down the admin user list — twenty
+  switches, one per row — showed nothing at all (WCAG 2.4.7). The ring is drawn
+  on the track, which is the control the eye sees.
+- **A name.** `admin/UsersPage` names its switch with `title` on the wrapping
+  `<label>` — a tooltip, not a name, and the label's own text is empty, so the
+  control is announced as "checkbox, not checked" twenty times over.
+  `admin/UserModal` puts `aria-label` on the `<label>` while the visible text
+  sits in a sibling `<span>` bound to nothing. `label` is required and really
+  bound. `billing/ProductDialog` and `shell/SettingsModal` put the checkbox row
+  class on a `<span>`, so clicking their text does nothing — impossible now,
+  because the label is the component's.
+- **The state said as a state.** Both switches were plain checkboxes:
+  "out of office" read as "checked". `role="switch"` on the native input, so the
+  checkedness stays the platform's and only the wording changes.
+- **The hint.** `shell/SettingsModal` draws one under every switch and describes
+  none of them.
+- **A disabled state.** Both switches disable on real conditions (your own admin
+  row, an unconfigured provider) and drew the result identically to a live
+  control. None of the four checkboxes had one at all.
+
+Two visible changes, recorded rather than softened. **The off track gets
+darker**: both copies filled it with `--border-strong`, 1.7:1 against the
+surface, under the 3:1 WCAG 1.4.11 asks of a control's boundary — and the white
+knob was 1.7:1 against the track it sits in. `--text-tertiary` is the same quiet
+role in a fill as in type, and it is 4.8:1. **Every checkbox becomes
+terracotta**: unstyled, the box is whatever the platform draws, which on Chrome
+is a blue tick — the one place in the product where the accent colour was not
+ours. One `accent-color` declaration, with the native control left alone.
+
+Dropped as a caller's concern: billing's `margin-right: auto` on the checkbox
+row, which was pushing a toolbar about; `ToolbarSpacer` is that. No
+indeterminate state and no `ToggleGroup` — nothing in the repository has either,
+and building for no caller is how a primitive grows a surface nobody asked for.
+
+Verified: 11 behaviour tests (switch role and checkedness, label really bound,
+hidden label still the name, hint described, reported state, drawn disabled
+state, track not announced twice; and for `Checkbox`: own bound label, *not* a
+switch, disabled, reported state). `npx tsc --noEmit`, `npx eslint`, `prettier
+--check`, `npm run build` and `npx vitest run src` (73 files, 664 tests) all
+green. No screenshot — like `Table`, `Toolbar` and `Select`, there is no caller
+until the D2 migrations, so the visual check lands with the first adoption. The
+4 unhandled rejections from `sites/Theme.test.tsx` are still there:
+pre-existing, another track's area, non-failing.
+
+No CHANGELOG line: a primitive with no caller changes nothing a user can see.
+The darker off track and the terracotta checkboxes become visible at D2, and
+D3.01 is where the wave is written up.
+
+**Next:** D2.01, migrate authoring.
