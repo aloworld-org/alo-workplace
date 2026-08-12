@@ -9,6 +9,15 @@ contracts.
 
 ## Unreleased
 
+- **The templates are now something you can see before you choose.** New
+  website shows the six shipped templates as cards saying who each one is for
+  and which pages it brings, and one click on a card draws that template on the
+  spot — the real page, rendered the way it would be published, with tabs for
+  its other pages. Blank site sits first in the same row, so starting from
+  nothing is still one click. You can walk the whole gallery with the arrow
+  keys and never touch a mouse. Create makes the site with all its pages in one
+  go and opens its Home page ready to edit; if the templates cannot be reached
+  for any reason, the blank path still works and says so.
 - **You can now start a website from a finished one, without describing
   anything to AI.** Six templates ship with the product — consultancy,
   restaurant or café, portfolio, association or charity, software or product,

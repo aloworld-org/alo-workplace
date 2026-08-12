@@ -627,6 +627,29 @@ public renderer, self-contained, `no-store`),
 `POST /sites/templates/{id}` `{name, subdomain}` (a draft site, never
 published). All three authenticate; an unknown template id is `404`.
 
+### The gallery (S2.11b)
+
+The catalog's screen is the second half of "New website", beside — never
+behind — the description field: `web/src/sites/TemplateGallery.tsx`, a real
+radio group (roving `tabindex`, arrow keys, Home/End, selection following
+focus) whose first option is the blank start, so a person who ignores the
+gallery still gets the path that existed before it. Choosing a card is one
+click and immediately renders that template through
+`GET /sites/templates/{id}/preview`, in a sandboxed iframe fed by `srcdoc`;
+the other pages are reached through tabs above the frame.
+
+The frame takes **no pointer events**. A rendered page's navigation points at
+a real host, and letting a link be clicked inside an opaque-origin frame
+would blank the preview to no one's benefit — so the preview is a picture and
+the tabs are the navigation. Creating goes through
+`POST /sites/templates/{id}`, one transaction, and lands in the new site's
+Home page exactly as generation does (S1.30c); a catalog that fails to load
+costs the gallery and not the screen, since the blank card below it still
+creates a site and its Home page. The old creation-time theme-preset picker
+is gone: a template carries its own preset, and a blank site's theme is
+chosen in the theme dialog that owns it (S1.14) rather than in a weaker
+second copy.
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):

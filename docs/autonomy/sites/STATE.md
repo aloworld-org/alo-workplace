@@ -4228,3 +4228,81 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.11b, the template gallery UI — a visual, keyboard-accessible
   manual creation path beside AI generation, with one-click preview and
   create, consuming the three routes this item wire-verified.
+
+## 2026-08-12 — S2.11b the gallery you can see, choose and walk with the arrow keys
+
+- **Item:** S2.11b — the template gallery UI: a visual, keyboard-accessible
+  manual creation path beside AI generation, with one-click preview and
+  create. Web only; it consumes the three routes S2.11a wire-verified and adds
+  no server surface.
+- **Shipped:**
+  - `web/src/sites/TemplateGallery.tsx` (new): the catalog as a real radio
+    group — roving `tabindex`, ArrowLeft/Right/Up/Down, Home/End, selection
+    following focus, both ends wrapping — whose FIRST option is the blank
+    start. A person who never touches the gallery keeps exactly the path that
+    existed before it; a person who cannot use a pointer can reach every
+    template. Each card says the template's name, who it is for, how many
+    pages it brings and what they are called.
+  - **One click previews.** Selecting a card fetches
+    `GET /sites/templates/{id}/preview` and renders it in a sandboxed
+    (`allow-scripts`, no same-origin) iframe via `srcDoc` — the same renderer
+    the public service uses, so the gallery shows the site itself. The
+    template's other pages are tabs above the frame; switching a tab refetches
+    with `?page=<slug>`, and the home page is the paramless request.
+  - The frame takes **no pointer events**, deliberately. A rendered page's
+    navigation points at a real host; a click inside an opaque-origin frame
+    would try to leave it and blank the preview for no gain. The preview is a
+    picture and the tabs are its navigation, and the copy under the frame says
+    so rather than leaving a person to discover that scrolling does nothing.
+  - `web/src/sites/api.ts`: `siteTemplates()`, `templatePreview(id, page?)`
+    (text, not JSON — like the existing draft and history previews) and
+    `createSiteFromTemplate(id, {name, subdomain})`; `types.ts`:
+    `SiteTemplate`, `SiteTemplatePage`, `TemplateSiteDraft`. The three shapes
+    were checked field-by-field against `sites_templates.rs::template_json`
+    and the instantiate answer, not guessed.
+  - `NewSiteDialog.tsx`: the manual path now instantiates a template in ONE
+    server transaction and opens the returned home page, or — with no template
+    chosen — keeps the blank `POST /sites` + Home-page path. Both endings land
+    in the editor with Home open (S1.30c). The server's own sentence still
+    surfaces verbatim on refusal (S1.30b), and the live address check,
+    self-suggesting address and disabled-Create explanation are untouched.
+  - `parts.tsx`: `DialogFrame` gained an opt-in `wide` prop (used only by the
+    gallery mode) and `.modalWide` in the module CSS; the description path
+    stays the narrow form it always was.
+  - i18n: 10 new keys in **en, fr and nl** (no `UNTRANSLATED` exemption), and
+    three existing strings corrected where they promised a "style" the screen
+    no longer offers.
+- **Verified:** `npx tsc --noEmit` clean; `npx eslint` clean on all ten
+  changed/new files; `npm run build` clean; `npx vitest run` — **78 files, 716
+  tests, all passing**, including the new `TemplateGallery.test.tsx` (7 tests:
+  the catalog renders with its page lists; one click previews the
+  server-rendered document in a sandboxed frame; a tab refetches with
+  `?page=contact`; the arrow-key/Home/End arc moves selection AND focus and
+  ignores unrelated keys; Create posts to `/sites/templates/consultancy` with
+  the self-suggested address, makes no second site or page, and navigates into
+  the new Home page; a 422 is shown verbatim in a dialog that stays open; a
+  catalog that fails to load still creates a blank site end to end).
+- **Cuts/flags:**
+  - **The creation-time theme-preset picker is gone**, deliberately and as
+    S2.11a's note anticipated. It was a bare preset list mislabelled
+    "template"; a real template carries its own preset, and a blank site's
+    theme belongs to the theme dialog that owns it (S1.14). Keeping both would
+    have put two theme controls in one flow, one of them weaker.
+  - **No browser run this iteration.** Nothing server-side changed, so no
+    local backend was started and no curl was re-run; the arc is covered by
+    the suite driving the real client and views over a recording fetch, plus
+    S2.11a's transcript of the three routes. The first hands-on pass over the
+    gallery belongs with the wave review (S2.16).
+  - **Template copy is still English only** (S2.11a's flag, unchanged): the
+    card names and summaries are shipped content, not UI chrome. The gallery's
+    own chrome is in all three languages.
+  - **Pre-existing, not this item:** `src/sites/Theme.test.tsx` emits four
+    unhandled rejections (`ThemeDialog.tsx:114` reading `theme` of an
+    undefined site when a stubbed reply is consumed) while all six of its
+    tests pass. Confirmed identical on a clean `main` checkout by stashing
+    this item's diff and re-running. Worth an item; not this one.
+  - **No new route prefix**: everything is under `/sites/*`, already proxied.
+    The production Caddyfile needs nothing at the next deploy.
+- **Next:** S2.12a, catalog sections — the tenant-owned catalog/category/item
+  model with its Base import seam, publish snapshots and public render
+  goldens.
