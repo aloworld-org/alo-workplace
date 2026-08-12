@@ -517,3 +517,54 @@ elements already counted. Still worth its own item rather than an invention
 mid-migration.
 
 **Next:** D2.03, migrate shell.
+
+## LOOP HALT: two loop invocations are running on this one checkout
+
+Nothing was built this iteration, and nothing should have been. Two headless
+`claude -p "… execute exactly ONE iteration of the loop for track 'ds' …"`
+processes were running against `C:\dev\Ficina-loop` at the same time:
+
+| PID | Started | Track |
+|---|---|---|
+| 25244 | 2026-08-13 00:42:32 | ds |
+| 28176 | 2026-08-13 00:45:53 | ds — **this invocation** |
+
+Both had picked up the same first-undone item, D2.03. This is the condition
+CLAUDE.md forbids outright: *"Concurrent editors on one checkout are forbidden
+— a second editor produces uncommitted, ambiguously authored work that cannot
+be trusted."*
+
+**How it was noticed, which is the part worth keeping.** The tree was clean at
+the start of this iteration (`git status` after the pull showed only the
+untracked `shell/adoption.test.tsx`). Six tool calls later — while this
+invocation had done nothing but read — `git status` showed seven modified
+files, and `AgentActionCard.module.css` joined the list between two consecutive
+calls. Reading them showed work that was plainly D2.03: `ComingSoon.module.css`
+had already renamed `.badge` to `.plate`, `ComingSoon.tsx` had grown the
+`aria-hidden` plate, and `AgentActionCard.tsx` had already adopted
+`<Card pad="sm" flat>`. A file changing under a reader who has not written is
+the whole signature of this bug, and it is invisible unless the tree is
+re-checked rather than assumed.
+
+**Why this invocation is the one that stopped.** Walking its own process
+ancestry put it at PID 28176 — the *younger* of the two, by three minutes. The
+older process owns the tree and is mid-item; overwriting its half-written files
+to "finish" D2.03 would produce exactly the ambiguously-authored commit the
+rule exists to prevent. So this iteration touched no code, no CSS, no
+`redefined.ts` and no QUEUE entry. D2.03 stays `[ ]` and belongs to PID 25244.
+
+Exiting non-zero stops *this* wrapper, which leaves exactly one loop running —
+the outcome we want — but it does not fix the cause. **For the human:** find
+the second wrapper (its parent is a Git-bash `sh.exe` running
+`/c/Users/SBW/AppData/Roaming/npm/claude -p …`) and stop it before restarting,
+or every future iteration is doubled too. A loop that races itself does not run
+twice as fast; it discards one of the two results and cannot say which.
+
+**Inherited work still sitting in the tree, unclaimed:**
+`web/src/shell/adoption.test.tsx`, untracked — 15 behaviour tests written as a
+D2.03 specification by an earlier attempt whose implementation the wrapper
+discarded, the same way `mail/components/adoption.test.tsx` arrived during
+D2.02. Whichever invocation completes D2.03 should treat it as the spec and
+commit it with the implementation.
+
+**Next:** D2.03, still — by the single loop that remains.
