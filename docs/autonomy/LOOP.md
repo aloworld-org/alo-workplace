@@ -38,7 +38,16 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
    slice half-done (record any cut in STATE.md).
 5. Gate it (all must pass):
    - Rust touched: `cargo fmt` on changed crates; `SQLX_OFFLINE=true cargo
-     clippy -p <crates> --all-targets` clean; `cargo test -p <crates>` green.
+     clippy -p <crates> --all-targets` clean; then **`cargo nextest run -p
+     <crates>`** green — *not* `cargo test`. `cargo test` runs each test
+     binary one after another, and this workspace has ~185 of them, so a full
+     `alo-store` run takes over ten minutes and no longer fits one command.
+     nextest runs them across all cores: the same 1 769 tests finish in ~18 s
+     (measured 2026-08-12). Config, including which binaries must stay serial,
+     is in `.config/nextest.toml`. If nextest is missing on this machine,
+     install it — `curl -sSfL https://get.nexte.st/latest/mac | tar zxf - -C
+     ~/.cargo/bin` — rather than falling back to `cargo test`, which will
+     blow the ceiling and send you back to polling.
    - Web touched: `npx tsc --noEmit`; `npx eslint <changed files>`;
      `npm run build` — all clean.
    - Storage touched: the **wrong-tenant test is mandatory** (tenant A
@@ -57,12 +66,17 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      `taskkill //F //IM alo-jmap.exe`). Real curl calls, real DB rows checked.
    - **RUN GATES IN THE FOREGROUND. Do not background them, do not poll.**
      One `Bash` call, `timeout: 600000`, read the exit code. This is not a
-     preference — it is the rule, and the measurement behind it is: a **cold**
-     build after `cargo clean`, plus every test in `alo-store` and `alo-jmap`,
-     took **5 min 34 s** (2 152 tests, 2026-08-11). `cargo clippy` is ~6 s
-     warm, because it type-checks without linking. Every gate this repo has
-     fits inside the ceiling with minutes to spare, so backgrounding one buys
-     nothing and costs the whole poll.
+     preference — it is the rule. With `cargo nextest` (above) the numbers are
+     ~18 s for all of `alo-store` and ~6 s for a warm clippy, so every gate
+     fits the ceiling many times over and backgrounding one buys nothing.
+     Note the earlier version of this paragraph justified itself with "a cold
+     build plus every test is 5 min 34 s" (2026-08-11). That was true when
+     measured and was false a day later, after 61 more test binaries landed:
+     the gate outgrew the ceiling, a foreground run was killed at 600 s, and
+     the loop fell back to polling exactly as the rule was trying to prevent.
+     A rule that rests on a measurement rots when the measurement does — if a
+     foreground gate is ever killed at the ceiling, re-measure and fix the
+     gate, do not go back to polling.
    - **Never size a wait by iteration count.** `for i in $(seq 1 58); do …
      sleep 10; done` runs 580 s whatever happens — it spends its entire budget
      even when the work finished in the first ten seconds. This is what turned

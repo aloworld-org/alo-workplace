@@ -1,0 +1,28 @@
+# cargo-nextest configuration.
+#
+# Why nextest at all: `cargo test` runs each test *binary* one after another,
+# and this workspace has ~185 of them (every file under tests/ links its own).
+# Execution, not compilation, became the cost — a full `alo-store` run took
+# over ten minutes and no longer fitted the build loop's per-command ceiling.
+# nextest runs the binaries across all cores: the same 1 757 tests finish in
+# about 18 seconds (measured 2026-08-12).
+#
+# `cargo test` remains correct and is the fallback where nextest is not
+# installed; nothing here changes what the tests assert.
+
+[test-groups]
+# Tests that contend for state which is deliberately NOT tenant-scoped, and so
+# cannot run beside each other. Keep this list short and justified: every entry
+# is a test that would otherwise be flaky under parallel execution.
+serial = { max-threads = 1 }
+
+[[profile.default.overrides]]
+# The publish scheduler hands work to sweepers through a global claim: exactly
+# one worker may take a due schedule, and a dead worker's claim expires back to
+# the pool. Two of these tests racing each other claim the same row and both
+# read a result the other caused — a different one fails on each run. That is
+# the mechanism working, not a bug in it, so the tests are serialised rather
+# than the product changed. Verified 2026-08-12: parallel fails ~1 in 4 runs,
+# serial passes 3/3.
+filter = 'binary(site_publish_schedule_tenancy)'
+test-group = 'serial'
