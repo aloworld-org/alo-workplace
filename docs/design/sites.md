@@ -526,9 +526,59 @@ visitor → POST /f/:form_id on alo-sites
     and delivers an INTERNAL message to the site owner's inbox (the existing
     local-delivery path — never outbound SMTP); From is the site's no-reply
     address and Reply-To is the visitor when supplied
-  → CRM lead creation when the business track's B2 lands (out of
-    scope here; the seam is the submission row)
+  → a person decides whether the enquiry is an opportunity, and hands it
+    off (below). Nothing creates a CRM deal on its own: a lead nobody
+    chose is a board full of spam.
 ```
+
+### The seam to CRM and Billing (S2.10b)
+
+The submission row is where Sites stops and the business starts. One
+tenant-scoped table owned by Sites, `site_lead_attribution`, records the
+only new fact — *this enquiry became that opportunity* — and everything
+else is read live from the modules that own it. Nothing about a deal or
+an invoice is copied: a copied value is wrong the moment somebody edits
+the deal.
+
+```
+site_form_submissions.id  ──link──▶  crm_deals.id  ──customer_id──▶  billing_invoices
+        (Sites owns)                  (CRM owns)                      (Billing owns)
+```
+
+- **The handoff is a person's decision, and one enquiry becomes at most
+  one lead** (a unique constraint, not a convention). Re-linking the same
+  deal answers the existing link; a second, different deal is refused by
+  name. Creating the opportunity uses CRM's own writer inside one
+  transaction with the link, so a handoff produces both rows or neither,
+  and the card carries the enquirer's own name and address rather than
+  re-typed ones. The words on the card are the caller's; the only fact
+  Sites supplies unasked is the site's subdomain as the deal's `source`.
+- **The invoice join is stated, not guessed.** Billing records no
+  opportunity on a document, so an invoice counts when it was raised for
+  the customer the lead became, **after** the link was made, and is
+  issued or paid — never a draft, never a void, and never a customer's
+  back catalogue. The payload names the rule (`invoiceRule:
+  customerSinceLead`) so a screen cannot quietly upgrade it to "revenue
+  this page generated".
+- **The period selects the leads, not the money.** `?days=` bounds the
+  conversion counts and the handoffs; the deals and documents of those
+  handoffs are then reported as they stand now, because an invoice
+  raised in March for a January enquiry is January's doing.
+- **Money is per ISO 4217 code, in integer cents, never converted** — as
+  CRM's own pipeline report does, and for the same reason: a forecast has
+  no issue date to convert at.
+- **Permission is the reason this is a separate route module.**
+  `/sites/{id}/*` is the one surface a site editor may use, so the
+  attribution routes refuse the site-editor role outright, honour the
+  per-user CRM switch, and refuse an accountant the *write* while
+  allowing the read. With Billing switched off the pipeline figures
+  remain and `invoicedCents` is `null` rather than `0` — "not yours to
+  see" and "nothing was invoiced" are different statements.
+- **Erasure is respected.** The link holds two ids, a user and a time,
+  and nothing about the visitor; deleting the submission takes the link
+  with it, while the aggregate conversion counters — which never held an
+  identity — are untouched. Deleting the deal removes the claim that a
+  form produced it, never the other way round.
 
 ### AI posture (S1.26–S1.30)
 

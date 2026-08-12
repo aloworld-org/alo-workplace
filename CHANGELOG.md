@@ -20,6 +20,24 @@ contracts.
   follow-up date is a filled pill rather than an outlined one and says
   "Overdue" in words as well as in red, and a calendar invitation sits on the
   same white as the message with a soft shadow instead of a grey panel.
+- **An enquiry from your website can now become an opportunity on your sales
+  board in one step, and you can see what the website is actually worth.** Open
+  a message someone sent through a contact form and hand it to your pipeline:
+  alo raises the card for you, carrying the sender's name and address so
+  nothing is typed twice, and records where the enquiry came from. You can also
+  point it at an opportunity you already have. One enquiry becomes at most one
+  opportunity — clicking twice does not make a twin, and attaching a second,
+  different card is refused with the reason. Your website's figures then read
+  the whole way through: how many people saw a form, began filling it in, sent
+  it, how many of those became opportunities, how many were won, and what has
+  since been invoiced to them. Money is shown per currency and never converted,
+  and the invoice figure says exactly what it counts — documents raised for the
+  customer an enquiry became, after it became one — rather than claiming the
+  page earned them. Unlinking is always available and changes nothing in CRM or
+  Billing: it only withdraws the claim that the website brought it in. A
+  collaborator invited to build a website still sees none of this; nor does
+  anyone an administrator has switched CRM off for, and a bookkeeper can read
+  the figures without being able to create or remove opportunities.
 - **The Docs editor can now be used without a mouse, and says what it is doing
   to a screen reader.** The equation dialog and the insert-code dialog close on
   Escape and keep the keyboard inside them while they are open — before, Tab

@@ -3937,3 +3937,106 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.10b, the CRM/Billing attribution seam — joining site conversion
   totals to lead, deal and invoice identities without editing the modules that
   own them.
+
+## 2026-08-12 — S2.10b the one new fact between a website and a business
+
+- **Shipped:** the Sites → CRM/Billing seam. Migration `0308` and
+  `site_lead_attribution` (tenant_id, id, site_id, source_kind, source_id,
+  submission_id, deal_id, linked_by, linked_at — composite FKs to `sites`,
+  `site_form_submissions` and `crm_deals`, unique on (tenant, submission));
+  `site_leads.rs` (the handoff: `create_site_lead` / `link_site_lead` /
+  `unlink_site_lead` / `site_lead_links` / `site_lead_link`);
+  `site_attribution.rs` (the join: `AccountStore::site_attribution` over the
+  existing `site_conversions` funnel); and `sites_attribution.rs` in alo-jmap —
+  `POST /sites/{id}/submissions/{submission}/lead`, `GET /sites/{id}/leads`,
+  `DELETE /sites/{id}/leads/{link}`, `GET /sites/{id}/attribution?days=`.
+- **The link is the only new fact.** A deal's value, its state and a customer's
+  invoices are read live from CRM's and Billing's own tenant-scoped tables at
+  query time; nothing is copied into a Sites table, because a copied value is
+  wrong the moment somebody edits the deal. **No file owned by Billing or CRM
+  was touched** — the create path calls CRM's own `insert_crm_deal_in` under
+  `share_crm_pipeline` inside one transaction with the link, so a handoff
+  writes both rows or neither, and the invoice figures are computed with
+  Billing's own `billing_totals::totals` from the stored lines rather than a
+  second money implementation.
+- **The invoice join is stated, never guessed.** Billing records no opportunity
+  on a document, so an invoice counts when it was raised for the customer the
+  lead became, **after** the link, and is issued or paid. The response carries
+  `invoiceRule: "customerSinceLead"` so the S2.10c screen cannot silently
+  upgrade it into "revenue this page generated". The period selects the leads
+  and the conversion counts; the deals and documents are then read as they
+  stand now — a March invoice for a January enquiry is January's doing.
+- **Permission was the design problem, and is why the routes are their own
+  module.** `/sites/{id}/*` is the single surface a site editor is allowed
+  (S2.03a), and the scoped-role middleware cannot tell one `/sites/{id}` route
+  from another — so this file refuses the site-editor role outright, honours the
+  per-user CRM switch (0208), and refuses an accountant the write while
+  allowing the read. Billing switched off keeps the pipeline figures and makes
+  `invoicedCents` / `invoices` **`null`** rather than `0`: "not yours to see"
+  and "nothing was invoiced" are different statements.
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-jmap --all-targets` with no warning from any file this item touched;
+  `cargo nextest run -p alo-store -p alo-jmap` — **2 744 tests, 2 744 passed,
+  1 skipped, 64 s**, including the new `site_attribution_tenancy` (the
+  wrong-tenant matrix in both directions, the one-lead rule, the invoice rule
+  with a pre-existing customer, a draft, two currencies, and the erasure
+  cascade).
+- **Wire-verified with real curl**, both debug binaries against docker `alo-pg`
+  (killed before and after), two fixture tenants bootstrapped for the run and
+  deleted afterwards. The whole arc on the wire: a published site whose page
+  carries `action="/f/a9pw…"`; two `view` and one `start` beacons plus two real
+  public submissions (`200`, two rows); the handoff `201` raising a card that
+  carries `Ada Lovelace / ada@visitor.example` and `source = wire-1786568138`
+  (the subdomain, unasked); the same deal again → the **same** link id; a
+  different deal → `422 "this enquiry has already been handed to an
+  opportunity"`; an empty body and `dealId` + `pipelineId` together → `400`; a
+  blank title → CRM's own `422 "title must not be empty"`; an invented
+  submission and an invented deal → `404` each. The funnel then read
+  `views 2 / starts 1 / submits 2 / leads 1 / dealsOpen 1`, `openCents 250 000`;
+  after winning the deal `dealsWon 1 / wonCents 250 000`; the **draft** invoice
+  raised through CRM's handoff counted **nothing**, and issuing it produced
+  `invoices 1 / invoicedCents 302 500` (250 000 net + 21 % VAT, computed from
+  the lines). `days=0` and `days=400` → `422`; all four routes unauthenticated
+  → `401`; the rival tenant → `404` on the funnel, `404` on the handoff,
+  `{"leads":[]}` on the list, `404` on the delete. A **site editor** invited to
+  that very site read `/sites/{id}/pages` `200` and got `403` on all four seam
+  routes. With Billing off: `billingVisible false`, `invoicedCents null`,
+  pipeline figures intact; with CRM off: `403` on both reads while `/sites`
+  still answered `200`. An **accountant** read both `200` and was refused both
+  writes in the same words `/crm/*` uses. `psql`: the row holds nine columns
+  and zero characters of the visitor's name, address or message; `DELETE` →
+  `204`, again → `404`, the funnel back to `leads 0` with the traffic counts
+  unchanged, and the deal and its issued `INV-2026-00001` untouched. No
+  production, email, DNS or external AI service was contacted.
+- **Cuts/flags:**
+  - **This item is the seam and the read, not a screen.** The funnel UI, the
+    dependency/unavailable states and the "no re-entry of known data" prefill
+    are S2.10c; nothing under `web/src` was touched, and the four Problem
+    details here are server messages like the rest of `/sites/*` — the
+    user-facing strings belong to S2.10c's catalogs.
+  - **`invoiceRule` is a contract, not a description.** It is in the payload so
+    that adding a second rule later (a real deal→document link, if Billing ever
+    grows one) is an additive change the UI can branch on rather than a silent
+    change of meaning.
+  - **A site figure may be smaller than the sum of its conversion points.** One
+    invoice reachable from two forms is counted once for the site and once
+    under each — the honest arithmetic, and S2.10c must not present the columns
+    as adding up.
+  - **A deal's own currency is never converted**, so a site with two currencies
+    reports two money lines and no total. That is CRM's rule (a forecast has no
+    issue date to convert at), inherited deliberately.
+  - **The handoff never happens by itself.** No automatic lead creation on
+    submission: a board full of spam is worse than a board somebody has to
+    fill. The design note's old "CRM lead creation when B2 lands" line was
+    replaced with this decision.
+  - **Pre-existing, outside this track:** `platform/alo-store/src/meet.rs:430`
+    still warns `unused variable: guest` on every clippy run; it is Meet's file
+    and predates this item. `products/mail/alo-jmap/tests/common/mod.rs` still
+    defaults `DATABASE_URL` to port **5433** while every other suite uses
+    **5432**, so gates here must export it explicitly.
+  - **No new top-level route prefix**: everything is under `/sites/*`, which
+    the production Caddyfile already proxies. Nothing to add at next deploy.
+- **Next:** S2.10c, the funnel UI — site → form → lead → deal → invoice with
+  its unavailable/dependency states, reading `GET /sites/{id}/attribution` and
+  `GET /sites/{id}/leads` and handing off through
+  `POST /sites/{id}/submissions/{submission}/lead`.

@@ -87,7 +87,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.09a Aggregate heatmap collection: bounded click coordinates and scroll-depth buckets with no visitor/session identity; schema privacy proof and abuse caps.
 - [x] S2.09b Aggregate heatmap UI: page/viewport overlays, minimum-sample suppression, keyboard-accessible summaries, and empty states.
 - [x] S2.10a Conversion events: aggregate form-view/start/submit attribution with stable site-owned source IDs and no individual journey storage.
-- [ ] S2.10b CRM/Billing attribution seam: tenant-safe handoff/read model joining site conversion totals to existing lead, deal, and invoice identities without editing the Billing/CRM-owned modules.
+- [x] S2.10b CRM/Billing attribution seam: tenant-safe handoff/read model joining site conversion totals to existing lead, deal, and invoice identities without editing the Billing/CRM-owned modules.
 - [ ] S2.10c Funnel UI: site → form → lead → deal → invoice aggregate funnel with clear unavailable/dependency states and no re-entry of known data.
 - [ ] S2.11a Template catalog: curated, versioned templates covering common site types with preview and deterministic instantiate tests.
 - [ ] S2.11b Template gallery UI: visual, keyboard-accessible manual creation path beside AI generation; one-click preview and create.
