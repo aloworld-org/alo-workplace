@@ -593,6 +593,40 @@ and optional key in Settings), and the unconfigured path degrades to
 blank-site + templates. Per-field copy operations are constrained to an
 exact stored section and JSON string pointer; proposing writes nothing.
 
+### The template catalog (S2.11a)
+
+The manual sibling of generation, and the path a tenant without a
+configured AI provider lands on. A template is **curated content shipped
+with the build** — `alo-store`'s `site_templates` module parses
+`site_templates/catalog.json` once into the same `SectionsEnvelope` types
+the editor writes — so there is no table, no migration and no per-tenant
+row, and every tenant sees the same catalog. Four rules hold, checked at
+load and asserted by the suite:
+
+- **No images.** Every picture is a tenant blob and the catalog is
+  tenant-less, so `text_image`, `gallery` and any image-bearing prop are
+  refused; the copy invites the owner to add pictures in the editor.
+- **No claim only the customer can make** — no testimonial, no team
+  member, no price. A tenant who publishes a template unedited must not
+  thereby publish a lie; the pricing page ships the em-dash placeholder.
+- **Every internal link resolves** inside the template's own page paths.
+- **One persistence door.** `SiteTemplate::draft` produces a
+  `NewGeneratedSite` and `create_generated_site` commits it — the same
+  atomic transaction, validation, contact-form linking and
+  born-as-a-draft rule the AI path gets.
+
+Templates are versioned individually (`version`, bumped when copy
+changes) and the instantiate answer names the version, so a support
+conversation can name the exact content a site started from. The version
+is not stored on the site: a site is the tenant's from the moment it
+exists and nothing reaches back into it.
+
+Routes: `GET /sites/templates` (the catalog),
+`GET /sites/templates/{id}/preview?page=` (one page rendered by the
+public renderer, self-contained, `no-store`),
+`POST /sites/templates/{id}` `{name, subdomain}` (a draft site, never
+published). All three authenticate; an unknown template id is `404`.
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):

@@ -4125,3 +4125,106 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.11a, the template catalog — curated, versioned templates for
   common site types with preview and deterministic instantiate tests (the
   manual, AI-off sibling of the generate-my-site path).
+
+## 2026-08-12 — S2.11a six finished websites, shipped with the build
+
+- **Item:** S2.11a — the template catalog: curated, versioned templates for
+  common site types, with preview and deterministic instantiate tests. The
+  manual, AI-off way to start a website, beside `POST /sites/generate`.
+- **Shipped:**
+  - `platform/alo-store/src/site_templates.rs` + `site_templates/catalog.json`:
+    the catalog as **shipped content, not tenant data** — no table, no
+    migration, no per-tenant row, parsed once from the embedded JSON into the
+    same `SectionsEnvelope`/`SiteTheme` types the editor writes. Six templates
+    (`consultancy`, `restaurant`, `portfolio`, `nonprofit`, `product`,
+    `trades`), three pages each, every page opening with a nav and closing
+    with a footer, each template carrying exactly one contact form and its own
+    theme preset.
+  - `SiteTemplate::draft(name, subdomain)` → `NewGeneratedSite`, committed by
+    the existing `create_generated_site`. There is **no second persistence
+    path**: same transaction, same validation, same contact-form minting, same
+    born-as-a-draft rule the AI path gets.
+  - `products/mail/alo-jmap/src/sites_templates.rs`: `GET /sites/templates`,
+    `GET /sites/templates/{id}/preview?page=`,
+    `POST /sites/templates/{id}` — registered in `server.rs` as static paths
+    ahead of `/sites/{id}`. The preview renders through the **public
+    renderer** (`alo_sites::render`), so the gallery shows the site itself
+    rather than a screenshot that ages the moment a section changes.
+- **The four rules of the catalog**, each checked at load and asserted by the
+  suite rather than left to review:
+  - **A template carries no image.** Every picture is a tenant blob and the
+    catalog is tenant-less, so `text_image` and `gallery` are refused
+    outright; the copy invites the owner to add pictures in the editor, where
+    the blobs are theirs.
+  - **A template never makes a claim only the customer can make** — no
+    invented testimonial, no invented team member, no price. A tenant who
+    publishes a template unedited must not thereby publish fake social proof
+    or a price they never chose; the product template's tiers ship the em-dash
+    placeholder and say so on the page.
+  - **Every internal link resolves** inside the template's own page paths — a
+    shipped site with a dead menu item is broken the first time it is
+    published. `section_hrefs` is an exhaustive match, so a new section
+    variant does not compile until it says whether it links anywhere.
+  - **A broken template is dropped and logged, never panicked on** — a
+    malformed shipped file must not take a running server down. The test
+    asserts every template declared in the JSON survives loading, so the
+    failure lands on the gate instead.
+- **Verified:** `rustfmt` on the three new files only (`main` is not
+  rustfmt-clean on this machine — see the marathon note); `SQLX_OFFLINE=true
+  cargo clippy -p alo-store -p alo-jmap --all-targets` with no warning from
+  any file this item touched; `cargo nextest run -p alo-store -p alo-jmap` —
+  **2 748 tests, 2 748 passed, 1 skipped, 62 s**, including the new
+  `tests/site_templates.rs` (five tests: every declared template is offered in
+  order; every template is a complete honest site; each catalog rule refuses a
+  template that breaks it; and the instantiate test proving determinism and
+  the wrong-tenant boundary).
+- **Wire-verified with real curl**, debug `alo-jmap` on `127.0.0.1:8080`
+  against docker `alo-pg` (killed before starting and after finishing), two
+  fixture tenants bootstrapped for the run and deleted afterwards:
+  all three routes unauthenticated → `401`; the catalog → six templates with
+  their versions, kinds, presets, page paths and section kinds; the
+  consultancy home preview → `200`, 15 853 bytes, `text/html`, `no-store`,
+  `<title>Home — Consultancy</title>`, `<h1>Advice that survives contact with
+  your business`, **zero `<img>`**, and only `/`, `/contact`, `/how-we-work`
+  as internal hrefs; `?page=contact` and `?page=pricing` → `200`; an unknown
+  template and an unknown page → `404` each; an empty name → `400 "Give the
+  website a name."`; a blank address → `400 "Give the website an address."`;
+  a full domain typed into the address → the store's own `422 "subdomain may
+  only contain lowercase letters, digits, and hyphens"` verbatim; a
+  non-JSON body → `400 notJSON`. The happy path returned a **draft** site on
+  `north` with three pages in nav order 0/1/2, the home page first, and the
+  contact form minted and linked into the one section that asked for it. The
+  same address again → `422 "subdomain is already taken"`; the rival tenant
+  → `404` on the site and its pages, `{"sites":[]}` on the list, and the
+  **same six templates** on the catalog (it is the product, not tenant data).
+  `psql`: two sites, `status=draft`, three `site_pages`, one `site_forms`
+  each, **zero `site_publishes`**, and each form id present in exactly one
+  page's sections. The new site's own draft preview then rendered through the
+  editor path (`200`, canonical `https://tplwire-nordic.alosites.test/`), and
+  publishing it was still an explicit act (`live`, one publish row). No
+  production, email, DNS or external AI service was contacted.
+- **Cuts/flags:**
+  - **The template a site came from is not stored on the site.** The
+    instantiate response names `{id, version}` and the catalog is versioned,
+    but no column records provenance. It would need a migration on `sites` and
+    only earns its keep with an "update from template" feature nobody has
+    asked for; a site is the tenant's from the moment it exists. Listed here
+    rather than half-built.
+  - **Template copy is English only.** The catalog names, summaries and page
+    content are shipped content like the theme preset names, not UI chrome, so
+    they do not go through `i18n/en.ts`; a site made from a template is
+    translated with the ordinary S2.01d/e path. Localised catalogs are a
+    wave-review question (S2.16), noted there rather than guessed here.
+  - **No web change in this item** — the gallery UI is S2.11b, which is where
+    `NewSiteDialog`'s current "template" mode (a bare theme-preset picker, not
+    a template) gets replaced by the real catalog. `tsc`/`eslint`/`build` were
+    therefore not part of this item's gate: nothing under `web/` was touched.
+  - **No new top-level route prefix**: all three routes are under `/sites/*`,
+    already proxied. The production Caddyfile needs nothing at the next
+    deploy.
+  - **Pre-existing, outside this item and outside this track:**
+    `platform/alo-store/src/meet.rs:430` warns `unused variable: guest` on
+    `main`. It is the business track's file; left untouched, flagged here.
+- **Next:** S2.11b, the template gallery UI — a visual, keyboard-accessible
+  manual creation path beside AI generation, with one-click preview and
+  create, consuming the three routes this item wire-verified.

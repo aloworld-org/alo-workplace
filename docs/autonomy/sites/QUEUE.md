@@ -89,7 +89,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.10a Conversion events: aggregate form-view/start/submit attribution with stable site-owned source IDs and no individual journey storage.
 - [x] S2.10b CRM/Billing attribution seam: tenant-safe handoff/read model joining site conversion totals to existing lead, deal, and invoice identities without editing the Billing/CRM-owned modules.
 - [x] S2.10c Funnel UI: site → form → lead → deal → invoice aggregate funnel with clear unavailable/dependency states and no re-entry of known data.
-- [ ] S2.11a Template catalog: curated, versioned templates covering common site types with preview and deterministic instantiate tests.
+- [x] S2.11a Template catalog: curated, versioned templates covering common site types with preview and deterministic instantiate tests.
 - [ ] S2.11b Template gallery UI: visual, keyboard-accessible manual creation path beside AI generation; one-click preview and create.
 - [ ] S2.12a Catalog sections: tenant-owned catalog/category/item model, Base import seam, publish snapshots, and public render goldens.
 - [ ] S2.12b Order forms: public order submission with validation, abuse controls, owner inbox/review/export flow, and no checkout dependency.

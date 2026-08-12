@@ -9,6 +9,17 @@ contracts.
 
 ## Unreleased
 
+- **You can now start a website from a finished one, without describing
+  anything to AI.** Six templates ship with the product — consultancy,
+  restaurant or café, portfolio, association or charity, software or product,
+  and local trade — each a small complete site of three pages with navigation,
+  a footer and a contact form already wired up, on a colour theme chosen to
+  suit it. You can look at any of them in full before you choose, exactly as it
+  would be published. Creating one gives you a draft site with all its pages,
+  ready to edit and yours from that moment; nothing goes live until you press
+  publish. The templates deliberately contain no invented customer quotes, no
+  invented team members and no prices — those are claims only you can make, so
+  the pricing page arrives with the prices blank.
 - **Your website now has a Results screen, and handing an enquiry to sales is a
   button in the contact inbox.** Results sits beside Analytics on the website
   page and reads the whole arc over 7, 30 or 90 days: how many people saw a
