@@ -9,6 +9,27 @@ contracts.
 
 ## Unreleased
 
+- **You can now frame a photo where you can see it, instead of guessing.** The
+  image fields in the website editor show the picture itself, with a frame you
+  drag over it to choose what stays visible and a marker for the one thing that
+  must never be cropped out — a face, a product. Both work with the keyboard as
+  well as the mouse (arrow keys move, shift with the arrows resizes), and the
+  exact percentages stay on screen and editable, so "the same crop as the other
+  three photos" is a number you type rather than a drag you repeat. "Use the
+  whole picture" undoes all of it in one click, replacing a picture starts its
+  framing over, and your original file is never altered — the frame is a
+  decision about the photo, not a change to it.
+
+- **A picture that nobody has described now says so, and can be described in
+  three ways.** Write the description yourself, mark the picture decorative
+  when it carries no information (screen readers then skip it, and the field
+  stops asking), or ask alo for a draft. The draft is a proposal you approve or
+  discard, and it comes with a warning that means what it says: alo has not
+  seen your photograph, it drafts from the words already in that section, so
+  check it against the picture before approving. Nothing is written until you
+  approve, and a suggestion longer than a sentence is refused rather than
+  shown.
+
 - **Photos on a published website now arrive at the size the visitor's screen
   actually needs.** Upload the picture your camera produced; a phone no longer
   downloads a 3000-pixel-wide version of it to show it 400 pixels wide. Each

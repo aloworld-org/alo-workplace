@@ -3309,3 +3309,111 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     gains the `image` crate at build time only.
 - **Next:** S2.07c, the image editor — crop and focal controls, manual alt
   text, and optional propose-then-approve AI alt text from fixtures.
+
+## 2026-08-12 — S2.07c framing a photo where you can see it
+
+- **Shipped:** the image editor. Every image field in the section forms now
+  shows the picture, a frame dragged over it (four corner handles, move by
+  dragging the frame, arrow keys to move and shift+arrows to resize), a focal
+  marker, four percent boxes for the exact numbers, "use the whole picture",
+  a deliberate **decorative** state, the missing-description prompt, and an
+  AI draft of the description behind propose-then-approve. New files:
+  `web/src/sites/imageGeometry.ts` (the arithmetic), `ImageFraming.tsx` (the
+  control), `ImageFields.tsx` (the image's fields, moved out of
+  `SectionForm.tsx`), `copyContext.ts` (the shared AI-copy context both files
+  now need), plus `GET /sites/{id}/images/{blob}` in alo-jmap and an
+  `alt_text` copy action on the existing `ai-edits` door.
+- **The editor needed the source pixels, and nothing served them.** The draft
+  preview inlines images as `data:` URIs, which is right for a rendered
+  document and useless to a control that must draw a rectangle over the photo
+  at its own aspect ratio. The new route is two tenant doors deep — the site
+  must resolve for the caller and the blob is read through the tenant-scoped
+  `AccountStore::site_image` — so another tenant's blob, a blob that is not an
+  image and an id that never existed are one indistinguishable `404`. Bytes
+  are immutable per blob id, so `private, max-age=3600, immutable`, plus
+  `nosniff` and the SVG-defanging CSP the public service uses.
+- **The arithmetic is a separate file because only half of it can be tested
+  in a browser-less DOM.** jsdom lays nothing out: every
+  `getBoundingClientRect()` is zero, so a simulated drag would prove only that
+  zero arithmetic works. Dragging and typing are the same operation on the
+  same numbers, so the rules live in `imageGeometry.ts` and are tested there
+  for real (13 tests): a frame dragged past an edge slides back in at full
+  size rather than shrinking, a frame can never collapse below the schema's
+  1% minimum, a drag reads the same in either direction, a typed width that
+  would leave the picture pulls the left edge back, an emptied percent box
+  cannot produce NaN geometry, and a focal point is always pulled onto its own
+  crop — the one contradiction the schema refuses outright.
+- **Absent means something, so absent is what gets stored.** A frame covering
+  the whole picture and a focal point sitting exactly at the crop's centre are
+  both written as *no key at all*: that is already what they mean, and the
+  alternative is geometry on every image anybody ever opened a form on. The
+  save-path test asserts the exact section, not a subset.
+- **Replacing the picture drops the frame.** A rectangle of a different
+  photograph is not a smaller version of the old decision, it is the wrong
+  region of a new one; uploading or pasting a new blob id clears crop and
+  focal.
+- **Decorative and undescribed stopped looking the same** in the UI, as they
+  already had in the schema. Ticking decorative clears the description and
+  disables the field (the schema refuses a decorative image that still carries
+  alt text — proven on the wire), and an undescribed picture says so in the
+  form rather than leaving a blank field to scroll past.
+- **The AI draft is honest about what it cannot see.** Nothing in this build
+  shows a model an image — `alo-ai` speaks text — so the prompt says "You have
+  NOT seen this photograph", confines the draft to what the section's own
+  words claim the picture shows, and forbids invented visual detail (colours,
+  counts, names, logos, words in the picture). The UI repeats it above the
+  approve button. Wrong alt text is worse for a screen-reader user than
+  missing alt text, which is why this is a proposal placed next to the real
+  photo for the one party who can see it. Guards: the action only aims at a
+  pointer ending `/alt` (refused before any model call), the answer must be a
+  single `rewrite_copy` at that exact target, and a description over 200
+  characters is refused rather than offered.
+- **Verified:** `cargo fmt`; strict offline `cargo clippy -p alo-jmap
+  --all-targets` — zero warnings from this change; `sites_http` 22 tests and
+  `sites_generate_http` 7 green (one new in each: the image route's five
+  answers including both wrong-tenant directions, and the alt-text arc against
+  the scripted fixture model — no external AI service was contacted). Web:
+  `npx tsc --noEmit` clean, `eslint` on all fourteen changed files clean,
+  `npm run build` clean, and 172 tests green across `src/sites` + `src/i18n`
+  (25 new: 13 geometry, 12 editor).
+- **Wire-verified with real curl** against the local debug `alo-jmap` over
+  docker `alo-pg` (server killed before and after): the uploaded PNG comes
+  back byte-identical with `content-type: image/png`, `private, max-age=3600,
+  immutable`, `nosniff` and the CSP; `401` without a token; `404` for a
+  text/plain blob, an unknown blob id, and a site id that is not the caller's;
+  the stored crop and focal point read back exactly as sent; `alt_text` aimed
+  at `/heading` is `422` with the reason, aimed at `/image/alt` it reaches the
+  typed `503 unconfigured`; a decorative image carrying alt text and a crop
+  that leaves the picture are each `422` naming the rule.
+- **Cuts/flags:**
+  - **Pointer drags are not covered by a test**, deliberately and with the
+    reason written in the suite: in a DOM with no layout every rectangle is
+    zero, so such a test would assert its own fixture. The geometry behind
+    every gesture is tested directly, and the keyboard path — the accessible
+    one — is exercised through the real component.
+  - **No aspect-ratio presets** (16:9, square, "match the other photos"). The
+    schema has no notion of a required ratio and no section declares one yet;
+    S3.01c is where ratios become a section-type property, and guessing one
+    now would be a second, weaker copy of that decision.
+  - **The focal point still changes no pixel** on the published site: it means
+    something only where a layout crops further with `object-fit: cover`, and
+    no section does that today (S2.07b's flag, unchanged). It is now editable,
+    stored and validated, waiting for a layout that crops.
+  - **Only section images got the editor.** The theme logo/favicon, blog cover
+    images and collection-card images still carry no crop model at all
+    (`SiteImage` is the only shape S2.07a gave one to), so there is nothing
+    for the control to edit there. Blog covers remain the biggest gap and are
+    worth their own item.
+  - Image *dimensions* are still not stored on upload, so the `w` descriptor
+    can still be optimistic (S2.07b's flag). The editor now loads the bytes
+    and could learn them, but writing them would be a schema change, and this
+    item's scope is the controls.
+  - No new top-level route prefix (`/sites/*` already exists), so the
+    production Caddyfile needs nothing.
+  - Unrelated: `platform/alo-store/src/meet.rs:430` carries an
+    `unused_variable` warning on `main` from the other track's area — left
+    untouched, flagged here so the next full-workspace clippy run is not read
+    as this change's.
+- **Next:** S2.08a, analytics dimensions — UTM campaign, coarse country,
+  device class, entry/exit, read-time buckets and outbound clicks as
+  aggregates, with raw IP/UA/query discarded.
