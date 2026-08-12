@@ -133,3 +133,68 @@ rejections from `sites/Theme.test.tsx` are still there — pre-existing, another
 track's area, non-failing.
 
 **Next:** D1.05 `Select`.
+
+## D1.05 — `Select`
+
+Seven copies, and this time the interesting agreement was not among the selects
+but beside them: **four of the seven wrote `.input, .select, .textarea` in one
+rule** (finance and projects byte-identical again, billing and inventory a line
+apart), which is the codebase saying out loud that these two controls stand in
+the same form row. So the base is `Input`'s box, not the majority's: 40px and
+`--text-base` rather than the ~33px each module had derived from `padding: 8px
+12px`. **That is a visible change** — every select in the product gets taller at
+its migration — but its neighbouring search field and text input are making the
+same move in the same commit, so the row stays level. Recorded here rather than
+softened with an `sm` size, which would have re-created the mismatch it was
+meant to fix.
+
+Reconciled rather than offered: one focus treatment (there were four, including
+none at all in both shell sections); one disabled state (`Input`'s, over
+shell's `opacity: 0.55`, which takes a control's text under the contrast floor
+— a control you cannot use still has to be readable); and room on the right for
+the arrow the platform draws, which every copy padded over.
+
+Kept as real differences: `variant="ghost"` (mail's formatting bar, borderless
+on `--bg-raised` hover — the same hover as the `IconButton`s it sits between),
+`fullWidth` (finance and projects, a select taking its column's width), and
+`size="lg"` to match `Input`.
+
+No `appearance: none`, and no listbox. The native control is the entire reason
+a select is usable on a phone, and the seven copies were unanimous — every one
+was a native `<select>` with a border drawn round it. Nobody was asking for the
+thing that would have cost typeahead, Home/End and the platform picker.
+
+What the copies were missing:
+
+- **A name.** `shell/FiltersSection` ships two unnamed selects — the field and
+  the operator of every filter condition — with no label, no `aria-label` and
+  no wrapping `<label>`. A screen reader reads the current value where the
+  question should be: "combo box, From". Nothing about a hand-rolled select
+  could surface that, so `Select` says it in `console.error` in development
+  only (`import.meta.env.DEV`, so the check leaves the production bundle). A
+  required `label` prop was wrong here, unlike `Table`'s: a select has three
+  legitimate ways to be named and two of them are already in use.
+- **The empty option, and what it means.** Six call sites open with
+  `<option value="">` and mean two different things by it. inventory's "All
+  locations" is an answer somebody must be able to return to; billing's "Pick a
+  product" is a prompt. `placeholder` renders it, and disables it only when the
+  select is `required` — which is also the only spelling the browser's own
+  required check understands, since a sentinel value passes it.
+- **`max-width`.** Only billing had it. It is the difference between a long
+  product name and a broken toolbar.
+
+Verified: 7 behaviour tests (wrapping-label naming, `Field` naming + describing
++ invalid, the unnamed-select report and its absence when named, the
+placeholder's position/value/selection, choosable when empty is an answer,
+disabled when it is a prompt); `npx tsc --noEmit`, `npx eslint`, `prettier
+--check`, `npm run build` and `npx vitest run src` (72 files, 653 tests) all
+green. No screenshot — like `Table` and `Toolbar`, the component has no caller
+until the D2 migrations, so the visual check lands with the first adoption. The
+4 unhandled rejections from `sites/Theme.test.tsx` are still there:
+pre-existing, another track's area, non-failing.
+
+No CHANGELOG line: a primitive with no caller changes nothing a user can see.
+The taller selects become user-visible at D2, and D3.01 is where the wave is
+written up.
+
+**Next:** D1.06 `Toggle`.
