@@ -384,4 +384,10 @@ Also noticed and left alone (pre-existing, not this item's): `EquationEditor`
 references `styles.catSection` and `styles.math`, neither of which has ever
 existed in that stylesheet.
 
+**Process defect in this iteration's own commit:** `cc92ac5` went out without
+the `Co-Authored-By: Claude …` trailer LOOP step 8 asks for — the harness did
+not append one and the message was written without it. It is already pushed and
+rewriting history is forbidden, so it stands as it is. Every commit from here
+writes the trailer explicitly rather than relying on the harness.
+
 **Next:** D2.02, migrate mail.
