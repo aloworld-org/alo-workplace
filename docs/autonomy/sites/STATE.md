@@ -4535,3 +4535,112 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.12c, catalog/order UI — visible item management, section
   mapping, the order inbox, and useful empty states (and the `/sites/*` catalog
   routes it needs).
+
+## 2026-08-13 — S2.12c1 the catalog you can actually edit, from a screen
+
+- **Item:** S2.12c1 (split out of S2.12c) — the `/sites/{id}/catalogs` edit
+  routes S2.12a deliberately deferred, plus the visible Catalog screen: create
+  a catalog, set its currency, switch ordering on, group what it holds, and
+  add, change and delete the items themselves. Until this iteration there was
+  **no HTTP way to create a catalog at all** — S2.12b's wire pass had to seed
+  one with `psql` — so this is the item everything else in the strand waits on.
+- **Shipped:**
+  - **`sites_catalogs.rs` (jmap)** — ten routes: list/create catalogs,
+    read-one (the catalog with its categories and *every* item, hidden ones
+    included — the editor's whole screen in one read), replace, delete;
+    create/replace/delete a category; create/replace/delete an item. No new
+    store code and no migration: S2.12a's storage already held all of it.
+    Two rules shape the wire contract, and both are in the module doc:
+    - **A price is typed, never posted as a number.** The body carries what
+      the owner wrote (`"€4,50"`, `"4.50"`, `"5"`) and the store's own
+      `parse_price_minor_units` reads it against the catalog's currency. There
+      is no second, weaker price parser in the browser and no float anywhere;
+      an unreadable or ambiguous price is a `422` in the store's own words
+      (`1,234 could mean two different prices…`). `priceCents` is
+      **not** an accepted field — it is `deny_unknown_fields`, so a client
+      cannot go round the parser.
+    - **A handle may be left to us — once.** On a create, a blank `slug` is
+      derived from the name with `catalog_slug_from_name`. On a **replace** an
+      absent slug keeps the **stored** one. That second half was a fix made
+      mid-iteration after the first wire pass showed a rename rewriting the
+      handle: a handle is public — a catalog section names a category by it,
+      an order names an item by it — so correcting "Breads" to "Breads &
+      rolls" would have silently unhooked a published section from the group
+      it shows.
+  - **`web/src/sites/CatalogsView.tsx`** — the screen, shaped like the
+    collections workspace next door (list on the left, the one being worked on
+    beside it) so it is recognised rather than learned. Catalog settings with
+    the currency rule stated (changing it re-reads prices, it does not convert
+    them), the ordering switch with what it actually means under it (nothing
+    is paid on the website; it appears at the next publish), groups as inline
+    rename rows, and the item list with price, note, group, an availability
+    chip and per-row edit/delete. Two empty states carry the onboarding: a site
+    with no catalog is told what a catalog is *and* lands with the create form
+    already open, and an empty catalog invites the first item.
+  - **`CatalogItemDialog.tsx`** — one form for adding and for changing, because
+    the server replaces the item whole either way. Handle placeholder "From the
+    name", price hint in menu spelling, availability explained (sold out still
+    shows, marked; hidden is not published at all).
+  - **`catalogPricing.ts`** — the only money code in the browser, and it does
+    no arithmetic on stored values: `priceInput` turns minor units into an
+    editable string, `formatPrice` shows them through `Intl` in the reader's
+    language. The currency's exponent is sent by the server
+    (`currencyExponent`) rather than re-derived here, so the ISO 4217
+    exception table has one home.
+  - **i18n** — 60 new keys in **en, fr and nl** (no `UNTRANSLATED` entries),
+    including per-item delete labels so a list of twenty rows does not offer
+    twenty buttons all called "Delete".
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-jmap
+  --all-targets` clean (the workspace's only warning stays the pre-existing
+  `meet.rs:430` unused `guest`, the business track's file); `cargo nextest run
+  -p alo-jmap` — **986 tests, all passing** (45 s), including the new
+  `tests/sites_catalogs_http.rs` (four: the catalog lifecycle through the
+  account door; the typed price, the derived handle, the appended position,
+  the whole-replace and the kept handle, plus hidden items in the editor's
+  read and a deleted group leaving its items; six refusals each naming their
+  rule and a `deny_unknown_fields` `400`; and the rival tenant refused on
+  **eleven** unauthenticated calls and eleven cross-tenant ones, with the
+  owner's rows unchanged after). Web: `npx tsc --noEmit`, `npx eslint`,
+  `npm run build` all clean; `npx vitest run src/i18n src/sites` — 222 tests
+  passing, including the new `Catalog.test.tsx` (8: both empty states, the
+  price shown with its note, the price sent verbatim as typed, the server's
+  refusal sentence shown as-is, delete asking once, the ordering switch, and
+  the minor-unit round trip).
+- **Wire-verified with real curl** against the debug `alo-jmap` on docker
+  `alo-pg` (killed before starting and after finishing; two fixture tenants
+  bootstrapped for the run and deleted afterwards): every route `401` without
+  a token; `POST /sites/{id}/catalogs` with `"currency":"eur"` answered
+  `"EUR"` with `currencyExponent: 2` and `ordersEnabled: false`; a group
+  created without a slug came back `breads-rolls`; an item posted with
+  `"price":"€4,50"` stored `priceCents: 450`, and one with `"price":""`
+  stored `null` at position 1. Refusals on the wire: `1,234` →
+  `422 "could mean two different prices"`, `availability:"maybe"` → `422`
+  naming all three words, a duplicate handle → `422 "that handle is already
+  used in this catalog"`, a name with no ASCII letters → `422 "item handle
+  must be 1-64 characters"`, `{nope` → `400 notJSON`, `"currency":"euro"` →
+  `422 ISO 4217`. The rival tenant got `404` on all ten verbs (`no such
+  catalog` / `not found`) and `psql` showed the owner's catalog untouched.
+  After the fix, `PUT` of a category with only a new name kept
+  `slug: breads-rolls`, and `PUT` of an item with only a new name kept
+  `slug: sourdough-loaf`. Deleting the group left both items in place,
+  uncategorised (`psql`); `DELETE` item → `204`, again → `404`; `DELETE`
+  catalog → `204` and `psql` showed 0 catalogs, 0 items, 0 groups.
+- **Cuts/flags:**
+  - **The item's photo is not in this screen.** The store holds an image blob
+    per item and the route accepts `imageBlobId` (a foreign blob is a `404`,
+    proven on the wire), but the Drive picker is not wired into the dialog.
+    It belongs with the section mapping, where the picture is finally seen —
+    folded into **S2.12c2**.
+  - **No drag-reorder of items.** Position is append-order, which the routes
+    expose (`position` is accepted) but the screen does not yet offer. Sites
+    has no drag primitive outside the section stack; reordering catalog items
+    is a natural sibling of **S3.01b** and is noted there rather than
+    half-built here.
+  - **Section mapping and the order inbox are S2.12c2**, as the queue split
+    now records. The catalog section still cannot be added from the editor —
+    it is a valid section type the schema and renderer support, but the web
+    section vocabulary does not carry it yet — so an owner can build a catalog
+    today and shows it on a page in the next item.
+  - **No new route prefix**: `/sites/*` is already proxied by the production
+    Caddyfile and by `web/vite.config.ts`. Nothing needed at the next deploy.
+- **Next:** S2.12c2, catalog section mapping + order inbox UI.

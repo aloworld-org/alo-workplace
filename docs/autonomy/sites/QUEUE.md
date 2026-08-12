@@ -93,7 +93,8 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.11b Template gallery UI: visual, keyboard-accessible manual creation path beside AI generation; one-click preview and create.
 - [x] S2.12a Catalog sections: tenant-owned catalog/category/item model, Base import seam, publish snapshots, and public render goldens.
 - [x] S2.12b Order forms: public order submission with validation, abuse controls, owner inbox/review/export flow, and no checkout dependency.
-- [ ] S2.12c Catalog/order UI: visible item management, section mapping, order inbox, and useful empty states.
+- [x] S2.12c1 Catalog editing API + item management UI: the `/sites/{id}/catalogs` routes S2.12a deferred (catalog, groups, items — typed prices, derived handles, tenant-hidden 404s) and the visible Catalog screen with its empty states. (Split from S2.12c 2026-08-13; one turn cannot hold the routes, the management screen, the section mapping and the order inbox at full depth.)
+- [ ] S2.12c2 Catalog section mapping + order inbox UI: the catalog section in the page editor (pick a catalog, optionally one group) and the per-site order inbox — lines, totals, status, CSV export, empty states — over the S2.12b routes.
 - [ ] S2.13a Booking section model: availability source binding and booking-field schema that references Agenda through a Sites-owned seam.
 - [ ] S2.13b Public booking flow: availability read, race-safe reservation, internal notification, privacy/security tests, and real-process transcript.
 - [ ] S2.13c Booking UI: visible Agenda connection, preview, booking management link, and dependency/error states.

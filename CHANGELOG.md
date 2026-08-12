@@ -9,6 +9,20 @@ contracts.
 
 ## Unreleased
 
+- **A website can now be given a catalog of what it offers, from a screen
+  rather than from the database.** Sites gains a Catalog screen: create a
+  price list, give it a currency, add the dishes, rooms, services or courses
+  it holds, and group them under headings. A price is written the way it would
+  be on a menu — `4.50` or `4,50`, with or without the currency sign — and the
+  server reads it; an item left without one shows "price on request" rather
+  than nothing or zero. An item can be marked sold out, which still shows it,
+  or hidden, which does not publish it at all. One switch on the catalog turns
+  on the order form under it — nothing is ever paid on the website; the order
+  arrives in the owner's inbox — and, like every price here, it reaches the
+  live site at the next publish, not before. Correcting a name no longer
+  changes the short handle underneath it, so a page that shows one group keeps
+  showing it.
+
 - **Settings can now be closed with Escape, and every box in it says what it
   is for.** The Settings panel keeps the keyboard inside it while it is open —
   before, Tab walked straight out onto the mailbox behind — and Escape closes
