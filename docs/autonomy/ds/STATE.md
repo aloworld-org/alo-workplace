@@ -568,3 +568,88 @@ D2.02. Whichever invocation completes D2.03 should treat it as the spec and
 commit it with the implementation.
 
 **Next:** D2.03, still — by the single loop that remains.
+
+## The race is still running, and now we know why it survived a halt
+
+Nothing was built this iteration either. The previous entry's diagnosis was
+correct and its instruction ("find the second wrapper and stop it") was never
+carried out — but blaming the human is the wrong reading. **Two mechanical
+bugs kept the race alive, and both are in `scripts/run-loop.sh`.** They are
+worth more than another head-count of processes, so this entry is mostly them.
+
+Live evidence at 00:55, gathered before touching anything:
+
+| PID | Started | What it is |
+|---|---|---|
+| 25244 | 00:42:32 | `claude -p … 'ds'` — **orphaned**; its wrapper (38432) is dead |
+| 39840 | 00:52:18 | `claude -p … 'ds'` — **this invocation**, spawned by wrapper 41372 |
+| 41372 | 00:45:52 | `bash scripts/run-loop.sh … ds` — holds `~/.alo-loop-ds.lock` (PID 19658) |
+
+The orphan is not idle. `web/src/shell/SettingsModal.module.css` was written at
+00:53:22 and `web/src/ds/redefined.ts` at 00:53:27 — the latter *twelve seconds
+after* a `git status` in this session that did not list it. A file appearing in
+the tree between two consecutive reads, again, by a reader that has written
+nothing. D2.03 is visibly mid-flight in another process: `redefined.ts` is
+being edited right now, which is step 3 of the migration loop.
+
+### Bug 1 — the halt marker was written in a form the wrapper cannot see
+
+`run-loop.sh` stops the loop with `grep -qE '^LOOP HALT'` (line 62), anchored
+deliberately so that prose *quoting* the marker is not mistaken for the marker.
+The previous iteration wrote its marker as a markdown heading:
+
+    ## LOOP HALT: two loop invocations are running on this one checkout
+
+`^LOOP HALT` does not match `## LOOP HALT`. Checked directly: `grep -nE
+'^LOOP HALT' docs/autonomy/ds/STATE.md` returns nothing, while an unanchored
+grep finds it at line 521. So the wrapper read the journal at 00:52, saw no
+halt, and started this invocation six minutes after the halt that was supposed
+to stop it. The halt was real, committed (`fc44571`), correct — and invisible.
+
+`LOOP.md` says *append `LOOP HALT: <reason>`*, which means at column 0. A
+heading is the natural thing to write in a prose journal and it silently
+disarms the stop. **This entry's marker is a bare line at column 0**, which is
+the whole difference between this halt and the last one. The same trap applies
+to `^LOOP COMPLETE`; the sites journal already lost an iteration to the mirror
+image of it (see the comment at `run-loop.sh:52`).
+
+### Bug 2 — the lock guards wrappers, but a worker outlives its wrapper
+
+The single-wrapper lock (lines 28–43) does exactly what it claims and is not at
+fault for what it covers: one live wrapper per track per machine, stale locks
+taken over. The gap is that `trap 'rm -f "$LOCK"' EXIT` releases the lock
+without killing the `claude -p` child it started. So:
+
+1. Wrapper 38432 starts worker 25244 at 00:42:32.
+2. Wrapper 38432 dies. Its trap removes the lock. **Worker 25244 keeps running**
+   — an unattended `claude -p` is not in the wrapper's process group on Git
+   Bash and nothing signals it.
+3. Wrapper 41372 starts at 00:45:52, finds a dead PID in the lock, correctly
+   reports "stale lock — taking over", and starts a rival worker beside a
+   process it has no idea exists.
+
+Every step is the lock behaving as designed. The invariant it enforces is "one
+wrapper", and the invariant that matters is **"one worker"**. The suggested
+fix, for the human rather than for this iteration: on takeover of a stale lock,
+kill any surviving `claude -p` for this track before iterating, and change the
+`EXIT` trap to `kill` the child first and remove the lock second.
+
+### What this invocation did not do
+
+No code, no CSS, no `redefined.ts`, no QUEUE line. D2.03 stays `[ ]` and
+belongs to PID 25244, which is ten minutes older and mid-item; overwriting its
+half-written files would produce exactly the ambiguously-authored commit
+CLAUDE.md forbids. Only this journal entry was written, and it was committed
+path-limited (`git commit docs/autonomy/ds/STATE.md`) so that the orphan's
+in-flight working tree was left untouched.
+
+**For the human, in order:** (1) let PID 25244 finish and commit D2.03, or kill
+it and let the next iteration redo the item from clean — either is fine, but
+not both at once; (2) fix the two bugs above in `scripts/run-loop.sh`; (3)
+delete this halt marker; (4) restart. `web/src/shell/adoption.test.tsx` is
+still untracked and is still the D2.03 specification — whichever invocation
+completes the item commits it with the implementation.
+
+**Next:** D2.03, unchanged.
+
+LOOP HALT: a second, orphaned loop worker (PID 25244) owns this checkout and is mid-D2.03; the previous halt marker was a markdown heading, so run-loop.sh's anchored `^LOOP HALT` never matched it and the wrapper restarted anyway.
