@@ -9,6 +9,21 @@ contracts.
 
 ## Unreleased
 
+- **The Docs editor can now be used without a mouse, and says what it is doing
+  to a screen reader.** The equation dialog and the insert-code dialog close on
+  Escape and keep the keyboard inside them while they are open — before, Tab
+  walked out onto the page behind and the only way out of the symbol palette
+  was to find the × with a pointer. A table in a document is now announced by
+  its number ("Table 2"), its columns are read as column headings, and the
+  strip it scrolls in can be reached by keyboard. The row of insert controls
+  above a paragraph is announced as one named group instead of two loose
+  buttons, and the "Numbered" box under an equation now has its word properly
+  attached, so clicking the word ticks the box. Some of this looks slightly
+  different: the two dialogs are a little wider and sit on the same ivory panel
+  as every other dialog in alo, and a broken cross-reference is now struck
+  through in the warning red the rest of the product uses rather than in
+  copper.
+
 - **You can now see where visitors click and how far down they read, page by
   page.** The attention map sits one click from your website statistics: pick a
   page and a screen size, and the whole page is drawn in proportion — top to

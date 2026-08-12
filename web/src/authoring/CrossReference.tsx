@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { Link2 } from "lucide-react";
 
 import { strings } from "../i18n";
-import { cx } from "../ds";
+import { Badge, cx } from "../ds";
 import {
   type DocItem,
   type ItemKind,
@@ -39,13 +39,17 @@ export function ReferenceChip({
 }) {
   const info = resolveReference(numbering, targetId);
   if (info === null) {
-    return <span className={cx(styles.chip, styles.chipBroken)}>{strings.refBroken}</span>;
+    return (
+      <Badge tone="danger" className={cx(styles.ref, styles.broken)}>
+        {strings.refBroken}
+      </Badge>
+    );
   }
   return (
-    <span className={styles.chip}>
-      <Link2 size={11} className={styles.chipIcon} />
+    <Badge tone="accent" className={styles.ref}>
+      <Link2 size={11} className={styles.refIcon} />
       {referenceText(info, refLabels())}
-    </span>
+    </Badge>
   );
 }
 

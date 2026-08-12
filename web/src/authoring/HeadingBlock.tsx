@@ -37,7 +37,7 @@ export function HeadingBlock({ level, text, number, onChange, onLevelChange }: H
       <div className={cx(styles.headingWrap, level === 1 ? styles.h1 : styles.h2)}>
         {number !== undefined && <span className={styles.number}>{number}</span>}
         <input
-          className={styles.input}
+          className={styles.title}
           value={text}
           placeholder={strings.headingPlaceholder}
           onChange={(e) => onChange(e.target.value)}

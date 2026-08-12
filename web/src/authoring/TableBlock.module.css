@@ -2,25 +2,14 @@
   margin: var(--space-5) 0;
 }
 
-.scroll {
-  overflow-x: auto;
-}
+/* The table is a `ds/Table` with `grid` (every cell bounded, no cell padding)
+   and `flat` (no panel border, because a block sits on the page rather than in
+   a card). What is left here is the editing: the field inside each cell, and
+   the controls that add and remove rows and columns. */
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-
-.table th,
-.table td {
-  border: 1px solid var(--border-subtle);
-  padding: 0;
-}
-
-.table th {
-  background: var(--bg-raised);
+.head {
   position: relative;
+  background: var(--bg-raised);
 }
 
 .cellInput {
@@ -32,7 +21,7 @@
   color: var(--text-primary);
 }
 
-.table th .cellInput {
+.head .cellInput {
   font-weight: var(--weight-semibold);
   color: var(--text-secondary);
 }
@@ -54,7 +43,7 @@
   transition: opacity var(--transition-fast);
 }
 
-.table th:hover .colRemove {
+.head:hover .colRemove {
   opacity: 1;
 }
 
@@ -63,6 +52,10 @@
   background: var(--bg-surface);
 }
 
+/* The add-a-column and remove-a-row cells are controls parked in the table's
+   markup, not part of the grid, so they drop the border every other cell has.
+   `!important` because the grid's rule is `.grid td`, which a class alone
+   cannot outrank. */
 .addColCell,
 .rowRemoveCell {
   border: none !important;

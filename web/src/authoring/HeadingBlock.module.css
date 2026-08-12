@@ -58,7 +58,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.input {
+/* The section title, typed straight into the page. Not a `ds/Input`: it takes
+   the heading's own 2rem type and draws no box at all, and putting a 40px
+   bordered field around a document's heading would turn a page into a form.
+   Renamed from `.input` for the same reason. */
+.title {
   flex: 1;
   min-width: 0;
   border: none;
@@ -67,6 +71,6 @@
   color: inherit;
 }
 
-.input:focus {
+.title:focus {
   outline: none;
 }

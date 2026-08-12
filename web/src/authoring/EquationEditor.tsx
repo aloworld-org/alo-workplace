@@ -7,6 +7,7 @@ import { useMemo, useRef, useState } from "react";
 import { Search, Sigma, X } from "lucide-react";
 
 import { strings } from "../i18n";
+import { Button, Checkbox, IconButton, Modal } from "../ds";
 import { renderMath } from "./katex";
 import { EQ_CATEGORIES, haystack, insertText, type EqSymbol } from "./equationSymbols";
 import styles from "./EquationEditor.module.css";
@@ -100,163 +101,153 @@ export function EquationEditor({
   }
 
   return (
-    <div className={styles.overlay} onMouseDown={onClose}>
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-label={strings.eqTitle}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className={styles.head}>
-          <Sigma size={18} className={styles.headIcon} />
-          <span className={styles.headTitle}>{strings.eqTitle}</span>
-          <div className={styles.spacer} />
-          <button
-            type="button"
-            className={styles.close}
-            onClick={onClose}
-            aria-label={strings.eqClose}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <textarea
-          ref={inputRef}
-          className={styles.input}
-          value={value}
-          spellCheck={false}
-          placeholder={strings.eqPlaceholder}
-          onChange={(e) => onChange(e.target.value)}
-          aria-label={strings.eqInputLabel}
-          rows={1}
+    <Modal
+      title={strings.eqTitle}
+      icon={<Sigma size={18} />}
+      onClose={onClose}
+      wide
+      // The symbol palette is a browser inside the dialog: without a fixed
+      // height, every search would resize the popup under the pointer.
+      tall
+      actions={
+        <IconButton
+          label={strings.eqClose}
+          icon={<X size={18} />}
+          onClick={onClose}
         />
-
-        <div className={styles.previewWrap}>
-          <span className={styles.previewLabel}>{strings.eqPreview}</span>
-          <div className={styles.preview}>
-            {rendered.error !== null ? (
-              <span className={styles.error}>{strings.eqError(rendered.error)}</span>
-            ) : value.trim().length === 0 ? (
-              <span className={styles.empty}>{strings.eqEmpty}</span>
-            ) : (
-              <span
-                className={styles.math}
-                // KaTeX escapes its own input; `trust:false` blocks command injection.
-                dangerouslySetInnerHTML={{ __html: rendered.html }}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className={styles.palette}>
-          {searchOpen ? (
-            <div className={styles.searchRow}>
-              <Search size={16} className={styles.searchIcon} />
-              <input
-                type="text"
-                className={styles.search}
-                value={query}
-                autoFocus
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setQuery("");
-                    setSearchOpen(false);
-                  }
-                }}
-                placeholder={strings.eqSearchPlaceholder}
-                aria-label={strings.eqSearchLabel}
-                spellCheck={false}
-              />
-              <button
-                type="button"
-                className={styles.searchClear}
-                onClick={() => {
-                  setQuery("");
-                  setSearchOpen(false);
-                }}
-                aria-label={strings.eqSearchClear}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          ) : (
-            <div className={styles.catRow}>
-              <div className={styles.catNav} role="tablist" aria-label={strings.eqSearchLabel}>
-                {EQ_CATEGORIES.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={styles.catChip}
-                    onClick={() => scrollToCat(c.id)}
-                  >
-                    {CAT_LABEL[c.id]}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                className={styles.searchToggle}
-                onClick={() => setSearchOpen(true)}
-                aria-label={strings.eqSearchLabel}
-                title={strings.eqSearchLabel}
-              >
-                <Search size={16} />
-              </button>
-            </div>
-          )}
-
-          <div className={styles.paletteScroll} ref={scrollRef}>
-            {matches !== null ? (
-              matches.length > 0 ? (
-                <div className={styles.grid}>
-                  {matches.map((s, i) => symbolButton(s, `r-${i}`))}
-                </div>
-              ) : (
-                <p className={styles.noMatches}>{strings.eqNoMatches}</p>
-              )
-            ) : (
-              EQ_CATEGORIES.map((c) => (
-                <section
-                  key={c.id}
-                  className={styles.catSection}
-                  ref={(el) => {
-                    if (el !== null) catRefs.current.set(c.id, el);
-                  }}
-                >
-                  <h4 className={styles.catHead}>{CAT_LABEL[c.id]}</h4>
-                  <div className={styles.grid}>
-                    {c.symbols.map((s, i) => symbolButton(s, `${c.id}-${i}`))}
-                  </div>
-                </section>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className={styles.footer}>
+      }
+      footer={
+        <>
           {onToggleNumbered !== undefined && (
-            <label className={styles.numbered}>
-              <input
-                type="checkbox"
-                checked={numbered ?? false}
-                onChange={(e) => onToggleNumbered(e.target.checked)}
-              />
-              {strings.eqNumbered}
-            </label>
+            <Checkbox
+              checked={numbered ?? false}
+              onChange={onToggleNumbered}
+              label={strings.eqNumbered}
+            />
           )}
           <div className={styles.spacer} />
-          <button
-            type="button"
-            className={styles.insert}
+          <Button
             onClick={onInsert}
             disabled={rendered.error !== null || value.trim().length === 0}
           >
             {strings.eqInsert}
-          </button>
+          </Button>
+        </>
+      }
+    >
+      <textarea
+        ref={inputRef}
+        className={styles.latex}
+        value={value}
+        spellCheck={false}
+        placeholder={strings.eqPlaceholder}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={strings.eqInputLabel}
+        rows={1}
+      />
+
+      <div className={styles.previewWrap}>
+        <span className={styles.previewLabel}>{strings.eqPreview}</span>
+        <div className={styles.preview}>
+          {rendered.error !== null ? (
+            <span className={styles.error}>{strings.eqError(rendered.error)}</span>
+          ) : value.trim().length === 0 ? (
+            <span className={styles.empty}>{strings.eqEmpty}</span>
+          ) : (
+            <span
+              className={styles.math}
+              // KaTeX escapes its own input; `trust:false` blocks command injection.
+              dangerouslySetInnerHTML={{ __html: rendered.html }}
+            />
+          )}
         </div>
       </div>
-    </div>
+
+      <div className={styles.palette}>
+        {searchOpen ? (
+          <div className={styles.searchRow}>
+            <Search size={16} className={styles.searchIcon} />
+            <input
+              type="text"
+              className={styles.search}
+              value={query}
+              autoFocus
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setQuery("");
+                  setSearchOpen(false);
+                }
+              }}
+              placeholder={strings.eqSearchPlaceholder}
+              aria-label={strings.eqSearchLabel}
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className={styles.searchClear}
+              onClick={() => {
+                setQuery("");
+                setSearchOpen(false);
+              }}
+              aria-label={strings.eqSearchClear}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        ) : (
+          <div className={styles.catRow}>
+            <div className={styles.catNav} role="tablist" aria-label={strings.eqSearchLabel}>
+              {EQ_CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={styles.catChip}
+                  onClick={() => scrollToCat(c.id)}
+                >
+                  {CAT_LABEL[c.id]}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.searchToggle}
+              onClick={() => setSearchOpen(true)}
+              aria-label={strings.eqSearchLabel}
+              title={strings.eqSearchLabel}
+            >
+              <Search size={16} />
+            </button>
+          </div>
+        )}
+
+        <div className={styles.paletteScroll} ref={scrollRef}>
+          {matches !== null ? (
+            matches.length > 0 ? (
+              <div className={styles.grid}>
+                {matches.map((s, i) => symbolButton(s, `r-${i}`))}
+              </div>
+            ) : (
+              <p className={styles.noMatches}>{strings.eqNoMatches}</p>
+            )
+          ) : (
+            EQ_CATEGORIES.map((c) => (
+              <section
+                key={c.id}
+                className={styles.catSection}
+                ref={(el) => {
+                  if (el !== null) catRefs.current.set(c.id, el);
+                }}
+              >
+                <h4 className={styles.catHead}>{CAT_LABEL[c.id]}</h4>
+                <div className={styles.grid}>
+                  {c.symbols.map((s, i) => symbolButton(s, `${c.id}-${i}`))}
+                </div>
+              </section>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }

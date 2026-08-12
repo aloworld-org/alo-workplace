@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Code2 } from "lucide-react";
 
 import { strings } from "../i18n";
+import { Button, Modal } from "../ds";
 import { EquationEditor } from "./EquationEditor";
 import { CodeBlock } from "./CodeBlock";
 import { DEFAULT_LANGUAGE } from "./prism";
@@ -38,23 +39,35 @@ function CodeInsert({ onInsert, onClose }: Omit<InsertProps, "kind">) {
   const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
   const canInsert = code.trim().length > 0;
   return (
-    <div className={styles.overlay} onMouseDown={onClose}>
+    <Modal
+      title={strings.codeInsertTitle}
+      icon={<Code2 size={18} />}
+      onClose={onClose}
+      wide
+      actions={<span className={styles.hint}>{strings.codeInsertHint}</span>}
+      footer={
+        <div className={styles.actions}>
+          <Button variant="ghost" onClick={onClose}>
+            {strings.insertCancel}
+          </Button>
+          <Button
+            disabled={!canInsert}
+            onClick={() => onInsert(codeEmailHtml(code, language))}
+          >
+            {strings.insertConfirm}
+          </Button>
+        </div>
+      }
+    >
+      {/* Escape and the backdrop belong to `Modal` now; this is only the
+          shortcut that confirms, which bubbles up from the code editor. */}
       <div
-        className={styles.modal}
-        onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            onClose();
-          } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canInsert) {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canInsert) {
             onInsert(codeEmailHtml(code, language));
           }
         }}
       >
-        <div className={styles.head}>
-          <Code2 size={18} className={styles.headIcon} />
-          {strings.codeInsertTitle}
-          <span className={styles.headHint}>{strings.codeInsertHint}</span>
-        </div>
         <CodeBlock
           code={code}
           onChange={setCode}
@@ -72,21 +85,8 @@ function CodeInsert({ onInsert, onClose }: Omit<InsertProps, "kind">) {
             />
           </div>
         )}
-        <div className={styles.footer}>
-          <button type="button" className={styles.cancel} onClick={onClose}>
-            {strings.insertCancel}
-          </button>
-          <button
-            type="button"
-            className={styles.insert}
-            disabled={!canInsert}
-            onClick={() => onInsert(codeEmailHtml(code, language))}
-          >
-            {strings.insertConfirm}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

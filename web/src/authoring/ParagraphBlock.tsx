@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { FunctionSquare, Link2 } from "lucide-react";
 
 import { strings } from "../i18n";
+import { Button, Toolbar } from "../ds";
 import type { DocItem, NumberInfo } from "./numbering";
 import { renderProse } from "./prose";
 import { CrossReferencePicker } from "./CrossReference";
@@ -69,20 +70,31 @@ export function ParagraphBlock({ text, onChange, items, numbering }: ParagraphBl
 
   return (
     <div className={styles.editor} ref={containerRef}>
-      <div className={styles.toolbar}>
-        <button type="button" className={styles.tool} onClick={() => insertAtCaret("$  $", 2)}>
-          <FunctionSquare size={14} />
+      {/* `keyboard="tab"`, not `roving`: the reference button opens a picker
+          full of buttons *inside* this row, and a roving tab stop would sweep
+          them into the toolbar's own arrow-key set. */}
+      <Toolbar
+        label={strings.paraToolbar}
+        density="compact"
+        className={styles.tools}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<FunctionSquare size={14} />}
+          onClick={() => insertAtCaret("$  $", 2)}
+        >
           {strings.paraInlineMath}
-        </button>
+        </Button>
         <div className={styles.refAnchor}>
-          <button
-            type="button"
-            className={styles.tool}
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Link2 size={14} />}
             onClick={() => setRefOpen((v) => !v)}
           >
-            <Link2 size={14} />
             {strings.paraReference}
-          </button>
+          </Button>
           {refOpen && (
             <div className={styles.refPop}>
               <CrossReferencePicker
@@ -96,10 +108,10 @@ export function ParagraphBlock({ text, onChange, items, numbering }: ParagraphBl
             </div>
           )}
         </div>
-      </div>
+      </Toolbar>
       <textarea
         ref={inputRef}
-        className={styles.input}
+        className={styles.textArea}
         value={text}
         autoFocus
         placeholder={strings.paraPlaceholder}

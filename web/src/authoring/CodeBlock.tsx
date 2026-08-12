@@ -71,7 +71,7 @@ function LanguagePicker({
               className={cx(styles.pickerItem, l.id === language && styles.pickerItemOn)}
               onClick={() => onChange(l.id)}
             >
-              <span className={styles.badge} style={{ background: l.badgeBg }}>
+              <span className={styles.langBadge} style={{ background: l.badgeBg }}>
                 {l.badge}
               </span>
               <span className={styles.pickerLabel}>{l.label}</span>
@@ -187,7 +187,7 @@ export function CodeBlock({ code, onChange, language, onLanguageChange, tall }: 
             <code className={`language-${language}`} dangerouslySetInnerHTML={{ __html: html }} />
           </pre>
           <textarea
-            className={styles.input}
+            className={styles.codeArea}
             value={code}
             spellCheck={false}
             wrap={wrap ? "soft" : "off"}

@@ -1,67 +1,18 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
-  background: rgba(28, 24, 18, 0.28);
-}
-
-.modal {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 600px;
-  /* Fixed size so switching LaTeX/Visual never resizes the popup — the symbol
-     palette flexes to absorb the difference. */
-  height: 620px;
-  max-height: 90vh;
-  overflow: hidden;
-  border-radius: var(--radius-xl, 16px);
-  background: var(--bg-app);
-  box-shadow: var(--shadow-lg, 0 24px 60px rgba(0, 0, 0, 0.28));
-  padding: var(--space-5);
-}
-
-.head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.headIcon {
-  color: var(--accent);
-}
-
-.headTitle {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-}
+/* The dialog is `ds/Modal` (`tall`, so the palette below scrolls inside a
+   popup whose size never moves). What is left here is the equation editor
+   itself. */
 
 .spacer {
   flex: 1;
 }
 
-.close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-md);
-  color: var(--text-tertiary);
-}
-
-.close:hover {
-  background: var(--bg-raised);
-  color: var(--text-primary);
-}
-
-.input {
+/* The LaTeX source. Not a `ds/Input`: it is multi-line and monospaced, and the
+   design system has no multi-line text control yet — twenty-seven `<textarea>`
+   elements across the app are still each styled where they stand, which is a
+   `Textarea` primitive waiting to be argued for, not something to invent
+   halfway through a migration. Named for what it holds so that the next reader
+   is not looking for a form field. */
+.latex {
   display: block;
   width: 100%;
   min-height: 48px;
@@ -76,7 +27,7 @@
   line-height: var(--leading-relaxed);
 }
 
-.input:focus {
+.latex:focus {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
@@ -123,7 +74,6 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  margin-top: var(--space-4);
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-subtle);
 }
@@ -250,7 +200,9 @@
   top: 0;
   z-index: 1;
   padding: var(--space-2) 0 var(--space-1);
-  background: var(--bg-app);
+  /* The dialog is a `ds/Modal`, so the surface a sticky heading covers is the
+     panel's ivory, not the workspace canvas this was written against. */
+  background: var(--bg-surface);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.06em;
@@ -272,7 +224,9 @@
   justify-content: center;
   border: none;
   border-radius: var(--radius-md);
-  background: var(--bg-surface);
+  /* A tile has to lift off the surface it sits on: on the modal's own ivory,
+     `--bg-surface` was the surface, so the grid read as one blank sheet. */
+  background: var(--bg-raised);
   color: var(--text-primary);
   font-size: 1.15rem;
   line-height: 1;
@@ -299,40 +253,3 @@
   font-size: var(--text-sm);
 }
 
-.footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
-.numbered {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.insert {
-  flex-shrink: 0;
-  height: 38px;
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--text-on-accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  transition: background-color var(--transition-fast);
-}
-
-.insert:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.insert:disabled {
-  opacity: 0.5;
-  cursor: default;
-}

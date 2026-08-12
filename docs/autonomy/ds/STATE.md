@@ -273,3 +273,115 @@ The darker off track and the terracotta checkboxes become visible at D2, and
 D3.01 is where the wave is written up.
 
 **Next:** D2.01, migrate authoring.
+
+## D2.01 — authoring, the first adoption
+
+Seven stylesheets off the list, 43 → 36. The authoring `.module.css` files lost
+243 lines and gained 77, so the migration is a net deletion of 166 lines; `ds/`
+grew by 64 for the two widenings below.
+
+**Three of the seven were real adoptions, four were names that were lying.**
+That split is the finding of this item, and it is worth stating plainly because
+the next nine migrations will meet it again: the ratchet matches class *names*,
+and in a document editor `.input` usually means "the surface you type the
+document into", not "the form control".
+
+Adopted:
+
+- **`AuthoringInsertModal`** and **`EquationEditor`** → `ds/Modal`, `Button`,
+  `IconButton`, `Checkbox`. Both hand-rolled the overlay and the panel, and
+  between them they handled Escape once, on a keydown bound to the panel — so
+  the equation dialog, which is the one with a symbol palette you can get lost
+  in, had no keyboard way out at all. Neither trapped Tab. Both now inherit all
+  of it.
+- **`ParagraphBlock`'s** insert row → `ds/Toolbar`. `keyboard="tab"`, not
+  `roving`: the reference button opens a picker *inside* the row, and roving
+  focus would have swept the picker's own buttons into the toolbar's arrow-key
+  set. That is the first real use of the choice D1.04 argued for.
+- **`TableBlock`** → `ds/Table` with `grid` and `flat`. It had exactly the two
+  defects D1.03 found in all ten data tables — a scroll region a mouse could
+  reach and a keyboard could not, and no name — plus no `scope` on any column
+  header. A numbered table is now named by its number, which is what a
+  cross-reference points at.
+- **`CrossReference`'s** `.chip` → `ds/Badge`. By the law D1.02 wrote down it
+  was never a chip: nothing happens when you click it.
+
+Renamed, with the argument in each file:
+
+- `CodeBlock.input` → `.codeArea` — a transparent-text textarea laid over the
+  highlighted `<pre>` so the caret sits on Prism's glyphs. It has no box and no
+  height of its own; a `ds/Input` on top of the code is not the same object.
+- `CodeBlock.badge` → `.langBadge` — a 22px square carrying the language's own
+  brand colour, one of eighty. A `Badge` states a fact in one of four *system*
+  tones.
+- `HeadingBlock.input` → `.title` — 2rem type, no border, `font: inherit`.
+  Putting a 40px bordered field around a document's heading turns a page into a
+  form.
+- `ParagraphBlock.input` → `.textArea` — the box, the border and the focus ring
+  belong to the `.editor` around it, so that what you are editing still looks
+  like the prose it will become.
+- `EquationEditor.input` → `.latex`. This is the one that is genuinely
+  form-shaped, and it stays local because **the design system has no multi-line
+  text control**. There are 27 `<textarea>` elements across 25 files, each
+  styled where it stands; that is a `Textarea` primitive with more demand than
+  `select` had (7) and it should be argued for as its own item rather than
+  invented mid-migration. **Flagged for D3.01.**
+
+Two widenings, both stated in their files:
+
+- `Modal.icon` — a decorative, `aria-hidden` mark before the title. Both
+  authoring dialogs open with an accent glyph (Σ, `</>`) that says which editor
+  you are in before the words do; dropping them would have been a loss the
+  migration did not need to cause.
+- `Modal.tall` — a fixed panel height with the body's own scrolling handed to
+  whichever child asks for it. The symbol palette is a browser inside a dialog:
+  without this, every keystroke in the search field resizes the popup under the
+  pointer, and the equation you are writing scrolls away from the symbols you
+  are picking.
+- `Table.grid` — every cell bounded on all four sides and no cell padding,
+  because each cell is filled edge to edge by the control that edits it. A data
+  table is read and a grid is typed into; that is the whole difference, and the
+  name, the caption and the reachable region are shared. Verified in the
+  *shipped* CSS, not just the source: `._grid_… th, td` and `._grid_…  tbody
+  tr:last-child td` both emit after the `._table_…` rules they tie with on
+  specificity, so the editable grid still draws exactly as it did.
+
+**Visible changes, recorded rather than softened.** Both dialogs move from
+`--bg-app` porcelain to the shared `--bg-surface` ivory, from 640/600px to the
+shared 720px `wide`, and onto the system's darker backdrop — and two rules
+inside the equation palette had to follow the surface they sit on, or they
+would have disappeared into it: the symbol tiles were `--bg-surface` (a tile on
+the panel's own colour is not a tile) and the sticky category heading was
+`--bg-app`. A broken cross-reference moves from copper to the `danger` tone:
+copper is the *secondary accent* in this system, so an error drawn in it read
+as decoration. The paragraph's two insert buttons become `Button ghost sm` —
+larger and bordered where they were 3px chips.
+
+Verified: 16 behaviour tests in `authoring/blocks.test.tsx`, each naming what
+the hand-built version did instead — the reachable named scroll region, the
+table named by its number, `scope="col"`, Escape and the Tab trap on the
+equation dialog, the bound "Numbered" checkbox, the toolbar as one named group
+with every control keeping its tab stop, ⌘/Ctrl+Enter still inserting code, and
+a broken reference that says so in words. `npx tsc --noEmit`, `npx eslint
+src/authoring src/ds src/i18n --max-warnings 0`, `npm run build` and `npx
+vitest run src` (74 files, **680** tests) all green. The 4 unhandled rejections
+from `sites/Theme.test.tsx` are still there: pre-existing, another track's
+area, non-failing.
+
+**Cut: no screenshot.** This environment has no browser and no screenshot tool
+(no Playwright or Puppeteer in `web/`, and nothing in `scripts/`), so the
+queue's "look at it" step cannot be done here as written. What replaced it: the
+16 DOM-level assertions above, a check that no `styles.x` reference in the
+seven files points at a rule that no longer exists, and the cascade check
+against the built CSS described under `Table.grid`. That is not the same as
+looking, and it does not catch a screen that has become ugly — **the first
+human to open Docs should read this entry first.** D3.01 walks the product in a
+browser and is where this is settled; if the loop is expected to keep this
+step, the environment needs a headless browser and that is a request for a
+human, not a thing to work around.
+
+Also noticed and left alone (pre-existing, not this item's): `EquationEditor`
+references `styles.catSection` and `styles.math`, neither of which has ever
+existed in that stylesheet.
+
+**Next:** D2.02, migrate mail.

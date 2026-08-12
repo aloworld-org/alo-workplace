@@ -157,7 +157,12 @@
   background: var(--accent-soft);
 }
 
-.badge {
+/* The language's own colour mark in the picker — a 22px square carrying two
+   letters on the brand colour `prism.ts` gives it. Not a `ds/Badge`, which
+   states a fact in one of four system tones; this one's colour is the
+   language's, and there are eighty of them. Renamed from `.badge`, which was
+   sending readers to look for a primitive that was never here. */
+.langBadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -231,7 +236,7 @@
 }
 
 .wrapped .pre,
-.wrapped .input {
+.wrapped .codeArea {
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -246,7 +251,11 @@
   color: var(--code-fg);
 }
 
-.input {
+/* The editing surface: a transparent-text textarea laid exactly over the
+   highlighted `<pre>` so the caret sits on the glyphs Prism drew. Not a
+   `ds/Input` — it has no box, no border and no height of its own, and giving
+   it one would put a form field on top of the code. Renamed from `.input`. */
+.codeArea {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -265,13 +274,13 @@
   tab-size: 2;
 }
 
-.input:focus {
+.codeArea:focus {
   outline: none;
 }
 
 /* The typed text is transparent (Prism shows it underneath), but the placeholder
    must be visible — give it its own dim color. */
-.input::placeholder {
+.codeArea::placeholder {
   color: var(--code-dim);
   opacity: 1;
 }

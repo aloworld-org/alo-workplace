@@ -1,25 +1,22 @@
-/* inline reference chip (Figma: a green cross-reference token in the prose) */
-.chip {
-  display: inline-flex;
-  align-items: center;
+/* An inline reference is a `ds/Badge`: it states a fact — which equation, which
+   table — and nothing happens when you click it. What is left here is the two
+   things a badge in running prose needs and a badge in a list does not: it
+   takes the size of the sentence around it rather than `--text-xs`, and it sits
+   on that sentence's baseline. */
+.ref {
   gap: 3px;
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  color: var(--accent);
   font-size: 0.9em;
-  font-weight: var(--weight-medium);
-  white-space: nowrap;
   vertical-align: baseline;
 }
 
-.chipIcon {
+.refIcon {
   opacity: 0.7;
 }
 
-.chipBroken {
-  background: var(--copper-50);
-  color: var(--copper-600);
+/* A reference whose target was deleted. The strike-through is the signal;
+   the tone is `danger`, because a colour alone says nothing to a reader who
+   cannot see it. */
+.broken {
   text-decoration: line-through;
 }
 
