@@ -11,6 +11,7 @@ wrapper script immediately starts the next iteration.
 |---|---|---|
 | **business** (default) | `docs/autonomy/QUEUE.md` + `STATE.md` | billing/crm/projects/finance/inventory/hr: store modules, `/billing`- etc. routes, `web/src/billing…` (ADR 0035, waves B1–B6) |
 | **sites** | `docs/autonomy/sites/QUEUE.md` + `sites/STATE.md` | `site_*` store modules, `products/sites/**`, `/sites/*` routes, `web/src/sites/**`, alo-ai sites module (ADR 0036) |
+| **ds** | `docs/autonomy/ds/QUEUE.md` + `ds/STATE.md` | the design system: `web/src/ds/**`, and the `.module.css` of any module it migrates. Touches many modules by design, so it must not run beside another track editing the same web areas — and never `web/src/sites/**` (ADR 0045) |
 
 Two loops run in parallel on different machines, both pushing to `main`.
 **Never touch the other track's areas.** The deliberately-shared files

@@ -10,11 +10,18 @@
 set -u
 
 REPO="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
-TRACK="${2:-business}"                    # business | sites (LOOP.md Tracks table)
+TRACK="${2:-business}"                    # business | sites | ds (LOOP.md Tracks table)
 MAX_ITERATIONS="${MAX_ITERATIONS:-500}"   # hard backstop against runaway loops
 PROMPT="Read docs/autonomy/LOOP.md and execute exactly ONE iteration of the loop for track '$TRACK', then exit."
+# Every track but the default keeps its journal in a folder of its own. Named
+# tracks were hardcoded here, so a new one silently read the *business*
+# journal, found its "LOOP COMPLETE" and stopped on the first iteration
+# reporting success — the failure that looks exactly like the work being done.
 STATE_FILE="docs/autonomy/STATE.md"
-[ "$TRACK" = "sites" ] && STATE_FILE="docs/autonomy/sites/STATE.md"
+[ "$TRACK" != "business" ] && STATE_FILE="docs/autonomy/$TRACK/STATE.md"
+if [ ! -f "$STATE_FILE" ]; then
+  echo "[loop] no journal at $STATE_FILE — is '$TRACK' a track in docs/autonomy/LOOP.md?"; exit 2
+fi
 
 cd "$REPO"
 

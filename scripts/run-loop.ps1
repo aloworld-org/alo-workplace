@@ -9,7 +9,7 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\run-loop.ps1 -RepoPath "C:\dev\Ficina"
 param(
   [string]$RepoPath = "C:\dev\Ficina",
-  [string]$Track = "business",       # business | sites (LOOP.md Tracks table)
+  [string]$Track = "business",       # business | sites | ds (LOOP.md Tracks table)
   [int]$MaxIterations = 500,         # hard backstop against runaway loops
   [int]$IdleKillMin = 20,            # kill a worker SILENT this long (true hang)
   [int]$IterationCeilingMin = 240    # absolute per-iteration backstop
@@ -17,7 +17,13 @@ param(
 $ErrorActionPreference = "Continue"
 Set-Location $RepoPath
 
-$StateFile = if ($Track -eq "sites") { "docs/autonomy/sites/STATE.md" } else { "docs/autonomy/STATE.md" }
+# Every track but the default keeps its journal in a folder of its own. Naming
+# them one by one meant a new track read the business journal, found its
+# "LOOP COMPLETE" and stopped on iteration one reporting success.
+$StateFile = if ($Track -eq "business") { "docs/autonomy/STATE.md" } else { "docs/autonomy/$Track/STATE.md" }
+if (-not (Test-Path $StateFile)) {
+  Write-Host "[loop] no journal at $StateFile - is '$Track' a track in docs/autonomy/LOOP.md?"; exit 2
+}
 $prompt = "Read docs/autonomy/LOOP.md and execute exactly ONE iteration of the loop for track '$Track', then exit."
 
 # Resolve the claude CLI: PATH first, else the newest VSCode-extension binary.
