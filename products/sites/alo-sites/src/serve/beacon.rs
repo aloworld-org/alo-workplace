@@ -1,11 +1,12 @@
 //! `POST /_alo/collect` — the collect endpoint of the published page's
 //! analytics beacon ([`crate::render::script::BEACON_SCRIPT`]).
 //!
-//! Four dimensions exist only in a browser: how long a page stayed readable,
-//! which outside domain a visitor followed a link to, where the page was
-//! clicked, and how far down it was read. Everything else in the traffic
-//! report is derived from the request at the door ([`super::analytics`]) and
-//! stays there — this endpoint exists precisely because those cannot be.
+//! Some facts exist only in a browser: how long a page stayed readable, which
+//! outside domain a visitor followed a link to, where the page was clicked,
+//! how far down it was read, and whether a conversion point on it was reached
+//! or begun ([`super::conversion`]). Everything else in the traffic report is
+//! derived from the request at the door ([`super::analytics`]) and stays there
+//! — this endpoint exists precisely because those cannot be.
 //!
 //! That makes it the one public write with no page load behind it, so its
 //! whole design is about what it *cannot* be used for:
@@ -22,8 +23,10 @@
 //!   keys are `t` (seconds, bucketed server-side), `o` (a DNS host, folded to
 //!   a bounded lowercase label), and the heatmap set — `p` (the page), `w`
 //!   (a viewport width, reduced to one of three classes and discarded), `x`
-//!   and `y` (a click, in permille of the page, reduced to one grid cell), and
-//!   `d` (a scroll depth, reduced to one tenth). Anything else is a `400`.
+//!   and `y` (a click, in permille of the page, reduced to one grid cell),
+//!   `d` (a scroll depth, reduced to one tenth), and the conversion pair — `c`
+//!   (a conversion point of the site, whose id the page's own markup already
+//!   published) with `s` (one of two stage words). Anything else is a `400`.
 //! - **Rate-limited per client**, on its own budget, so beacon traffic can
 //!   never spend the budget that stands between a guesser and a protected
 //!   page or a flood and a form.
@@ -45,6 +48,7 @@ use time::OffsetDateTime;
 use alo_store::{PublicSiteHeatmapReport, PublicSiteSignal, ReadTimeBucket};
 
 use super::AppState;
+use super::conversion::ConversionReport;
 use super::heatmap::HeatmapReport;
 
 /// The most a beacon body may carry. A real one is under fifty bytes (`t=137`,
@@ -69,6 +73,9 @@ enum Report {
     Outbound(String),
     /// A click cell or a scroll depth on one named page ([`super::heatmap`]).
     Heatmap(HeatmapReport),
+    /// A conversion point of this site was seen or begun
+    /// ([`super::conversion`]).
+    Conversion(ConversionReport),
 }
 
 /// Handles one beacon POST: rate limit, parse, resolve the Host, write one
@@ -148,6 +155,17 @@ pub(super) async fn collect(State(state): State<Arc<AppState>>, request: Request
                 )
                 .await
         }
+        Report::Conversion(conversion) => {
+            // The bool says whether the source resolved to a form of this
+            // resolved site. A foreign or invented id simply counts nothing:
+            // answering differently would turn the endpoint into an oracle for
+            // which ids exist.
+            state
+                .store
+                .record_public_site_conversion(&resolved, day, &conversion.source, conversion.stage)
+                .await
+                .map(drop)
+        }
     };
     if let Err(error) = written {
         // A metrics outage is not a site outage, and the beacon's sender
@@ -191,6 +209,7 @@ fn parse(body: &str) -> Option<Report> {
         }
         "o" => safe_domain(&super::analytics::decode_form_value(value)).map(Report::Outbound),
         "x" | "d" => super::heatmap::parse(&pairs).map(Report::Heatmap),
+        "c" => super::conversion::parse(&pairs).map(Report::Conversion),
         _ => None,
     })
 }
@@ -296,6 +315,20 @@ mod tests {
         assert_eq!(parse("x=500&y=250"), None, "a click with no page");
         assert_eq!(parse("d=880&w=1440"), None, "a scroll with no page");
         assert_eq!(parse("p=%2Fprices&w=1440"), None, "a page with no event");
+    }
+
+    #[test]
+    fn a_conversion_report_is_read_by_its_own_parser() {
+        // The marker key hands the body to the conversion parser, which
+        // decides what is a report — including refusing the submit stage,
+        // which is counted at the write instead ([`super::super::conversion`]).
+        assert!(matches!(
+            parse("c=Qk9tX3zvS1aQmN2pRt4uYw&s=view"),
+            Some(Report::Conversion(_))
+        ));
+        assert_eq!(parse("c=Qk9tX3zvS1aQmN2pRt4uYw&s=submit"), None);
+        assert_eq!(parse("c=Qk9tX3zvS1aQmN2pRt4uYw"), None, "half a report");
+        assert_eq!(parse("s=view"), None, "a stage with no conversion point");
     }
 
     #[test]

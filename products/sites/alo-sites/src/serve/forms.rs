@@ -23,7 +23,8 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 
-use alo_store::StoreError;
+use alo_store::{ConversionStage, StoreError};
+use time::OffsetDateTime;
 
 use crate::render::{EN, UiStrings};
 
@@ -98,7 +99,10 @@ pub(super) async fn submit(
         .add_public_form_submission(&form_id, &body.name, &body.email, &body.message)
         .await
     {
-        Ok(Some(_)) => sent(&EN),
+        Ok(Some(_)) => {
+            count_submit(&state, &form_id).await;
+            sent(&EN)
+        }
         Ok(None) => super::not_found(state.unknown_host.clone()),
         Err(StoreError::Validation(reason)) => {
             let text = format!("{reason}. {}", EN.form_back_hint);
@@ -108,6 +112,27 @@ pub(super) async fn submit(
             tracing::error!(%error, "form submission write failed");
             super::unavailable()
         }
+    }
+}
+
+/// Counts the submit stage of the conversion funnel (S2.10a), and only after a
+/// submission was actually written: the honeypot's silent drop, a refused body
+/// and an unresolvable form id all write nothing, so they must count nothing —
+/// a funnel that reported conversions the owner has no message for would be
+/// worse than no funnel.
+///
+/// This is the one stage the server sees for itself, which is why the page's
+/// beacon may not claim it ([`super::conversion`]). A counting failure is
+/// logged and swallowed: the visitor's message is already stored, and failing
+/// their submission over a metric would be the wrong trade.
+async fn count_submit(state: &AppState, form_id: &str) {
+    let day = OffsetDateTime::now_utc().date();
+    if let Err(error) = state
+        .store
+        .record_public_form_conversion(form_id, day, ConversionStage::Submit)
+        .await
+    {
+        tracing::warn!(%error, "form conversion count failed");
     }
 }
 

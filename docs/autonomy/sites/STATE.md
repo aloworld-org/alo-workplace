@@ -3849,3 +3849,91 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.10a, conversion events — aggregate form-view/start/submit
   attribution with stable site-owned source ids and no individual journey
   storage.
+
+## 2026-08-12 — S2.10a a funnel of totals, counted where it can be believed
+
+- **Shipped:** aggregate conversion events for a published site's contact
+  forms. New migration `0307_site_conversion_events.sql`
+  (`site_conversion_daily`: tenant, site, day, source kind + id, stage, hits —
+  seven columns, none of which could hold a visitor); the anonymous write door
+  `site_public_conversions.rs` (`ConversionSource`, `ConversionStage`, and the
+  two `record_public_*_conversion` writes); the owner read
+  `site_conversions.rs` (`AccountStore::site_conversions` → a per-source and
+  site-wide funnel); the authenticated route
+  `GET /sites/{id}/conversions?days=` in the new `sites_conversions.rs`; the
+  beacon's conversion half (`alo-sites` `serve/conversion.rs`, wired into
+  `serve/beacon.rs`) and five lines in the published-page beacon script.
+- **Where each stage is counted, and why.** The **view** and the **start** can
+  only be seen in a browser — the server serves a whole page and cannot know
+  the form on it was reached, nor see a first keystroke — so the page script
+  reports them over the resolved Host. The **submit** is *not* reportable from
+  the page: it is counted inside `POST /f/{id}` after a submission was actually
+  written, and the beacon parser **refuses the word `submit`** (`400`). A
+  script is easier to lie to than a socket, and the submit is the one number an
+  owner would act on.
+- **The identity is the site's, never the visitor's.** A row is keyed by a
+  source the tenant itself created — a `site_forms` id, already public in the
+  page's own markup as `<form action="/f/{id}">` — so attribution needs no
+  cookie, token or session; there is no column one could be put in. The three
+  stages are counted independently, so a funnel is a ratio of totals and
+  resolves to nobody. Cardinality is bounded by construction: the insert
+  resolves the form and writes in one statement, taking tenant and site from
+  the resolved row, so a browser cannot open buckets by inventing ids the way
+  it can with a page path — and no daily cap is needed.
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-jmap -p alo-sites --all-targets` with no warning from any file this item
+  touched; `cargo nextest run -p alo-store -p alo-jmap -p alo-sites` —
+  **2 865 tests, 2 865 passed, 1 skipped, 86 s**, including the new
+  `site_conversion_tenancy` (both directions of wrong-tenant, the draft-site
+  form that counts no submit) and `alo-sites` `conversions` (the whole arc, the
+  foreign source's quiet `204`, the refused bodies, the dropped submission).
+  All 18 published-page goldens re-blessed for the five beacon lines.
+- **Wire-verified with real curl**, both debug binaries against docker `alo-pg`
+  (killed before and after), fixture tenants bootstrapped for the run: a site
+  published through `alo-jmap`, its `contact_form` section auto-linking form
+  `wgPM…` which the served page carries as `action="/f/wgPM…"`. Two `c=…&s=view`
+  and one `s=start` → `204 cache-control: no-store`, no cookie; `s=submit`,
+  `s=SUBMIT`, `s=opened`, a half report, an empty id and `c=<script>` → seven
+  `400`s; an invented id → `204` and no row; an unknown Host → `404`; `GET` →
+  `405`. Then the submission door: a real submission `200` and **one** submit
+  row; the honeypot `200`, an empty body and a bad address `400`, an invented
+  form id `404` — none of which moved a counter. A **second tenant's** form id,
+  read out of its own public markup and posted to the first site's Host, is a
+  quiet `204` that writes nothing for either site. The owner read: `401`
+  unauthenticated; the funnel `views 2 / starts 1 / submits 1` named per source
+  with the form's own label; `days=7` the same; `days=0` and `days=400` a `422`
+  carrying the sentence verbatim; the rival's site and a made-up id both `404`;
+  the rival's own untouched site a zeroed report listing its form. `psql`: the
+  table's seven columns, and zero rows matching an address or a user agent.
+  Both fixture sites deleted afterwards — the counts cascaded to zero with
+  them. No production, email, DNS or external AI service was contacted.
+- **Cuts/flags:**
+  - **This item is the collection and the read, not a screen.** The funnel UI
+    is S2.10c and the CRM/Billing attribution seam is S2.10b; nothing under
+    `web/src/sites` was touched.
+  - **A view count and a page-view count are not comparable**, as for read time
+    and clicks: browsers without `sendBeacon` report neither view nor start,
+    while their submit — counted at the write — is fully recorded. A rate built
+    from these three is a floor, and S2.10c must say so on the screen.
+  - **A start is not nested in a view.** Both are independent observations, so
+    `starts > views` is possible (an anchor arrival, a lost beacon) and the
+    JSON shape says so rather than implying a subset.
+  - **The source id is not a foreign key.** Deleting a form must not rewrite
+    last month's report, so its counts stay and are reported with a `null`
+    name; the site FK still cascades, which is what emptied the fixtures above.
+  - **Pre-existing, outside this track:** `?days=abc` on `/sites/{id}/
+    conversions` answers axum's own `400 Failed to deserialize query string`
+    rather than a `Problem` — identical on the existing `/analytics` and
+    `/heatmap` routes, so it is a property of the shared extractor and a
+    cross-cutting fix, not this item's to make silently. Also
+    `platform/alo-store/src/meet.rs:430` warns `unused variable: guest` on
+    every clippy run; it is Meet's file and predates this item, left untouched.
+  - `products/mail/alo-jmap/tests/common/mod.rs` defaults `DATABASE_URL` to
+    port **5433** while every other suite defaults to **5432**; on this machine
+    the whole `alo-jmap` suite fails with `PoolTimedOut` until `DATABASE_URL`
+    is exported. Gates here must set it explicitly.
+  - **No new top-level route prefix**: `/sites/*` is already proxied and
+    `/_alo/collect` is unchanged, so the production Caddyfile needs nothing.
+- **Next:** S2.10b, the CRM/Billing attribution seam — joining site conversion
+  totals to lead, deal and invoice identities without editing the modules that
+  own them.

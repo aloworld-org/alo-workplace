@@ -180,8 +180,13 @@ fn contact_form_without_form_id_renders_text_only() {
     assert!(html.contains("<h2>Write us</h2>"));
     assert!(!html.contains("<form"));
     // A form with no submit is nothing for the behavior script to do; the
-    // beacon is unconditional and is the only script left.
-    assert!(!html.contains("form[action^=\"/f/\"]"));
+    // beacon is unconditional and is the only script left. It looks for
+    // conversion points with the same selector — and finds none here, so a
+    // page without a form reports no conversion either.
+    assert!(
+        !html.contains("fetch("),
+        "the behavior script was appended for a page with nothing to submit"
+    );
     assert_eq!(html.matches("<script>").count(), 1);
 }
 

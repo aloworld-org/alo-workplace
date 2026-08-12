@@ -75,6 +75,11 @@
         "&y=" + permille(event.pageY, height()) + shape());
     }
   }, true);
+  document.querySelectorAll('form[action^="/f/"]').forEach(function (form) {
+    var point = "c=" + encodeURIComponent(form.getAttribute("action").slice(3));
+    send(point + "&s=view");
+    form.addEventListener("input", function () { send(point + "&s=start"); }, { once: true });
+  });
 })();</script>
 </body>
 </html>

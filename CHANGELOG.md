@@ -23,6 +23,17 @@ contracts.
   as every other dialog in alo, and a broken cross-reference is now struck
   through in the warning red the rest of the product uses rather than in
   copper.
+- **Your website now counts how many people reached a contact form, began
+  filling it in, and actually sent it.** Each form on a published site is
+  counted at those three moments, so you can see where interest turns into a
+  message — and where it stops. The sent count is the honest one: it is
+  recorded where your message is written, so a form left half-filled, a
+  honeypot-caught bot, or a refused submission never counts as a conversion.
+  Forms nobody has reached yet are listed too, with zeroes, because "nobody has
+  found it" is worth knowing. As with every other number here, the three counts
+  are kept separately and nothing links them: there is no visitor identity, no
+  cookie, and no record of one person's path through your site — only totals
+  per day, per form.
 
 - **You can now see where visitors click and how far down they read, page by
   page.** The attention map sits one click from your website statistics: pick a

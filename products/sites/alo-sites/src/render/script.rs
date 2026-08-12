@@ -21,10 +21,11 @@
 //!   with its `data-success` message (via `textContent` — never HTML). Any
 //!   failure falls back to a native submit, so the server's response page
 //!   handles errors; programmatic `submit()` does not re-fire the listener.
-//! - **Analytics beacon** — reports a read-time bucket and outbound-link
-//!   domains ([`BEACON_SCRIPT`]). A visitor who runs no scripts is still
-//!   counted as a page view by the server; only these two dimensions go
-//!   unreported.
+//! - **Analytics beacon** — reports the browser-only dimensions: a read-time
+//!   bucket, outbound-link domains, click and scroll positions, and whether a
+//!   conversion point was seen or begun ([`BEACON_SCRIPT`]). A visitor who
+//!   runs no scripts is still counted as a page view by the server; only these
+//!   dimensions go unreported.
 
 /// The inline script block, terminated by a newline like every other
 /// top-level fragment. Contains no `</script>` sequence and never touches
@@ -59,12 +60,13 @@ pub(super) const BEHAVIOR_SCRIPT: &str = r#"<script>(function () {
 /// The analytics beacon, appended to every **published** page (never to the
 /// authenticated draft preview, the unlock screen, or the 404 page).
 ///
-/// It reports the four traffic dimensions a server cannot see for itself: how
-/// long the page stayed readable, which outside domain a visitor followed a
-/// link to, where the page was clicked, and how far down it was read.
-/// Everything else about a visit is already derived from the request at the
-/// door (`crate::serve::analytics`) — and stays derived there, because a
-/// script is easier to lie to than a socket.
+/// It reports the traffic facts a server cannot see for itself: how long the
+/// page stayed readable, which outside domain a visitor followed a link to,
+/// where the page was clicked, how far down it was read, and whether a
+/// conversion point on the page was reached or begun. Everything else about a
+/// visit is already derived from the request at the door
+/// (`crate::serve::analytics`) — and stays derived there, because a script is
+/// easier to lie to than a socket.
 ///
 /// What it deliberately does not do:
 ///
@@ -86,9 +88,15 @@ pub(super) const BEHAVIOR_SCRIPT: &str = r#"<script>(function () {
 ///   and only when it is deeper than the last one sent.
 /// - **It reports at most twenty clicks per page view**, so a page nobody can
 ///   stop clicking costs the endpoint twenty beacons and not twenty thousand.
+/// - **The only id it ever sends is the site's own.** A conversion report
+///   carries the form id the page's markup already published
+///   (`<form action="/f/{id}">`) and one of two stage words — seen, or begun.
+///   It never claims the third stage: a submit is counted where the submission
+///   is written (`crate::serve::forms`), so no script can inflate the one
+///   number an owner is most likely to act on.
 /// - **It is not required for a page view to count.** Views are recorded by
 ///   the server; a visitor with scripting switched off is fully counted, minus
-///   these four dimensions.
+///   these browser-only dimensions.
 ///
 /// Like [`BEHAVIOR_SCRIPT`] this is a static constant with zero user data
 /// interpolated, which is what makes inlining it XSS-safe.
@@ -136,6 +144,11 @@ pub(crate) const BEACON_SCRIPT: &str = r#"<script>(function () {
         "&y=" + permille(event.pageY, height()) + shape());
     }
   }, true);
+  document.querySelectorAll('form[action^="/f/"]').forEach(function (form) {
+    var point = "c=" + encodeURIComponent(form.getAttribute("action").slice(3));
+    send(point + "&s=view");
+    form.addEventListener("input", function () { send(point + "&s=start"); }, { once: true });
+  });
 })();</script>
 "#;
 
