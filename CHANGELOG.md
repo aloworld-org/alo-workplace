@@ -9,6 +9,18 @@ contracts.
 
 ## Unreleased
 
+- **Your website statistics now answer where visitors came from and what they
+  read first.** Alongside visits and pages, alo counts the campaign a link
+  carried (`utm_campaign`), the country the connection was reported from, the
+  kind of device — phone, tablet, desktop, or a crawler that is not a reader
+  at all — and which page each day's visitors arrived on and left from. It is
+  still counting, not watching: the rest of the link's parameters are thrown
+  away before anything is stored, the address and the browser string are read
+  once to derive a number and then dropped, and no visitor is followed from
+  one day to the next. Still no cookies and still no banner. (Reading time and
+  clicks to other websites need a small script on the page and are not part of
+  this.)
+
 - **You can now frame a photo where you can see it, instead of guessing.** The
   image fields in the website editor show the picture itself, with a frame you
   drag over it to choose what stays visible and a marker for the one thing that

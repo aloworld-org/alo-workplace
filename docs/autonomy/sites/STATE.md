@@ -3417,3 +3417,105 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.08a, analytics dimensions — UTM campaign, coarse country,
   device class, entry/exit, read-time buckets and outbound clicks as
   aggregates, with raw IP/UA/query discarded.
+
+## 2026-08-12 — S2.08a where the visit came from, and what it read first
+
+- **Item:** S2.08a, analytics dimensions. Shipped the five dimensions a
+  request already carries — campaign, country, device class, entry page, exit
+  page — end to end: migration, public write path, owner read, the
+  `/sites/{id}/analytics` response, and tests at both doors. Read-time buckets
+  and outbound clicks are **not** in this item; they are queued as S2.08a2
+  (below, under Cuts).
+- **The reduction happens at the door, and only there.** `serve::analytics`
+  already turned a request into a date, a path, a referrer *domain* and a
+  daily HMAC before any async work began; it now also turns the query string
+  into one campaign label, the edge proxy's country header into two letters,
+  and the user agent into one of five words. The raw values never leave that
+  function — the store's write door literally cannot express them: it takes a
+  `PublicSiteVisit` whose every field is a derivative, and re-validates each
+  one rather than trusting the caller.
+- **`utm_campaign` survives; the rest of the link does not.** A mail-out link
+  carries the campaign next to things that identify one recipient
+  (`utm_content=recipient-42`, an address in a parameter). One key is read,
+  percent- and plus-decoded byte-wise (slicing the string could land inside a
+  multi-byte character and panic on a hostile query), lowercased, folded to
+  `[a-z0-9-_. ]` with everything else collapsed to a hyphen, and cut at 64
+  characters. `<script>` becomes `script`, `été` becomes `t`, a 200-character
+  campaign becomes 64: a link cannot invent a dimension shape, and the
+  wire test proves `example.test` and `recipient` appear nowhere in any
+  analytics table afterwards.
+- **The country comes from the edge or not at all.** `cf-ipcountry`,
+  `x-country`, `x-geo-country` — two ASCII letters or nothing. Cloudflare's
+  `XX` (could not resolve) and `T1` (Tor) are not countries and are stored as
+  "not reported". alo does not ship a geo-IP database and does not resolve an
+  address to a place itself; if no proxy names the country, the bucket is
+  honestly empty.
+- **A crawler is not a reader, so it is named.** Device classification checks
+  bot markers *first* — Googlebot's user agent claims to be an Android phone,
+  and counting it as one would inflate the number an owner acts on. Five
+  words: phone, tablet, desktop, bot, unknown. `unknown` is its own bucket
+  rather than a guess: a request that named no device is not evidence of a
+  desktop.
+- **Entry and exit without a journey.** One cursor row per site, per day, per
+  opaque token, holding only the page that token last looked at. First view of
+  a day: entry+1 and exit+1 on that page. Moving on: the old page's exit
+  count hands back to the new one (`GREATEST(hits - 1, 0)`, and the row is
+  `SELECT … FOR UPDATE` inside the same transaction, so two simultaneous views
+  cannot both believe they are first). Re-reading the same page moves nothing.
+  A visitor-day therefore contributes exactly one entry and one exit, and the
+  report suppresses buckets that fell back to zero (`HAVING SUM(hits) > 0`) so
+  a page a visitor merely passed through is not reported as an exit.
+- **Views, not people.** The dimension table stores no visitor token at all,
+  so there is no way to join "arrived on a campaign" to "is this person" —
+  the deliberate reason the new aggregates carry a hit count and no unique
+  count. The two new tables' exact column lists are asserted in a test, as the
+  originals already were.
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-sites -p alo-jmap --all-targets` — zero warnings from this change (the
+  pre-existing `meet.rs:430` `unused_variable` on `main` is the other track's
+  area, untouched). Tests green: all of `alo-sites` (including six boundary
+  unit tests and the new `dimensions_are_derived_at_the_door_and_the_raw_
+  request_is_dropped` integration test), `alo-store`'s
+  `site_analytics_tenancy` (now asserting every dimension plus the
+  wrong-tenant direction: tenant A's campaign never appears in tenant B's
+  report), and `alo-jmap`'s `sites_http` 22 tests.
+- **Wire-verified with real curl**, both services running locally against
+  docker `alo-pg` (both killed before and after): a site published through
+  `alo-jmap`, then real visits through `alo-sites` on the subdomain Host — a
+  phone on a `?utm_campaign=Summer+Launch&utm_content=recipient-42&email=…`
+  link from `cf-ipcountry: nl` reading `/` then `/about`, a Belgian desktop on
+  `/`, and Googlebot with `cf-ipcountry: XX` on `/about`. The owner report
+  answered exactly: campaigns `summer launch` 1 / none 3; countries NL 2, BE
+  1, unreported 1; devices phone 2, desktop 1, bot 1; entry `/` 2 and
+  `/about` 1; exit `/about` 2 and `/` 1 — the phone's exit moved from `/` to
+  `/about` as it read on. `401` unauthenticated, `422` naming the rule for
+  `days=0`, `404` for a site id that is not the caller's. A `psql` scan of the
+  stored rows for `example.test`, `recipient`, `198.51.100`, and `mozilla`
+  returned zero.
+- **Cuts/flags:**
+  - **Read-time buckets and outbound clicks are cut, and queued as S2.08a2.**
+    Neither is visible to a server: they exist only in the browser, so they
+    need a script on the published page and a public collect endpoint —
+    a different privacy argument (what a beacon may send), a different abuse
+    surface (an unauthenticated write with no page load behind it), and the
+    published pages' near-zero-JS budget to re-argue. Half of it in this item
+    would have been a beacon without caps or a byte budget; the whole of it
+    belongs in its own commit.
+  - **Bot traffic is counted, not filtered.** It appears in visits and pages
+    as it always did, now with a `bot` device bucket beside it so an owner can
+    see how much of the number is not a reader. Excluding it from totals is a
+    product decision with a UI, and belongs with S2.08b.
+  - **Device classification is substring matching**, which ages: it will call
+    a device that names itself in a new way `desktop`. It is deliberately not
+    a user-agent database (that is a dependency, a data file, and an update
+    treadmill) and the classes are coarse enough that being wrong about one
+    tablet changes no decision.
+  - The country depends on a proxy that reports one. In the current
+    production shape nothing sets `cf-ipcountry`, so the country panel will be
+    entirely "not reported" until an edge does — a deployment note for
+    S2.08b's empty state, not a code gap.
+  - No new top-level route prefix (`/sites/*` and the public service's own
+    Host serving already exist), so the production Caddyfile needs nothing.
+- **Next:** S2.08b, the analytics UI — a calm overview and drill-down for the
+  new aggregates, with the privacy explanation and useful empty states
+  (including the honest "no edge reports countries yet" case).

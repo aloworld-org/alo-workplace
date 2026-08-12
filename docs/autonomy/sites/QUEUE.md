@@ -81,7 +81,8 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.07a Image presentation model: crop rectangle, focal point, and alt text on image-bearing sections with backwards-compatible validation.
 - [x] S2.07b Responsive images: safe derivative pipeline and published `srcset`/`sizes`; byte/cache/XSS tests and public goldens.
 - [x] S2.07c Image editor: crop/focal controls, manual alt text, and optional propose-then-approve AI alt text using fixtures only.
-- [ ] S2.08a Analytics dimensions: aggregate UTM campaign, coarse country, device class, entry/exit, read-time buckets, and outbound clicks while discarding raw IP/UA/query.
+- [x] S2.08a Analytics dimensions: aggregate UTM campaign, coarse country, device class, entry/exit, read-time buckets, and outbound clicks while discarding raw IP/UA/query. (Shipped the five server-derivable dimensions; read-time and outbound clicks need a page beacon and are S2.08a2.)
+- [ ] S2.08a2 Page-beacon dimensions: a tiny published-page script and a public collect endpoint on alo-sites for read-time buckets and outbound-click domains — size caps, per-IP rate limits, no identity in the payload, byte-budget and privacy-schema tests, and the no-JS path still counting page views.
 - [ ] S2.08b Analytics UI: calm overview and drill-down surfaces for the new aggregates, with privacy explanation and useful empty states.
 - [ ] S2.09a Aggregate heatmap collection: bounded click coordinates and scroll-depth buckets with no visitor/session identity; schema privacy proof and abuse caps.
 - [ ] S2.09b Aggregate heatmap UI: page/viewport overlays, minimum-sample suppression, keyboard-accessible summaries, and empty states.

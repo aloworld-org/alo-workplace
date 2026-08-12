@@ -140,6 +140,24 @@ store's tenancy doors; ids are newtypes; timestamps are
   never read. No raw IP, UA, full referrer URL, or cross-day visitor identity
   is persisted. Exact daily uniqueness therefore survives a process restart
   without becoming a visitor profile.
+- **`site_analytics_dimension_daily`** — (tenant, site, date, dimension,
+  value, hit count) for the five dimensions that answer *where did they come
+  from and what did they read*: `campaign` (the `utm_campaign` label only —
+  every other query parameter, including whatever a mail-out put in
+  `utm_content`, is dropped at the door), `country` (the two-letter code the
+  edge proxy reports; alo never resolves an address to a place itself),
+  `device` (one of `phone`, `tablet`, `desktop`, `bot`, `unknown`, derived
+  from the user agent, which is then discarded), and `entry`/`exit` (the page
+  a visitor-day started and ended on). These count views, not people: no
+  visitor token is stored per dimension, so there is nothing to join a
+  campaign to a person with. Its companion **`site_analytics_visitor_day`**
+  holds one row per site, day, and opaque token — the page that token last
+  looked at — which is what makes an exit page computable without storing a
+  journey; it reveals no more than the per-day visitor set above, and dies
+  with the day's token. Values are bounded and lowercased into a small ASCII
+  label at the boundary, so a hostile link cannot invent dimensions.
+  Read-time and outbound clicks are *not* here: they need a page beacon, and
+  a beacon is a different privacy argument (see the collection boundary).
 
 ### Render pipeline
 
@@ -551,7 +569,7 @@ feature is silently absent: each is shipped or names its explicit dependency.
 | Contact forms | **Shipped**, one stated dependency | Contact sections create their form records; public submit has caps, honeypot and rate limiting; submissions are reviewable/exportable CSV; internal notifications are claimed at most once. Notification server copy is English in S1. **CRM lead creation remains intentionally deferred to B2**, exactly as the feature line states. |
 | ★ Blog written in alo Docs | **Shipped** | Tenant-owned Docs become draft/published posts; the public index paginates, post HTML is sanitized, and RSS is served. |
 | SEO | **Shipped** | Per-page overrides, Open Graph, canonical URLs, sitemap and robots are rendered from published state. |
-| ★ Privacy-first analytics | **Shipped** | Daily path/referrer aggregates and exact day-scoped uniques use opaque HMAC tokens. No cookies, raw IP, UA, query, full referrer, or cross-day visitor identity is stored. |
+| ★ Privacy-first analytics | **Shipped** | Daily path/referrer aggregates and exact day-scoped uniques use opaque HMAC tokens, plus campaign, country, device-class and entry/exit aggregates derived at the door. No cookies, raw IP, UA, query, full referrer, or cross-day visitor identity is stored. Read-time and outbound clicks await a page beacon. |
 | ★ AI copy tools per section | **Shipped** | Exact-field and whole-page proposals show reviewable before/after content; approve is the sole write and selecting a different field cannot silently retarget a proposal. |
 
 **Languages.** The complete Sites surface is translated in English, French,
