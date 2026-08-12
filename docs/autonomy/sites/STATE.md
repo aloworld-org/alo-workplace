@@ -3787,3 +3787,65 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.09b, the heatmap UI — page/viewport overlays over the full-page
   grid, minimum-sample suppression, keyboard-accessible summaries of what the
   overlay says, and empty states for a page nobody has clicked yet.
+
+## 2026-08-12 — S2.09b the map, and the words beside it
+
+- **Shipped:** the attention map, `/sites/:id/heatmap` in the web module — a
+  new `HeatmapView` reached from a link in the traffic desk's header (a
+  drill-down of those numbers, not a fifth button on the site page), plus
+  `HeatmapOverlay` (the picture), `heatmapReading.ts` (the pure rules) and
+  `Heatmap.test.tsx`. No server change: S2.09a's `GET /sites/{id}/heatmap`
+  already answers everything the screen reads, and the client types are copied
+  from `sites_heatmap.rs::report_json` field for field.
+- **What the screen does.** Period 7/30/90 (same control as analytics); a page
+  menu built from the endpoint's own path list with its event count, so nobody
+  types a URL; tabs per screen class labelled with their totals, opening on the
+  busiest; the click grid drawn as **the whole page in proportion** (the frame
+  takes the grid's own aspect ratio through a custom property — it does not
+  assume 32x64) labelled *top of the page* / *bottom of the page*; the depth
+  curve as all ten tenths in depth order.
+- **The two guards this item owns**, both flagged as the UI's job by S2.09a:
+  - **Minimum-sample suppression is presentation, not storage.** Fewer than
+    **20** clicks on a screen class → no picture at all, and the panel says
+    "3 of 20 clicks counted … a map drawn from a handful of clicks shows the
+    handful, not your visitors". The depth curve is gated separately on its own
+    20 reports, because a page can have plenty of one and none of the other.
+    The written summary is suppressed with the picture — otherwise the
+    threshold would only move the same three clicks into a list.
+  - **Every colour has words beside it.** Cells are aggregated into named
+    regions (a third of the width x a tenth of the height) and ranked busiest
+    first — "Centre, 0–10% down — 42 clicks" — so the finding is reachable
+    without seeing the shading. Positions are never grid coordinates: one cell
+    is 1/32 of the width and means nothing said out loud.
+- **Honest copy, since a shape is not a rate:** the privacy note repeats that
+  only reporting browsers are counted and at most twenty clicks per page view,
+  and says to read the map as where attention went, never as how many people
+  did something.
+- **Verified:** `npx tsc --noEmit` clean; `npx eslint` on all eleven changed
+  files clean; `npm run build` clean; `npx vitest run` — **67 files, 621 tests,
+  zero failures**, including the new 12-test `Heatmap.test.tsx` (busiest
+  page + screen chosen by default, the words summary and its ordering, all ten
+  tenths in depth order, the too-few state with its counts and no `img` at all,
+  a screen class with nothing on it, changing page refetching and reopening on
+  that page's busiest screen, period refetch, the no-data onboarding, a failed
+  read shown as an alert, and unit tests pinning the third-of-width naming and
+  region aggregation). The pre-existing 17 unhandled rejections in other sites
+  tests (ThemeDialog etc.) are unchanged at 16–17 — verified by running the
+  suite on a stashed tree.
+- **Cuts/flags:**
+  - **No screenshot underlay.** The overlay is a proportional blank page, not
+    the page itself: there is no screenshot service, and building one is a
+    different item (it would need a headless renderer against a published
+    snapshot). The frame is labelled top and bottom so the shape still reads.
+  - **The suppression threshold (20) is a UI constant**, not a store rule and
+    not configurable. If a real customer's site is quiet enough that 20 is
+    always out of reach, the honest fix is a longer period, not a lower floor.
+  - **Two requests per page view of this screen** — the path menu is asked
+    without a path, then the grid with one. Deliberate: the menu must exist
+    before anything is chosen, and it does not refetch when the page changes.
+  - No new HTTP route and no store change, so no wire transcript and no
+    wrong-tenant test in this item; both were done in S2.09a, whose 404 for a
+    foreign site id is what this screen surfaces as its error banner.
+- **Next:** S2.10a, conversion events — aggregate form-view/start/submit
+  attribution with stable site-owned source ids and no individual journey
+  storage.

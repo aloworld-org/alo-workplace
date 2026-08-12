@@ -9,6 +9,20 @@ contracts.
 
 ## Unreleased
 
+- **You can now see where visitors click and how far down they read, page by
+  page.** The attention map sits one click from your website statistics: pick a
+  page and a screen size, and the whole page is drawn in proportion — top to
+  bottom, not one screenful — with the areas that were clicked most shaded
+  darkest, plus a curve showing how many readers reached each tenth of the way
+  down. Beside the picture the same finding is written out in words ("Centre,
+  30–40% down — 42 clicks"), so it can be read without seeing the colours.
+  Phones, tablets and computers are kept apart, because a page that reflows
+  puts the same button somewhere else. A screen size with only a handful of
+  clicks is deliberately not drawn: it says how many have been counted and how
+  many are needed instead, because a map made from three clicks is a picture of
+  three people. Nothing here is a recording — no cursor trail, no session
+  replay, nothing that links two visits to the same person.
+
 - **Your published pages now count where visitors click and how far down they
   read** — the raw material for the heatmap screen that follows. A click is
   counted as one square of a coarse grid over the page and a scroll as one

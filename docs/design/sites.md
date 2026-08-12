@@ -184,6 +184,14 @@ store's tenancy doors; ids are newtypes; timestamps are
   because a heatmap of "some other page" would be an overlay over nothing.
   Owners read it through `GET /sites/{id}/heatmap`, which answers the pages
   that have data and, for one named page, the grid and the depth curve.
+  **Presentation adds a floor the store deliberately does not:** the attention
+  map draws nothing for a screen class with fewer than twenty clicks (or fewer
+  than twenty depth reports for the curve), and says how many were counted
+  instead — a map made from three clicks is a picture of three people wearing
+  the authority of a thousand. It draws the grid as the whole page in
+  proportion rather than over a screenshot or a screen-height box, because the
+  grid spans the scrollable page, and every shaded square is repeated in words
+  ("Centre, 30–40% down") so the finding survives without the colours.
 
 ### The page beacon
 
