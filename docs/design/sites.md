@@ -346,6 +346,23 @@ withheld from an anonymous visitor, so it is deliberately narrow.
   refusal. Same guards as the rest of `/sites/{id}`: the per-site grant
   middleware, `404` outside the caller's tenant, `422` carrying the
   store's own sentence.
+- **Owner surface** (S2.06b, `web/src/sites/PagePassword.tsx`) — a panel
+  in the page editor stating who can open the page rather than naming a
+  setting, plus a lock badge per row in the site's page list (one
+  `GET /sites/{id}/passwords`, not one call per page) and a line on the
+  editor's preview saying visitors are asked for the password first, so
+  a preview is never mistaken for what the internet serves. Three
+  properties the screen owes the model. It never renders a stored
+  password (there is none to render) and says so, offering a show/hide
+  toggle instead of a confirm field. It only refuses an EMPTY field
+  itself; length and whitespace rules belong to the store and its
+  sentence is shown verbatim. And lifting a password — the one gesture
+  that discloses a page to the internet and cannot be undone — arms
+  first and acts on the second click, while setting and changing, both
+  reversible, act immediately (ux-principles law 7). When the protection
+  state cannot be read at all the panel says it does not know rather
+  than defaulting to "anyone can open this page": the reassuring guess
+  is the dangerous one.
 
 ### Form flow
 

@@ -419,9 +419,19 @@ fn the_unlock_screen_asks_for_a_password_and_reveals_nothing_else() {
             !asked.contains(notice),
             "no notice on the first ask: {asked}"
         );
+        assert!(
+            !asked.contains("aria-invalid") && !asked.contains("aria-describedby"),
+            "nothing has gone wrong on the first ask: {asked}"
+        );
 
         let refused = render_password_challenge(&site, "/prices", strings.protected_wrong.into());
         assert!(refused.contains(notice), "{refused}");
         assert!(refused.contains("role=\"alert\""), "{refused}");
+        assert!(
+            refused.contains("id=\"site-password-notice\"")
+                && refused.contains("aria-describedby=\"site-password-notice\"")
+                && refused.contains("aria-invalid=\"true\""),
+            "a visitor back on the field hears why it refused: {refused}"
+        );
     }
 }

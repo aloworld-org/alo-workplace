@@ -8,6 +8,25 @@ contracts.
 
 ## Unreleased
 
+- **Putting a page behind a password is now something you can see and do.**
+  Every page in the editor says who can open it, in those words: anyone on the
+  internet, or only the people you handed the password to. Protecting a page
+  takes a password and a click, and the screen is honest about what follows —
+  visitors meet an unlock screen that shows nothing of the page, not even its
+  title, so do not go looking for your page's name on it; the password opens
+  the page for the rest of their day; and setting, changing or lifting it
+  works at once, with no need to publish the website again. Nobody can read a
+  password back to you afterwards, alo included, so the screen says so rather
+  than letting you assume otherwise, and a "show" toggle lets you check what
+  you typed before you save it. Changing the password tells you plainly that
+  everyone who was let in with the old one will be asked again. Taking a
+  password off asks a second time before it does it, because the page is
+  public the moment it lands. The page list marks every protected page, and
+  the editor's preview says out loud that visitors are asked for the password
+  first, so a preview is never mistaken for what the internet sees. Visitors
+  who get the password wrong now hear why when they move back to the field,
+  not only when the screen first loads.
+
 - **A page can now be published behind a password.** Some pages are meant for
   the internet and some are meant for the people you gave the address to: a
   dealer price list, a rehearsal programme, a page shared with one client. Put

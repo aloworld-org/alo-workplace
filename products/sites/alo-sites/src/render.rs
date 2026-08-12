@@ -301,7 +301,7 @@ pub fn render_password_challenge(
     ));
     if let Some(notice) = notice {
         out.push_str(&format!(
-            "<p class=\"form-error\" role=\"alert\">{}</p>\n",
+            "<p class=\"form-error\" role=\"alert\" id=\"site-password-notice\">{}</p>\n",
             esc(notice)
         ));
     }
@@ -313,10 +313,18 @@ pub fn render_password_challenge(
         "<p><label for=\"site-password\">{}</label>\n",
         esc(site.strings.protected_password)
     ));
-    out.push_str(
-        "<input id=\"site-password\" name=\"password\" type=\"password\" \
-         autocomplete=\"current-password\" required autofocus></p>\n",
-    );
+    // A refusal is announced by `role="alert"` when the screen is read as it
+    // arrives, but a visitor who moves back to the field afterwards — the one
+    // thing a person does after a wrong password — hears nothing unless the
+    // field itself carries the refusal. `aria-describedby` puts the sentence
+    // in the field's own announcement, and `aria-invalid` says which control
+    // it is about; both are dropped on the first ask, where there is no
+    // refusal to describe and nothing has gone wrong yet.
+    out.push_str("<input id=\"site-password\" name=\"password\" type=\"password\" ");
+    if notice.is_some() {
+        out.push_str("aria-invalid=\"true\" aria-describedby=\"site-password-notice\" ");
+    }
+    out.push_str("autocomplete=\"current-password\" required autofocus></p>\n");
     out.push_str(&format!(
         "<p><button type=\"submit\">{}</button></p>\n",
         esc(site.strings.protected_open)

@@ -3020,3 +3020,76 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     production Caddyfile needs nothing for this item.
 - **Next:** S2.06b, the password UI (visible protect/remove controls, the clear
   public-preview state, and the accessible visitor unlock screen).
+
+## 2026-08-12 — S2.06b the screen that says who can open a page
+
+- **Shipped:** the owner-facing half of the password gate S2.06a built. A new
+  `PagePassword` panel in the page editor (`web/src/sites/PagePassword.tsx`),
+  the four client methods it needs (`pagePassword`, `protectedPages`,
+  `setPagePassword`, `removePagePassword` on the existing `/sites/*` routes —
+  no new server route in this item), a lock badge per row in the site's page
+  list, and a line on the editor's preview saying visitors are asked for the
+  password first. English, French and Dutch strings for all of it. One small
+  Rust change on the public side: the unlock screen's refusal is now tied to
+  the field it is about (`aria-describedby` + `aria-invalid`), so a visitor who
+  moves back to the field after a wrong password hears why — `role="alert"`
+  alone only announces on arrival.
+- **The panel says who can READ the page, never what a setting is called.**
+  The state line is "anyone on the internet can open this page" or "only people
+  with the password can — set on <date>", and under it what the visitor
+  actually meets: an unlock screen carrying nothing of the page, not even its
+  title. That sentence is the reason it is there — S2.06a's own journal flagged
+  that an owner expecting the page's name on the unlock screen would think it
+  broke, and the copy is where that gets answered.
+- **Three properties the screen owes the model.** (1) It never renders a stored
+  password, because no read on the server answers one; the field is always
+  empty, and a show/hide toggle stands in for a confirm field so a typo is seen
+  before it is saved rather than after a visitor cannot get in. (2) It refuses
+  only an EMPTY field itself — length and whitespace are the store's rules and
+  its `422` sentence is shown verbatim, so two doors never disagree. (3)
+  Lifting a password arms first and acts on the second click, like taking a
+  live site off the air; setting and changing act at once, because they are
+  reversible and disclosure is not (ux-principles law 7).
+- **A protection that could not be read says so.** When the load fails the
+  panel shows "not known right now" and hides the protect button, rather than
+  falling back to "anyone can open this page" — the reassuring guess is the
+  dangerous one, and a test pins it.
+- **Verified:** `npx tsc --noEmit`, `npx eslint` on every changed file, and
+  `npm run build` — all clean. `npx vitest run src/sites` green: 81 tests, 11
+  of them new (7 in `PagePassword.test.tsx`; 3 in `PageEditor.test.tsx` running
+  the REAL client through the fake-network harness, which pins the wire
+  spelling — `GET`/`PUT {"password"}`/`DELETE` on
+  `/sites/{id}/pages/{pid}/password`; 1 in `SitesModule.test.tsx` proving the
+  list marks only the protected row and reads the whole list in ONE call). The
+  four unhandled rejections the suite prints are pre-existing — confirmed by
+  stashing this work and re-running (same four on `main`). Rust: `cargo fmt -p
+  alo-sites`, strict offline all-target Clippy clean, `cargo test -p alo-sites`
+  green (66 tests across the crate's suites, with `DATABASE_URL` pointed at docker
+  `alo-pg` on 5432 — note the crate's own default is 5433).
+- **Mutation checks, both red for the right reason:** dropping the arming step
+  from "remove the password" turns the two-click test red, and the render
+  assertions go red without the new aria attributes.
+- **Wire check:** the debug `alo-jmap` (already built by S2.06a, unchanged by
+  this item) on `127.0.0.1:8080` against docker `alo-pg`, curled with no token
+  on exactly the paths and verbs the new client spells: `GET
+  /sites/{id}/passwords` → `401`, `GET|PUT|DELETE
+  /sites/{id}/pages/{pid}/password` → `401` — the handler, not a `404` or a
+  `405`, so no path typo can hide in the client. The full authenticated
+  transcript for these routes is S2.06a's, and nothing on the server moved.
+  Server killed afterwards. No production, email, DNS or external AI service
+  was contacted.
+- **Cuts/flags:**
+  - The panel is per PAGE, in the page editor. There is no site-wide "password
+    the whole site" control, because there is no site-wide model behind one
+    (S2.06a's own cut). If an owner wants every page closed they set a password
+    per page, which the list makes visible but tedious past a handful of pages.
+  - The badge in the page list is read once per visit to the site screen; a
+    password set in the editor shows there on the next load of that screen, not
+    live. One read for the list was the trade against a request per row.
+  - No "here is a link that skips the password" affordance, deliberately —
+    S2.06a refused that model and the UI does not invent one.
+  - No new route prefix, so the production Caddyfile needs nothing for this
+    item.
+- **Next:** S2.07a, the image presentation model (crop rectangle, focal point
+  and alt text on image-bearing sections, with backwards-compatible
+  validation).
