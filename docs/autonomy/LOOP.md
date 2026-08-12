@@ -54,20 +54,32 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      (found: one survived 19 hours and poisoned a whole night). Kill it before rebuilding too
      (macOS/Linux: `pkill -f alo-jmap`; Windows locks the exe:
      `taskkill //F //IM alo-jmap.exe`). Real curl calls, real DB rows checked.
-   - **Never wait for a background command with `until ! pgrep -f "<cmd>"`.**
-     `pgrep -f` matches whole command lines, so the waiting shell matches
-     *itself*: the condition never goes false and the wait spins until the
-     tool's 600 s ceiling kills it. Retrying with a longer `sleep` does not
-     help — the poll interval was never the problem. This burned ~80 of one
-     iteration's 142 minutes on 2026-08-09 (~43 minutes of real work), and
-     it is the reason gate-heavy items looked like rate limiting.
-     Prefer the FOREGROUND with an explicit `timeout` (up to 600000 ms) — a
-     gate that fits in one call needs no polling at all. When a command must
-     run in the background, end it with a marker and poll the log for that:
-     `cargo test … > out.log 2>&1; echo "EXIT=$?" >> out.log` then
-     `until grep -q "EXIT=" out.log; do sleep 10; done`. If a process match
-     is truly unavoidable, break the self-match with a character class:
-     `pgrep -f "[c]argo test -p alo-store"`.
+   - **RUN GATES IN THE FOREGROUND. Do not background them, do not poll.**
+     One `Bash` call, `timeout: 600000`, read the exit code. This is not a
+     preference — it is the rule, and the measurement behind it is: a **cold**
+     build after `cargo clean`, plus every test in `alo-store` and `alo-jmap`,
+     took **5 min 34 s** (2 152 tests, 2026-08-11). `cargo clippy` is ~6 s
+     warm, because it type-checks without linking. Every gate this repo has
+     fits inside the ceiling with minutes to spare, so backgrounding one buys
+     nothing and costs the whole poll.
+   - **Never size a wait by iteration count.** `for i in $(seq 1 58); do …
+     sleep 10; done` runs 580 s whatever happens — it spends its entire budget
+     even when the work finished in the first ten seconds. This is what turned
+     a ~40-minute item into 151 minutes on 2026-08-12: **eight** such loops,
+     ~9.7 minutes each, 111 of 151 minutes spent waiting on commands that had
+     already exited.
+   - **Never wait with `until ! pgrep -f "<cmd>"`.** `pgrep -f` matches whole
+     command lines, so the waiting shell matches *itself*: the condition never
+     goes false and the wait spins to the ceiling. A longer `sleep` does not
+     help — the interval was never the problem. This cost ~80 of one
+     iteration's 142 minutes on 2026-08-09.
+   - If a background run is genuinely unavoidable (only when a single call
+     cannot fit), have it write a marker and poll with a loop that **exits on
+     the condition, not on a count** — `until grep -q "EXIT=" out.log; do
+     sleep 5; done` — and break the self-match with a character class:
+     `pgrep -f "[c]argo test -p alo-store"`. Two incidents, in two different
+     shapes, both from the same instinct to background a gate that fits in
+     the foreground. Resist it.
 6. Update what changed behaviour: a CHANGELOG.md line (user voice), rustdoc/
    TSDoc on public items, all UI strings through `i18n/en.ts` (fr/nl at wave
    reviews). New top-level route prefixes: note in STATE.md that the
