@@ -3093,3 +3093,109 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.07a, the image presentation model (crop rectangle, focal point
   and alt text on image-bearing sections, with backwards-compatible
   validation).
+
+## 2026-08-12 — S2.07a how an image is framed
+
+- **Shipped:** the model half of image presentation. `SiteImage` — the one
+  image reference all four image-bearing sections share (hero, text_image,
+  gallery, team) — gains three optional props: a `crop` rectangle, a `focal`
+  point, and a `decorative` flag, with validation, a golden fixture, a
+  storage round-trip against real Postgres, and a wire transcript. No new
+  route, no new column, no migration: this is the `sections` JSONB schema
+  growing three keys it already had room for.
+- **Basis points, not floats and not pixels.** Crop and focal are stored as
+  ten-thousandths of the source width/height with a top-left origin
+  (`x_bp`/`y_bp`/`width_bp`/`height_bp`), the same unit and suffix
+  `vat_rate_bp` uses. Pixels would break the moment a photo is re-uploaded at
+  another resolution; floats would cost `Eq` on `Section` and every type above
+  it, and make goldens fragile. `u16` with a validated ceiling of 10 000 keeps
+  the whole family `Copy + Eq` and exact.
+- **Cropping is presentation, never destruction.** The tenant's blob keeps
+  every pixel; a crop is a rectangle over it. Re-framing a photo can always be
+  undone, and the derivative pipeline (S2.07b) reads the rectangle rather than
+  a cut-down file.
+- **The two props can never contradict each other.** Validation refuses a
+  rectangle that leaves the image, one with less than 1% extent on an axis
+  (`MIN_CROP_EXTENT_BP` — the degenerate case that would ask S2.07b to blow a
+  handful of pixels up to full width), a focal point off the image, and — the
+  rule worth having — a focal point that sits *outside its own crop*.
+- **`decorative` is the missing half of alt text.** A blank `alt` used to mean
+  "decorative" by convention, which made "nothing to describe" and "nobody has
+  written it yet" the same stored value — and S2.07c has to tell them apart to
+  ask for alt text at all. Blank `alt` **with** the flag is deliberate; blank
+  `alt` **without** it is what `SiteImage::needs_alt_text()` reports. Setting
+  both is refused: the renderer emits `alt=""` for a decorative image, so the
+  alt text would silently vanish.
+- **Backwards compatible by construction, and pinned as such.** All three
+  props are `#[serde(default, skip_serializing_if …)]`, so a section stored
+  before they existed parses unchanged, reads as whole-image-centred
+  (`crop_or_full` / `focal_or_center`), and **re-serializes with no new keys**
+  — proven byte-for-byte by the twelve pre-existing goldens still passing
+  untouched, and named explicitly by two new tests. The crop object is closed
+  like everything else: an invented `zoom` is a 422, not a silently dropped
+  key.
+- **`Section::images()` is new and `image_blob_ids()` now derives from it.**
+  The exhaustive match that made a new section variant fail to compile until
+  it declares its images now yields the whole `SiteImage`, which is what
+  S2.07b's derivative pipeline needs; the blob-id view is the same set,
+  reduced. A test asserts the two agree.
+- **The editor carries the frame through without offering it.** No prop form
+  edits a crop yet (that is S2.07c), so `web/src/sites/sectionDrafts.ts` was
+  the one place that would silently unframe every photo on the next save —
+  the same hazard its own header comment already names for `form_id`. The
+  three props now ride through `draftImage`/`optImage`/`reqImage`, and a new
+  `PageEditor.test.tsx` case runs the REAL client and editor over the fake
+  network to prove that editing a heading leaves the crop and focal point on
+  the wire exactly as they arrived.
+- **Verified:** `cargo fmt`; strict offline `cargo clippy -p alo-store -p
+  alo-sites -p alo-jmap --all-targets` — zero warnings; the whole `alo-store`
+  suite green (the run reaches and completes doc-tests, which a failing test
+  binary would have stopped); `cargo test -p alo-store --lib site_model` → 20
+  tests, 11 of them new; the new `tests/site_image_presentation.rs` → 2 tests
+  green against docker `alo-pg`; `tests/site_sections.rs` → 5 green including
+  the two new backwards-compatibility tests; `cargo test -p alo-sites` → 66
+  green across the crate's suites. Web: `npx tsc --noEmit`, `npx eslint` on
+  the three changed files, `npm run build` — all clean; `npx vitest run
+  src/sites` → 82 passed (81 before, 1 new). The four unhandled rejections the
+  web suite prints are the same pre-existing ones journalled under S2.06b.
+- **Mutation check, red for the right reason:** short-circuiting
+  `check_image_geometry` and disabling the decorative rule turns exactly the
+  three new rule tests red (`crop_rules_…`, `a_focal_point_…`,
+  `decorative_and_missing_alt_text_…`) and nothing else.
+- **Wire transcript** (fresh admin `owner@framing-check.test` on docker
+  `alo-pg`, debug `alo-jmap` on `127.0.0.1:8080`, password grant token; the
+  server was killed before it started and again after): no token → `401`;
+  `PUT /sites/{id}/pages/{pid}/sections` with a cropped image and a decorative
+  one → `200` echoing the canonical envelope; `GET` the page → the crop and
+  focal point came back off disk unchanged, and the flag nobody set is still
+  absent; then every refusal, each naming its own rule — crop leaving the
+  image → `422 image crop must stay inside the image (x + width and y + height
+  may not exceed 10000 basis points)`; zero-area crop → `422 … at least 100
+  basis points of the image`; focal off the image → `422 … within 10000 basis
+  points on each axis`; focal outside its crop → `422 image focal point must
+  lie inside the crop`; alt text on a decorative image → `422 a decorative
+  image must have empty alt text`; an invented `zoom` prop → `422 unknown
+  field 'zoom', expected one of 'x_bp', 'y_bp', 'width_bp', 'height_bp'`. A
+  re-read after all six proved none of them changed a stored byte. The
+  editor's single-section save (`PUT …/sections/0`) keeps the frame too, and
+  the authenticated draft preview still renders `200` with the image and its
+  alt text. No production, email, DNS or external AI service was contacted.
+- **Cuts/flags:**
+  - **The renderer does not honour the crop yet.** A framed image still
+    renders as the whole image — applying the rectangle belongs with the
+    derivative pipeline in S2.07b, and a CSS-only half-measure now would be
+    rewritten next item. Nothing produces crops yet (the editor lands in
+    S2.07c), so no published page is currently mis-framed.
+  - No UI edits a crop, a focal point or the decorative flag in this item, by
+    the queue's own a/b/c split. The web change is pass-through only.
+  - `decorative` reclassifies existing blank-alt images as "alt not written
+    yet" rather than "decorative". That is the honest reading of the stored
+    data — nobody ever said which they meant — and it is what makes S2.07c's
+    prompt possible. The renderer's output is unchanged either way.
+  - CHANGELOG untouched: schema and validation only, nothing a user can do
+    changed yet. It lands with S2.07b/c.
+  - No new route prefix, so the production Caddyfile needs nothing for this
+    item.
+- **Next:** S2.07b, responsive images — the safe derivative pipeline and the
+  published `srcset`/`sizes`, with byte/cache/XSS tests and public goldens.
+  It is the item that makes the crop and focal point visible.

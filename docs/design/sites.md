@@ -83,6 +83,23 @@ store's tenancy doors; ids are newtypes; timestamps are
   rewritten lazily on the next save. Prices inside the `pricing`
   section are **display strings**, not money values — nothing computes
   on them, so the integer-cents law is not in play.
+- **Image presentation** — every image a section carries (`hero`,
+  `text_image`, `gallery`, `team`) is a `blob_id` + `alt` plus three
+  optional presentation props: a `crop` rectangle, a `focal` point, and
+  a `decorative` flag. Crop and focal are **basis points**
+  (ten-thousandths) of the source width/height with a top-left origin —
+  never pixels, so a crop survives re-uploading the photo at another
+  resolution, and never floats, so a stored value compares and
+  round-trips exactly. Cropping is presentation, never destruction: the
+  tenant's blob keeps every pixel. Validation refuses a rectangle that
+  leaves the image or has less than 1% extent on an axis, and a focal
+  point outside the image or outside its own crop, so the two props can
+  never contradict each other. `decorative` is the missing half of alt
+  text: blank `alt` **with** the flag means "nothing to describe";
+  blank `alt` **without** it means "not written yet" — the distinction
+  the editor's write-the-alt-text prompt is driven off. All three are
+  additive: sections stored before they existed parse unchanged, mean
+  whole-image-centred, and re-serialize with no new keys.
 - **`site_page_snapshots`** — immutable per-page published copies:
   page ref, snapshot of sections + meta + slug + nav order, theme
   snapshot on the site's publish record, `published_at`. Publish

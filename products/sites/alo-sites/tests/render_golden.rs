@@ -26,10 +26,10 @@ const BASE_URL: &str = "https://nordwind.alosites.com";
 /// One fully-populated instance of every section variant, mirroring the
 /// store's schema-test corpus — deterministic content, deterministic ids.
 fn full_sections() -> Vec<Section> {
-    let image = SiteImage {
-        blob_id: BlobId::new("9hK3vQ2mR8pT1xWz4bC5dg"),
-        alt: "Roasting drum mid-batch".to_owned(),
-    };
+    let image = SiteImage::new(
+        BlobId::new("9hK3vQ2mR8pT1xWz4bC5dg"),
+        "Roasting drum mid-batch",
+    );
     let link = |label: &str, href: &str| Link {
         label: label.to_owned(),
         href: href.to_owned(),
