@@ -1,8 +1,16 @@
-# ADR 0042 — Meet guest links and lobby admission
+# ADR 0043 — Meet guest links and lobby admission
 
 ## Status
 
 Accepted, 2026-08-11.
+
+Numbered 0043 rather than 0042. It was written as 0042 in a new `docs/adr/`
+directory on the same night ADR 0042 (direct-manipulation editing) landed in
+`docs/decisions/`, so two decisions briefly shared a number in two directories.
+This one moved because nothing referenced it, while 0042 is cited by the wave-3
+items in the sites queue — the renumbering that breaks least is the right one.
+**ADRs live in `docs/decisions/`.** A second directory forks the numbering
+silently and forever.
 
 ## Surface
 

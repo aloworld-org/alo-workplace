@@ -33,11 +33,24 @@ than rediscovery. Paste the "Prompt" section into a new chat, or just read this.
 
 ## Who else is working here
 
-| Stream | Where | Area — do not touch |
+| Stream | Where | Area |
 |---|---|---|
-| **Codex, on this machine** | `C:\dev\Ficina` (a second checkout of the same repo) | **alo Sites**: `products/sites/**`, `platform/alo-store/src/site_*`, `/sites/*` routes, `web/src/sites/**`, sites generation in `platform/alo-ai` |
-| **The Mac's loop** | Another machine | **Business modules**: billing, CRM, finance, inventory, projects, HR |
-| **You** | `C:\dev\Ficina-loop` | Everything else — chat, Meet, agents, shell, mail, drive, calendar |
+| **The Mac's loop** | Another machine | **alo Sites** — `products/sites/**`, `platform/alo-store/src/site_*`, `/sites/*`, `web/src/sites/**`, sites generation in `platform/alo-ai`. Took this track over from Codex on 2026-08-11; the business queue it finished is at `docs/autonomy/QUEUE.md` |
+| **Codex, on this machine** | `C:\dev\Ficina` | UI/UX quality and feature gaps, outside Sites |
+| **You** | `C:\dev\Ficina-loop` | chat, Meet, agents, shell, mail, drive, agenda, admin, identity |
+
+**Each stream edits only its own checkout.** This is not tidiness; it is the
+only thing keeping two agents' uncommitted work apart. On 2026-08-12 a complete
+Meet guest-admission feature — a migration, an ADR, store tests, three
+languages — was written into `Ficina-loop` by the other stream and swept into an
+unrelated docs commit by a `git add -A`, arriving on `main` under the message
+"allocate the ports". Nothing broke, and only because the work happened to be
+good.
+
+Two habits follow from that. **Stage explicitly** — `git add <paths>`, never
+`git add -A`, in a checkout somebody else may be writing to. And **read
+`git status` before committing**: files you did not create are the signal that
+somebody else is in here.
 
 Their queues are `docs/autonomy/QUEUE.md` and `docs/autonomy/sites/QUEUE.md`.
 **These are live input.** A loop takes the first unchecked item and builds it in
@@ -167,7 +180,11 @@ screenshot**. This is the only verification that counts for UI.
    `web/vite.config.ts` *and* all **three** `@backend path` matchers in
    `deploy/production/Caddyfile`. Otherwise the route reaches the SPA and 404s,
    which looks exactly like a broken handler. Cost two afternoons (chat, Meet).
-2. **Migration numbers collide across checkouts.** Before adding one, list
+2. **ADRs live in `docs/decisions/`, nowhere else.** A `docs/adr/` directory
+   appeared on 2026-08-12 holding a second ADR 0042; it was folded back and the
+   Meet decision renumbered to 0043. A second directory forks the numbering
+   silently, and the fork is only visible once two documents claim one number.
+3. **Migration numbers collide across checkouts.** Before adding one, list
    `platform/alo-store/migrations/` in **both** `Ficina-loop` and `Ficina`.
 3. **Disk.** Two Rust `target/` directories filled a 474 GB disk twice in one
    day, corrupting build artifacts and wedging Docker's daemon mid-pull.
