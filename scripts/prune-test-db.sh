@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Prune the local test database of tenants left behind by test runs.
+#
+# Why this exists: 92 of the 128 test files that create a tenant never delete
+# it, and the shared harness does not either. That is harmless in CI, which
+# gets a fresh database per run, and harmless for a developer running a suite
+# once. It is not harmless for a build loop running suites continuously: six
+# days of running left 74 671 tenants, 228 046 postings and a 583 MB database,
+# and every tenant-scoped query in every test scanned all of it.
+#
+# The effect is severe and easy to misread, because it grows silently: the same
+# `cargo nextest run -p alo-store` took 18 seconds against a clean database and
+# over 90 minutes against the bloated one. It also makes any timing measurement
+# expire — a gate benchmarked on Monday no longer describes Tuesday.
+#
+# Tests are not wrong to create tenants; the tenant is the isolation boundary
+# and a test that shares one proves less. The environment is what needs the
+# sweeping, so the sweeping lives here rather than in 92 test files.
+#
+# Usage:  bash scripts/prune-test-db.sh [max-age-hours]   # default 2
+#
+# Deletes every tenant older than the cutoff EXCEPT the bootstrap accounts the
+# local backend signs in as. Deleting a tenant cascades to its rows, so this is
+# the only statement needed. Batched, so a suite running alongside it waits
+# briefly rather than blocking on one long lock.
+set -euo pipefail
+
+HOURS="${1:-2}"
+DB_URL="${DATABASE_URL:-postgres://alo:alo-dev-only@localhost:5432/alo}"
+CONTAINER="${ALO_PG_CONTAINER:-alo-pg}"
+KEEP_EMAILS="'disan@alomails.com','admin@alomails.com'"
+BATCH=5000
+
+psql_q() { docker exec "$CONTAINER" psql -U alo -d alo -t -c "$1" 2>/dev/null | tr -d ' '; }
+
+before=$(psql_q "select count(*) from tenants;")
+echo "tenants before: ${before:-unknown}"
+
+while :; do
+  deleted=$(psql_q "DELETE FROM tenants WHERE id IN (
+      SELECT id FROM tenants
+      WHERE created_at < now() - make_interval(hours => $HOURS)
+        AND id NOT IN (SELECT tenant_id FROM users WHERE email IN ($KEEP_EMAILS))
+      LIMIT $BATCH);" | grep -oE '[0-9]+$' || echo 0)
+  [ "${deleted:-0}" -eq 0 ] && break
+  echo "  pruned $deleted"
+done
+
+after=$(psql_q "select count(*) from tenants;")
+echo "tenants after:  ${after:-unknown}"
+echo "database size:  $(psql_q "select pg_size_pretty(pg_database_size('alo'));")"

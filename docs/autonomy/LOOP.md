@@ -37,6 +37,16 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
    Cut scope, never depth — a narrower slice that fully works beats the listed
    slice half-done (record any cut in STATE.md).
 5. Gate it (all must pass):
+   - **Before the Rust gate, prune the test database: `bash
+     scripts/prune-test-db.sh`.** It takes seconds when there is little to do.
+     Tests create a tenant each and mostly never delete it, so the shared local
+     database grows by ~12 000 tenants a day and every tenant-scoped query in
+     every test slows with it. Left alone for six days it reached 74 671
+     tenants and 583 MB, and the identical `cargo nextest run -p alo-store`
+     went from **18 seconds to over 90 minutes** — which is what pushed the
+     gate past the one-command ceiling and sent earlier iterations into the
+     polling workarounds below. If a gate is mysteriously slow, this is the
+     first thing to check, not the last: `select count(*) from tenants;`.
    - Rust touched: `cargo fmt` on changed crates; `SQLX_OFFLINE=true cargo
      clippy -p <crates> --all-targets` clean; then **`cargo nextest run -p
      <crates>`** green — *not* `cargo test`. `cargo test` runs each test

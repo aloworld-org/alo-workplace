@@ -156,3 +156,41 @@ small, or a `[!]` note for the human if large.
 - [x] B6.11 Wave review: fr/nl, CHANGELOG, design as-built, features [B6] reconciliation.
 - [x] B6.12a FINAL arc, money: quote→invoice→payment→ledger and deal→won→invoice, wire-verified end-to-end on local; transcript in STATE.md.
 - [x] B6.12b FINAL arc, operations: hours→invoice line, PO→receive→bill→reconcile, leave→Agenda — transcripts; then `LOOP COMPLETE`.
+
+## Wave B7 — the gaps the final integration pass found (added 2026-08-12)
+
+Wave B6.12 verified every cross-module arc on the wire and found three places
+where shipped work does not meet what its own design note promises. These are
+not new features: each is a stated intention that was never wired, and each was
+demonstrated end to end rather than read off the source. Ordered by what breaks
+without it.
+
+- [ ] B7.01 ★ Post the document to the ledger. `billing_invoices::issue`,
+  the payment path and the credit-note path never call the posting functions,
+  so `GET /finance/reports/pl` and the balance sheet read zero after a real
+  invoice and a real payment (B6.12a, on the wire). The rules are not missing —
+  `fin_invoice_posting` and `fin_payment_posting` are green, 12 tests including
+  golden entries, idempotency and the wrong-tenant refusal. What is missing is
+  the call. `docs/design/finance.md` already specifies where it goes: "in-process,
+  inside the transaction that made the document real", so an issue that cannot
+  post fails the issue and burns no number, exactly as B1.08's numbering already
+  relies on. Done when: issuing, paying and crediting each move the P&L and the
+  balance sheet on the wire; issuing into a locked period is a typed refusal
+  (B4.10); posting twice is idempotent; the arc from B6.12a is re-run and the
+  fourth hop is no longer zero.
+- [ ] B7.02 Tenant deletion survives reconciliation. `bank_matches` holds
+  `ON DELETE RESTRICT` foreign keys to `billing_payments` and `fin_entries`, so
+  deleting a tenant that has ever reconciled a bank line fails on the constraint
+  — `delete_tenant` is the erasure path, which makes this a GDPR obligation and
+  not housekeeping. The existing purge tests pass only because their tenants
+  never reach B4.09's tables. RESTRICT is right *within* a tenant (a reconciled
+  payment must not vanish under the ledger) and wrong *across* tenant deletion.
+  Done when: a tenant with bank lines, matches and postings deletes cleanly and
+  leaves no rows behind in any `bank_*`, `billing_*` or `fin_*` table; a test
+  proves it; deleting a matched payment on its own is still refused.
+- [ ] B7.03 Leave reaches Agenda. Approved absences surface only under
+  People → Who's away; `grep -rn "/hr/" web/src/agenda/` finds nothing, so the
+  "team absence feed into Agenda" line in B6.03 and the `[B6]` feature it comes
+  from are not met (B6.12b, finding 3). Done when: an approved absence appears
+  in the team's Agenda view for its dates and disappears when the request is
+  withdrawn; the wrong-tenant test covers the feed.
