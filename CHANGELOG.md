@@ -9,6 +9,18 @@ contracts.
 
 ## Unreleased
 
+- **Photos on a published website now arrive at the size the visitor's screen
+  actually needs.** Upload the picture your camera produced; a phone no longer
+  downloads a 3000-pixel-wide version of it to show it 400 pixels wide. Each
+  page offers the browser three sizes of every photo and says how wide the
+  photo will be shown, and the browser takes the one it needs — usually a
+  fraction of the bytes, with nothing to configure and nothing to prepare
+  before uploading. A photo smaller than the size asked for is sent as it is,
+  never enlarged, and the file you uploaded is kept whole and untouched. If a
+  photo has been framed with a crop, the frame is what the website shows —
+  including in the browsers and email clients that ignore the modern picture
+  tags altogether, which used to be a hole this closes.
+
 - **Putting a page behind a password is now something you can see and do.**
   Every page in the editor says who can open it, in those words: anyone on the
   internet, or only the people you handed the password to. Protecting a page

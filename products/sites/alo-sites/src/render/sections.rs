@@ -13,6 +13,8 @@ use alo_store::site_model::{
     TeamSection, TestimonialsSection, TextImageSection,
 };
 
+use crate::images::ImageSlot;
+
 use super::html::{esc, safe_href};
 use super::{PageRenderContext, SiteRenderContext};
 
@@ -195,7 +197,7 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection) {
         out.push_str("</p>\n");
     }
     if let Some(image) = &s.image {
-        push_figure(out, site, image);
+        push_figure(out, site, image, ImageSlot::Banner);
     }
     out.push_str("</section>\n");
 }
@@ -223,7 +225,7 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
         ImageSide::Right => "image-right",
     };
     out.push_str(&format!("<section class=\"s-text-image {side}\">\n"));
-    push_figure(out, site, &s.image);
+    push_figure(out, site, &s.image, ImageSlot::Half);
     out.push_str("<div class=\"text\">\n");
     push_opt_heading(out, s.heading.as_deref());
     out.push_str(&format!("<p>{}</p>\n", esc(&s.body)));
@@ -236,7 +238,7 @@ fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection) {
     out.push_str("<ul class=\"grid\">\n");
     for image in &s.images {
         out.push_str("<li>");
-        push_figure(out, site, image);
+        push_figure(out, site, image, ImageSlot::Card);
         out.push_str("</li>\n");
     }
     out.push_str("</ul>\n</section>\n");
@@ -310,7 +312,7 @@ fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection) {
     for member in &s.members {
         out.push_str("<li>\n");
         if let Some(photo) = &member.photo {
-            push_figure(out, site, photo);
+            push_figure(out, site, photo, ImageSlot::Card);
         }
         out.push_str(&format!("<h3>{}</h3>\n", esc(&member.name)));
         if let Some(role) = &member.role {
@@ -420,14 +422,25 @@ fn push_link(out: &mut String, link: &Link, class: &str) {
 }
 
 /// `<figure><img></figure>` — `alt` is always present; empty means the model
-/// marked the image decorative. The `src` comes from the context's image
-/// sources (public path or inline data URI).
-fn push_figure(out: &mut String, site: &SiteRenderContext<'_>, image: &SiteImage) {
-    out.push_str(&format!(
-        "<figure><img src=\"{}\" alt=\"{}\"></figure>\n",
-        site.images.src(image.blob_id.as_str()),
-        esc(&image.alt)
-    ));
+/// marked the image decorative.
+///
+/// On a published page the image is responsive: `srcset` offers the
+/// derivative ladder ([`crate::images`]) and `sizes` says how wide the slot
+/// will be, so a phone downloads a phone-sized photo. The `src` is the
+/// fallback for anything that ignores `srcset` — the original for an unframed
+/// photo, the widest derivative for a cropped one, because the original is
+/// the picture *before* the owner framed it. The draft preview carries the
+/// bytes inline and offers neither attribute.
+fn push_figure(out: &mut String, site: &SiteRenderContext<'_>, image: &SiteImage, slot: ImageSlot) {
+    let (src, srcset) = site.images.figure_src(image);
+    out.push_str(&format!("<figure><img src=\"{src}\""));
+    if let Some(srcset) = srcset {
+        out.push_str(&format!(" srcset=\"{srcset}\" sizes=\"{}\"", slot.sizes()));
+    }
+    if slot.lazy() {
+        out.push_str(" loading=\"lazy\" decoding=\"async\"");
+    }
+    out.push_str(&format!(" alt=\"{}\"></figure>\n", esc(&image.alt)));
 }
 
 /// The section's optional `<h2>`.

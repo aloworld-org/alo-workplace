@@ -23,7 +23,9 @@
 //!
 //! - `/assets/site.css` — the one stylesheet, generated from the site's theme
 //!   tokens.
-//! - `/assets/img/<blob_id>` — image blobs of the resolved site's tenant.
+//! - `/assets/img/<blob_id>` — image blobs of the resolved site's tenant, and
+//!   under it `/[c<crop>/]w<width>` for the responsive derivatives a section
+//!   image's `srcset` offers (the [`images`] grammar).
 //! - `/f/<form_id>` — contact-form submission target.
 //!
 //! These are a contract: the service must serve them, and changing them means
@@ -33,6 +35,7 @@
 
 pub mod blocknote;
 pub mod blog;
+pub mod images;
 pub mod render;
 pub mod seo;
 pub mod serve;

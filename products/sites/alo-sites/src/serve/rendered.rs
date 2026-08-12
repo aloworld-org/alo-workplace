@@ -49,6 +49,12 @@ pub struct RenderedSite {
     /// this site. Collected from the same frozen content the pages were
     /// rendered from, so what is servable is exactly what is shown.
     images: HashSet<String>,
+    /// The derivative keys this publish's documents reference — every
+    /// `<blob>/w<width>` and `<blob>/c…/w<width>` that appears in a `srcset`,
+    /// and nothing else. A width or a frame the pages never asked for is not
+    /// servable, so the resize pipeline can only ever be asked for work this
+    /// site's own HTML already promises ([`crate::images`]).
+    variants: HashSet<String>,
 }
 
 impl RenderedSite {
@@ -98,6 +104,7 @@ impl RenderedSite {
         let mut page_ids = HashMap::with_capacity(snapshots.len());
         let mut page_locales = HashMap::with_capacity(snapshots.len());
         let mut images = HashSet::new();
+        let mut image_variants = HashSet::new();
         images.extend(
             [theme.logo.as_ref(), theme.favicon.as_ref()]
                 .into_iter()
@@ -121,12 +128,10 @@ impl RenderedSite {
             // The same lenient read the renderer uses, so the servable image
             // set can never disagree with what the documents reference.
             for section in render::sections_lenient(&snapshot.sections) {
-                images.extend(
-                    section
-                        .image_blob_ids()
-                        .into_iter()
-                        .map(|blob| blob.as_str().to_owned()),
-                );
+                for image in section.images() {
+                    images.insert(image.blob_id.as_str().to_owned());
+                    image_variants.extend(crate::images::variant_keys(image));
+                }
             }
             let page = PageRenderContext {
                 path: &path,
@@ -188,6 +193,7 @@ impl RenderedSite {
             css: stylesheet::stylesheet(&theme),
             not_found: render::render_not_found(&default_ctx),
             images,
+            variants: image_variants,
             name: site.name.clone(),
             base_url,
             theme,
@@ -242,6 +248,15 @@ impl RenderedSite {
     #[must_use]
     pub fn serves_image(&self, blob_id: &str) -> bool {
         self.images.contains(blob_id)
+    }
+
+    /// Whether this publish's own documents reference the derivative `key`
+    /// (the part after `/assets/img/`) — the gate on the resize pipeline. It
+    /// is checked before anything is read or decoded, so a width, a crop or a
+    /// blob the published pages do not show costs one hash lookup.
+    #[must_use]
+    pub fn serves_variant(&self, key: &str) -> bool {
+        self.variants.contains(key)
     }
 }
 

@@ -3199,3 +3199,113 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.07b, responsive images — the safe derivative pipeline and the
   published `srcset`/`sizes`, with byte/cache/XSS tests and public goldens.
   It is the item that makes the crop and focal point visible.
+
+## 2026-08-12 — S2.07b the photo arrives at the size the screen needs
+
+- **Shipped:** responsive images end to end on the public site. Every section
+  image now renders `srcset` over a fixed three-rung ladder (480/960/1440 px)
+  with a `sizes` attribute taken from the slot it sits in, and `alo-sites`
+  serves those derivatives — decoded, **cropped**, resized and re-encoded from
+  the tenant's own blob. New: `src/images.rs` (the URL grammar),
+  `src/serve/derivative.rs` (the pipeline), a derivative cache in
+  `serve/cache.rs`, the variant set on `RenderedSite`, and one new dependency
+  (`image`, pure Rust, codecs limited to jpeg/png/webp).
+- **One grammar, three readers, no drift.** `/assets/img/<blob>/w960` and
+  `/assets/img/<blob>/c<x>-<y>-<w>-<h>/w960` are written by the renderer,
+  collected into the servable set by `RenderedSite::build` from the same
+  lenient section read, and parsed back by the service — all three out of
+  `alo_sites::images`. A unit test walks every candidate the renderer emits
+  back through the parser and asserts it says what the section said.
+- **Nothing is decoded that the publish did not already promise.** The
+  requested derivative is checked against the served publish's own variant set
+  *before* any read or decode, so the resize pipeline can only be asked for the
+  handful of URLs the site's own HTML names. A width off the ladder, a frame
+  nobody published, an unreferenced blob, `w0480`, `//w480` and
+  `../../etc/passwd/w480` are all the site's themed 404. This is the
+  difference between an image service and a CPU amplifier pointed at its own
+  origin.
+- **Two independent gates, and the mutation check proved they are
+  independent.** Forcing `serves_variant` to `true` turned
+  `only_the_derivatives_the_publish_references_exist` red — and left
+  `one_hosts_derivatives_are_never_reachable_from_another` **green**, because
+  the store read behind it is scoped to the resolved site's tenant. Membership
+  bounds the work; the tenant scope bounds the bytes. Neither is carrying the
+  other.
+- **Bounded decoding, on the blocking pool.** A source over 16 MB is never
+  decoded; the header is read first and a canvas over 120 megapixels is
+  refused (a 70-byte PNG claiming 40 000 × 40 000 is a test, and it is
+  refused); allocation is capped; and `derive` runs in `spawn_blocking`, so a
+  slow or panicking decoder costs one request instead of the runtime — a join
+  error still answers with the original bytes.
+- **Three rules keep the answer honest.** Never upscale (a rung wider than the
+  source serves the source). Never grow the payload (a derivative that came
+  out no smaller than its source is dropped) — *unless* the frame differs,
+  where the crop is the whole point and correctness outranks bytes. And a
+  source this build cannot decode (SVG, GIF, AVIF, ICO) serves its original
+  bytes under the derivative path, so a vector logo in a gallery still shows.
+  Encoding is chosen by transparency, not by what arrived: alpha → PNG,
+  otherwise JPEG q82.
+- **The crop is now visible — closing S2.07a's flag.** A cropped image's `src`
+  fallback is the widest **derivative**, never the original: the original is
+  the picture before the owner framed it, and a client ignoring `srcset` must
+  not be shown what was cropped away. The served crop is pixel-checked in the
+  wire suite (a photo that is red on the left and blue on the right comes back
+  blue throughout at the right-half frame, and still red-then-blue unframed).
+- **Cache contract unchanged in shape, extended in reach.** A derivative is
+  immutable per path, so it carries the same `"img:<key>"` `ETag`,
+  `public, max-age=3600`, `nosniff` and the SVG-defanging CSP as the original,
+  and honors `If-None-Match` with an empty 304. Derivatives are cached in
+  memory keyed by **site id + path** (a blob id is unique only inside a
+  tenant) under a 64 MB byte bound; the "declined" answer is cached too, so an
+  SVG is not re-examined per request.
+- **Verified:** `cargo fmt --check` clean; strict offline `cargo clippy -p
+  alo-sites -p alo-jmap --all-targets` — zero warnings; whole `alo-sites`
+  suite green, **92 tests across 15 binaries** (66 before): 19 lib (11 of them
+  the new grammar tests), the new `responsive_images.rs` 11 and
+  `serve_derivatives.rs` 6, plus 4 new rules tests in `render_rules.rs` (20).
+  The alo-jmap sites bank is green too — `sites_http` 21, `site_versions_http`
+  6, `site_protection_http` 6, `sites_generate_http` 4, `site_editor_role_http`
+  4, `site_schedule_http` 3, `site_notify` 1 — so the draft preview and the
+  editor's own HTML assertions are unmoved. Goldens re-blessed and read line by
+  line: hero/text_image/team/gallery gained the ladder, the gallery gained a
+  second, **cropped** tile that pins what a frame spells in a URL. Byte budget:
+  the full-page golden went 6 379 → 7 697 bytes, 7.7% of the 100 KB page
+  budget, for four responsive images. No production, email, DNS or external AI
+  service was contacted.
+- **Wire verification** was the in-process bank through the real router
+  against docker `alo-pg` (`tower::oneshot`, real photos written through the
+  real store) — the established shape for this service, since `alo-sites` is
+  not part of the local `alo-jmap` dev stack. It exercises the real HTTP
+  semantics this item is about: status, `Content-Type`, `Cache-Control`,
+  `ETag`, `If-None-Match` → 304, and the decoded pixels of the response body.
+- **Cuts/flags:**
+  - **Only section images get the ladder.** The theme logo/favicon, blog cover
+    images and collection-card images keep their single original URL: none of
+    them carries a crop model (S2.07a covers `SiteImage` only), and the logo is
+    usually a vector with no raster derivative at all. Blog covers are the
+    biggest remaining win and are worth their own item.
+  - **The focal point is still not rendered.** It only means something where a
+    layout crops further (`object-fit: cover`), and no section does that today
+    — the stylesheet fits images rather than covering with them. Emitting an
+    `object-position` nobody reads would have been decoration. It stays stored
+    and validated, waiting for a layout that crops.
+  - **Derivatives are made on first request, not at publish.** The first
+    visitor to each rung pays one resize (tens of ms) and everyone after it
+    gets the cached bytes. Pre-generating at publish would move that cost onto
+    the owner's publish click for widths nobody may ask for; if a real site
+    ever shows a cold-cache problem, the pipeline is already a pure function
+    and can be called ahead of time without changing a URL.
+  - **The `w` descriptor can be optimistic.** The renderer has no access to a
+    photo's real dimensions (the stored model has none, and rendering never
+    touches blob bytes), so the ladder is always offered in full and the
+    *service* refuses to upscale. A 600px photo therefore advertises a 1440w
+    candidate that answers 600px wide. The alternative — storing dimensions on
+    upload — is a model change that belongs with S2.07c's editor, which is the
+    first code that will know them.
+  - No UI in this item, so no i18n strings and no web gate; `web/` is
+    untouched.
+  - No new route prefix (derivatives live under the existing `/assets/img/`),
+    so the production Caddyfile needs nothing. The `alo-sites` container image
+    gains the `image` crate at build time only.
+- **Next:** S2.07c, the image editor — crop and focal controls, manual alt
+  text, and optional propose-then-approve AI alt text from fixtures.

@@ -435,3 +435,130 @@ fn the_unlock_screen_asks_for_a_password_and_reveals_nothing_else() {
         );
     }
 }
+
+/// A published section image is responsive: the ladder in `srcset`, the slot
+/// width in `sizes`, and a `src` that still works for anything that honors
+/// neither. Grid cards defer their load; a hero — often the largest element
+/// painted — does not.
+#[test]
+fn published_section_images_carry_the_derivative_ladder() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [
+            {"type": "hero", "heading": "Roasted here",
+             "image": {"blob_id": "9hK3vQ2mR8pT1xWz4bC5dg", "alt": "The drum"}},
+            {"type": "gallery", "images": [
+                {"blob_id": "9hK3vQ2mR8pT1xWz4bC5dg", "alt": "The drum"}]}
+        ]
+    }));
+    assert!(
+        html.contains(
+            "srcset=\"/assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w480 480w, \
+             /assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w960 960w, \
+             /assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w1440 1440w\""
+        ),
+        "{html}"
+    );
+    assert!(
+        html.contains("sizes=\"(min-width: 70rem) 67.5rem, 100vw\" alt=\"The drum\""),
+        "the hero fills the content column and is not deferred: {html}"
+    );
+    assert!(
+        html.contains(
+            "sizes=\"(min-width: 70rem) 17rem, (min-width: 48rem) 33vw, 100vw\" \
+             loading=\"lazy\" decoding=\"async\""
+        ),
+        "a gallery tile is a card, and cards defer: {html}"
+    );
+    // The unframed fallback stays the original bytes at their own path.
+    assert!(html.contains("<img src=\"/assets/img/9hK3vQ2mR8pT1xWz4bC5dg\" srcset="));
+}
+
+/// A cropped image may not fall back to the unframed original: that is the
+/// picture *before* the owner framed it. Its `src` is the widest derivative,
+/// and every candidate carries the same rectangle.
+#[test]
+fn a_framed_image_falls_back_to_the_frame_never_to_the_whole_photo() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [{"type": "hero", "heading": "Roasted here", "image": {
+            "blob_id": "9hK3vQ2mR8pT1xWz4bC5dg",
+            "alt": "The drum",
+            "crop": {"x_bp": 2500, "y_bp": 1000, "width_bp": 5000, "height_bp": 6000},
+            "focal": {"x_bp": 5000, "y_bp": 4000}
+        }}]
+    }));
+    assert!(
+        html.contains("<img src=\"/assets/img/9hK3vQ2mR8pT1xWz4bC5dg/c2500-1000-5000-6000/w1440\""),
+        "{html}"
+    );
+    assert!(html.contains("/assets/img/9hK3vQ2mR8pT1xWz4bC5dg/c2500-1000-5000-6000/w480 480w"));
+    assert!(
+        !html.contains("src=\"/assets/img/9hK3vQ2mR8pT1xWz4bC5dg\""),
+        "the unframed original is never the fallback of a cropped image: {html}"
+    );
+}
+
+/// The draft preview carries its bytes inline; there is no origin behind the
+/// sandboxed iframe to fetch a derivative from, so it offers no ladder at all
+/// rather than a set of paths that would all 404.
+#[test]
+fn the_inline_preview_offers_no_derivatives() {
+    let map = std::collections::HashMap::from([(
+        "9hK3vQ2mR8pT1xWz4bC5dg".to_owned(),
+        "data:image/png;base64,QUJD".to_owned(),
+    )]);
+    let theme = SiteTheme::new();
+    let site = SiteRenderContext {
+        name: "Nordwind Coffee Roasters",
+        base_url: "https://nordwind.alosites.com",
+        locale: "en",
+        theme: &theme,
+        strings: &EN,
+        images: ImageSources::Inline(&map),
+    };
+    let collections = HashMap::new();
+    let sections = json!({
+        "schema_version": 1,
+        "sections": [{"type": "hero", "heading": "Roasted here", "image": {
+            "blob_id": "9hK3vQ2mR8pT1xWz4bC5dg",
+            "alt": "The drum",
+            "crop": {"x_bp": 2500, "y_bp": 1000, "width_bp": 5000, "height_bp": 6000}
+        }}]
+    });
+    let page = PageRenderContext {
+        path: "/",
+        title: "Home",
+        seo_title: None,
+        seo_description: None,
+        sections: &sections,
+        collections: &collections,
+    };
+    let html = render_page(&site, &page);
+    assert!(html.contains("<img src=\"data:image/png;base64,QUJD\" alt=\"The drum\">"));
+    assert!(
+        !html.contains("srcset") && !html.contains("sizes="),
+        "{html}"
+    );
+}
+
+/// Defense in depth on the new attribute: a stored blob id that the write
+/// gate would never have admitted still cannot close the `srcset` quote and
+/// start an event handler. Every candidate path is escaped exactly like the
+/// `src` beside it.
+#[test]
+fn a_hostile_blob_id_cannot_escape_the_srcset_attribute() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [{"type": "gallery", "images": [
+            {"blob_id": "x\" onerror=\"alert(1)", "alt": "Broken"}]}]
+    }));
+    assert!(
+        !html.contains("onerror=\"alert(1)\""),
+        "the handler must never be an attribute: {html}"
+    );
+    assert!(
+        html.contains("x&quot; onerror=&quot;alert(1)/w480 480w"),
+        "the id renders as inert text inside the attribute: {html}"
+    );
+}

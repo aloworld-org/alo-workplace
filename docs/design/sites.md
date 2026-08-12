@@ -161,6 +161,44 @@ authenticated draft-preview endpoint, so preview and production HTML
 cannot drift. Golden-HTML tests per section type plus a full-page
 golden pin the output.
 
+**Responsive images (S2.07b).** Every section image renders with a
+`srcset` over a fixed three-rung ladder (480/960/1440 px) and a `sizes`
+attribute derived from the slot it sits in — banner, half column, or
+grid card — so the browser picks a candidate before it has any CSS.
+Grid cards additionally carry `loading="lazy"`; a hero never does (it
+is often the largest element painted). The URL grammar lives in one
+module (`alo_sites::images`) read by three parties who must not drift:
+the renderer writes the paths, `RenderedSite` collects the same paths
+into the servable set, and the service parses one back.
+
+```
+/assets/img/<blob>                      the uploaded bytes, unframed
+/assets/img/<blob>/w960                 the whole image at 960px
+/assets/img/<blob>/c<x>-<y>-<w>-<h>/w960   a crop of it at 960px
+```
+
+Three rules make the pipeline safe. **Nothing is decoded that the
+publish did not reference** — membership in the served publish's own
+variant set is checked before any read, so a derivative cannot be
+*asked* for, only *offered* (a query-parameter resizer is a CPU
+amplifier pointed at its own origin). **Decoding is bounded**: a source
+over 16 MB or 120 megapixels is never decoded, and the resize runs on
+the blocking pool, so a hostile or slow image costs one request rather
+than the runtime. **The answer is never worse than the original**:
+nothing is upscaled, nothing that came out larger than its source is
+served, and a source this build cannot decode (SVG, GIF, AVIF, ICO)
+serves its original bytes under the derivative path. Derivatives are
+cached in memory keyed by *site* + path — a blob id is unique only
+inside a tenant — and are immutable, so they carry the same
+`max-age=3600` + `ETag` contract as the original.
+
+A cropped image's `src` fallback is the widest derivative, not the
+original: the original is the picture *before* the owner framed it, and
+a client that ignores `srcset` must not show what was cropped away. The
+draft preview offers no ladder at all — it inlines `data:` URIs, and
+there is no origin behind the sandboxed iframe to fetch a second copy
+from.
+
 ### Two services, one boundary
 
 - **`alo-jmap`** (existing, authenticated): all editing/management —
@@ -470,9 +508,9 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
 - Free-form design tools / pixel canvas, custom code injection,
   template marketplace, third-party embeds or trackers of any kind
   (ADR 0036 non-goals; the analytics promise depends on it).
-- Responsive image derivatives (S2 — a later slice). Version history,
-  rollback, whole-site AI translation, scheduled publishing and
-  password-protected pages have since shipped and are described above.
+- Version history, rollback, whole-site AI translation, scheduled
+  publishing, password-protected pages and responsive image derivatives
+  have since shipped and are described above.
 - CRM lead creation from form submissions (waits for business-track
   B2; the seam is the stored submission).
 - Production serving infrastructure: the public domain and wildcard DNS are

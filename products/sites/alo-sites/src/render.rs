@@ -22,7 +22,7 @@ mod strings;
 pub use strings::{EN, FR, NL, UiStrings, strings_for};
 
 use alo_store::SiteCollectionSnapshot;
-use alo_store::site_model::{SECTIONS_SCHEMA_VERSION, Section};
+use alo_store::site_model::{SECTIONS_SCHEMA_VERSION, Section, SiteImage};
 use alo_store::site_theme::SiteTheme;
 
 use html::{esc, img_src};
@@ -71,6 +71,31 @@ impl ImageSources<'_> {
             ImageSources::Inline(map) => map
                 .get(blob_id)
                 .map_or_else(|| img_src(blob_id), |uri| esc(uri)),
+        }
+    }
+
+    /// The attribute-ready `src` and `srcset` for a framed section image.
+    ///
+    /// Public serving offers the derivative ladder ([`crate::images`]) and, for
+    /// a cropped photo, falls back to the widest derivative rather than to the
+    /// unframed original. The draft preview carries one inlined `data:` URI
+    /// per image and offers no ladder at all: there is no origin behind the
+    /// sandboxed iframe to fetch a second copy from, and an image the preview
+    /// cannot inline degrades to the public path exactly as before.
+    pub(crate) fn figure_src(&self, image: &SiteImage) -> (String, Option<String>) {
+        match self {
+            ImageSources::PublicPaths => {
+                let srcset = crate::images::candidates(image)
+                    .into_iter()
+                    .map(|candidate| format!("{} {}w", esc(&candidate.path), candidate.width))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                (
+                    esc(&crate::images::fallback_path(image)),
+                    (!srcset.is_empty()).then_some(srcset),
+                )
+            }
+            ImageSources::Inline(_) => (self.src(image.blob_id.as_str()), None),
         }
     }
 }

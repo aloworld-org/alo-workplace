@@ -79,7 +79,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.06a Password-protected pages: strong password hashing, anonymous challenge/session gate, cache-safe responses, rate limiting, and security tests.
 - [x] S2.06b Password UI: visible protect/remove controls, clear public-preview state, and accessible visitor unlock screen.
 - [x] S2.07a Image presentation model: crop rectangle, focal point, and alt text on image-bearing sections with backwards-compatible validation.
-- [ ] S2.07b Responsive images: safe derivative pipeline and published `srcset`/`sizes`; byte/cache/XSS tests and public goldens.
+- [x] S2.07b Responsive images: safe derivative pipeline and published `srcset`/`sizes`; byte/cache/XSS tests and public goldens.
 - [ ] S2.07c Image editor: crop/focal controls, manual alt text, and optional propose-then-approve AI alt text using fixtures only.
 - [ ] S2.08a Analytics dimensions: aggregate UTM campaign, coarse country, device class, entry/exit, read-time buckets, and outbound clicks while discarding raw IP/UA/query.
 - [ ] S2.08b Analytics UI: calm overview and drill-down surfaces for the new aggregates, with privacy explanation and useful empty states.

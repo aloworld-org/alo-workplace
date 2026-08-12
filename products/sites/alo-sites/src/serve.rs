@@ -15,6 +15,10 @@
 //! - `/assets/img/<blob_id>` serves image bytes for exactly the blob ids
 //!   the served publish references (tenant-scoped through the resolved
 //!   site); immutable per id, so `max-age=3600` with the id as `ETag`.
+//! - `/assets/img/<blob_id>/[c<crop>/]w<width>` serves one derivative of such
+//!   an image — the frame and the width the publish's own `srcset` names, and
+//!   only those ([`crate::images`], [`derivative`]). Immutable per path, so
+//!   the same validator and lifetime as the original.
 //! - Unknown host → the generic not-found (identical for unknown and
 //!   unpublished — no existence leak). Unknown path on a live site → the
 //!   site's themed not-found. Both `404`, `no-cache`.
@@ -30,6 +34,7 @@ mod analytics;
 mod blog;
 mod cache;
 pub mod config;
+pub mod derivative;
 mod forms;
 mod host;
 mod rate;
@@ -59,6 +64,9 @@ pub struct AppState {
     cache: cache::SiteCache,
     /// The one body every host-level miss serves (built once).
     unknown_host: String,
+    /// Resized images by tenant and derivative path, so a photo is decoded
+    /// once per width rather than once per visitor.
+    derivatives: cache::DerivativeCache,
     /// Per-client budget on the form-submit path (in-memory, transient).
     rate: rate::RateLimiter,
     /// The separate, tighter budget on password guesses at protected pages.
@@ -87,6 +95,7 @@ impl AppState {
             store,
             sites_domain,
             cache: cache::SiteCache::default(),
+            derivatives: cache::DerivativeCache::default(),
             unknown_host: rendered::unknown_host_not_found(&EN),
             rate: rate::RateLimiter::default(),
             unlock_rate: rate::RateLimiter::with_budget(
@@ -320,7 +329,29 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     // this publish references (`RenderedSite::serves_image`), read
     // tenant-scoped through the resolved site. Anything else — foreign,
     // unreferenced, or non-image — is the site's themed 404.
-    if let Some(blob_id) = path.strip_prefix("/assets/img/") {
+    if let Some(blob_id) = path.strip_prefix(crate::images::IMAGE_PATH_PREFIX) {
+        // A derivative asks for a frame and a width on top of a blob id. Only
+        // the exact derivatives this publish's own pages reference exist: the
+        // membership check comes before any read, let alone any decode.
+        if blob_id.contains('/') {
+            if !site.serves_variant(blob_id) {
+                tracing::debug!(host = %public_host, "image derivative not referenced by the served publish");
+                return not_found(site.not_found.clone());
+            }
+            let Some(request) = crate::images::parse_variant(blob_id) else {
+                tracing::warn!(host = %public_host, "a referenced derivative path did not parse");
+                return not_found(site.not_found.clone());
+            };
+            return serve_derivative(
+                &state,
+                &resolved,
+                blob_id,
+                &request,
+                req.headers(),
+                site.not_found.clone(),
+            )
+            .await;
+        }
         let referenced = if site.serves_image(blob_id) {
             true
         } else {
@@ -455,6 +486,90 @@ async fn serve_image(
             unavailable()
         }
     }
+}
+
+/// Serves one derivative of a referenced image: the frame and width the
+/// publish's own `srcset` asked for.
+///
+/// The bytes are a pure function of (blob, crop, width) — all three in the
+/// URL — so the path is its own validator and the same cache contract as the
+/// original applies. The resize runs on the blocking pool: it is CPU-bound on
+/// untrusted input, and a decoder that panics or hangs must cost one request,
+/// not the runtime. Anything the pipeline declines (a vector, an animation, a
+/// photo already narrower than the rung) serves the original bytes under the
+/// derivative's own path, which is what the `srcset` fallback expects.
+async fn serve_derivative(
+    state: &Arc<AppState>,
+    resolved: &alo_store::PublishedSite,
+    key: &str,
+    request: &crate::images::DerivativeRequest,
+    req_headers: &axum::http::HeaderMap,
+    site_not_found: String,
+) -> Response {
+    let etag = format!("\"img:{key}\"");
+    if if_none_match_hits(req_headers.get(header::IF_NONE_MATCH), &etag) {
+        return image_response(StatusCode::NOT_MODIFIED, None, &etag, Vec::new());
+    }
+    // The cache is keyed by the resolved site, not by the blob id alone: a
+    // blob id is only unique inside its tenant, and a site belongs to exactly
+    // one — so no host can ever read another tenant's pixels out of the map.
+    let scope = resolved.site.as_str();
+    if let Some(cached) = state.derivatives.get(scope, key) {
+        return image_response(
+            StatusCode::OK,
+            Some(cached.content_type),
+            &etag,
+            cached.bytes.to_vec(),
+        );
+    }
+    let source = match state
+        .store
+        .published_image(resolved, &request.blob_id)
+        .await
+    {
+        Ok(Some(source)) => source,
+        Ok(None) => {
+            tracing::warn!(site = %resolved.site, "referenced image blob is not servable");
+            return not_found(site_not_found);
+        }
+        Err(error) => {
+            tracing::error!(site = %resolved.site, %error, "image read failed");
+            return unavailable();
+        }
+    };
+    let crop = request.crop;
+    let width = request.width;
+    let produced = {
+        let source = source.clone();
+        tokio::task::spawn_blocking(move || derivative::derive(&source, crop, width)).await
+    };
+    let served = match produced {
+        Ok(Some(derived)) => cache::CachedImage {
+            content_type: derived.content_type,
+            bytes: derived.bytes,
+        },
+        Ok(None) => cache::CachedImage {
+            content_type: source.content_type,
+            bytes: source.bytes,
+        },
+        Err(error) => {
+            // A panicking decoder is one bad image, not an outage: the
+            // original bytes are still a correct answer for this path.
+            tracing::error!(site = %resolved.site, %error, "image derivation task failed");
+            cache::CachedImage {
+                content_type: source.content_type,
+                bytes: source.bytes,
+            }
+        }
+    };
+    let served = Arc::new(served);
+    state.derivatives.put(scope, key, Arc::clone(&served));
+    image_response(
+        StatusCode::OK,
+        Some(served.content_type),
+        &etag,
+        served.bytes.to_vec(),
+    )
 }
 
 /// A 200/304 for an image: revalidatable for an hour, `nosniff`, and a CSP

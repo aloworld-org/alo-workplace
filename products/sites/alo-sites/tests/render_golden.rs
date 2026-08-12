@@ -12,9 +12,10 @@ use alo_sites::render::{EN, ImageSources, PageRenderContext, SiteRenderContext, 
 use alo_store::id::{BlobId, SiteCollectionId};
 use alo_store::site_model::{
     CollectionSection, ContactFormSection, CtaSection, FaqItem, FaqSection, FeatureItem,
-    FeaturesSection, FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection,
-    PricingSection, PricingTier, SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, SiteImage,
-    TeamMember, TeamSection, Testimonial, TestimonialsSection, TextImageSection,
+    FeaturesSection, FooterSection, GallerySection, HeroSection, ImageCrop, ImageFocalPoint,
+    ImageSide, Link, NavSection, PricingSection, PricingTier, SECTIONS_SCHEMA_VERSION, Section,
+    SectionsEnvelope, SiteImage, TeamMember, TeamSection, Testimonial, TestimonialsSection,
+    TextImageSection,
 };
 use alo_store::site_theme::SiteTheme;
 use alo_store::{SiteCollectionItem, SiteCollectionSnapshot};
@@ -63,7 +64,10 @@ fn full_sections() -> Vec<Section> {
         }),
         Section::Gallery(GallerySection {
             heading: Some("Inside the roastery".to_owned()),
-            images: vec![image.clone()],
+            // The second tile is framed (S2.07a): the golden pins what a crop
+            // spells in a `srcset`, and that its `src` fallback is the framed
+            // derivative rather than the unframed original.
+            images: vec![image.clone(), cropped_image()],
         }),
         Section::Testimonials(TestimonialsSection {
             heading: Some("What cafés say".to_owned()),
@@ -122,6 +126,24 @@ fn full_sections() -> Vec<Section> {
             links: vec![link("Imprint", "/imprint"), link("Privacy", "/privacy")],
         }),
     ]
+}
+
+/// A framed photo: the right two-thirds of the source, focal point on the
+/// left of that rectangle.
+fn cropped_image() -> SiteImage {
+    SiteImage {
+        crop: Some(ImageCrop {
+            x_bp: 3333,
+            y_bp: 0,
+            width_bp: 6667,
+            height_bp: 10000,
+        }),
+        focal: Some(ImageFocalPoint {
+            x_bp: 4000,
+            y_bp: 5000,
+        }),
+        ..SiteImage::new(BlobId::new("Cr0pp3dPh0t0aaaaaaaaaa"), "The cupping table")
+    }
 }
 
 fn collection_snapshots() -> HashMap<String, SiteCollectionSnapshot> {
