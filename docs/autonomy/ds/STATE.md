@@ -85,3 +85,51 @@ rejections from `sites/Theme.test.tsx`; pre-existing, another track's area,
 non-failing.
 
 **Next:** D1.04 `Toolbar`.
+
+## D1.04 — `Toolbar`
+
+Eleven copies, and **four were byte-identical** again — crm, finance,
+inventory, projects, right down to the `flex-wrap`. That is the base. The rest
+differed in three ways worth keeping and no others: whether the row draws
+chrome (`surface` — nothing, agenda/tasks/mail's rule-under-a-bar, billing's
+raised card), how tight the gap is (`density`), and whether controls line up on
+their centres or their baselines (`align="end"`, hr's row of labelled fields).
+
+Reconciled rather than offered: one separator colour (`--border-subtle`, what
+every other rule in the system uses — agenda and tasks had drifted to
+`--border-default` via a hardcoded `1px`), and one cluster gap (`--space-1`;
+mail's formatting bar packed its buttons at `var(--border-width)`, a token
+doing duty as a length).
+
+What none of the eleven had:
+
+- **A name or a role.** Every one was a bare `<div>`. `tasks` has two on one
+  screen (`.toolbar` and `.toolbar2`) which from the outside are
+  indistinguishable. `label` is required.
+- **Wrapping.** Seven could not wrap, so at phone width their last controls sat
+  outside the pane — gone, not merely unseen (WCAG 1.4.10). Wrapping is the
+  base, and `ToolbarGroup` is what stops a wrap landing in the middle of a
+  segmented control.
+- **Arrow keys.** mail's formatting bar is a dozen icon buttons, so a dozen tab
+  stops between the message list and the message body.
+
+`keyboard` is a choice rather than a default, and that is the one judgement
+call in the item. APG's `role="toolbar"` — one tab stop, arrows inside — assumes
+a toolbar of buttons; most of ours also hold a search field or a select, where
+arrow keys belong to the caret. So `tab` (default) is a named `role="group"`
+with every control keeping its tab stop, and `keyboard="roving"` opts into the
+toolbar role *and* the behaviour that role promises: roving tabindex, arrows,
+Home/End, disabled controls skipped, and a control that appears later arriving
+outside the tab order. Announcing a role without its keyboard model would be a
+promise the component does not keep.
+
+Also `ToolbarSpacer` (three copies had it, all `flex: 1`) and `ToolbarDivider`.
+
+Verified: 9 behaviour tests; `npm run build` (tsc + vite) clean, `npx eslint`
+clean, `prettier --check` clean, `npx vitest run src` green — 71 files, 646
+tests. No screenshot: like `Table`, the component has no caller until the D2
+migrations, so the visual check lands with the first adoption. The 4 unhandled
+rejections from `sites/Theme.test.tsx` are still there — pre-existing, another
+track's area, non-failing.
+
+**Next:** D1.05 `Select`.
