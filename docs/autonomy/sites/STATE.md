@@ -3695,3 +3695,95 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.09a, aggregate heatmap collection — bounded click coordinates
   and scroll-depth buckets with no visitor or session identity, with the schema
   privacy proof and the abuse caps.
+
+## 2026-08-12 — S2.09a a heatmap that cannot become a journey
+
+- **Item:** S2.09a, aggregate heatmap collection. A published page now reports
+  **where it was clicked** and **how far down it was read**, and both arrive
+  reduced past the point where they could describe a person.
+- **The reduction is the design, not a formatting step.** A click is sent as
+  permille of the page's own width and height and becomes one cell of a fixed
+  **32 x 64 grid**; a scroll becomes one of **ten tenths**; the reported CSS
+  pixel width becomes one of `phone`/`tablet`/`desktop` and the number is
+  dropped at the boundary that read it. `HeatmapCell` and `ScrollDepth` have
+  private fields and one total constructor each, so there is no type in the
+  store that can hold a coordinate at all.
+- **`site_analytics_heatmap_daily`** (migration 0306) is the strictest
+  analytics table we keep: tenant, site, day, path, viewport, metric, grid_x,
+  grid_y, hits — **no visitor column, not even the day-scoped token page views
+  carry**, no session, no time of day. A `CHECK` pins scroll rows to
+  `grid_x = 0` and a bucket in 0..9, so "a scroll is a tenth" is a schema fact
+  rather than a convention. The privacy proof is a test that reads
+  `information_schema` and pins the column set exactly.
+- **The one key a browser names is the page path**, so distinct paths per site
+  and day are capped at 100 — dropped past the cap rather than folded into an
+  overflow bucket, because a heatmap of "some other page" would be an overlay
+  over nothing. The path is canonicalized to the exact shape a page view is
+  counted under (`/about/` → `/about`), and anything that is not an absolute
+  page path (a URL, a query string, a fragment, whitespace, control
+  characters) is a `400`, never repaired.
+- **Second abuse bound, in the page:** the beacon reports at most **twenty
+  clicks per page view**, and the scroll depth only when it is deeper than the
+  last one sent, alongside the read time at hide/unload. The endpoint's own
+  per-address budget (120 per ten minutes, separate from forms and unlock)
+  still stands behind it.
+- **Owner read:** `GET /sites/{id}/heatmap?days=30[&path=/prices]` in a new
+  `sites_heatmap` module — the pages that have data (a menu, so nobody has to
+  remember a URL) and, for a named page, the grid, its dimensions, and the
+  depth curve with all ten tenths kept. Cells are sparse; the curve is not.
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-sites -p alo-jmap --all-targets` — zero warnings from this change (the
+  one `meet.rs` unused-variable warning is pre-existing, another track's area).
+  Whole `alo-sites` suite green (34 unit + every golden), including the new
+  3-test `tests/heatmap.rs` and the 4 new unit tests in `serve/heatmap.rs` and
+  `serve/beacon.rs`; `alo-store`'s new 2-test `site_heatmap_tenancy` green
+  (wrong-tenant in both directions, the cap, the schema proof). Full
+  `cargo test -p alo-store -p alo-jmap` re-run to completion after the wire
+  check: **181 suites, 2 738 tests, zero failures**.
+- **Goldens re-blessed:** the beacon script grew, so all 18 published-page
+  goldens carrying it were regenerated from the constant; its byte budget went
+  from 1 KB to 2 KB and is still pinned (the whole page-script budget is now
+  ~2.6 KB).
+- **Wire-verified with real curl**, both binaries running locally against
+  docker `alo-pg` (killed before and after): a site published through
+  `alo-jmap`, then on the public Host — three clicks and two scrolls each
+  `204` with `no-store` and no cookie; the stored rows are exactly
+  `/prices phone click 16,16 x2`, `/prices desktop click 0,63`, `/prices phone
+  scroll bucket 8`, `/prices desktop scroll bucket 1`. Nine malformed or
+  hostile bodies (no page, no viewport, half a click, a negative number, a
+  decimal, a URL as the path, a query string, markup) are all `400`; an
+  unknown Host `404`, a 700-byte body `413`, a `GET` `405`. The 121st beacon
+  from one address is `429` while another address is still `204`. A `psql`
+  scan of the site's rows for an address, markup, a raw width or a query
+  string returned zero. The owner report answered the path menu (126 events),
+  the grid `32x64`, per-viewport cells and the ten-tenth curve; `401`
+  unauthenticated, `422` for `days=0` and for `path=prices`, `404` for a site
+  id that is not the caller's — and a **second real tenant** asking for this
+  site's heatmap gets the same `404`.
+- **Cuts/flags:**
+  - **The grid is over the whole scrollable page, not the viewport.** That is
+    what makes a cell mean the same thing on two screens, but it means the UI
+    (S2.09b) must draw the overlay against a full-page screenshot or a
+    proportional box — not against a phone-height viewport.
+  - **A click count and a page-view count are not comparable**, exactly as
+    S2.08a2 flagged for read time: browsers without `sendBeacon` report
+    nothing, and the twenty-click cap truncates the busiest sessions. The
+    overlay is a shape, never a rate.
+  - **Minimum-sample suppression is not enforced by the store.** The read
+    returns whatever was collected, including a page with one click. S2.09b
+    owns the suppression threshold and must not present a two-click grid as a
+    heatmap.
+  - **The path cap drops silently.** A site past 100 pages in a day gets no
+    row for the 101st page and no signal that it happened; acceptable for an
+    aggregate, worth a note if a real customer ever runs a site that wide.
+  - **No new top-level route prefix in production**: `/_alo/collect` is
+    unchanged and `/sites/*` is already proxied. The production Caddyfile
+    needs nothing.
+  - The first `cargo test -p alo-store -p alo-jmap` run of this iteration was
+    killed by my own `pkill -f "[a]lo-jmap"` before the wire check — that
+    pattern also matches `cargo test … -p alo-jmap`. Kill the built binary by
+    path (`pkill -f "target/debug/alo-jmap"`) instead; noted here because it
+    cost an hour of test time.
+- **Next:** S2.09b, the heatmap UI — page/viewport overlays over the full-page
+  grid, minimum-sample suppression, keyboard-accessible summaries of what the
+  overlay says, and empty states for a page nobody has clicked yet.

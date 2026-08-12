@@ -1,8 +1,8 @@
 //! The public HTTP surface (ADR 0036, `docs/design/sites.md`): resolve the
 //! Host header to one tenant's live site, serve its published snapshots, and
 //! accept contact-form submissions (`POST /f/{form_id}`, the [`forms`]
-//! module) and page-beacon reports (`POST /_alo/collect`, the [`beacon`]
-//! module) — nothing else. The service holds no session — its whole tenant
+//! module) and page-beacon reports (`POST /_alo/collect`, the [`beacon`] and
+//! [`heatmap`] modules) — nothing else. The service holds no session — its whole tenant
 //! scope is the [`host`] lookup's result (or, for a submission, the posted
 //! form id's own resolution) — and it is deliberately terse on the wire:
 //! misses are one uniform not-found, errors carry no internals.
@@ -38,6 +38,7 @@ mod cache;
 pub mod config;
 pub mod derivative;
 mod forms;
+mod heatmap;
 mod host;
 /// The public surface's anti-abuse budgets. Public because they are an
 /// operational contract — an operator sizing a proxy, and the tests that pin

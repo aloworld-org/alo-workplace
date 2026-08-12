@@ -9,6 +9,17 @@ contracts.
 
 ## Unreleased
 
+- **Your published pages now count where visitors click and how far down they
+  read** — the raw material for the heatmap screen that follows. A click is
+  counted as one square of a coarse grid over the page and a scroll as one
+  tenth of it, kept separately for phones, tablets and desktops because a page
+  reflows. As with every other number in your website statistics, nothing that
+  could identify a reader is kept: no cookie, no session, no time of day, and
+  no pointer position — two clicks by one visitor cannot be told apart from one
+  click by two visitors. Pages your visitors' browsers name are capped at a
+  hundred per day, so nobody can flood your statistics with pages you never
+  published.
+
 - **Your website statistics screen now shows everything it counts, grouped so
   it can be read at a glance.** Under the visit chart there are now three
   groups — how people found you (referrers, campaigns, countries), what they

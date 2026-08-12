@@ -59,25 +59,36 @@ pub(super) const BEHAVIOR_SCRIPT: &str = r#"<script>(function () {
 /// The analytics beacon, appended to every **published** page (never to the
 /// authenticated draft preview, the unlock screen, or the 404 page).
 ///
-/// It reports the only two traffic dimensions a server cannot see for itself:
-/// how long the page stayed readable, and which outside domain a visitor
-/// followed a link to. Everything else about a visit is already derived from
-/// the request at the door (`crate::serve::analytics`) — and stays derived
-/// there, because a script is easier to lie to than a socket.
+/// It reports the four traffic dimensions a server cannot see for itself: how
+/// long the page stayed readable, which outside domain a visitor followed a
+/// link to, where the page was clicked, and how far down it was read.
+/// Everything else about a visit is already derived from the request at the
+/// door (`crate::serve::analytics`) — and stays derived there, because a
+/// script is easier to lie to than a socket.
 ///
 /// What it deliberately does not do:
 ///
 /// - **It carries no identity.** No cookie, no storage, no id of any kind —
 ///   not even the opaque daily token page views are counted with. The collect
 ///   endpoint cannot join two beacons from one browser, by construction.
-/// - **It names no page.** A read time is a fact about the site's day, not
-///   about `/prices` at 14:03, and the endpoint has no field to put a path in.
+/// - **It names no page for the read time.** A read time is a fact about the
+///   site's day, not about `/prices` at 14:03. A heatmap event is the one
+///   report that must name its page — an overlay is drawn over one page — and
+///   it names nothing else: a click is sent as a position in permille of the
+///   page, which the door reduces to one cell of a coarse grid.
+/// - **It sends a size, never a screen.** The viewport width goes with a
+///   heatmap event because a layout that reflows makes a shared grid
+///   meaningless; the door reduces it to one of three classes and drops the
+///   number.
 /// - **It reports the read time once**, when the page is first hidden or
 ///   unloaded — "how long they read before looking away". A visitor who comes
-///   back and reads on is not counted twice.
+///   back and reads on is not counted twice. The scroll depth goes with it,
+///   and only when it is deeper than the last one sent.
+/// - **It reports at most twenty clicks per page view**, so a page nobody can
+///   stop clicking costs the endpoint twenty beacons and not twenty thousand.
 /// - **It is not required for a page view to count.** Views are recorded by
 ///   the server; a visitor with scripting switched off is fully counted, minus
-///   these two dimensions.
+///   these four dimensions.
 ///
 /// Like [`BEHAVIOR_SCRIPT`] this is a static constant with zero user data
 /// interpolated, which is what makes inlining it XSS-safe.
@@ -86,12 +97,25 @@ pub(crate) const BEACON_SCRIPT: &str = r#"<script>(function () {
   var since = Date.now();
   var read = 0;
   var reported = false;
+  var clicks = 0;
+  var depth = 0;
+  var page = "&p=" + encodeURIComponent(location.pathname) + "&w=";
   function send(body) {
     if (navigator.sendBeacon) { navigator.sendBeacon("/_alo/collect", body); }
   }
+  function permille(value, total) {
+    return total > 0 ? Math.max(0, Math.min(1000, Math.round((value / total) * 1000))) : 0;
+  }
+  function height() {
+    var body = document.body;
+    return Math.max(document.documentElement.scrollHeight, body ? body.scrollHeight : 0);
+  }
+  function shape() { return page + Math.round(window.innerWidth || 0); }
   function record() {
     read += Date.now() - since;
     since = Date.now();
+    var reach = permille(window.scrollY + window.innerHeight, height());
+    if (reach > depth) { depth = reach; send("d=" + reach + shape()); }
     if (reported) { return; }
     reported = true;
     send("t=" + Math.round(read / 1000));
@@ -105,6 +129,11 @@ pub(crate) const BEACON_SCRIPT: &str = r#"<script>(function () {
     var link = target && target.closest ? target.closest("a[href]") : null;
     if (link && link.hostname && link.hostname !== location.hostname) {
       send("o=" + encodeURIComponent(link.hostname));
+    }
+    if (clicks < 20 && typeof event.pageX === "number") {
+      clicks += 1;
+      send("x=" + permille(event.pageX, document.documentElement.scrollWidth) +
+        "&y=" + permille(event.pageY, height()) + shape());
     }
   }, true);
 })();</script>
@@ -125,7 +154,7 @@ mod tests {
             BEHAVIOR_SCRIPT.len()
         );
         assert!(
-            BEACON_SCRIPT.len() < 1024,
+            BEACON_SCRIPT.len() < 2048,
             "beacon script is {} bytes",
             BEACON_SCRIPT.len()
         );

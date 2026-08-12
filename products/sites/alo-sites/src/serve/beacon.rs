@@ -1,11 +1,11 @@
 //! `POST /_alo/collect` — the collect endpoint of the published page's
 //! analytics beacon ([`crate::render::script::BEACON_SCRIPT`]).
 //!
-//! Two dimensions exist only in a browser: how long a page stayed readable,
-//! and which outside domain a visitor followed a link to. Everything else in
-//! the traffic report is derived from the request at the door
-//! ([`super::analytics`]) and stays there — this endpoint exists precisely
-//! because those two cannot be.
+//! Four dimensions exist only in a browser: how long a page stayed readable,
+//! which outside domain a visitor followed a link to, where the page was
+//! clicked, and how far down it was read. Everything else in the traffic
+//! report is derived from the request at the door ([`super::analytics`]) and
+//! stays there — this endpoint exists precisely because those cannot be.
 //!
 //! That makes it the one public write with no page load behind it, so its
 //! whole design is about what it *cannot* be used for:
@@ -19,8 +19,11 @@
 //!   construction, which is why these aggregates carry a hit count and no
 //!   unique count.
 //! - **Tiny and bounded.** The body may be [`BEACON_BODY_MAX_BYTES`]; the
-//!   only two keys are `t` (seconds, bucketed server-side) and `o` (a DNS
-//!   host, folded to a bounded lowercase label); anything else is a `400`.
+//!   keys are `t` (seconds, bucketed server-side), `o` (a DNS host, folded to
+//!   a bounded lowercase label), and the heatmap set — `p` (the page), `w`
+//!   (a viewport width, reduced to one of three classes and discarded), `x`
+//!   and `y` (a click, in permille of the page, reduced to one grid cell), and
+//!   `d` (a scroll depth, reduced to one tenth). Anything else is a `400`.
 //! - **Rate-limited per client**, on its own budget, so beacon traffic can
 //!   never spend the budget that stands between a guesser and a protected
 //!   page or a flood and a form.
@@ -39,14 +42,19 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use time::OffsetDateTime;
 
-use alo_store::{PublicSiteSignal, ReadTimeBucket};
+use alo_store::{PublicSiteHeatmapReport, PublicSiteSignal, ReadTimeBucket};
 
 use super::AppState;
+use super::heatmap::HeatmapReport;
 
-/// The most a beacon body may carry. A real one is under thirty bytes
-/// (`t=137`, or `o=` and a domain); this leaves room for a long
-/// percent-encoded punycode host and nothing else.
+/// The most a beacon body may carry. A real one is under fifty bytes (`t=137`,
+/// `o=` and a domain, or a click on a short path); this leaves room for a long
+/// percent-encoded punycode host or page path and nothing else.
 pub(super) const BEACON_BODY_MAX_BYTES: usize = 512;
+
+/// The most key/value pairs a body may hold. The largest report uses four
+/// (`x`, `y`, `p`, `w`); the bound keeps a padded body from costing a scan.
+const BEACON_MAX_PAIRS: usize = 8;
 
 /// The most a domain label may be, matching the store's referrer bound.
 const DOMAIN_MAX_LEN: usize = 253;
@@ -59,6 +67,8 @@ enum Report {
     ReadSeconds(u64),
     /// The DNS host a visitor left for, already folded to storage shape.
     Outbound(String),
+    /// A click cell or a scroll depth on one named page ([`super::heatmap`]).
+    Heatmap(HeatmapReport),
 }
 
 /// Handles one beacon POST: rate limit, parse, resolve the Host, write one
@@ -106,18 +116,40 @@ pub(super) async fn collect(State(state): State<Arc<AppState>>, request: Request
         }
     };
 
-    let signal = match &report {
-        Report::ReadSeconds(seconds) => {
-            PublicSiteSignal::ReadTime(ReadTimeBucket::from_seconds(*seconds))
-        }
-        Report::Outbound(domain) => PublicSiteSignal::Outbound(domain),
-    };
     let day = OffsetDateTime::now_utc().date();
-    if let Err(error) = state
-        .store
-        .record_public_site_signal(&resolved, day, signal)
-        .await
-    {
+    let written = match &report {
+        Report::ReadSeconds(seconds) => {
+            state
+                .store
+                .record_public_site_signal(
+                    &resolved,
+                    day,
+                    PublicSiteSignal::ReadTime(ReadTimeBucket::from_seconds(*seconds)),
+                )
+                .await
+        }
+        Report::Outbound(domain) => {
+            state
+                .store
+                .record_public_site_signal(&resolved, day, PublicSiteSignal::Outbound(domain))
+                .await
+        }
+        Report::Heatmap(heatmap) => {
+            state
+                .store
+                .record_public_site_heatmap(
+                    &resolved,
+                    &PublicSiteHeatmapReport {
+                        day,
+                        path: &heatmap.path,
+                        viewport: heatmap.viewport,
+                        signal: heatmap.signal,
+                    },
+                )
+                .await
+        }
+    };
+    if let Err(error) = written {
         // A metrics outage is not a site outage, and the beacon's sender
         // cannot act on the difference — but the operator can.
         tracing::warn!(site = %resolved.site, %error, "site beacon write failed");
@@ -143,18 +175,24 @@ fn terse(status: StatusCode) -> Response {
 ///
 /// Exactly one report per request: the first recognized, well-formed key
 /// wins, and a body with no such key is refused rather than silently ignored.
+/// A heatmap report needs several keys together ([`super::heatmap`]), so its
+/// marker key hands the whole pair list over rather than reading one value.
 fn parse(body: &str) -> Option<Report> {
-    body.split('&')
+    let pairs = body
+        .split('&')
         .filter_map(|pair| pair.split_once('='))
-        .find_map(|(key, value)| match key {
-            // Bounded before parsing: a thousand-digit number is not a
-            // duration, and refusing it here keeps the parse total.
-            "t" if !value.is_empty() && value.len() <= 7 => {
-                value.parse::<u64>().ok().map(Report::ReadSeconds)
-            }
-            "o" => safe_domain(&super::analytics::decode_form_value(value)).map(Report::Outbound),
-            _ => None,
-        })
+        .take(BEACON_MAX_PAIRS)
+        .collect::<Vec<_>>();
+    pairs.iter().find_map(|&(key, value)| match key {
+        // Bounded before parsing: a thousand-digit number is not a
+        // duration, and refusing it here keeps the parse total.
+        "t" if !value.is_empty() && value.len() <= 7 => {
+            value.parse::<u64>().ok().map(Report::ReadSeconds)
+        }
+        "o" => safe_domain(&super::analytics::decode_form_value(value)).map(Report::Outbound),
+        "x" | "d" => super::heatmap::parse(&pairs).map(Report::Heatmap),
+        _ => None,
+    })
 }
 
 /// Folds a browser-reported hostname into the bounded lowercase DNS host
@@ -241,6 +279,23 @@ mod tests {
         }
         let long = format!("o={}.example", "a".repeat(DOMAIN_MAX_LEN));
         assert_eq!(parse(&long), None);
+    }
+
+    #[test]
+    fn a_heatmap_report_needs_its_whole_set_of_keys() {
+        // The marker key hands the body to the heatmap parser, which decides
+        // whether the rest of it forms a report at all.
+        assert!(matches!(
+            parse("x=500&y=250&p=%2Fprices&w=1440"),
+            Some(Report::Heatmap(_))
+        ));
+        assert!(matches!(
+            parse("d=880&p=%2Fprices&w=390"),
+            Some(Report::Heatmap(_))
+        ));
+        assert_eq!(parse("x=500&y=250"), None, "a click with no page");
+        assert_eq!(parse("d=880&w=1440"), None, "a scroll with no page");
+        assert_eq!(parse("p=%2Fprices&w=1440"), None, "a page with no event");
     }
 
     #[test]

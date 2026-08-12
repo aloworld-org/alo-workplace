@@ -168,26 +168,53 @@ store's tenancy doors; ids are newtypes; timestamps are
   are counted under the literal bucket `other`, which cannot be mistaken for a
   domain because a stored domain always contains a dot.
 
+- **`site_analytics_heatmap_daily`** — (tenant, site, date, path, viewport
+  class, metric, grid column, grid row, hit count): *where* a published page
+  was clicked and *how far down* it was read. Both are beacon-reported like
+  the two dimensions above, and both are reduced before they are stored: a
+  click becomes one cell of a fixed **32 x 64 grid** over the whole scrollable
+  page (never a coordinate), a scroll becomes one of **ten tenths**, and the
+  reported CSS pixel width becomes one of `phone`, `tablet`, `desktop` (never
+  a size — a viewport width is a fingerprinting signal). There is **no visitor
+  column in this table at all**, not even the day-scoped token, and no time of
+  day: two clicks by one reader are indistinguishable from one click by two
+  readers the moment they are written. The page path is the one key a
+  *browser* names, so distinct paths per site and day are capped at 100; past
+  that a new page is dropped rather than folded into an overflow bucket,
+  because a heatmap of "some other page" would be an overlay over nothing.
+  Owners read it through `GET /sites/{id}/heatmap`, which answers the pages
+  that have data and, for one named page, the grid and the depth curve.
+
 ### The page beacon
 
-Two numbers an owner asks for are invisible to a server: how long a page was
-read, and which outside link a visitor took. They exist only in the browser,
-so they need a script on the page and a public endpoint to report to — an
-unauthenticated write with no page load behind it, which is a different
-argument from every other collection above and gets its own bounds.
+Four numbers an owner asks for are invisible to a server: how long a page was
+read, which outside link a visitor took, where the page was clicked, and how
+far down it was read. They exist only in the browser, so they need a script on
+the page and a public endpoint to report to — an unauthenticated write with no
+page load behind it, which is a different argument from every other collection
+above and gets its own bounds.
 
-- **What the script may say.** Two payloads, `t=<seconds>` and
-  `o=<hostname>`, at most one per request. It carries **no identity of any
-  kind** — no cookie, no storage, not even the day-scoped visitor token page
-  views are counted with — and **names no page**, so a read time is a fact
-  about the site's day rather than about `/prices` at 14:03. It reports the
-  read time once, when the page is first hidden or unloaded.
+- **What the script may say.** Four payloads, at most one per request:
+  `t=<seconds>`, `o=<hostname>`, a click `x=<permille>&y=<permille>`, and a
+  scroll `d=<permille>`; the two heatmap payloads add `p=<path>` and
+  `w=<viewport width>`. It carries **no identity of any kind** — no cookie, no
+  storage, not even the day-scoped visitor token page views are counted with.
+  The read time **names no page**, so it is a fact about the site's day rather
+  than about `/prices` at 14:03; a heatmap event is the one report that must
+  name its page, because an overlay is drawn over one page, and it names
+  nothing else. It reports the read time once, when the page is first hidden or
+  unloaded, sends the scroll depth alongside it and only when it is deeper than
+  the last one sent, and reports **at most twenty clicks per page view**.
 - **What the endpoint refuses.** Tenant scope is the `Host` and never the
   payload (there is no field to put one in); an unresolvable Host is the same
   terse `404` a page request gets, so the endpoint cannot enumerate sites. The
   body is capped at 512 bytes, seconds become a bucket server-side, and a
   hostname that is not a bounded lowercase DNS host is refused outright rather
-  than repaired into a storable label. Every answer is a bare status with no
+  than repaired into a storable label. A heatmap report is refused unless it is
+  complete and every part of it is a measurement: a path that is not an
+  absolute page path (a URL, a query string, a fragment, anything with
+  whitespace or control characters) and a coordinate that is not a bounded
+  integer are `400`, never repaired. Every answer is a bare status with no
   body — `204` on success — because `sendBeacon` cannot read a response and a
   chatty endpoint would only help someone probing.
 - **Its own rate limit**, separate from the form and unlock budgets, so page
@@ -196,7 +223,7 @@ argument from every other collection above and gets its own bounds.
 - **The no-script path is unaffected.** Page views, referrers, campaigns,
   countries, devices and entry/exit are all still derived from the request at
   the door. A visitor who runs no scripts is a fully counted visit; only these
-  two dimensions go unreported. The beacon is therefore never on the draft
+  four dimensions go unreported. The beacon is therefore never on the draft
   preview either — an editor moving sections around is not a reader.
 
 ### Render pipeline

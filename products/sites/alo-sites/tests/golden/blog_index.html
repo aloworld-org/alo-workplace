@@ -35,12 +35,25 @@
   var since = Date.now();
   var read = 0;
   var reported = false;
+  var clicks = 0;
+  var depth = 0;
+  var page = "&p=" + encodeURIComponent(location.pathname) + "&w=";
   function send(body) {
     if (navigator.sendBeacon) { navigator.sendBeacon("/_alo/collect", body); }
   }
+  function permille(value, total) {
+    return total > 0 ? Math.max(0, Math.min(1000, Math.round((value / total) * 1000))) : 0;
+  }
+  function height() {
+    var body = document.body;
+    return Math.max(document.documentElement.scrollHeight, body ? body.scrollHeight : 0);
+  }
+  function shape() { return page + Math.round(window.innerWidth || 0); }
   function record() {
     read += Date.now() - since;
     since = Date.now();
+    var reach = permille(window.scrollY + window.innerHeight, height());
+    if (reach > depth) { depth = reach; send("d=" + reach + shape()); }
     if (reported) { return; }
     reported = true;
     send("t=" + Math.round(read / 1000));
@@ -54,6 +67,11 @@
     var link = target && target.closest ? target.closest("a[href]") : null;
     if (link && link.hostname && link.hostname !== location.hostname) {
       send("o=" + encodeURIComponent(link.hostname));
+    }
+    if (clicks < 20 && typeof event.pageX === "number") {
+      clicks += 1;
+      send("x=" + permille(event.pageX, document.documentElement.scrollWidth) +
+        "&y=" + permille(event.pageY, height()) + shape());
     }
   }, true);
 })();</script>
