@@ -15,15 +15,16 @@
 //! for assistive technology, which outranks literal ordering.
 
 pub(crate) mod html;
+pub(crate) mod money;
 pub(crate) mod script;
 mod sections;
 mod strings;
 
 pub use strings::{EN, FR, NL, UiStrings, strings_for};
 
-use alo_store::SiteCollectionSnapshot;
 use alo_store::site_model::{SECTIONS_SCHEMA_VERSION, Section, SiteImage};
 use alo_store::site_theme::SiteTheme;
+use alo_store::{SiteCatalogSnapshot, SiteCollectionSnapshot};
 
 use html::{esc, img_src};
 
@@ -117,6 +118,9 @@ pub struct PageRenderContext<'a> {
     /// Immutable Base-backed collections frozen with this publish, keyed by
     /// the stable id referenced by collection sections.
     pub collections: &'a std::collections::HashMap<String, SiteCollectionSnapshot>,
+    /// Immutable catalogs frozen with this publish, keyed by the stable id
+    /// referenced by catalog sections. Hidden items are already absent.
+    pub catalogs: &'a std::collections::HashMap<String, SiteCatalogSnapshot>,
 }
 
 /// One exact translation of the current stable page identity.

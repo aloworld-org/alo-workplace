@@ -74,7 +74,8 @@ store's tenancy doors; ids are newtypes; timestamps are
   is one variant of a typed Rust enum (serde, `#[serde(tag = "type")]`)
   in a `site_model` module: `nav`, `hero`, `features`, `text_image`,
   `gallery`, `testimonials`, `pricing`, `team`, `faq`, `cta`,
-  `contact_form`, `footer` — each with typed props. Unknown section
+  `contact_form`, `collection` (S2.02a), `catalog` (S2.12a), `footer` —
+  each with typed props. Unknown section
   types or props are a **validation error on write** (the editor and AI
   are the only writers, both speak the schema) but tolerated as
   *skip-with-log on read* by the renderer, so an old renderer never
@@ -649,6 +650,41 @@ creates a site and its Home page. The old creation-time theme-preset picker
 is gone: a template carries its own preset, and a blank site's theme is
 chosen in the theme dialog that owns it (S1.14) rather than in a weaker
 second copy.
+
+### The catalog (S2.12a)
+
+A **collection** binds to a table in alo Base and is re-read on every publish.
+A **catalog** is the opposite choice and exists because most of what a small
+business sells is not in a Base at all: the rows live in `site_catalogs` /
+`site_catalog_categories` / `site_catalog_items`, tenant- and site-scoped like
+every other Sites object, and the tenant edits them here. Both exist on purpose
+— one for data that has another home, one for data whose home is the website.
+
+- **Money** is integer minor units (`price_cents`) plus the catalog's own ISO
+  4217 `currency`; the decimal count comes from `currency_exponent`, the single
+  place that knows yen has none and dinars have three. Nothing in the path is a
+  float, and formatting happens at the very edge, in the renderer, per locale
+  (`render/money.rs`: separators and symbol placement are `UiStrings` fields,
+  so a new language is a new const). An absent price means *no price shown* —
+  an enquiry-only service — which is not zero.
+- **Availability** is `available | sold_out | hidden`. `sold_out` renders with
+  a label; `hidden` is removed at freeze time, so a withheld item is absent
+  from the published copy rather than filtered out of it by the renderer. That
+  is the same construction the drafts/snapshots split uses: unreachable, not
+  hidden.
+- **The Base import is a seam, not a binding.** `site_catalog_import` copies a
+  mapped table into the catalog once; each imported row remembers its Base
+  record in `source_key`, so a second import updates what it created before
+  instead of duplicating it, and rows typed by hand are never touched. A price
+  it cannot read *unambiguously* — `1,234`, which is 1234 in Amsterdam and
+  1.234 in Boston — stops the import naming the row. Guessing there would put a
+  wrong number on a public page, and a wrong price is worse than no import.
+- **Publishing freezes it.** `site_catalog_snapshots` holds one immutable copy
+  per (publish, catalog): name, currency, categories, and visible items, with
+  each item carrying its category's *handle* rather than an editable id, so a
+  published page never depends on a row that can still move. The public service
+  reads only this copy; the draft preview resolves through the same function
+  without writing, so the editor sees what the next publish would freeze.
 
 ## Errors
 

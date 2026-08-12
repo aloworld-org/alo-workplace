@@ -9,6 +9,21 @@ contracts.
 
 ## Unreleased
 
+- **Your website can now show what you actually sell.** A site holds a catalog
+  — the dishes, rooms, services or courses you offer — in one currency, grouped
+  into categories you name, with a price, a description and a picture per item.
+  A catalog section puts it on a page, and can show one grouping alone, so
+  starters and mains are two sections over one list. An item can be marked
+  unavailable, and the page says so; an item marked hidden is not published at
+  all — it never leaves the editor. Prices are written the way the page's
+  language writes them (€ 12.50 in English, 12,50 € in French), always as whole
+  cents and never as an approximation. If the list already lives in an alo Base
+  table, one import copies it across — names, prices, descriptions, groupings
+  and photos — and importing the same table again updates the rows it made
+  rather than duplicating them; anything it cannot read unambiguously, like a
+  price that could mean two different amounts, stops the import naming the row
+  instead of guessing. Publishing freezes the catalog: what a visitor sees is
+  exactly what was true when you published, until you publish again.
 - **The templates are now something you can see before you choose.** New
   website shows the six shipped templates as cards saying who each one is for
   and which pages it brings, and one click on a card draws that template on the

@@ -328,6 +328,53 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   color: var(--muted);
 }
 
+/* Catalog: groupings of what the site offers, price aligned with the name. */
+.catalog-group + .catalog-group { margin-top: 2.5rem; }
+.catalog-group h3 { margin-bottom: 1rem; }
+.catalog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+.catalog-item {
+  overflow: hidden;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+.catalog-item img {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.catalog-item h4 { margin-bottom: 0.25rem; font-size: 1.125rem; }
+.catalog-price { font-weight: 600; }
+.catalog-price .price-note { font-weight: 400; color: var(--muted); }
+.catalog-unavailable {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.catalog-description { margin-top: 0.5rem; color: var(--muted); }
+.catalog-empty {
+  max-width: 38rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  color: var(--muted);
+}
+
 /* Text beside image; sides swap by modifier, stack on small screens. */
 .s-text-image { display: grid; gap: 2rem; align-items: center; }
 .s-text-image img { border-radius: 0.75rem; }

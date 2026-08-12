@@ -6,16 +6,17 @@
 //! `<img>` carries `alt` (empty means decorative, straight from the model).
 //! All text goes through [`esc`], every link target through [`safe_href`].
 
-use alo_store::SiteCollectionSnapshot;
 use alo_store::site_model::{
-    CollectionSection, ContactFormSection, CtaSection, FaqSection, FeaturesSection, FooterSection,
-    GallerySection, HeroSection, ImageSide, Link, NavSection, PricingSection, Section, SiteImage,
-    TeamSection, TestimonialsSection, TextImageSection,
+    CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqSection, FeaturesSection,
+    FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection, PricingSection,
+    Section, SiteImage, TeamSection, TestimonialsSection, TextImageSection,
 };
+use alo_store::{SiteCatalogSnapshot, SiteCatalogSnapshotItem, SiteCollectionSnapshot};
 
 use crate::images::ImageSlot;
 
 use super::html::{esc, safe_href};
+use super::money::format_price;
 use super::{PageRenderContext, SiteRenderContext};
 
 /// A `nav` section, rendered as a `<header>` landmark. The brand link shows
@@ -103,7 +104,136 @@ pub(super) fn body_section(
         Section::Cta(s) => cta(out, s),
         Section::ContactForm(s) => contact_form(out, site, s, index),
         Section::Collection(s) => collection(out, site, s, page.collections),
+        Section::Catalog(s) => catalog(out, site, s, page.catalogs),
     }
+}
+
+/// A `catalog` section: what the site offers, exactly as it was frozen into
+/// this publish. Items are grouped under their category in the catalog's own
+/// order, and the items belonging to no category close the list. A section may
+/// name one category, in which case only that group renders — a menu page can
+/// show starters and mains as two sections without duplicating the catalog.
+fn catalog(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    section: &CatalogSection,
+    snapshots: &std::collections::HashMap<String, SiteCatalogSnapshot>,
+) {
+    out.push_str("<section class=\"s-catalog\">\n");
+    push_opt_heading(out, section.heading.as_deref());
+    let Some(snapshot) = snapshots.get(section.catalog_id.as_str()) else {
+        tracing::warn!(
+            catalog = %section.catalog_id,
+            "published page references a missing catalog snapshot"
+        );
+        push_catalog_empty(out, site);
+        return;
+    };
+    let wanted = section.category.as_deref();
+    let mut groups: Vec<(Option<&str>, Vec<&SiteCatalogSnapshotItem>)> = Vec::new();
+    for category in &snapshot.categories {
+        if wanted.is_some_and(|wanted| wanted != category.slug) {
+            continue;
+        }
+        let items: Vec<&SiteCatalogSnapshotItem> = snapshot
+            .items
+            .iter()
+            .filter(|item| item.category.as_deref() == Some(category.slug.as_str()))
+            .collect();
+        if !items.is_empty() {
+            groups.push((Some(category.name.as_str()), items));
+        }
+    }
+    if wanted.is_none() {
+        let known: Vec<&str> = snapshot
+            .categories
+            .iter()
+            .map(|category| category.slug.as_str())
+            .collect();
+        // An item whose category vanished between two publishes still belongs
+        // on the page; it joins the ungrouped items rather than disappearing.
+        let loose: Vec<&SiteCatalogSnapshotItem> = snapshot
+            .items
+            .iter()
+            .filter(|item| {
+                item.category
+                    .as_deref()
+                    .is_none_or(|slug| !known.contains(&slug))
+            })
+            .collect();
+        if !loose.is_empty() {
+            groups.push((None, loose));
+        }
+    }
+    if groups.is_empty() {
+        push_catalog_empty(out, site);
+        return;
+    }
+    for (name, items) in groups {
+        out.push_str("<div class=\"catalog-group\">\n");
+        if let Some(name) = name {
+            out.push_str(&format!("<h3>{}</h3>\n", esc(name)));
+        }
+        out.push_str("<ul class=\"catalog-list\">\n");
+        for item in items {
+            catalog_item(out, site, item, &snapshot.currency);
+        }
+        out.push_str("</ul>\n</div>\n");
+    }
+    out.push_str("</section>\n");
+}
+
+fn catalog_item(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    item: &SiteCatalogSnapshotItem,
+    currency: &str,
+) {
+    out.push_str(&format!(
+        "<li class=\"catalog-item\" id=\"item-{}\">\n",
+        esc(&item.slug)
+    ));
+    if let Some(image) = &item.image {
+        out.push_str(&format!(
+            "<img src=\"{}\" alt=\"{}\">\n",
+            site.images.src(image.as_str()),
+            esc(&item.name)
+        ));
+    }
+    out.push_str(&format!("<h4>{}</h4>\n", esc(&item.name)));
+    if let Some(price) = item.price_cents {
+        out.push_str(&format!(
+            "<p class=\"catalog-price\">{}",
+            esc(&format_price(price, currency, site.strings))
+        ));
+        if let Some(note) = &item.price_note {
+            out.push_str(&format!(" <span class=\"price-note\">{}</span>", esc(note)));
+        }
+        out.push_str("</p>\n");
+    }
+    if item.sold_out {
+        out.push_str(&format!(
+            "<p class=\"catalog-unavailable\">{}</p>\n",
+            esc(site.strings.catalog_sold_out)
+        ));
+    }
+    if let Some(description) = &item.description {
+        out.push_str(&format!(
+            "<p class=\"catalog-description\">{}</p>\n",
+            esc(description)
+        ));
+    }
+    out.push_str("</li>\n");
+}
+
+/// The one empty state a catalog section has — the same sentence whether the
+/// snapshot is missing, filtered to nothing, or genuinely empty, so a visitor
+/// never learns anything about the tenant's editing state from it.
+fn push_catalog_empty(out: &mut String, site: &SiteRenderContext<'_>) {
+    out.push_str(&format!(
+        "<p class=\"catalog-empty\">{}</p>\n</section>\n",
+        esc(site.strings.catalog_empty)
+    ));
 }
 
 fn collection(

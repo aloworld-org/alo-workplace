@@ -40,6 +40,7 @@ fn render_with(
         seo_description,
         sections,
         collections: &collections,
+        catalogs: &HashMap::new(),
     };
     render_page(&site, &page)
 }
@@ -321,6 +322,7 @@ fn inline_image_sources_swap_srcs_per_id_and_never_touch_og_image() {
         seo_description: None,
         sections: &hero_page(),
         collections: &collections,
+        catalogs: &HashMap::new(),
     };
     let html = render_page(&site, &page);
     // The hero image is in the map: rendered inline.
@@ -365,6 +367,7 @@ fn preview_is_the_published_document_with_the_stylesheet_inlined() {
             seo_description: Some("Who we are."),
             sections: &hero_page(),
             collections: &collections,
+            catalogs: &HashMap::new(),
         };
         let css = stylesheet(&theme);
         let published = render_page(&site, &page);
@@ -577,6 +580,7 @@ fn the_inline_preview_offers_no_derivatives() {
         seo_description: None,
         sections: &sections,
         collections: &collections,
+        catalogs: &HashMap::new(),
     };
     let html = render_page(&site, &page);
     assert!(html.contains("<img src=\"data:image/png;base64,QUJD\" alt=\"The drum\">"));

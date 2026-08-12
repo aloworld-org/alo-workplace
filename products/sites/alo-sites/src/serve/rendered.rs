@@ -5,7 +5,9 @@
 use std::collections::{HashMap, HashSet};
 
 use alo_store::site_theme::SiteTheme;
-use alo_store::{PublishedSite, SiteCollectionSnapshot, SitePageSnapshot, SitePublishId};
+use alo_store::{
+    PublishedSite, SiteCatalogSnapshot, SiteCollectionSnapshot, SitePageSnapshot, SitePublishId,
+};
 
 use crate::render::{
     self, ImageSources, LanguageAlternate, PageRenderContext, SiteRenderContext, UiStrings,
@@ -67,6 +69,7 @@ impl RenderedSite {
         site: &PublishedSite,
         snapshots: &[SitePageSnapshot],
         collection_snapshots: &[SiteCollectionSnapshot],
+        catalog_snapshots: &[SiteCatalogSnapshot],
     ) -> Self {
         let theme = SiteTheme::from_stored(site.theme.clone());
         let base_url = format!("https://{public_host}");
@@ -74,6 +77,11 @@ impl RenderedSite {
             .iter()
             .cloned()
             .map(|snapshot| (snapshot.collection_id.as_str().to_owned(), snapshot))
+            .collect();
+        let catalogs: HashMap<String, SiteCatalogSnapshot> = catalog_snapshots
+            .iter()
+            .cloned()
+            .map(|snapshot| (snapshot.catalog_id.as_str().to_owned(), snapshot))
             .collect();
         let mut variants: HashMap<String, Vec<(String, String)>> = HashMap::new();
         for snapshot in snapshots {
@@ -118,6 +126,13 @@ impl RenderedSite {
                 .filter_map(|item| item.image.as_ref())
                 .map(|blob| blob.as_str().to_owned()),
         );
+        images.extend(
+            catalog_snapshots
+                .iter()
+                .flat_map(|snapshot| &snapshot.items)
+                .filter_map(|item| item.image.as_ref())
+                .map(|blob| blob.as_str().to_owned()),
+        );
         for snapshot in snapshots {
             let path = localized_path(
                 &site.default_locale,
@@ -140,6 +155,7 @@ impl RenderedSite {
                 seo_description: snapshot.seo_description.as_deref(),
                 sections: &snapshot.sections,
                 collections: &collections,
+                catalogs: &catalogs,
             };
             let Some(translations) = variants.get(snapshot.page_id.as_str()) else {
                 tracing::warn!(

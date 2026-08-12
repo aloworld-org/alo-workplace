@@ -4306,3 +4306,105 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.12a, catalog sections — the tenant-owned catalog/category/item
   model with its Base import seam, publish snapshots and public render
   goldens.
+
+## 2026-08-13 — S2.12a a catalog of what you actually sell, frozen when you publish
+
+- **Item:** S2.12a — catalog sections: the tenant-owned catalog/category/item
+  model, the Base import seam, publish snapshots, and public render goldens.
+  Store + renderer only; no HTTP and no web (see cuts).
+- **Shipped:**
+  - **Migrations `0309_site_catalogs.sql` / `0310_site_catalog_snapshots.sql`:**
+    `site_catalogs` (name, ISO-4217 `currency` with a regex check),
+    `site_catalog_categories` (name, handle unique per catalog, position),
+    `site_catalog_items` (category, name, handle, description, `price_cents`
+    BIGINT with a non-negative check, price note, image blob, `availability`
+    checked to three values, position, `source_key`), and
+    `site_catalog_snapshots` (one immutable copy per publish+catalog).
+    `category_id` deliberately carries **no** FK: a composite
+    `ON DELETE SET NULL` would null `tenant_id` with it, so the store clears
+    the reference inside the delete transaction and every write proves the
+    category belongs to the same catalog. Snapshot rows have no FK to
+    `site_catalogs` either — history must survive deleting the catalog.
+  - **`site_catalog.rs`** — the container: catalog + category CRUD, the shared
+    validators (name, handle, currency), `catalog_slug_from_name`,
+    `currency_exponent` (the one place that knows JPY has no minor unit and
+    KWD has three) and `parse_price_minor_units`. That parser reads `12`,
+    `12.50`, `12,50`, `1.234,50`, `1,234.50` and `€ 9,95`, and **refuses**
+    `1,234` for a two-decimal currency — 1234 in Amsterdam, 1.234 in Boston,
+    and a silent guess is a wrong price on a public page. For a zero-decimal
+    currency the same spelling can only be grouping, and for a three-decimal
+    one only decimals, so both are read rather than refused.
+  - **`site_catalog_items.rs`** — item CRUD, every write validated whole
+    (handle rules, description/note caps, price range, a note without a price
+    refused, a category from another catalog and an image blob that is not the
+    tenant's both a clean `NotFound`).
+  - **`site_catalog_import.rs`** — the Base seam. A mapped table is copied
+    **once** (not bound like a collection); each row remembers its Base record
+    in `source_key`, so a second import updates what it created rather than
+    duplicating it, and hand-typed rows are never touched. Missing categories
+    are created as the rows name them; a repeated name gets its own handle
+    (`mussels`, `mussels-2`); a cell of the wrong type or an unreadable price
+    stops the import naming the row.
+  - **`site_catalog_publish.rs`** — `freeze_referenced_catalogs` runs inside
+    the publish transaction (one line added to `site_publish.rs`), so a catalog
+    that cannot be frozen refuses the whole publish. **Hidden items are absent
+    from the snapshot**, not filtered later; categories freeze by handle, never
+    by id. `site_catalog_preview` resolves the same way without writing, which
+    is what the editor's draft preview now uses.
+  - **`site_model.rs`** — the fourteenth section type, `catalog`
+    (`catalog_id`, optional `heading`, optional `category` handle). Templates
+    refuse it exactly as they refuse `collection`.
+  - **Renderer** — `render/money.rs` formats minor units per locale (separators
+    and symbol placement are new `UiStrings` fields in en/fr/nl: `€ 12.50`,
+    `12,50 €`), and `render/sections.rs` renders groups in catalog order with
+    the ungrouped items last, an `Unavailable` label, and one calm empty state
+    whether the snapshot is missing, filtered to nothing, or genuinely empty —
+    a visitor learns nothing about the tenant's editing state. Catalog images
+    join the servable image set; `SitePublicStore::published_catalogs` feeds
+    `RenderedSite::build`, and both jmap previews (draft and version history)
+    inline catalog images and show the frozen/preview copy.
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-sites -p alo-jmap --all-targets` — clean for all three (the only warning
+  in the workspace is the pre-existing `meet.rs:430` unused `guest`, the
+  business track's file); `cargo nextest run -p alo-store -p alo-sites -p
+  alo-jmap` — **2886 tests, all passing**, including five new ones:
+  `site_catalog_tenancy` (a rival tenant is refused at *every* door — list,
+  read, update, delete, item and category writes, preview — and leaves no mark;
+  the write rules incl. per-catalog handle uniqueness, a note without a price,
+  a foreign category, and a deleted grouping keeping its items; the import
+  copying rows once, updating them on a second run without duplicating, and
+  naming the row of an ambiguous price) and `site_catalog_publish` (hidden
+  items never frozen, sold-out surviving, the publish immutable under later
+  edits, `published_catalogs` returning exactly the same rows through a Host
+  resolution, a foreign tenant reading nothing, and a page pointing at a
+  deleted catalog refusing to publish without leaving a half-written publish).
+  Goldens: `section_catalog.html`, `section_catalog_empty.html`,
+  `section_catalog_one_category.html`, plus re-blessed `full_page.html` and
+  `site.css`.
+- **Cuts/flags:**
+  - **No HTTP routes and no web in this item**, as the queue splits it: S2.12a
+    is the model, the seam, the snapshots and the goldens. The `/sites/*`
+    routes the editor needs land with **S2.12c**, which is the item that has a
+    UI to call them. Nothing under `web/` was touched, so `tsc`/`eslint`/`build`
+    were not part of this gate.
+  - **A catalog is site-scoped, not tenant-scoped.** "Tenant-owned" in the
+    queue means *owned by the tenant rather than read from Base*; scoping it to
+    a site keeps it beside every other Sites object and leaves no cross-site
+    leakage question. A tenant with two sites keeps two catalogs; sharing one
+    across sites is a question for the wave review, not a guess here.
+  - **Handles are capped at 64 characters**, not 80, because the section schema
+    caps an id token at 64 and a catalog section names a category by its
+    handle: a handle a section could not reference would be a trap.
+  - **The import creates categories but never deletes them**, and never removes
+    an item whose Base row was deleted — a copy is the tenant's from the moment
+    it lands, and deleting their rows because a table changed would be the
+    binding behaviour a catalog deliberately is not. The UI item should say so.
+  - **ADR 0041's "no second copy" rule is not in play yet.** That rule governs
+    stock, price and availability read from Billing/Inventory in wave 3; this
+    catalog is the Sites-owned list those seams will later read *into*
+    (S3.04a), and it stores nothing owned by another module.
+  - **No new route prefix**: nothing new is served, so the production Caddyfile
+    needs nothing at the next deploy.
+- **Next:** S2.12b, order forms — public order submission with validation,
+  abuse controls, and the owner inbox/review/export flow, with no checkout
+  dependency.

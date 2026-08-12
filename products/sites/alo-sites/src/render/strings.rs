@@ -80,6 +80,17 @@ pub struct UiStrings {
     pub blog_page_of: &'static str,
     /// Collection section: stable message for a deliberately empty source.
     pub collection_empty: &'static str,
+    /// Catalog section: shown when the published catalog holds nothing.
+    pub catalog_empty: &'static str,
+    /// Catalog item: label on an item that is currently unavailable.
+    pub catalog_sold_out: &'static str,
+    /// Catalog price: what this language writes between whole and decimals.
+    pub decimal_separator: &'static str,
+    /// Catalog price: what this language writes between thousands.
+    pub group_separator: &'static str,
+    /// Catalog price: whether the currency leads the amount (`€ 12.50`) or
+    /// follows it (`12,50 €`).
+    pub price_symbol_leads: bool,
     /// Protected page: heading of the unlock screen (and its `<title>`).
     pub protected_title: &'static str,
     /// Protected page: explanation above the password field.
@@ -129,6 +140,11 @@ pub const EN: UiStrings = UiStrings {
     blog_page: "Page",
     blog_page_of: "of",
     collection_empty: "Nothing to show yet.",
+    catalog_empty: "Nothing on offer yet.",
+    catalog_sold_out: "Unavailable",
+    decimal_separator: ".",
+    group_separator: ",",
+    price_symbol_leads: true,
     protected_title: "This page is protected",
     protected_text: "Enter the password to open this page.",
     protected_password: "Password",
@@ -172,6 +188,11 @@ pub const FR: UiStrings = UiStrings {
     blog_page: "Page",
     blog_page_of: "sur",
     collection_empty: "Rien à afficher pour le moment.",
+    catalog_empty: "Rien à proposer pour le moment.",
+    catalog_sold_out: "Indisponible",
+    decimal_separator: ",",
+    group_separator: "\u{202f}",
+    price_symbol_leads: false,
     protected_title: "Cette page est protégée",
     protected_text: "Saisissez le mot de passe pour ouvrir cette page.",
     protected_password: "Mot de passe",
@@ -215,6 +236,11 @@ pub const NL: UiStrings = UiStrings {
     blog_page: "Pagina",
     blog_page_of: "van",
     collection_empty: "Nog niets om te tonen.",
+    catalog_empty: "Nog niets in het aanbod.",
+    catalog_sold_out: "Niet beschikbaar",
+    decimal_separator: ",",
+    group_separator: ".",
+    price_symbol_leads: true,
     protected_title: "Deze pagina is beveiligd",
     protected_text: "Voer het wachtwoord in om deze pagina te openen.",
     protected_password: "Wachtwoord",

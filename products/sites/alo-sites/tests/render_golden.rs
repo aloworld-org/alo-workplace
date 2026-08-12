@@ -9,16 +9,19 @@ use std::fs;
 use std::path::PathBuf;
 
 use alo_sites::render::{EN, ImageSources, PageRenderContext, SiteRenderContext, render_page};
-use alo_store::id::{BlobId, SiteCollectionId};
+use alo_store::id::{BlobId, SiteCatalogId, SiteCollectionId};
 use alo_store::site_model::{
-    CollectionSection, ContactFormSection, CtaSection, FaqItem, FaqSection, FeatureItem,
-    FeaturesSection, FooterSection, GallerySection, HeroSection, ImageCrop, ImageFocalPoint,
-    ImageSide, Link, NavSection, PricingSection, PricingTier, SECTIONS_SCHEMA_VERSION, Section,
-    SectionsEnvelope, SiteImage, TeamMember, TeamSection, Testimonial, TestimonialsSection,
-    TextImageSection,
+    CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqItem, FaqSection,
+    FeatureItem, FeaturesSection, FooterSection, GallerySection, HeroSection, ImageCrop,
+    ImageFocalPoint, ImageSide, Link, NavSection, PricingSection, PricingTier,
+    SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, SiteImage, TeamMember, TeamSection,
+    Testimonial, TestimonialsSection, TextImageSection,
 };
 use alo_store::site_theme::SiteTheme;
-use alo_store::{SiteCollectionItem, SiteCollectionSnapshot};
+use alo_store::{
+    SiteCatalogSnapshot, SiteCatalogSnapshotCategory, SiteCatalogSnapshotItem, SiteCollectionItem,
+    SiteCollectionSnapshot,
+};
 use serde_json::json;
 
 const SITE_NAME: &str = "Nordwind Coffee Roasters";
@@ -121,6 +124,11 @@ fn full_sections() -> Vec<Section> {
             collection_id: SiteCollectionId::new("seasonal-roasts"),
             heading: Some("Seasonal roasts".to_owned()),
         }),
+        Section::Catalog(CatalogSection {
+            catalog_id: SiteCatalogId::new("harbour-menu"),
+            heading: Some("On the counter".to_owned()),
+            category: None,
+        }),
         Section::Footer(FooterSection {
             text: Some("© Nordwind Coffee Roasters".to_owned()),
             links: vec![link("Imprint", "/imprint"), link("Privacy", "/privacy")],
@@ -163,6 +171,70 @@ fn collection_snapshots() -> HashMap<String, SiteCollectionSnapshot> {
     HashMap::from([(snapshot.collection_id.as_str().to_owned(), snapshot)])
 }
 
+/// The one frozen catalog the corpus renders: two groupings, a sold-out item,
+/// an item with no price, and one that belongs to no category — every branch
+/// the section has, pinned in one golden.
+fn catalog_snapshots() -> HashMap<String, SiteCatalogSnapshot> {
+    let snapshot = SiteCatalogSnapshot {
+        catalog_id: SiteCatalogId::new("harbour-menu"),
+        name: "Harbour menu".to_owned(),
+        currency: "EUR".to_owned(),
+        categories: vec![
+            SiteCatalogSnapshotCategory {
+                slug: "brews".to_owned(),
+                name: "Brews".to_owned(),
+            },
+            SiteCatalogSnapshotCategory {
+                slug: "beans".to_owned(),
+                name: "Beans".to_owned(),
+            },
+        ],
+        items: vec![
+            SiteCatalogSnapshotItem {
+                slug: "filter".to_owned(),
+                name: "Filter brew".to_owned(),
+                category: Some("brews".to_owned()),
+                description: Some("Whatever came off the drum this morning.".to_owned()),
+                price_cents: Some(350),
+                price_note: Some("per cup".to_owned()),
+                image: None,
+                sold_out: false,
+            },
+            SiteCatalogSnapshotItem {
+                slug: "cold-brew".to_owned(),
+                name: "Cold brew".to_owned(),
+                category: Some("brews".to_owned()),
+                description: None,
+                price_cents: Some(4_250),
+                price_note: None,
+                image: None,
+                sold_out: true,
+            },
+            SiteCatalogSnapshotItem {
+                slug: "harbour-blend".to_owned(),
+                name: "Harbour blend, 1 kg".to_owned(),
+                category: Some("beans".to_owned()),
+                description: None,
+                price_cents: Some(123_450),
+                price_note: None,
+                image: Some(BlobId::new("9hK3vQ2mR8pT1xWz4bC5dg")),
+                sold_out: false,
+            },
+            SiteCatalogSnapshotItem {
+                slug: "subscription".to_owned(),
+                name: "Standing order".to_owned(),
+                category: None,
+                description: Some("Tell us how much you drink; we work it out.".to_owned()),
+                price_cents: None,
+                price_note: None,
+                image: None,
+                sold_out: false,
+            },
+        ],
+    };
+    HashMap::from([(snapshot.catalog_id.as_str().to_owned(), snapshot)])
+}
+
 fn envelope_value(sections: Vec<Section>) -> serde_json::Value {
     SectionsEnvelope {
         schema_version: SECTIONS_SCHEMA_VERSION,
@@ -191,6 +263,7 @@ fn render_default(sections: Vec<Section>) -> String {
         seo_description: None,
         sections: &value,
         collections: &collection_snapshots(),
+        catalogs: &catalog_snapshots(),
     };
     render_page(&site, &page)
 }
@@ -214,7 +287,7 @@ fn assert_golden(name: &str, actual: &str) {
 #[test]
 fn one_golden_per_section_type() {
     let sections = full_sections();
-    assert_eq!(sections.len(), 13, "corpus must cover every variant");
+    assert_eq!(sections.len(), 14, "corpus must cover every variant");
     for section in sections {
         let kind = section.kind();
         let html = render_default(vec![section]);
@@ -250,8 +323,86 @@ fn empty_collection_has_a_stable_public_golden() {
         seo_description: None,
         sections: &value,
         collections: &collections,
+        catalogs: &HashMap::new(),
     };
     assert_golden("section_collection_empty.html", &render_page(&site, &page));
+}
+
+/// A published catalog section whose snapshot holds nothing renders one calm
+/// sentence — the same one whether the catalog is empty, filtered to nothing,
+/// or missing from the publish entirely, so a visitor learns nothing about the
+/// tenant's editing state.
+#[test]
+fn empty_catalog_has_a_stable_public_golden() {
+    let theme = SiteTheme::new();
+    let value = envelope_value(vec![Section::Catalog(CatalogSection {
+        catalog_id: SiteCatalogId::new("harbour-menu"),
+        heading: Some("On the counter".to_owned()),
+        category: None,
+    })]);
+    let site = SiteRenderContext {
+        name: SITE_NAME,
+        base_url: BASE_URL,
+        locale: "en",
+        theme: &theme,
+        strings: &EN,
+        images: ImageSources::PublicPaths,
+    };
+    let snapshot = SiteCatalogSnapshot {
+        catalog_id: SiteCatalogId::new("harbour-menu"),
+        name: "Harbour menu".to_owned(),
+        currency: "EUR".to_owned(),
+        categories: Vec::new(),
+        items: Vec::new(),
+    };
+    let catalogs = HashMap::from([(snapshot.catalog_id.as_str().to_owned(), snapshot)]);
+    let page = PageRenderContext {
+        path: "/",
+        title: "Home",
+        seo_title: None,
+        seo_description: None,
+        sections: &value,
+        collections: &HashMap::new(),
+        catalogs: &catalogs,
+    };
+    assert_golden("section_catalog_empty.html", &render_page(&site, &page));
+}
+
+/// One category of a catalog, shown on its own — the second page of a menu
+/// site, where starters and mains are two sections over one catalog.
+#[test]
+fn a_catalog_section_can_show_one_category() {
+    let theme = SiteTheme::new();
+    let value = envelope_value(vec![Section::Catalog(CatalogSection {
+        catalog_id: SiteCatalogId::new("harbour-menu"),
+        heading: Some("Beans to take home".to_owned()),
+        category: Some("beans".to_owned()),
+    })]);
+    let site = SiteRenderContext {
+        name: SITE_NAME,
+        base_url: BASE_URL,
+        locale: "en",
+        theme: &theme,
+        strings: &EN,
+        images: ImageSources::PublicPaths,
+    };
+    let catalogs = catalog_snapshots();
+    let page = PageRenderContext {
+        path: "/",
+        title: "Home",
+        seo_title: None,
+        seo_description: None,
+        sections: &value,
+        collections: &HashMap::new(),
+        catalogs: &catalogs,
+    };
+    let html = render_page(&site, &page);
+    assert!(html.contains("Harbour blend, 1 kg"), "{html}");
+    assert!(
+        !html.contains("Filter brew") && !html.contains("Standing order"),
+        "a filtered section showed another category: {html}"
+    );
+    assert_golden("section_catalog_one_category.html", &html);
 }
 
 #[test]
@@ -279,6 +430,7 @@ fn full_page_golden_with_theme_logo_and_seo() {
         seo_description: Some("Small-batch coffee roastery on the harbour, shipping on roast day."),
         sections: &value,
         collections: &collection_snapshots(),
+        catalogs: &catalog_snapshots(),
     };
     let html = render_page(&site, &page);
     // The design note's byte budget for the golden site's page.
@@ -314,6 +466,7 @@ fn search_defaults_golden_uses_page_site_and_theme_logo() {
         seo_description: None,
         sections: &value,
         collections: &collection_snapshots(),
+        catalogs: &catalog_snapshots(),
     };
     assert_golden("seo_defaults.html", &render_page(&site, &page));
 }

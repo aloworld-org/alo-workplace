@@ -231,11 +231,19 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                     return unavailable();
                 }
             };
+            let catalogs = match state.store.published_catalogs(&resolved).await {
+                Ok(catalogs) => catalogs,
+                Err(error) => {
+                    tracing::error!(host = %public_host, %error, "catalog snapshot read failed");
+                    return unavailable();
+                }
+            };
             let built = Arc::new(RenderedSite::build(
                 &public_host,
                 &resolved,
                 &snapshots,
                 &collections,
+                &catalogs,
             ));
             tracing::info!(
                 host = %public_host,
@@ -243,6 +251,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                 publish = %resolved.publish,
                 pages = snapshots.len(),
                 collections = collections.len(),
+                catalogs = catalogs.len(),
                 "rendered publish into cache"
             );
             state.cache.put(&public_host, Arc::clone(&built));
