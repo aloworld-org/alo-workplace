@@ -9,6 +9,17 @@ contracts.
 
 ## Unreleased
 
+- **Mail's controls no longer run off the edge of a narrow window, and its
+  toolbars say what they are.** The row above a conversation and the formatting
+  bar in compose now wrap onto a second line when the pane is too narrow for
+  them, instead of pushing Delete and Categorize out of reach — and each is
+  announced as a named set of controls rather than as a run of loose buttons.
+  Twelve of those formatting buttons used to be read out as switches that were
+  "not pressed", which was never true of any of them. Some of this looks
+  different: Reply all and Forward are now outlined buttons beside Reply, a
+  follow-up date is a filled pill rather than an outlined one and says
+  "Overdue" in words as well as in red, and a calendar invitation sits on the
+  same white as the message with a soft shadow instead of a grey panel.
 - **The Docs editor can now be used without a mouse, and says what it is doing
   to a screen reader.** The equation dialog and the insert-code dialog close on
   Escape and keep the keyboard inside them while they are open — before, Tab

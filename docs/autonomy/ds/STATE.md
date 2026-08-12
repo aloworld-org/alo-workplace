@@ -391,3 +391,129 @@ rewriting history is forbidden, so it stands as it is. Every commit from here
 writes the trailer explicitly rather than relying on the harness.
 
 **Next:** D2.02, migrate mail.
+
+## D2.02 — mail
+
+Seven stylesheets off the list, 36 → 29. The mail `.module.css` files and their
+`.tsx` lost 419 lines and gained 181 — a net deletion of 238 — and `ds/` grew by
+95 for the two widenings below.
+
+**Six of the seven were real adoptions and one was a name that was lying**, the
+reverse of D2.01's split. `mail` is chrome rather than documents, so a `.chip`
+here really was a chip.
+
+Adopted:
+
+- **`FlagDueControl`** → `ds/Chip` (button form) and `ds/Input`. The pill was a
+  hand-drawn button carrying a `title` and nothing else: a screen reader
+  announced a button that did something unspecified when pressed, with no hint
+  that a menu was behind it and no way to know whether it was open. It now says
+  both.
+- **`RecipientInput`** → `ds/Chip` (removable form). This one was already close
+  — it is where `Chip.removeLabel` came from at D1.02 — so the migration is
+  mostly deletion.
+- **`SnoozeMenu`** → `ds/IconButton`. It drew *two* triggers, one for the
+  toolbar and one for the list's bulk bar, differing only in corner radius and
+  two pixels of icon. Neither difference was a decision anybody made twice.
+- **`InvitationCard`** → `ds/Card` (`pad="sm"`) and `ds/Button`. Its three RSVP
+  buttons were styled by a bare `.actions button` descendant rule with an
+  `!important` triplet on top of it for Accept — and two of the three referenced
+  `styles.tentative` and `styles.decline`, which have never existed in that
+  stylesheet.
+- **`ReadingPane`** → `ds/Toolbar` (`surface="bar"`, `density="compact"`),
+  `ds/Button`, `ToolbarSpacer`. Its own media query — "on a phone the toolbar
+  can overflow; let it wrap" — is gone, because a `ds/Toolbar` wraps at every
+  width by default.
+- **`RichTextEditor`** → `ds/Toolbar`, `ds/Select variant="ghost"`,
+  `ds/IconButton`, `ToolbarDivider`. This is the bar that argued three of the
+  D1 components into existence, and it is the one that had `role="toolbar"`
+  with no arrow keys, no Home and no End behind it. It is now honestly a named
+  group (`keyboard="tab"`): the row holds two selects and two colour pickers,
+  where arrow keys belong to the control and not to us.
+
+Renamed, with the argument in the file:
+
+- `ComposeModal.modal` → `.window`. Not a styling call: `ds/Modal` is a
+  blocking dialog — centred, focus trapped, Escape closes it, the page behind
+  inert — and this is the opposite object. It docks in a corner so the rest of
+  mail stays usable while you write, it minimizes to its own title bar, and
+  Escape must not throw a half-written message away. Only its `full` view is
+  modal and that view already says so. The name is `window` so nothing invites
+  the confusion again.
+- `ComposeModal.fields` → `.headers`. A container that only decides where the
+  recipient and subject rows sit; each row is its own control.
+- `RecipientInput.input` → `.entry`, `.field` → `.tokens`. The tail you type
+  the next address into has no box of its own: the border and the rule under it
+  belong to the row, which is one field holding many recipients. A `ds/Input`
+  there would draw a second field inside the first — the same argument as
+  `ParagraphBlock.textArea` at D2.01.
+
+Also adopted although the ratchet does not match their names, because leaving
+them would have been the D2.01 finding in reverse: `ComposeModal.iconBtn` (four
+call sites) and `.fromSelect` → `ds/IconButton` and `ds/Select`;
+`ReadingPane.textBtn` → `ds/Button variant="ghost"`.
+
+Two widenings, both stated in their files:
+
+- **`Chip` gained a button form.** A chip is either a button (`onClick`, mail's
+  follow-up date, which opens a menu) or a chip with a button in it
+  (`onRemove`, a recipient). Both at once nests a button inside a button, which
+  renders perfectly happily and then swallows one of the two clicks, so asking
+  for both is reported in development rather than quietly resolved. It also
+  gained `tone`, named and matched to `Badge`'s, since the follow-up chip
+  carries three states.
+- **`IconButton` stopped claiming to be a toggle.** It set `aria-pressed` on
+  every button it rendered, so the twelve tools of the formatting bar were each
+  announced "not pressed" over text that may well have been bold — by a control
+  that tracks no state at all. `active` is now optional and `aria-pressed` is
+  written only when a caller passes it. The five callers that do (the rail, the
+  flag, sites' preview width) are unchanged.
+
+**Visible changes, recorded rather than softened.** The follow-up chip moves
+from an outlined pill to a filled one — it was the only chip in the product
+drawn with a border, and `danger`/`accent` say what its border colour used to.
+Reply all and Forward become outlined `ghost` buttons beside Reply, where they
+were borderless text. The invitation card moves from `--bg-raised` to the
+system's `--bg-surface` with `--shadow-sm`, so it is lifted off the reading pane
+rather than tinted against it. The compose window's From picker and the two
+formatting dropdowns get the shared select box (the D1.05 height change,
+arriving here). The formatting bar takes `Toolbar`'s `bar` padding, so the
+editor wrapper handed its horizontal padding to the toolbar and the body
+separately.
+
+Verified: 12 behaviour tests in `mail/components/adoption.test.tsx` and 3 in
+`ds/Chip.test.tsx`, each naming what the hand-built version did instead — the
+due chip's `aria-haspopup`/`aria-expanded`, overdue said in words, the picked
+date still reporting end-of-day rather than midnight, the snooze trigger no
+longer announced as an unpressed toggle, each recipient's remove button naming
+its own recipient, removal keeping the rest, the formatting bar as a named group
+with no `role="toolbar"`, `mousedown` still prevented so a tool does not steal
+the caret from the body, and both dropdowns still named. `npx tsc --noEmit`,
+`npx eslint src/mail src/ds src/i18n --max-warnings 0`, `npm run build` and
+`npx vitest run src` (76 files, 694 tests) all green. A dangling-class check
+across all seven files found no `styles.x` pointing at a rule that no longer
+exists. The 4 unhandled rejections from `sites/Theme.test.tsx` are still there:
+pre-existing, another track's area, non-failing.
+
+**Two test files arrived as inherited work.** `ds/Chip.test.tsx` and
+`mail/components/adoption.test.tsx` were sitting untracked in the checkout at
+the start of this iteration — written by an earlier D2.02 attempt whose
+implementation the wrapper discarded, exactly as the headless-discipline
+section warns. They were treated as a specification and the implementation
+written to meet them; both pass. Worth knowing because it means the tests were
+written before this code and not against it.
+
+**Cut: no screenshot, same as D2.01.** There is still no browser and no
+screenshot tool in this environment (no Playwright or Puppeteer in `web/`), so
+the queue's "look at it" step cannot be done as written. What replaced it: the
+15 DOM-level assertions above, the dangling-class check, and a production build.
+That is not the same as looking. The shipped CSS is now 909.8 KB across four
+files — the number D3.01 is asked to compare against 252 KB, which does not
+match anything measured here and should be re-derived rather than trusted.
+
+**Flagged for D3.01, carried forward from D2.01:** the design system still has
+no multi-line text control, and mail adds callers to the 27 `<textarea>`
+elements already counted. Still worth its own item rather than an invention
+mid-migration.
+
+**Next:** D2.03, migrate shell.
