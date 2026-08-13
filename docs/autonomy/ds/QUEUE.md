@@ -135,7 +135,7 @@ reach zero from this queue alone, and D3.01 accounts for that.
 - [x] D2.03 Migrate **shell** (7 stylesheets — badge,button,card,field,input,modal,select,toggle) to `ds/`: adopt the components, delete the local rules, remove the lines from `ds/redefined.ts`, and screenshot one screen from the area.
 - [x] D2.04 Migrate **drive** (3 stylesheets — chip,dialog,input) to `ds/`: adopt the components, delete the local rules, remove the lines from `ds/redefined.ts`, and screenshot one screen from the area.
 - [x] D2.05 Migrate **admin**, **agenda**, **auth** — one commit, same loop: adopt, delete, remove the lines, screenshot.
-- [ ] D2.06 Migrate **billing**, **chat**, **contacts** — one commit, same loop: adopt, delete, remove the lines, screenshot.
+- [ ] D2.06 Migrate **billing**, **chat**, **contacts** — chat is done; billing and contacts remain.
 - [ ] D2.07 Migrate **crm**, **finance**, **home** — one commit, same loop: adopt, delete, remove the lines, screenshot.
 - [ ] D2.08 Migrate **hr**, **importer**, **insights** — one commit, same loop: adopt, delete, remove the lines, screenshot.
 - [ ] D2.09 Migrate **inventory**, **invite**, **meet** — one commit, same loop: adopt, delete, remove the lines, screenshot.
