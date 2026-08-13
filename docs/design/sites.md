@@ -1091,6 +1091,48 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
   bump aggregate} for the resolved site — no read-back surface exists
   publicly.
 
+### Who may use the edit surface, as built (S2.16a)
+
+The wave review re-walked the whole authenticated surface — 85 route templates
+under `/sites/*`, against the grant that was written when there were a dozen.
+What it found and what it fixed:
+
+- **The API answers at two addresses, and the browser only uses the second
+  one.** `server::routes` mounts the entire router a second time under `/api`,
+  and production Caddy proxies `/api/*` and nothing else — so every
+  authenticated request a real user makes is `/api/sites/…`, and the bare path
+  is a test-only address. Three middlewares read the matched route template;
+  only [`module_access`] normalised the mount away. The site-editor branch of
+  [`scoped_roles`] matched `"/sites/{id}"` literally, so **every restricted
+  collaborator was refused every route, including their own site**, at the only
+  address the product uses — while the bare-path tests stayed green. Fixed by
+  reading both the template and the path through `without_api_mount`, and both
+  mounts are now asserted in the same test. The rule for anything added later:
+  a gate that reads a template must normalise the mount, and its test must
+  knock at `/api/…`, because that is the door.
+- **The middleware decides the *surface*, the handler decides the *door*.**
+  `enforce_scoped_roles` says yes to any `/sites/{id}…` template once
+  `can_edit_site` holds — by construction, so a route added tomorrow inherits
+  it. What separates building a website from running the business behind it is
+  therefore a per-handler guard, and the review knocked on each one:
+  `require_site_manager` for the collaborator list and for every
+  `domain-purchases` route (money), and `require_crm_reader` for the leads and
+  attribution routes (CRM/Billing identities). All held. The matrix is pinned
+  by `the_editor_matrix_holds_over_the_surface_added_after_the_grant`.
+- **A collaborator reads the records the website produced** — form
+  submissions, orders, bookings, analytics — because those are Sites' own
+  records and answering an enquiry is part of the job the invitation is for.
+  It is a wider grant than "edit these pages", and it is stated here rather
+  than left to be discovered from a route table: an outside contractor invited
+  to a site can read the names and email addresses of the people who wrote to
+  it. Narrowing it is a product decision, not a bug fix; if it narrows, the
+  place to say so is the invite screen, which today promises only editing.
+- **Two doors are deliberately open to anyone**, and neither is a session:
+  the invitation token routes (a person accepting an invitation has no account
+  yet) and `POST /sites/domain-payments/settle`, which carries the deployment's
+  settlement secret because a tenant may not declare their own payment
+  settled. Both are documented at their handlers.
+
 ## Out of scope (v1 — cuts are decisions)
 
 - E-commerce checkout (S+ / ADR 0041's later waves). The catalog storefront

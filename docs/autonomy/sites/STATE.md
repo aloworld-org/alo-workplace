@@ -6072,3 +6072,82 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.16 (wave review: complete browser arcs, accessibility,
   responsiveness, performance, language parity, privacy/security
   reconciliation, changelog, as-built docs, final cross-service transcripts).
+
+## 2026-08-13 — S2.16a the address nobody tested, and who may open which door
+
+- **Item:** S2.16a — the security half of the wave review: the authenticated
+  `/sites/*` surface re-walked against the site-editor grant (S2.03a), the
+  money door (S2.15c) and the CRM/Billing seam (S2.10b), at both addresses the
+  API answers on. **S2.16 was split** into a (this), b (accessibility and
+  language), c (as-built docs and the human inbox) and d (the final
+  cross-service arcs) — one turn cannot hold four reviews at full depth, and a
+  half-done review reports a clean bill it did not earn.
+- **Found, on the wire: every site collaborator was locked out of everything.**
+  `server::routes` mounts the whole router a second time under `/api`, and
+  production Caddy proxies `/api/*` and nothing else (`deploy/production/
+  Caddyfile:42`) — so every authenticated request a real user makes is
+  `/api/sites/…`. Three middlewares read the matched route template;
+  `module_access` normalises the mount away, `scoped_roles`' site-editor branch
+  matched `"/sites/{id}"` **literally**. A restricted collaborator therefore
+  fell to the catch-all arm and got `403 this site editor can use only the
+  websites they have been invited to` for every request — including the site
+  they had just been invited to. S2.03a/S2.03b were shipped and tested entirely
+  at the bare mount, which no browser and no deployment uses, so the feature has
+  been dead in the product since it landed and green in CI the whole time.
+- **Shipped:**
+  - `without_api_mount` in `scoped_roles.rs` — a whole-segment `/api` strip
+    applied to the template *and* to the path the site id is read out of
+    (`/api/sites/{id}/…` → position 2 again). Deliberately not `module_of`'s
+    `find(segment != "api")`, which drops the segment wherever it appears and
+    keeps only the first one; this one keeps the rest of the path.
+  - `the_api_mount_scopes_a_site_editor_exactly_as_the_bare_path_does` — the
+    granted site listed, its pages read and its name changed through `/api`,
+    and the closed half proven still closed there: another site, an unknown
+    site, `/api/contacts`, `/api/drive/list`, `/api/billing/customers`,
+    `/api/admin/users`. It failed before the fix (403 vs 200, line 156) and
+    passes after. **It is the only test in the whole alo-jmap crate that knocks
+    at the `/api` mount** — 738 tests ran here and one address had never been
+    exercised.
+  - `the_editor_matrix_holds_over_the_surface_added_after_the_grant` — the
+    matrix the review was for. The middleware says yes to *any* `/sites/{id}…`
+    template once `can_edit_site` holds, so what keeps the money and the
+    business shut is a per-handler guard, and each was knocked on: open —
+    pages, posts, submissions, orders, bookings, catalogs, analytics, heatmap,
+    conversions, domains, publishes; refused — collaborators, domain-purchases,
+    leads, attribution, and the site-less `domain-catalog`/`domain-search`. All
+    held on the first run; that is the evidence, not the assumption.
+  - The as-built matrix written into `docs/design/sites.md` ("Who may use the
+    edit surface, as built (S2.16a)"), including the two deliberately
+    session-less doors (invitation tokens, the settlement secret), and a
+    CHANGELOG entry in the user's voice.
+- **Verified** (foreground, real exit codes): `cargo fmt -p alo-jmap`;
+  `SQLX_OFFLINE=true cargo clippy -p alo-jmap --all-targets` clean;
+  `cargo nextest run -p alo-jmap -E 'kind(lib) or binary(site_editor_role_http)
+  or binary(accountant_role_http) or binary(audit_http) or binary(audit_routes)
+  or binary(sites_http) or binary(sites_domain_purchases_http)'` — **738 tests,
+  all green, 19 s**. Test DB pruned first (291 → 190 tenants, 79 MB). No web
+  files touched, so no tsc/eslint/build in this item.
+- **Flags for the human — two of them are the business track's to fix, and I
+  did not touch their files:**
+  1. **The business audit trail records nothing for anything done in the
+     browser.** `audit_action::event_for` takes the module from
+     `segments(template).first()`, which is `"api"` for every request through
+     the mount production proxies, and `"api"` is not in `AUDITED_MODULES`, so
+     the event is `None` and no row is written. Same root cause as the bug
+     fixed here; same one-line shape of fix, in `audit_action.rs` (B2.13, the
+     business track's file). Worth checking before anyone relies on that log.
+  2. **`scoped_roles`' accountant branch passes the un-normalised template to
+     `audit_action::writes_nothing`**, so the listed dry runs (e.g. `POST
+     /crm/imports/leads/preview`) are treated as writes at the `/api` address
+     and refused to an accountant. Fail-closed, so a nuisance rather than a
+     hole; left for the owner of that rule.
+  3. **A site collaborator can read the website's submissions, orders and
+     bookings** — names, email addresses, what people wrote and what they
+     ordered. Defensible (answering an enquiry is the job) but wider than the
+     invite screen promises, and it is a product decision, not a bug fix.
+     Stated in the design doc; if it narrows, the invite screen is where it
+     should be said.
+- **Cuts:** none in this item's scope. The remaining three quarters of the wave
+  review are S2.16b/c/d, listed above.
+- **Next:** S2.16b (accessibility and responsiveness over every sites screen,
+  plus the language-parity re-check).

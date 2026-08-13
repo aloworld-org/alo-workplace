@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Fixed: people invited to help with a website could not open it.** A
+  collaborator invited to one website was refused everywhere in alo — including
+  the website they had just been invited to — because the check that keeps them
+  to that one site did not recognise the address the app actually calls. Their
+  invitations, sites, pages and publishing now work as they were meant to, and
+  everything the invitation does not cover stays shut exactly as before: the
+  rest of the workspace, this website's other collaborators, its domain
+  purchases, and the customer records held in alo CRM and Billing.
+
 - **Your website now has a Domains screen, and it tells you what a domain really
   costs.** Connect a domain you already own — add it, publish the exact record
   shown at your DNS host, press Check, and if it has not travelled yet the screen
