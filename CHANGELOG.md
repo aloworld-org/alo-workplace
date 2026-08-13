@@ -10,6 +10,18 @@ contracts.
 
 ## Unreleased
 
+- **Fixed: the website dialogs can now be used without a mouse, and they fit a
+  phone.** Opening a dialog — new website, new page, theme, publish, the picker
+  you add a section from, any of them — now moves the cursor into it, keeps Tab
+  inside it instead of walking onto the page it is covering, closes on Escape
+  from the moment it opens, and hands focus back to whatever you pressed to
+  open it. The cross in the corner is called Close, so it is no longer the
+  second thing named Cancel in the same box. Six website screens — analytics,
+  funnel, heatmap, catalogue, bookings and collections — offered a screen
+  reader two "main" regions to jump to; now they offer the one that is really
+  there. On a phone, the title bars, the list headings and the paired fields in
+  the dialogs now stack instead of running off the side of the screen.
+
 - **Fixed: people invited to help with a website could not open it.** A
   collaborator invited to one website was refused everywhere in alo — including
   the website they had just been invited to — because the check that keeps them

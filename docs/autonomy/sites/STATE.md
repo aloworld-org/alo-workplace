@@ -6151,3 +6151,85 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   review are S2.16b/c/d, listed above.
 - **Next:** S2.16b (accessibility and responsiveness over every sites screen,
   plus the language-parity re-check).
+
+## 2026-08-13 — S2.16b thirteen dialogs that said "dialog" and behaved like a div
+
+- **Item:** S2.16b — the accessibility and responsiveness half of the wave
+  review: every sites screen against `docs/design/ux-principles.md` and the
+  keyboard/screen-reader basics, plus the language-parity re-check.
+- **Found, and all of it real:**
+  1. **No dialog on the surface could be used without a mouse.** All thirteen
+     (`DialogFrame` carries twelve — new site, new page, theme, SEO, post
+     publish, catalog item, domain purchase, handoff, the section prop forms —
+     and `SectionPicker` is its own) announced `role="dialog"
+     aria-modal="true"` and then did none of what that promises. Focus stayed
+     on the button behind the scrim, so the first Tab went to whatever followed
+     that button *on the covered page*; Tab kept walking through the page
+     underneath, which a screen reader reads out although it cannot be clicked;
+     Escape was handled on the panel, so it did nothing until focus had already
+     been moved inside by hand; and closing dropped the caret at the top of the
+     document. Five dialogs autofocus their first field and so escaped the
+     first symptom only — the trap and the Escape were missing everywhere.
+  2. **Two controls named "Cancel" in every dialog**: the corner cross carried
+     `aria-label={strings.sitesCancel}` beside the footer's Cancel button. In a
+     rotor listing that is the same word twice with nothing to choose between.
+  3. **Six screens opened a second `<main>` inside the shell's** (analytics,
+     funnel, heatmap, catalogs, bookings, collections). Nested `main` is
+     invalid, and a landmark list offering "main" twice offers a choice that
+     means nothing.
+  4. **The stylesheet had six media queries for 3 646 lines** — the schedule,
+     protect, collaborator, copy-tone and AI-composer panels and the editor's
+     two columns — and nothing for the layouts every screen is built from.
+- **Shipped:**
+  - `useDialogKeyboard.ts` — focus in on open (yielding to a child's
+    `autoFocus`), a Tab trap that also pulls back focus found outside the
+    panel, Escape on a document-level capture listener so it works from the
+    opener, and focus restored to the opener on close. Two details that are
+    not in `ds/Modal.tsx`, which is the canonical copy this one mirrors (ADR
+    0045 keeps the ds track out of `web/src/sites/**`, so the chrome and its
+    behaviour live here): the opener is captured **during render**, because
+    React applies a child's `autoFocus` in the same commit and by effect time
+    the opener is already lost; and `onClose` is read through a ref rather than
+    an effect dependency, so a parent re-render cannot yank focus back to the
+    close button while somebody is typing.
+  - `strings.close` on both frames' corner crosses — an existing key, already
+    in fr and nl, so no new translation debt.
+  - The six nested `<main>`s are `<div>`s; `SiteInvitationView` keeps its own,
+    correctly — `App.tsx` routes it outside `AppShell`.
+  - Phone-width rules at 40rem for what cannot reflow on its own: `.header`
+    and `.sectionBar` wrap, `.headerActions` loses its `margin-left: auto`,
+    `.title`/`.mono` break an unbroken word, `.fieldRow`/`.onboardingChoices`/
+    `.translationFields` collapse to one column, the five-column
+    `.translationReviewItem` stacks, and `.tableWrap` stops spending 48px of a
+    360px screen on its own margins. `flex-wrap` only acts once a row has run
+    out of room, so the wide layout is untouched.
+  - `DialogKeyboard.test.tsx` (9 tests) and `SitesLandmarks.test.ts` (3), the
+    latter a source ratchet in `ds/primitives.test.ts`'s shape because the
+    mistake is invisible in the file it is made in.
+- **Verified** (foreground, real exit codes): `npx tsc --noEmit` clean; `npx
+  eslint src/sites` clean; `npx vitest run src/sites src/i18n` — **278 tests,
+  22 files, all green**; `npm run build` clean. The nine dialog tests were run
+  against the unfixed components first: **6 of 9 failed**, which is the
+  evidence that they test the defect and not the fix. **Language parity
+  re-checked**: `i18n/locale.test.ts` 65 tests green with `UNTRANSLATED` still
+  empty, and this item added no English key. No Rust touched, no new route.
+- **Cuts — the half a loop cannot do, now S2.16b2.** Everything above was found
+  by reading source and proven by a test. Nobody looked at a screen. Focus
+  *order* through the page editor's section stack and its drag-reorder, the
+  analytics and heatmap surfaces at 360px, contrast on the status chips, and
+  reduced-motion all need a browser this loop does not have, and a review that
+  only read the source must not claim to have looked. Queued rather than
+  quietly folded into S2.16d.
+- **Flags:**
+  - `ImageFraming`'s crop rectangle and focal point are `role="button"` with
+    arrow-key handlers and `aria-label`s, with the four numeric fields beneath
+    as the exact path. Operable, but a two-dimensional value announced as a
+    button is a stretch of the role; the numbers make it non-blocking. Left as
+    a product/design question rather than churned in a review.
+  - `ds/Modal.tsx` re-runs its focus effect on every `onClose` identity change
+    and captures the opener in the effect. Both are fixed in this module's
+    copy; the ds track owns that file and this track must not edit it (ADR
+    0045). Worth carrying across.
+- **Next:** S2.16c (as-built docs: `docs/design/sites.md` reconciled with what
+  S2 shipped, the features.md [S2] table, the CHANGELOG sweep and the
+  human-inbox summary).
