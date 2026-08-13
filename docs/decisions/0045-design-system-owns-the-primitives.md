@@ -1,9 +1,21 @@
 # ADR 0045 — The design system owns the primitives
 
-**Status:** accepted
+**Status:** accepted — **styling half superseded by ADR 0046** (2026-08-13)
 **Date:** 2026-08-12
 **Context:** `web/src/ds/`, `web/src/ds/primitives.test.ts`, ADR 0042
 (direct-manipulation editing)
+
+> **Read this alongside ADR 0046.** The decision below — that primitives are
+> components in `ds/` rather than classes each module rewrites for itself,
+> enforced by a test — **still stands, and is the load-bearing half of this
+> ADR**. What no longer holds is the styling mechanism: the paragraph rejecting
+> Tailwind was overruled by the owner on 2026-08-13, on the weighting of
+> editing cost against migration cost, not on any measurement here — none of
+> which was disputed. Styles are now Tailwind utilities generated from these
+> same tokens, so the 98.6% token discipline this ADR measured is preserved
+> rather than discarded. The composition argument is untouched: utility class
+> strings do not compose either, which is exactly why `ds/` still owns the
+> primitives.
 
 ## The decision in one line
 
