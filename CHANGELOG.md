@@ -63,6 +63,21 @@ contracts.
   changes the short handle underneath it, so a page that shows one group keeps
   showing it.
 
+- **Drive's dialogs can now be closed with Escape, and its Base grids say what
+  each cell is.** "Move to…", version history and a Space's members keep the
+  keyboard inside them while they are open — before, Tab walked straight out
+  onto the file list behind, where a screen reader read out files you could no
+  longer reach — Escape closes them, and closing one puts the cursor back on
+  whatever you opened it from. On the members list, each Remove button now
+  names the person it removes rather than every row saying only "Remove", and
+  the box and dropdown for adding someone say what they are for instead of the
+  dropdown being announced as whichever role it currently shows. In a Base,
+  every cell you type into now carries its column's name, so a row read aloud
+  is Budget and Owner rather than eight anonymous edit fields. Some of this
+  looks slightly different: the three dialogs sit on the same panel as every
+  other dialog in alo, and the coloured tags on a Base's choice fields are the
+  shared ones — same shape and spacing as the tags elsewhere in the product,
+  still carrying the colour that tells one choice from another.
 - **Settings can now be closed with Escape, and every box in it says what it
   is for.** The Settings panel keeps the keyboard inside it while it is open —
   before, Tab walked straight out onto the mailbox behind — and Escape closes

@@ -808,3 +808,90 @@ seen, four prose mentions ignored.
 does not match what the build actually emits (909.8 KB across four files). The
 review item should re-derive it rather than compare against a number this
 session wrote down wrongly.
+
+## D2.04 — drive migrated to `ds/`, 2026-08-13
+
+Three stylesheets off `ds/redefined.ts`: `drive/BaseEditor.module.css`,
+`drive/DriveModule.module.css`, `drive/docBlocks.module.css`. The list is now
+down to nineteen files, of which `sites/SitesModule.module.css` is the other
+track's and stays.
+
+**What was adopted.** The three Drive dialogs — "Move to…"/"Copy to…", version
+history, and a Space's members — are `ds/Modal`. The Base cell editors are
+`ds/Input`, the Base chips are `ds/Chip`, and the members dialog's add row is
+`ds/Input` + `ds/Select` + `ds/Button`. `docBlocks.module.css` needed no
+adoption at all: its `.edit`/`.tag`/`.input` rows had stopped being rendered
+when the equation block started opening `authoring/EquationEditor`, so they
+were dead code and are simply gone.
+
+**Two components were widened rather than worked around**, as the queue's rule
+requires:
+
+* `ds/Input` gained `variant="cell"` — the editor inside a grid cell, where the
+  cell already draws the box. Border transparent rather than removed (so the
+  `invalid` state still has something to colour and the width does not move),
+  focus ring drawn *inside* the cell so a table edge does not clip it, and
+  13px text, which is a density decision the Base tables were built at.
+* `ds/Chip` gained `color` — a colour derived from the chip's **value**, not
+  its state. Base select fields invent their own choices, so no named tone can
+  cover them; the component mixes the colour (16% fill, 70% label) through
+  `--chip-color` so no caller writes the mix. `tone` answers a different
+  question and `color` overrides it; both are documented as mutually exclusive.
+
+**Also fixed while in there**, both a11y rather than styling: each member row's
+Remove button now names the person (`driveRemoveMemberFor`), and the add-member
+input and role select have accessible names (`driveAddMemberLabel`,
+`driveMemberRoleLabel`) — `ds/Select`'s dev-mode check would otherwise have
+shouted on every render. All three keys added to en/fr/nl; `UNTRANSLATED` stays
+empty.
+
+Verified: 14 behaviour tests in `drive/adoption.test.tsx`, each naming what the
+hand-built version did instead — the dialog role and `aria-modal` (there was no
+role at all), Escape closing, the backdrop still dismissing while a press
+inside the panel does not, the focus trap returning Tab from the last control
+to the first and Shift+Tab back, focus returning to the opener on unmount, the
+role select named by its question rather than its answer (with `console.error`
+asserted silent), each Remove naming its member, Enter in the email box still
+adding (the risk of swapping a native input for a component), `ds/Button`
+defaulting to `type="button"`, the version-load error keeping its `role=alert`
+inside the new body, every Base cell named by its column, the cell still
+committing on blur, and the choice colour surviving as `--chip-color` while a
+link chip stays neutral. `npx tsc --noEmit`, `npx eslint src/drive src/ds
+src/i18n --max-warnings 0`, `npm run build` and `npx vitest run src` (82 files,
+769 tests) all green. A dangling-class check both ways across the three
+stylesheets found no `styles.x` pointing at a deleted rule; the two orphan
+rules it did report (`BaseEditor .center`, `DriveModule .view_*`) predate this
+item and were not touched. The 4 unhandled rejections from
+`sites/Theme.test.tsx` are still there: pre-existing, another track's area,
+non-failing.
+
+**A mock that was measuring a render loop.** The first draft of the test file
+returned a fresh client object from `useJmapClient()` on every render. Both
+dialogs list `client` in an effect's dependencies, so the effect re-fired
+forever and the "Enter adds the member" test failed for a reason that had
+nothing to do with the component. One module-level client object fixed it.
+Worth remembering: a mock hook that returns an object literal is a re-render
+loop waiting for the first component that depends on its identity.
+
+**Cut: no screenshot, the same cut as D2.01–D2.03.** Still no browser and no
+screenshot tool in this environment — no Playwright or Puppeteer in `web/`,
+checked again. What replaced it: the 14 DOM-level assertions above, the
+dangling-class check, and a production build.
+
+**For D3.01, a number that moved the wrong way.** CSS *source* fell by 63 lines
+(59 added, 122 removed across five stylesheets) — a net deletion, as a
+migration should be. The *shipped* CSS did not: `ls -l dist/assets/*.css` after
+`npm run build` totals **936,779 bytes across 27 files**, against the 932,239
+across 27 recorded at D2.03 — 4.5 KB *up*. The obvious explanation (ds rules
+duplicated into many chunks by Vite's CSS code splitting) does not hold: only 2
+of the 27 files contain the new `--chip-color` rule. No baseline rebuild was
+done to chase it, because that is D3.01's job and D3.01 must re-derive the
+figure with a stated method anyway. The finding to carry forward is that the
+shipped total is not a usable per-item signal — a 63-line source deletion moved
+it up — so D3.01 should measure something it can attribute, per-chunk or with
+the vendor CSS (katex, BlockNote, Collabora) separated out.
+
+**Still flagged for D3.01, carried forward from D2.01–D2.03:** the design
+system has no multi-line text control.
+
+**Next:** D2.05, migrate admin, agenda and auth in one commit.
