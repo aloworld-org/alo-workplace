@@ -22,10 +22,14 @@ use super::html::{esc, safe_href};
 use super::money::format_price;
 use super::{PageRenderContext, SiteRenderContext};
 
-/// Which typed property a rendered element's text came from — the whole of
-/// direct manipulation on the editor side (ADR 0042).
+/// Which typed field a rendered element came from — the whole of direct
+/// manipulation on the editor side (ADR 0042).
 ///
-/// In the editable draft preview every element whose text is **exactly one
+/// Two annotations, both only in the editable draft preview. A section's root
+/// element carries `data-alo-section="<index>"`, which is the coordinate a
+/// `reorder_section` operation names, so a section dragged on the page and a
+/// section the assistant moves are the same change (S3.01b). And every
+/// element whose text is **exactly one
 /// typed string** carries `data-alo-text="<section index><JSON pointer>"`,
 /// e.g. `data-alo-text="2/items/0/title"`. That is the same coordinate a
 /// `rewrite_copy` edit operation names, so a person typing on the page and a
@@ -83,6 +87,30 @@ impl Marks {
         }
         format!(" data-alo-text=\"{}{pointer}\"", self.index)
     }
+
+    /// The attribute naming this section's **position in the page envelope**,
+    /// on the element that is the whole section — the coordinate a
+    /// `reorder_section` operation names (S3.01b).
+    ///
+    /// One element per section, so a drag has exactly one thing to pick up and
+    /// the editor has exactly one number to send. `sealed()` does not remove
+    /// it: a custom-code block may be moved and deleted like any other section
+    /// (`alo_ai::site_edits` refuses only *writing* one), so it is draggable
+    /// even though nothing inside it is typed into.
+    pub(super) fn block(self) -> String {
+        if !self.editable {
+            return String::new();
+        }
+        format!(" data-alo-section=\"{}\"", self.index)
+    }
+}
+
+/// Opens a section's root element: `<section class="s-hero">`, plus its
+/// position when the document is the editable preview. Every section type goes
+/// through here, so "one element per section, carrying its index" is a
+/// property of the renderer rather than of sixteen remembered call sites.
+pub(super) fn open_section(out: &mut String, tag: &str, class: &str, m: Marks) {
+    out.push_str(&format!("<{tag} class=\"{class}\"{}>\n", m.block()));
 }
 
 /// A `nav` section, rendered as a `<header>` landmark. The brand link shows
@@ -91,7 +119,7 @@ impl Marks {
 /// JavaScript is unavailable.
 pub(super) fn nav(out: &mut String, site: &SiteRenderContext<'_>, s: &NavSection, m: Marks) {
     let menu_id = format!("nav-menu-{}", m.index);
-    out.push_str("<header class=\"s-nav\">\n");
+    open_section(out, "header", "s-nav", m);
     out.push_str(&format!(
         "<nav aria-label=\"{}\">\n",
         esc(site.strings.nav_label)
@@ -127,7 +155,7 @@ pub(super) fn nav(out: &mut String, site: &SiteRenderContext<'_>, s: &NavSection
 
 /// A `footer` section, rendered as a `<footer>` landmark.
 pub(super) fn footer(out: &mut String, site: &SiteRenderContext<'_>, s: &FooterSection, m: Marks) {
-    out.push_str("<footer class=\"s-footer\">\n");
+    open_section(out, "footer", "s-footer", m);
     if !s.links.is_empty() {
         out.push_str(&format!(
             "<nav aria-label=\"{}\">\n<ul>\n",
@@ -198,7 +226,7 @@ fn custom_code(
     section: &CustomCodeSection,
     m: Marks,
 ) {
-    out.push_str("<section class=\"s-custom-code\">\n");
+    open_section(out, "section", "s-custom-code", m);
     push_opt_heading(out, section.heading.as_deref(), m.sealed());
     out.push_str(&format!(
         "<iframe class=\"custom-frame\" title=\"{}\" sandbox=\"{}\" loading=\"lazy\" \
@@ -275,7 +303,7 @@ fn catalog(
     snapshots: &std::collections::HashMap<String, SiteCatalogSnapshot>,
     m: Marks,
 ) {
-    out.push_str("<section class=\"s-catalog\">\n");
+    open_section(out, "section", "s-catalog", m);
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.catalog_id.as_str()) else {
         tracing::warn!(
@@ -486,7 +514,7 @@ fn booking(
     m: Marks,
 ) {
     let t = site.strings;
-    out.push_str("<section class=\"s-booking\">\n");
+    open_section(out, "section", "s-booking", m);
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.booking_id.as_str()) else {
         tracing::warn!(
@@ -549,7 +577,7 @@ fn collection(
     snapshots: &std::collections::HashMap<String, SiteCollectionSnapshot>,
     m: Marks,
 ) {
-    out.push_str("<section class=\"s-collection\">\n");
+    open_section(out, "section", "s-collection", m);
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.collection_id.as_str()) else {
         tracing::warn!(
@@ -615,7 +643,7 @@ fn collection(
 }
 
 fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Marks) {
-    out.push_str("<section class=\"s-hero\">\n");
+    open_section(out, "section", "s-hero", m);
     out.push_str(&format!(
         "<h1{}>{}</h1>\n",
         m.at("/heading"),
@@ -645,7 +673,7 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
 }
 
 fn features(out: &mut String, s: &FeaturesSection, m: Marks) {
-    out.push_str("<section class=\"s-features\">\n");
+    open_section(out, "section", "s-features", m);
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(intro) = &s.intro {
         out.push_str(&format!(
@@ -672,7 +700,7 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
         ImageSide::Left => "image-left",
         ImageSide::Right => "image-right",
     };
-    out.push_str(&format!("<section class=\"s-text-image {side}\">\n"));
+    open_section(out, "section", &format!("s-text-image {side}"), m);
     push_figure(out, site, &s.image, ImageSlot::Half);
     out.push_str("<div class=\"text\">\n");
     push_opt_heading(out, s.heading.as_deref(), m);
@@ -681,7 +709,7 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
 }
 
 fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m: Marks) {
-    out.push_str("<section class=\"s-gallery\">\n");
+    open_section(out, "section", "s-gallery", m);
     push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul class=\"grid\">\n");
     for image in &s.images {
@@ -693,7 +721,7 @@ fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m
 }
 
 fn testimonials(out: &mut String, s: &TestimonialsSection, m: Marks) {
-    out.push_str("<section class=\"s-testimonials\">\n");
+    open_section(out, "section", "s-testimonials", m);
     push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul>\n");
     for (i, item) in s.items.iter().enumerate() {
@@ -715,7 +743,7 @@ fn testimonials(out: &mut String, s: &TestimonialsSection, m: Marks) {
 }
 
 fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
-    out.push_str("<section class=\"s-pricing\">\n");
+    open_section(out, "section", "s-pricing", m);
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(intro) = &s.intro {
         out.push_str(&format!(
@@ -771,7 +799,7 @@ fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
 }
 
 fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Marks) {
-    out.push_str("<section class=\"s-team\">\n");
+    open_section(out, "section", "s-team", m);
     push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul class=\"grid\">\n");
     for (i, member) in s.members.iter().enumerate() {
@@ -804,7 +832,7 @@ fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Mark
 }
 
 fn faq(out: &mut String, s: &FaqSection, m: Marks) {
-    out.push_str("<section class=\"s-faq\">\n");
+    open_section(out, "section", "s-faq", m);
     push_opt_heading(out, s.heading.as_deref(), m);
     for (i, item) in s.items.iter().enumerate() {
         // <details>/<summary> is a native, scriptless accordion.
@@ -820,7 +848,7 @@ fn faq(out: &mut String, s: &FaqSection, m: Marks) {
 }
 
 fn cta(out: &mut String, s: &CtaSection, m: Marks) {
-    out.push_str("<section class=\"s-cta\">\n");
+    open_section(out, "section", "s-cta", m);
     out.push_str(&format!(
         "<h2{}>{}</h2>\n",
         m.at("/heading"),
@@ -841,7 +869,7 @@ fn cta(out: &mut String, s: &CtaSection, m: Marks) {
 /// filling it is bot traffic, silently dropped by the forms backend).
 fn contact_form(out: &mut String, site: &SiteRenderContext<'_>, s: &ContactFormSection, m: Marks) {
     let index = m.index;
-    out.push_str("<section class=\"s-contact-form\">\n");
+    open_section(out, "section", "s-contact-form", m);
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(body) = &s.body {
         out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));

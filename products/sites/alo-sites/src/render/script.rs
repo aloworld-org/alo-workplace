@@ -160,7 +160,16 @@ pub(crate) const BEACON_SCRIPT: &str = r#"<script>(function () {
 /// instead of inventing a grey that may fail on a dark site. Focus gets a
 /// solid two-pixel ring: the same affordance the app's own fields have, and
 /// the one a keyboard user needs to know where they are.
-pub(super) const EDIT_STYLE: &str = r#"<style>[data-alo-text]{outline:1px dashed color-mix(in srgb,currentColor 40%,transparent);outline-offset:3px;border-radius:2px}[data-alo-text]:hover{outline-style:solid}[data-alo-text]:focus{outline:2px solid currentColor;outline-offset:3px}[data-alo-text]:focus-visible{outline:2px solid currentColor}</style>
+///
+/// Sections get the same treatment one level out, plus a grab cursor — the
+/// affordance that says a section can be picked up (S3.01b). **Every
+/// declaration here is layout-neutral by construction**: `outline`, `cursor`
+/// and `opacity` change no box on the page. Nothing sets `position`, and that
+/// is deliberate rather than an omission — `position:relative` on a section
+/// would become the containing block of any absolutely positioned descendant,
+/// and a preview that lays a page out differently from the published one is a
+/// preview that lies.
+pub(super) const EDIT_STYLE: &str = r#"<style>[data-alo-text]{outline:1px dashed color-mix(in srgb,currentColor 40%,transparent);outline-offset:3px;border-radius:2px}[data-alo-text]:hover{outline-style:solid}[data-alo-text]:focus{outline:2px solid currentColor;outline-offset:3px}[data-alo-text]:focus-visible{outline:2px solid currentColor}main>[data-alo-section]{cursor:grab}main>[data-alo-section]:hover{outline:1px dashed color-mix(in srgb,currentColor 30%,transparent);outline-offset:6px}main>[data-alo-section]:focus{outline:2px solid currentColor;outline-offset:6px}main>[data-alo-section].alo-moving{opacity:.55;cursor:grabbing}</style>
 "#;
 
 /// Direct manipulation, the page's half (ADR 0042): every element the renderer
@@ -187,11 +196,41 @@ pub(super) const EDIT_STYLE: &str = r#"<style>[data-alo-text]{outline:1px dashed
 /// - **Links and forms do nothing.** In a preview a navigation cannot arrive
 ///   anywhere (there is no origin behind it) and would silently discard the
 ///   edit in progress; the published page keeps every one of them.
+///
+/// # Moving a section (S3.01b)
+///
+/// The second half of the same idea: a section is picked up on the page and
+/// the page **reflows under the pointer** — the node really is moved in the
+/// DOM on every `dragover`, so what is being previewed during the drag is the
+/// arrangement itself, not a placeholder standing in for it. Only `<main>`'s
+/// own children take part; the nav and the footer are landmarks, not stack
+/// positions, and offering to drag them would offer an arrangement the
+/// renderer will not honour.
+///
+/// - **The report is a neighbour, never a destination.** The frame posts
+///   `{alo:"site-section-move",from,before}` where `before` is the *original*
+///   index of the section the moved one now sits above (`null` at the end).
+///   Turning that into a `reorder_section` destination is index arithmetic on
+///   a list this document does not have — the editor holds the sections, so
+///   the editor does the arithmetic, where it is unit-tested.
+/// - **A press that starts on text is a text gesture.** `draggable` is set at
+///   `mousedown` and only when the press did not begin inside an editable or
+///   interactive element, so selecting a word in a headline never picks the
+///   whole section up.
+/// - **`Alt+ArrowUp`/`Alt+ArrowDown` is the keyboard equivalent**, on the
+///   focused section itself (each is `tabindex="0"`). It is the same message
+///   and therefore the same operation — there is no keyboard-only path to
+///   drift.
+/// - **The words come from the app, not from here.** A section's accessible
+///   name is posted in by the editor (`{alo:"site-edit-chrome",labels,focus}`)
+///   because it is *editor* chrome: it must be in the language of the person
+///   editing, which is not necessarily the language of the site. The same
+///   message restores focus after a move, since applying one replaces this
+///   whole document.
 pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
   "use strict";
   var MAX = 5000;
   var fields = document.querySelectorAll("[data-alo-text]");
-  if (!fields.length) { return; }
   var original = null;
   function value(node) { return node.textContent.replace(/\s+$/, ""); }
   function commit(node) {
@@ -230,6 +269,80 @@ pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
     if (event.target.closest && event.target.closest("a")) { event.preventDefault(); }
   }, true);
   document.addEventListener("submit", function (event) { event.preventDefault(); }, true);
+
+  var main = document.querySelector("main");
+  var moving = null;
+  function blocks() {
+    if (main === null) { return []; }
+    return Array.prototype.filter.call(main.children, function (node) {
+      return node.hasAttribute("data-alo-section");
+    });
+  }
+  function at(node) { return Number(node.getAttribute("data-alo-section")); }
+  function neighbour(list, position) {
+    var node = list[position];
+    return node ? at(node) : null;
+  }
+  function ask(node, before) {
+    parent.postMessage({ alo: "site-section-move", from: at(node), before: before }, "*");
+  }
+  blocks().forEach(function (node) {
+    node.tabIndex = 0;
+    node.addEventListener("mousedown", function (event) {
+      node.draggable = !(event.target.closest &&
+        event.target.closest("[data-alo-text],a,button,input,textarea,select,iframe"));
+    });
+    node.addEventListener("dragstart", function (event) {
+      moving = node;
+      node.classList.add("alo-moving");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", node.getAttribute("data-alo-section"));
+      }
+    });
+    node.addEventListener("dragover", function (event) {
+      if (moving === null || node === moving) { return; }
+      event.preventDefault();
+      var box = node.getBoundingClientRect();
+      main.insertBefore(
+        moving,
+        event.clientY > box.top + box.height / 2 ? node.nextSibling : node
+      );
+    });
+    node.addEventListener("drop", function (event) { event.preventDefault(); });
+    node.addEventListener("dragend", function () {
+      node.classList.remove("alo-moving");
+      node.draggable = false;
+      if (moving !== node) { return; }
+      moving = null;
+      var list = blocks();
+      ask(node, neighbour(list, list.indexOf(node) + 1));
+    });
+    node.addEventListener("keydown", function (event) {
+      if (event.target !== node || !event.altKey) { return; }
+      var list = blocks();
+      var position = list.indexOf(node);
+      if (event.key === "ArrowUp" && position > 0) {
+        event.preventDefault();
+        ask(node, at(list[position - 1]));
+      } else if (event.key === "ArrowDown" && position < list.length - 1) {
+        event.preventDefault();
+        ask(node, neighbour(list, position + 2));
+      }
+    });
+  });
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    if (event.source !== parent || !data || data.alo !== "site-edit-chrome") { return; }
+    blocks().forEach(function (node) {
+      var label = data.labels ? data.labels[at(node)] : null;
+      if (typeof label === "string") { node.setAttribute("aria-label", label); }
+    });
+    var wanted = typeof data.focus === "number" && main !== null
+      ? main.querySelector('[data-alo-section="' + data.focus + '"]')
+      : null;
+    if (wanted !== null) { wanted.focus(); }
+  });
 })();</script>
 "#;
 
@@ -256,16 +369,20 @@ mod tests {
 
     /// The edit script is not part of that budget — no visitor ever downloads
     /// it — but it is still inlined into a document, so it gets a ceiling of
-    /// its own rather than none at all.
+    /// its own rather than none at all. Raised from 4 KB to 8 KB when moving a
+    /// section joined typing on it (S3.01b): a ceiling is only honest while it
+    /// is the number the thing actually needs.
     #[test]
     fn the_edit_script_stays_small_and_never_ships_to_a_visitor() {
         assert!(
-            EDIT_SCRIPT.len() + EDIT_STYLE.len() < 4096,
+            EDIT_SCRIPT.len() + EDIT_STYLE.len() < 8192,
             "edit mode is {} bytes",
             EDIT_SCRIPT.len() + EDIT_STYLE.len()
         );
-        assert!(!BEHAVIOR_SCRIPT.contains("data-alo-text"));
-        assert!(!BEACON_SCRIPT.contains("data-alo-text"));
+        for script in [BEHAVIOR_SCRIPT, BEACON_SCRIPT] {
+            assert!(!script.contains("data-alo-text"));
+            assert!(!script.contains("data-alo-section"));
+        }
     }
 
     /// Neither script may terminate its own block or interpolate anything —

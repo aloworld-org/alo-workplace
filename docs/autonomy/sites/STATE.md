@@ -6674,3 +6674,115 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   pruned before the gate (686 → 492 tenants).
 - **Next:** S3.01b (reorder by dragging, with the page reflowing live and a
   keyboard-accessible equivalent).
+
+## 2026-08-13 — S3.01b the section you pick up, and the neighbour it reports
+
+- **Item:** S3.01b — reorder by dragging, the page reflowing live, a
+  keyboard-accessible equivalent, and diff goldens (ADR 0042).
+- **Shipped:** the editable preview's second gesture. Every section's root
+  element now carries `data-alo-section="<index>"` — emitted by one
+  `open_section` helper that all sixteen section builders go through, so "one
+  element per section, carrying its index" is a property of the renderer rather
+  than of sixteen remembered call sites. The edit script makes `<main>`'s own
+  children draggable and focusable: on every `dragover` the node is **really
+  moved in the DOM**, so the page reflows under the pointer and what is being
+  previewed during the drag is the arrangement itself. `Alt`+`ArrowUp`/
+  `ArrowDown` on a focused section is the same message, and after the document
+  is replaced the app posts focus back onto the section that moved, so a
+  section can be walked down a page without leaving the preview.
+- **The frame reports a neighbour, not a destination.**
+  `postMessage({alo:"site-section-move", from, before})`, `before` being the
+  index the section now sits above and `null` the end of the page. Both doors
+  that move a section splice — remove, then insert — so a section travelling
+  *down* lands one earlier than the index it was dropped above; that arithmetic
+  is `web/src/sites/sectionMove.ts`, unit-tested against a plain splice of the
+  same list, rather than a subtraction inside a string of JavaScript in a Rust
+  const. Nav and footer take no part: they are landmarks, and offering to drag
+  them would offer an arrangement the renderer does not honour.
+- **Which door, and why not the other one.** Inline text (S3.01a) had no
+  route of its own, so it borrowed the reviewed AI door. Reordering already
+  has a native one — `POST …/sections/{index}/move`, which the stack's buttons
+  use — so the drop goes there, through the *same `move()` function* the
+  buttons call. That is the stronger "no second edit path": the gesture on the
+  page and the button beside it are one call, one announcement, one focus rule,
+  one request. The assistant's `reorder_section` remains a third way to ask,
+  and `sites_http` proves on the wire that it produces the byte-identical
+  stored envelope — two doors that spliced differently would be two orderings a
+  customer could reach.
+- **Diff goldens.** `products/mail/alo-jmap/tests/site_section_move.rs`: over a
+  page carrying **all sixteen** section types, every (from, to) pair — 240
+  moves — is applied and asserted to permute the sections and change **no
+  value** (sorted-value equality before and after), with the move back
+  restoring byte-identical JSON, which is what undo asks of it. Five
+  representative moves are pinned as a text golden
+  (`tests/golden/section-move-diff.txt`) showing the order before, the order
+  after and an always-empty "values changed" list — if a move ever starts
+  rewriting a property, it appears there as a line to review.
+- **One undo for both gestures.** `web/src/sites/editHistory.ts` replaces the
+  text-only history: a step is `{kind:"text",…}` or `{kind:"move",from,to}`,
+  every step is invertible by construction, and undo *is the inverse gesture
+  through the gesture's own door* — not a restored snapshot, so it is
+  validated, refused and stored like anything else a person does. ⌘Z therefore
+  walks back typing and moving in the order they happened. `sitesUndoTextEdit`/
+  `sitesRedoTextEdit` became `sitesUndoEdit`/`sitesRedoEdit` ("Undo last
+  change") in en/fr/nl, since the button no longer only undoes text.
+- **The editor supplies the words.** A section's accessible name is posted
+  into the frame (`{alo:"site-edit-chrome", labels, focus}`) rather than
+  rendered by `alo-sites`: it is editor chrome and must be in the language of
+  the person editing, which need not be the language of the site being edited.
+  The frame accepts it only from `parent`, and only ever writes it to
+  `aria-label`.
+- **Two traps avoided, both recorded in `docs/design/sites.md`:**
+  - **A press that begins on text is a text gesture.** `draggable` is set at
+    `mousedown` and only when the press did not start inside an editable or
+    interactive element — otherwise selecting a word in a headline picks the
+    whole section up.
+  - **The editing stylesheet is layout-neutral by construction** —
+    `outline`, `cursor`, `opacity` and nothing else. The obvious drag handle
+    (`position:relative` + a `::before` glyph) was rejected: `position` would
+    make a section the containing block of any absolutely positioned
+    descendant, and a preview that lays the page out differently from the
+    published one is a preview that lies.
+- **Verified:** `SQLX_OFFLINE=true cargo clippy -p alo-sites -p alo-jmap
+  --all-targets` clean; `cargo nextest run -p alo-sites` → **149 green**
+  (15.4 s); `-p alo-jmap -E 'binary(~site)'` → **97 green** (22.3 s), which is
+  every sites binary in the package, the only ones a renderer change can
+  reach. `rustfmt --edition 2024 --check` clean on the six changed files
+  (`cargo fmt` on a crate here still rewrites hundreds of pre-existing lines).
+  Web: `npx tsc --noEmit` clean, `npx eslint` on the changed files clean,
+  `npm run build` clean, `npx vitest run src/sites` → **241 green in 24 files**
+  (13 new), i18n parity 65 green with the four changed/new strings in en/fr/nl.
+  Test database pruned before the gate (1 475 → 1 455 tenants, 83 MB).
+- **Wire transcript**
+  (`sites_http::a_section_dragged_on_the_preview_moves_through_the_door_the_stack_uses`,
+  real router, real Postgres):
+  ```
+  PUT  /sites/{id}/pages/{pid}/sections    hero + faq + cta        → 200
+  GET  /sites/{id}/pages/{pid}/preview                             → 200
+       contains data-alo-section="0" … "1" … "2"
+       contains site-section-move
+  POST /sites/{id}/pages/{pid}/sections/0/move  {"to":2}           → 200
+       stored order: faq cta hero
+  POST … /sections/2/move {"to":0}                                 → 200
+       stored envelope identical to the original
+  PUT  /sites/{id}/pages/{pid}/ai-edits  reorder_section 0 → 2     → 200
+       stored envelope BYTE-IDENTICAL to the dragged one
+  POST … /sections/0/move {"to":9}                                 → 422
+  GET  /sites/{id}/pages/{pid}/preview        other tenant         → 404
+  POST … /sections/0/move                     other tenant         → 404
+  ```
+- **Cuts:**
+  - **No drag on a localized page.** The translation view writes whole
+    localized drafts rather than section ops, so its preview is not annotated
+    (the same rule S3.01a set) — the stack's move buttons still reorder a
+    translation, through `saveLocalized`.
+  - **No touch drag.** The gesture is HTML5 drag-and-drop, which phones do not
+    fire; on a phone the section list's move buttons are the path, and they are
+    the ones S2.16b2 already walked at 360px. A pointer-events drag for touch
+    is worth its own item, not a smuggled half.
+  - **The byte ceiling on the editing surface was raised** from 4 KB to 8 KB
+    (measured need, not a blanket rise). It is never downloaded by a visitor;
+    the published-script budgets — 2 KB each — are untouched and still pinned.
+- **Next:** S3.01c (constrained resize: each section type declares its allowed
+  ratios and shapes, responsive goldens at phone/tablet/desktop, and a test
+  that no gesture can produce free positioning).

@@ -214,15 +214,17 @@ pub fn render_page_preview(
 
 /// The draft preview a person edits *on the page* (ADR 0042): the document
 /// [`render_page_preview`] produces, plus the annotations and the small script
-/// that turn every element holding exactly one typed string into a text field.
+/// that turn every element holding exactly one typed string into a text field
+/// and every section into something that can be picked up and moved.
 ///
-/// The annotation is a coordinate — `data-alo-text="<section index><JSON
-/// pointer>"` — and it is the same coordinate the model names in a
-/// `rewrite_copy` operation, so typing on the page and asking for a rewrite
-/// travel the identical route and produce the identical diff. Nothing here
-/// writes: the script reports the finished text to the editor through
-/// `postMessage`, and the editor applies it through the guarded edit door,
-/// which is what re-renders this document.
+/// Both annotations are coordinates the edit vocabulary already speaks —
+/// `data-alo-text="<section index><JSON pointer>"` for a `rewrite_copy`, and
+/// `data-alo-section="<index>"` for a `reorder_section` — so typing on the
+/// page, dragging a section, and asking the model for either travel the
+/// identical route and produce the identical diff. Nothing here
+/// writes: the script reports the finished text or the new neighbour to the
+/// editor through `postMessage`, and the editor applies it through the guarded
+/// edit door, which is what re-renders this document.
 ///
 /// Only the editor asks for this rendering. A published page, a version
 /// preview, and the “after” view of a proposal are all rendered without it —

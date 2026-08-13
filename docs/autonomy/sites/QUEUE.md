@@ -129,7 +129,7 @@ reserved through their owner, never stored again (ADR 0041).
 ### Editing on the page (ADR 0042)
 
 - [x] S3.01a Inline text editing: edit a typed section's text on the page rather than in a sidebar form, producing the same change shape an AI edit produces; undo/redo, and a test proving both paths yield an identical diff.
-- [ ] S3.01b Reorder by dragging, with the page reflowing live and a keyboard-accessible equivalent; ordering is a change to typed sections, with diff goldens proving it.
+- [x] S3.01b Reorder by dragging, with the page reflowing live and a keyboard-accessible equivalent; ordering is a change to typed sections, with diff goldens proving it.
 - [ ] S3.01c Constrained resize: each section type declares its allowed ratios and shapes, and the editor offers only those; responsive goldens at phone, tablet and desktop, and a test that no gesture can produce free positioning.
 - [ ] S3.01d Section palette: drag a new section in, previewed with the tenant's own content rather than lorem ipsum; keyboard path and goldens.
 - [ ] S3.01e Editor arc review: one browser arc from blank page to published site using only direct manipulation, checked for accessibility, mobile and the reviewable-diff property.

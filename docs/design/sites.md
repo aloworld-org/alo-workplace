@@ -756,6 +756,52 @@ Three rules bound it:
 Undo and redo are the same operation with the previous text, applied
 through the same door, in the editor's toolbar and on ⌘Z/Ctrl+Z.
 
+### Moving a section on the page (S3.01b, ADR 0042)
+
+The second gesture on the same document. A section's root element in the
+editable preview carries `data-alo-section="<index>"` — the coordinate a
+`reorder_section` operation names — and the script makes `<main>`'s own
+children draggable and focusable. Dragging one **reflows the page under
+the pointer**: the node is really moved in the DOM on every `dragover`,
+so what is previewed during the drag is the arrangement itself. Nav and
+footer are landmarks rather than stack positions and take no part.
+
+- **The frame reports a neighbour, not a destination.**
+  `postMessage({alo:"site-section-move", from, before})`, where `before`
+  is the index the section now sits above and `null` means the end. Both
+  doors that can move a section splice — remove, then insert — so the
+  destination is one off when a section travels *down* the page, and that
+  arithmetic lives in the app (`web/src/sites/sectionMove.ts`), where it
+  is unit-tested, rather than in a string of JavaScript in the renderer.
+- **One door, three ways to ask.** The drop, the stack's own move
+  buttons and an assistant's `reorder_section` all end at the same stored
+  ordering. `sites_http.rs` proves the first two on the wire produce the
+  byte-identical envelope as the third; `site_section_move.rs` proves the
+  diff of a move is *only* a permutation — every value byte-identical
+  before and after, over every (from, to) pair on a page carrying every
+  section type — and pins it as a golden.
+- **A keyboard equivalent on the page.** Each section is `tabindex="0"`;
+  `Alt`+`ArrowUp`/`ArrowDown` sends the same message, and after the
+  document is replaced the app posts focus back to the section that
+  moved, so a section can be walked down a page without leaving it. The
+  stack beside the preview keeps its own labelled move buttons.
+- **The editor supplies the words.** A section's accessible name is
+  posted into the frame (`{alo:"site-edit-chrome", labels, focus}`)
+  rather than rendered by `alo-sites`: it is *editor* chrome and must be
+  in the language of the person editing, which need not be the language
+  of the site. A press that begins inside a text field is a text gesture,
+  never a drag.
+- **The preview may not lie about layout.** The editing stylesheet is
+  layout-neutral by construction — `outline`, `cursor`, `opacity` and
+  nothing else. In particular nothing sets `position`, which would make a
+  section the containing block of an absolutely positioned descendant and
+  lay the draft out differently from the published page.
+
+A move is a step in the same undo history as a text edit
+(`web/src/sites/editHistory.ts`); its inverse is the move back, applied
+through the same door, so ⌘Z covers both gestures in the order they
+happened.
+
 ### The template catalog (S2.11a)
 
 The manual sibling of generation, and the path a tenant without a

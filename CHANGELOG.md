@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Website sections are now moved by dragging them on the page.** Pick a
+  section up in the preview and the page rearranges as you drag, so you see the
+  new order rather than imagining it from a list. With the keyboard, move
+  through the preview to a section and hold Alt with the up or down arrow —
+  focus stays on the section you moved, so you can walk it down the page.
+  The move buttons beside the section list still do exactly the same thing, and
+  Undo (⌘Z / Ctrl+Z) now takes back a move as well as a text change, in the
+  order you made them.
+
 - **Website text is now edited on the page itself.** Click a heading, a
   paragraph, a question or a price tier's name in the website preview and type:
   Enter saves it, Escape puts the old words back, and Undo (⌘Z / Ctrl+Z, or the
