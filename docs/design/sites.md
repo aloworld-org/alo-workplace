@@ -902,6 +902,24 @@ template is code we put in other people's sites, and shipping executable
 JavaScript that way would make the catalog a supply chain. Moving and deleting a
 block stay allowed: both are reversible arrangement that changes no code.
 
+**The editor (S2.14b)** is `web/src/sites/CustomCodeFields.tsx`, and it says the
+boundary out loud *before* the first field: sealed from the site, no network,
+and nobody vets it. The two capabilities are switches, default off, each with
+the consequence of leaving it off written beside it. The script field exists
+only while the block is allowed to run one, and the biconditional the store
+checks holds by construction on the way out: switching the capability off saves
+the block **without** its script rather than saving bytes the browser is
+forbidden to execute, and the form says so while the switch is being flipped
+rather than after the refusal. The only rule the web repeats is the byte caps,
+and only to *count*: the counters never block a save, so a cap that moves in
+Rust makes a counter stale, never a save impossible. There are no copy tools
+anywhere in this form — the assistant refuses to touch code by name, so the
+affordance would only produce a refusal. The draft preview needs nothing of its
+own: the pane renders the page server-side with the publishing renderer, and its
+own `sandbox="allow-scripts"` frame can only *narrow* what the block's nested
+frame is granted, so what the owner sees is never more capable than what the
+internet gets.
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):

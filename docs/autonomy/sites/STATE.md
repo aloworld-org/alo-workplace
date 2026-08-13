@@ -5374,3 +5374,88 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     written.
 - **Next:** S2.14b (the editor half — section mirror, prop form with capability
   switches, draft preview, visible risk boundary).
+
+## 2026-08-13 — S2.14b the custom-code editor
+
+- **Item:** S2.14b (the editor half S2.14a deferred: the web section mirror, the
+  form, the capability switches, the draft preview, the visible risk boundary).
+- **Shipped:**
+  - **The web mirror caught up with the store.** `sections.ts` gained
+    `CustomCodeSection` + `CustomCodeCapabilities` and `custom_code` in
+    `SECTION_KINDS`, which turned the module's exhaustive switches from a
+    silent `undefined` into a compile error at every site that had to learn the
+    kind — label, description, card summary, picker thumbnail, draft, wire
+    conversion. A page carrying a block now reads as a block everywhere instead
+    of a blank card, which was S2.14a's named first job for this item.
+  - **`web/src/sites/CustomCodeFields.tsx`** (its own file — the form body is a
+    different reason to change than the fifteen prop forms in
+    `SectionForm.tsx`, which is already 1 200 lines). Order on screen is the
+    order the decisions are made in: the **boundary first**, before the first
+    field — sealed from the site, no network, nobody vets it — then the page
+    heading and the frame's accessible name, then markup and style, then what
+    the block is *allowed* to do, then how tall it is.
+  - **The capability switches carry their consequence, not just their name.**
+    Both default off. The script box exists only while the block may run a
+    script, so the store's biconditional (a script iff the capability) holds by
+    construction on the way out: `toSection` sends the script only with
+    `scripts: true`, and switching the capability off saves the block **without**
+    its script rather than saving bytes the browser is forbidden to execute. The
+    draft keeps the typed script either way, so flipping the switch twice costs
+    nothing, and both halves of the rule are said *while the switch is being
+    flipped* — "there is no script to run yet", "the script below is not saved
+    with the block" — instead of arriving as a 422 afterwards.
+  - **Byte counters, and they are the only rule the web repeats.** A person
+    cannot count bytes, and learning at save time that a snippet is 400 bytes
+    too long is a bad way to find out. The four caps are mirrored with a comment
+    naming `site_custom_code.rs`, and they only *count*: over budget colours the
+    line and says so, and the save button stays enabled. A cap that moves in
+    Rust makes a counter stale, never a save impossible.
+  - **No copy tools in this form.** `alo-ai` refuses `rewrite_copy` on a
+    `custom_code` section by name, so offering the affordance would only produce
+    a refusal.
+  - **Height** is a number field bounded 40–2 000 with the honest reason under
+    it (a sealed frame cannot be measured from outside), defaulting to 320 —
+    a required field never starts blank. Anything a height cannot be (blank, a
+    word, a negative, past `u16`) is sent as `0`, so the server answers by
+    naming the range instead of failing to parse the envelope.
+  - **en + fr + nl in the same commit** (32 keys). The catalogs are at full
+    parity and `untranslated.ts` is still empty; it stays that way.
+- **Verified** (all foreground, real exit codes):
+  - `npx tsc --noEmit` clean; `npx eslint` on the ten changed/added files clean;
+    `npm run build` clean.
+  - `npx vitest run src/sites src/i18n` → **253 green**, including the new
+    `CustomCode.test.tsx` (7): the boundary is on screen before the first field;
+    a save POSTs the three parts apart with **both** capabilities present and
+    denied; a script travels only with the permission that runs it and the
+    granted-but-empty state is named; taking the permission away saves the block
+    without the script and says so first; the counter reads bytes not characters
+    (`<p>café</p>` is 12) and over-budget never disables Save; a 422 is shown
+    verbatim with everything typed still in the dialog; a headingless block
+    reads on its card by the name visitors are told.
+  - Rust: `bash scripts/prune-test-db.sh` (902 → 215 tenants, 93 MB), `cargo
+    fmt -p alo-store`, `SQLX_OFFLINE=true cargo clippy -p alo-store
+    --all-targets` clean, `cargo nextest run -p alo-store -E 'kind(lib)'` →
+    **1 211 green**, including the one test this item adds: the editor's exact
+    envelope — every capability stated, including the denied ones — parses to
+    the same value as saying nothing and validates. That pins the seam this item
+    creates, since S2.14a only ever posted `{"scripts": true}`.
+- **Cuts/flags:**
+  - **No new route, and the preview needed no code.** The pane already renders
+    the draft server-side with the publishing renderer, and S2.14a's golden pins
+    what that renderer emits for a block. The pane's own
+    `sandbox="allow-scripts"` frame can only *narrow* what the block's nested
+    frame is granted (nested sandbox flags intersect), so the preview is never
+    more capable than the published page — it cannot flatter the block. Not
+    click-verified in a browser this iteration: no code on that path changed.
+  - **The picker is now sixteen tiles.** `PageEditor.test.tsx`'s older
+    "offers all thirteen types" test checks a subset and still passes; the name
+    is stale rather than wrong. Left for the wave review with the full-page
+    fixture S2.14a also flagged (twelve of sixteen section types, still claiming
+    "every section type in page order").
+  - **`nextest` still cannot list this workspace's larger test sets on this
+    machine** (S2.14a's finding, unchanged): `-E 'test(...)'` across all
+    binaries hung past 300 s and was killed, while `-E 'kind(lib)'` ran 1 211
+    tests in 2.7 s. Filtered-by-kind runs and `cargo test` work; a human look is
+    still worth it before the next all-crates gate.
+- **Next:** S2.15a (domain commerce adapter: EU registrar interface, fixture
+  provider, availability/pricing model, no external calls in tests).

@@ -10,6 +10,19 @@ contracts.
 
 ## Unreleased
 
+- **The custom-code block can now be written in the website editor.** Add it
+  from the section picker like any other block: a heading for the page, the name
+  a screen reader reads out, and the markup, style and script in three separate
+  boxes that count what you have written against what fits. Above them, before
+  you type anything, is what the block can and cannot do — it is sealed off from
+  your site, it has no internet access, and it is your code, published as you
+  wrote it. Two switches say what it is allowed to do, both off until you turn
+  them on; the script box only appears once you allow a script, and turning that
+  back off tells you the script goes with it before you save rather than after.
+  The preview beside the editor shows the block exactly as a visitor will get
+  it, and anything the server refuses comes back in its own words with
+  everything you typed still in place.
+
 - **A page on your website can now hold a piece of your own HTML, CSS and
   JavaScript.** It is published inside a sealed frame of its own: your code
   cannot read the page around it, and — this is deliberate — it cannot reach the
