@@ -6428,3 +6428,148 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.16d (wave review, final arcs: complete cross-service
   transcripts on the real local stack — generate → edit → publish → serve →
   convert → owner inbox → analytics — plus the performance/byte budgets).
+
+## 2026-08-13 — S2.16d the whole distance, twice: as a regression and on the wire
+
+- **Item:** S2.16d — the wave's final arcs. One site travels generate → edit →
+  publish → serve → convert (enquiry, order, appointment) → owner inbox →
+  analytics, first as a permanent in-process regression across both services,
+  then on the **real local stack** with two real processes, real curl and real
+  database rows. Byte and latency budgets measured on the bytes an anonymous
+  visitor actually downloads.
+- **Shipped:** `products/mail/alo-jmap/tests/sites_final_arc.rs` — one
+  deliberately sequential test (the notification sweeps are global; concurrent
+  scenarios would claim each other's rows mid-assertion). It generates a draft
+  from a description through a **scripted localhost model fixture** (never an
+  external service), adds a catalog that takes orders and a bookable service
+  through the authenticated editor, mounts both as typed sections, sets a
+  theme, publishes, serves the site anonymously through the separate
+  `alo-sites` router on its own subdomain Host, converts three ways, runs the
+  three notification sweeps, and reads the whole thing back on the owner's
+  submissions, orders, analytics and conversion surfaces. A second tenant
+  lives on the same store handle throughout — the way production runs one
+  process for every tenant — and is proven blind at **nine** authenticated
+  doors, at the public Host, and in its own inbox.
+- **Budgets, measured rather than assumed** (the served bytes, not the source):
+  home page **7 526 B**, contact page **5 259 B** (ceiling 100 KB), stylesheet
+  **15 773 B** (ceiling 50 KB), warm cached page **0.01 s** on the wire and
+  under the test's 500 ms ceiling in process. The test asserts the ceilings so
+  a future section cannot quietly blow them.
+- **The wire transcript** — docker `alo-pg` (database `alo`), a fresh tenant
+  from `identityctl bootstrap-admin`, debug `alo-jmap` on `127.0.0.1:8080` and
+  debug `alo-sites` on `127.0.0.1:8090` with `SITES_DOMAIN=sites.test`, and the
+  services' **real 30-second sweeps** (nothing invoked by hand):
+
+  ```
+  POST /admin/ai/providers  (localhost fixture)      → 200 ; …/default → 200
+  POST /sites/generate      "A small Utrecht bakery" → 200 draft, subdomain
+       arcwire…, contact section linked to form t9q8ABee…
+  POST /sites/{id}/catalogs        EUR, orders on    → 200
+  POST …/catalogs/{c}/items        "€4,50"           → 200 slug=sourdough-loaf
+       priceCents=450
+  GET  …/booking-sources                             → 200 (the account's own
+       calendar; a booking service never invents one)
+  POST /sites/{id}/bookings        30 min, 7 days    → 200
+  POST …/pages/{home}/sections     catalog, booking  → 200, 200
+  PUT  /sites/{id}/theme           midnight          → 200
+  POST /sites/{id}/publish                           → 200 {"publishId":…,
+       "status":"live"}
+  GET  /            Host arcwire….sites.test         → 200  7 526 B — catalog
+       heading present, price rendered "€ 4.50" from the publish
+  GET  /contact                                      → 200  5 259 B — the form
+       posts to /f/t9q8ABee…
+  GET  /assets/site.css                              → 200 15 773 B
+  GET  /            Host nobody-here.sites.test      → 404
+  POST /f/{form}    Ada Lovelace                     → 200
+  POST /o/{catalog} Grace Hopper, qty 2              → 200
+  GET  /b/{booking}?date=2026-08-20                  → 200 offers 09:30 as
+       2026-08-20T07:30:00Z
+  POST /b/{booking} Alan Turing                      → 200 "Appointment booked"
+  (waited on the running services' own sweeps)
+  psql messages of the owner                         → 3
+       "New message from Ada Lovelace (Juniper Bakery)"
+       "New order from Grace Hopper (Juniper Bakery)"
+       "New booking: Bakery tour with Alan Turing (Juniper Bakery)"
+  GET  /sites/{id}/submissions                       → 200  1  Ada Lovelace
+  GET  /sites/{id}/orders                            → 200  1  900 cents,
+       Grace Hopper — the total priced server-side, not by the client
+  GET  /sites/{id}/analytics?days=7                  → 200  3 visits,
+       pages ["/","/contact"], referrer domain news.example
+       PII in the report: none (the visitor sent 203.0.113.77, a user agent,
+       /weekend/guide and utm_source=post; none of it survives)
+  GET  /sites/{id}/conversions?days=7                → 200 submits 1 on the
+       form's own counter ("Talk to the bakery")
+  GET  /sites/{id}{,/submissions,/orders,/analytics,/conversions}  no token
+                                                     → 401 ×5
+  psql rows: submissions 1 | orders 1 | appointments 1
+  ```
+
+  The conversion **views and starts stay 0 in a curl transcript and that is
+  correct**: those two counters are reported by the published page's beacon,
+  which needs a browser to run. The submit is counted at the write, which is
+  why the funnel still knows about the enquiry when the visitor has JavaScript
+  off — the property S2.08a2 was built for, visible here as an asymmetry rather
+  than as a hole.
+- **Verified:** the new test green **three consecutive runs** (1.20 s each)
+  against docker Postgres; `rustfmt --edition 2024` on the new file only
+  (`cargo fmt` on a crate here still rewrites hundreds of pre-existing lines —
+  see the note under S2.16b); `SQLX_OFFLINE=true cargo clippy -p alo-jmap
+  --all-targets` clean; the sites blast radius `cargo nextest run -p alo-jmap
+  -E 'binary(sites_final_arc) or binary(site_notify) or
+  binary(site_booking_notify) or binary(sites_http) or binary(sites_orders_http)
+  or binary(sites_bookings_http) or binary(sites_catalogs_http) or
+  binary(sites_generate_http) or binary(site_editor_role_http) or kind(lib)'`
+  → **721 green in 9.7 s**; then the whole package, `cargo nextest run -p
+  alo-jmap` → **1 028 tests green in 58 s**. Test database pruned before the
+  gate (287 → 196 tenants) per the LOOP rule. No web file changed, no
+  migration, no new route: this item adds a test, one nextest override and a
+  journal, and the CHANGELOG is deliberately untouched because nothing a user
+  can see changed.
+- **`.config/nextest.toml` gained one override, and it is not optional.** The
+  arc drives all three notification sweeps, and every sweep claims across
+  tenants by design; running beside `site_notify` or `site_booking_notify`,
+  each of which asserts an exact delivery count, either suite would be counting
+  rows the other took. `binary(sites_final_arc)` therefore joins the existing
+  `serial` group — the same reasoning already written there for the publish
+  scheduler, the booking sweep and the domain sweep. The arc's own sweep
+  assertions are `>= 1` rather than `== 1` for the same reason in the other
+  direction: on the shared local database a sweep may also carry rows an
+  earlier run abandoned. What it pins exactly is the owner's inbox (3) and the
+  outsider's (0).
+- **Gate health, for the next iteration that sees it: two `cargo nextest run
+  -p alo-jmap` invocations stalled with no output and were killed at the
+  600 s ceiling — and the cause was macOS, not the tests.** `sample` on the
+  hung process showed the lib test binary stopped inside `_dyld_start` at 0 %
+  CPU while `syspolicyd` burned ~50 % of a core: the first execution of each
+  freshly linked ~150 MB binary blocks in the dynamic loader while the code
+  signing/notarization daemon evaluates it, and this package links about sixty
+  of them. It is a one-time cost per link, not a per-run one — the very next
+  full run finished in 58 seconds. So: a nextest run that prints `Finished
+  test profile` and then nothing is a dyld queue, not a hung test; check
+  `ps ax | grep syspolicyd` before suspecting the suite, and re-run rather
+  than falling back to polling.
+- **FINDING for the human inbox — not a Sites file, and a real production
+  bug.** `POST /admin/ai/providers` answers **200 while writing nothing** when
+  another tenant already used that provider id. `ai_providers` has its PRIMARY
+  KEY on `id` **alone** (migration 0011), so provider ids are a *global*
+  namespace, and `upsert_ai_provider`'s `ON CONFLICT (id) DO UPDATE … WHERE
+  ai_providers.tenant_id = $2` correctly refuses to overwrite the other
+  tenant's row — and then reports success on a no-op. Reproduced on the wire
+  twice: the second tenant to name a provider `arc-fixture` got `200
+  {"id":"arc-fixture"}`, an empty `GET /admin/ai/providers`, `404` from
+  `…/providers/default`, and `503 unconfigured` from every AI route afterwards.
+  In production the first customer to call theirs `openai` locks that name for
+  everyone else, silently. **Isolation holds** (no tenant can read or overwrite
+  another's provider, and the transaction rolls back); what fails is honesty.
+  Left unfixed here on purpose: the file is `platform/alo-store/src/account.rs`
+  plus a migration, which is outside this track's code areas, and the correct
+  fix — moving the primary key to `(tenant_id, id)` — is destructive DDL that
+  the LOOP forbids unattended. The cheap half a human may prefer meanwhile:
+  return a typed conflict when `rows_affected() == 0` instead of `Ok(())`.
+  Worked around in the arc by giving the fixture provider a per-run id.
+- **Cuts:** none of the item's own scope. The arc deliberately does not
+  re-walk the S2 surfaces that already have their own end-to-end tests
+  (locales, collections, versions, scheduling, protected pages, heatmap):
+  this item's brief is the one path from a description to a paid-attention
+  inbox, and adding the rest would have made a slower test that proves less.
+- **Next:** S3.01a (inline text editing on the page, ADR 0042) — wave 3 begins.

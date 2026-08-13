@@ -51,3 +51,12 @@ test-group = 'serial'
 # not choose.
 filter = 'binary(site_domain_purchases) or binary(site_domain_registration) or binary(sites_domain_purchases_http)'
 test-group = 'serial'
+
+[[profile.default.overrides]]
+# S2.16d's final arc drives all three notification sweeps — form, order and
+# booking — end to end, and every sweep claims across tenants by design. Any
+# suite asserting an exact delivery count beside it would be counting rows this
+# one took (or vice versa), so the arc joins the serial group rather than the
+# other suites being weakened into inexact assertions.
+filter = 'binary(sites_final_arc)'
+test-group = 'serial'
