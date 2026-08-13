@@ -96,8 +96,8 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.12c1 Catalog editing API + item management UI: the `/sites/{id}/catalogs` routes S2.12a deferred (catalog, groups, items — typed prices, derived handles, tenant-hidden 404s) and the visible Catalog screen with its empty states. (Split from S2.12c 2026-08-13; one turn cannot hold the routes, the management screen, the section mapping and the order inbox at full depth.)
 - [x] S2.12c2 Catalog section mapping + order inbox UI: the catalog section in the page editor (pick a catalog, optionally one group) and the per-site order inbox — lines, totals, status, CSV export, empty states — over the S2.12b routes.
 - [x] S2.12c3 Catalog item photo: the Drive picker in the item dialog (the store, the route and the renderer already carry `imageBlobId`; only the UI is missing) + the published card's image, alt text and empty state. (Deferred from S2.12c1 and again from S2.12c2 — recorded here rather than in a journal entry.)
-- [ ] S2.13a Booking section model: availability source binding and booking-field schema that references Agenda through a Sites-owned seam.
-- [ ] S2.13b Public booking flow: availability read, race-safe reservation, internal notification, privacy/security tests, and real-process transcript.
+- [x] S2.13a Booking section model: availability source binding and booking-field schema that references Agenda through a Sites-owned seam.
+- [ ] S2.13b Public booking flow: the `booking` section variant (deferred from S2.13a, so that the renderer ships a form that actually works) + availability read, race-safe reservation, internal notification, privacy/security tests, and real-process transcript.
 - [ ] S2.13c Booking UI: visible Agenda connection, preview, booking management link, and dependency/error states.
 - [ ] S2.14a Sandboxed custom-code model: explicit HTML/CSS/JS capabilities, size caps, CSP contract, and validation that rejects unsafe host-page escape.
 - [ ] S2.14b Sandboxed custom-code rendering/UI: isolated iframe output, preview, visible risk boundary, and security goldens without hidden core actions.

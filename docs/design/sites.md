@@ -695,6 +695,50 @@ every other Sites object, and the tenant edits them here. Both exist on purpose
   reads only this copy; the draft preview resolves through the same function
   without writing, so the editor sees what the next publish would freeze.
 
+### Booking services and the Agenda seam (S2.13a)
+
+A **booking service** (`site_bookings`, tenant- and site-scoped) is what a
+visitor may book: a name, a duration, the weekly hours it is offered in, the
+extra questions asked, and the Agenda calendar it lives in. The model half is
+S2.13a; reading availability and taking a reservation are S2.13b, and the
+editor screens are S2.13c.
+
+- **Agenda is reached through one seam.** `site_agenda` is the only place in
+  the Sites code that asks Agenda anything: it turns the account's calendars
+  into `SiteAvailabilitySource { calendar, name, writable }` and resolves one
+  by id. Nothing in Sites edits `calendar.rs` or queries `calendars` directly,
+  so the day a share works differently, Sites changes in one function. A source
+  must be **writable** (owner or editor), because the booking that follows has
+  to put the appointment somewhere; a read-only share is *listed* — so the
+  picker can explain it — and refused at binding time by name. A source is
+  resolved on every read and never cached: a calendar that has since been
+  deleted or unshared reads back as `null` beside the stored `calendarId`,
+  which is a broken connection the editor can show rather than an empty week a
+  visitor discovers.
+- **Opening hours are declared, not inferred.** A dentist whose Sunday is empty
+  is not open on Sunday, so availability starts from weekly windows the owner
+  wrote — ISO 8601 weekday (1 = Monday … 7 = Sunday) and minutes from midnight
+  in the service's own IANA `time_zone` — and the calendar can only ever take
+  slots away. Storing wall-clock minutes plus a zone rather than UTC instants
+  is what makes a daylight-saving change move the appointments *with* the
+  clock. The store sorts the week before writing it, refuses two windows that
+  overlap on one day, and refuses a window shorter than the appointment it
+  offers, because that window can only ever produce zero slots.
+- **Name and email are structural.** They are not part of the field schema and
+  cannot be removed: an appointment nobody can be told about is not a booking.
+  `fields` is what a *particular* business needs on top of them — a phone
+  number, a registration plate, which treatment — each with a machine-stable
+  `key` that outlives its label, a kind (`text`, `long_text`, `phone`,
+  `choice`), and options exactly when it is a choice.
+- **The calendar carries no foreign key.** Agenda owns a calendar's lifetime; a
+  booking service must neither block its deletion (`RESTRICT`) nor disappear
+  with it (`CASCADE`). Tenancy is enforced the way every other site-owned row
+  enforces it — `(tenant_id, site_id)` referencing `sites`, every statement
+  scoped by both — and the binding's validity is a resolution, not a constraint.
+- **Rejected:** deriving availability from the calendar's free/busy alone. It
+  needs no model and no screen, and it offers a stranger 03:00 on Sunday
+  whenever the week happens to be empty.
+
 ### Order forms (S2.12b)
 
 A catalog carries `orders_enabled`, and the flag is **frozen into the
@@ -803,8 +847,10 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
 
 ## Out of scope (v1 — cuts are decisions)
 
-- E-commerce checkout, catalog storefront, booking pages (S+ / ADR
-  0035's later waves).
+- E-commerce checkout (S+ / ADR 0041's later waves). The catalog storefront
+  has since shipped as order-by-form, and the booking *model* — the service,
+  its week, its questions, and the Agenda seam — landed with S2.13a; reading
+  availability and taking a reservation are S2.13b, the editor screens S2.13c.
 - Free-form design tools / pixel canvas, custom code injection,
   template marketplace, third-party embeds or trackers of any kind
   (ADR 0036 non-goals; the analytics promise depends on it).

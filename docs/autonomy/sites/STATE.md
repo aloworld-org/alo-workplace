@@ -4845,3 +4845,136 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     `--no-run` first, then running per crate, keeps every call well inside it.
 - **Next:** S2.13a (booking section model: the availability-source binding and
   booking-field schema over a Sites-owned seam into Agenda).
+
+## 2026-08-13 — S2.13a what a site can be booked for, and the one door onto Agenda
+
+- **Item:** S2.13a — booking section model: the availability-source binding and
+  the booking-field schema, referencing Agenda through a Sites-owned seam.
+- **Shipped:**
+  - **`site_agenda`, the seam.** One module is now the only place in the Sites
+    code that asks Agenda anything: it turns the account's calendars into
+    `SiteAvailabilitySource { calendar, name, writable }` and resolves one by
+    id. `calendar.rs` is not edited and not reached around — the seam is built
+    on its public reads — so the day sharing works differently, Sites changes
+    in one function rather than in a search. Two rules are in the code: a
+    source must be **writable** (owner or editor), because the reservation
+    S2.13b will write has to land somewhere, and a read-only share is
+    *listed* — so the picker can explain it — but refused at binding time
+    naming the calendar; and a source is **resolved, never cached**, so a
+    calendar since deleted or unshared reads back as `null` beside the stored
+    id, which is a broken connection a screen can show rather than an empty
+    week a visitor discovers.
+  - **`site_bookings` (migration 0313) — the service.** Name, description,
+    location, the bound calendar, an IANA time zone, appointment length,
+    buffer, notice, horizon, the weekly hours, the extra questions, and an
+    on/off switch. Tenant- and site-scoped like every other Sites row; whole
+    writes only, because hours, questions and source are one decision and a
+    partial write could leave a public page offering a week nobody agreed to.
+  - **Opening hours are declared, not inferred.** A dentist whose Sunday is
+    empty is not open on Sunday: availability starts from windows the owner
+    wrote — ISO 8601 weekday (1 = Monday … 7 = Sunday) and minutes from
+    midnight **in the service's own zone**, which is what makes a daylight
+    saving change move the appointments with the clock instead of an hour off
+    it — and the calendar can only ever take slots away (S2.13b). The store
+    sorts the week before storing it (two owners who typed the same week in a
+    different order store the same row), refuses two windows overlapping on one
+    day, and refuses a window shorter than the appointment it offers, because
+    that window can only ever produce zero slots.
+  - **Name and email are structural**, not schema: an appointment nobody can be
+    told about is not a booking. `fields` is what a particular trade needs on
+    top of them — a phone number, a plate, which treatment — each with a
+    machine-stable `key` that outlives its label (`[a-z][a-z0-9_]*`), one of
+    four kinds (`text`, `long_text`, `phone`, `choice`), and options exactly
+    when it is a choice: at least two, distinct, and refused on any other kind.
+  - **No foreign key to `calendars`, deliberately.** Agenda owns a calendar's
+    lifetime; a booking service must neither block its deletion (`RESTRICT`)
+    nor vanish with it (`CASCADE`). Tenancy comes from `(tenant_id, site_id)`
+    referencing `sites` and from every statement scoping by both; the binding's
+    validity is a resolution through the seam, not a constraint.
+  - **The wire:** `GET /sites/{id}/booking-sources` (the calendars this account
+    could attach, each with `writable`), and `GET|POST /sites/{id}/bookings`
+    plus `GET|PUT|DELETE /sites/{id}/bookings/{booking}`. A body names the
+    calendar by id and nothing else about it; the answer carries both the
+    stored `calendarId` and the server-resolved `calendar` object (or `null`).
+    Only five fields have no honest default — name, calendar, zone, length,
+    hours — the rest default (60 days of horizon, no buffer, no notice, no
+    questions, and the service on).
+  - **Caps** (`SITE_BOOKING_*`): 20 services per site, 21 weekly windows,
+    8 questions, 20 answers per choice, 5–480 minute appointments, ≤240 minutes
+    of buffer, ≤30 days of notice, ≤365 days of horizon.
+- **Verified:** `bash scripts/prune-test-db.sh` (8 943 tenants, 96 MB — nothing
+  to prune); `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-jmap -p alo-sites --all-targets` clean (the workspace's only warning
+  stays the pre-existing `meet.rs:430` unused `guest`, the business track's
+  file); `cargo nextest run` — **2 946 tests, all passing** (`alo-store` 1 815
+  in 17 s, `alo-jmap` + `alo-sites` 1 131 in 63 s), including
+  - store unit tests: the week stored sorted whatever order it was typed in,
+    an overlap on one day refused while the same hours on another day are not,
+    a 20-minute window refused **by name** against a 30-minute appointment, a
+    weekday outside 1–7 and a span outside the day refused, choice questions
+    needing two distinct answers and other kinds refusing any, keys that must
+    start with a lowercase letter and be unique, a time zone the server can
+    actually convert with, and the four kinds round-tripping;
+  - store tenancy (`site_bookings_tenancy`): the round trip of the week, the
+    trimmed questions and the resolved source; a whole replace dropping the
+    questions it did not send while keeping `created_at`; **the rival tenant**
+    seeing nothing on either site and getting `NotFound` on update and delete,
+    and its binding of the owner's calendar id being `NotFound` rather than a
+    refusal that would confirm the id exists; a calendar shared **viewer**
+    refused by name and the same write accepted once raised to **editor**; a
+    deleted calendar leaving the service visible and its source unresolved;
+    and the 20-per-site cap.
+  - jmap (`sites_bookings_http`): the create/read/replace/delete arc with the
+    defaults and the resolved `calendar` object, `401` on read and write
+    without a token, `400` for a body that is not the shape, `422` carrying the
+    store's sentence, and the outsider tenant `404` on all five verbs.
+- **Wire-verified with real curl** against the debug `alo-jmap` on docker
+  `alo-pg` (`pkill -f alo-jmap` before starting; two fixture tenants
+  bootstrapped for the run and deleted afterwards): every route `401` without a
+  token; `GET booking-sources` listed the account's Personal calendar
+  `writable: true`; a create with only the five required fields came back
+  `horizonDays: 60`, `bufferMinutes: 0`, `noticeMinutes: 0`, `active: true`,
+  no questions, and the hours it was given; a `PUT` with two questions replaced
+  the whole service (`durationMinutes: 60`, `active: false`, `location`
+  set, the Friday-only week). Refusals on the wire: `{nope` → `400 notJSON`,
+  an unknown field → `400`, `Middle/Earth` → `422 "…use an IANA name such as
+  Europe/Brussels"`, two Monday windows → `422 "…must not overlap"`, a 20-minute
+  window → `422 "an opening window of 20 minutes is shorter than the 30-minute
+  appointment it offers"`, `kind:"dropdown"` → `422` naming all four kinds, a
+  choice with one answer → `422`, and `calendarId:"cal-nobody"` → `404`. The
+  rival tenant got `404` on all six verbs, `psql` showed the owner's row
+  untouched (`Long consultation`, its calendar, `Europe/Brussels`, 60/15/240/30,
+  `active=f`, the stored week and questions), `DELETE` → `204`, again → `404`,
+  and `select count(*)` → 0.
+- **Cuts/flags:**
+  - **The `booking` *section* variant is deliberately not in this item**, and
+    the queue now records it as the first half of S2.13b. Adding a fourteenth
+    `Section` variant forces the public renderer to render it, and everything
+    that makes a booking section worth rendering — the available slots, the
+    form that reserves one — is S2.13b. Shipping the variant here would have
+    put a section on live pages that shows a service and cannot book it, which
+    is the stub this loop does not ship. The store, the routes and the seam are
+    complete without it.
+  - **No UI, no i18n keys.** S2.13c owns the screens; the store's refusal
+    sentences are English server strings surfaced verbatim, exactly as the
+    catalog routes' are (S1.30b made that the rule).
+  - **Availability is not computed here.** The seam lists and resolves
+    calendars; reading busy time out of `events_in_range` and turning the
+    week + the calendar + the buffer/notice/horizon into slots is S2.13b's
+    first job, and belongs beside the reservation that races against it.
+  - **The public flow will need an owner-scoped door.** `site_agenda` is an
+    `AccountStore` seam — tenant *and* user — which is right for the editor.
+    The public booking service has no user, so S2.13b must resolve the site's
+    creator the way `claim_form_notifications` does and read the calendar
+    through that account, not widen this seam.
+  - **The local gate still needs `DATABASE_URL`** (`postgres://alo:alo-dev-only@localhost:5432/alo`
+    — the test default port 5433 is not this machine's), and a filter argument
+    to `cargo nextest run` matches **test names, not binaries**: `-E
+    'binary(site_bookings_tenancy)'` is what runs one integration suite. Also
+    measured: after a change to the `alo-store` lib, the first `nextest` run
+    relinks ~124 test binaries and macOS pays first-launch verification on each
+    during nextest's list phase — that run took ~20 minutes wall while the
+    tests themselves took 9 seconds. Subsequent runs are seconds. Budget for it
+    once per iteration; it is not a hang.
+- **Next:** S2.13b (public booking flow: the `booking` section, availability
+  read, race-safe reservation, internal notification).

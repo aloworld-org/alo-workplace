@@ -9,6 +9,20 @@ contracts.
 
 ## Unreleased
 
+- **A website can now describe what it can be booked for, in the calendar you
+  already keep.** A booking service says what it is called, how long it takes,
+  which of your calendars the appointment belongs in, and the hours of the week
+  you offer it — written on your own clock, so a change of daylight saving
+  moves the appointments with it rather than an hour off. On top of the name
+  and email every booking asks for, you add the questions your trade actually
+  needs: a phone number, a registration plate, which treatment, each optional
+  or required. A calendar somebody shared with you for reading only is offered
+  but explained, rather than quietly missing, because an appointment has to be
+  written somewhere; and if a calendar is later deleted or unshared, the
+  service says its connection is broken instead of showing an empty week.
+  Visitors cannot book yet — this is the record the booking page will be made
+  from.
+
 - **Anything you offer can now be photographed.** An item in a catalog takes a
   picture — chosen from your computer, kept in Drive like every other image on
   your site — and the card on the published page shows it. Beside it you say
