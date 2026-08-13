@@ -26,3 +26,12 @@ serial = { max-threads = 1 }
 # serial passes 3/3.
 filter = 'binary(site_publish_schedule_tenancy)'
 test-group = 'serial'
+
+[[profile.default.overrides]]
+# The booking-notification sweep claims across every tenant (that is what a
+# sweep is), so the two suites that exercise it — alo-store's claim test and
+# alo-jmap's end-to-end delivery test — would otherwise claim each other's
+# appointments and each fail on rows the other took. Serialised rather than
+# weakened: both assert exact counts, which is the point of them.
+filter = 'binary(site_bookings_public) or binary(site_booking_notify)'
+test-group = 'serial'

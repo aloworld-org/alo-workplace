@@ -22,6 +22,17 @@ contracts.
   access is being removed. Selects and text boxes in these screens are a little
   taller, matching the rest of the product, and they show a proper focus ring.
 
+- **A booking on your website now also arrives in your inbox.** Within half a
+  minute of a visitor taking an appointment you get an ordinary email saying
+  what they booked, when — written on the clock you offered it in, with the
+  zone named — who they are and what they answered to your own questions.
+  Replying to it answers the visitor: their address is the reply address, so
+  confirming a booking is one reply and nothing is sent in your name without
+  you. The appointment is in your calendar either way; this is the second
+  telling, for the days you do not look at the calendar first. It arrives once
+  and only once, and only ever in the inbox of the workspace the website
+  belongs to.
+
 - **Visitors can now book an appointment on a published website, and it lands
   in your calendar.** A page carries what you offer — the name, how long it
   takes, where it happens — and a day field. Choosing a day shows exactly the

@@ -5082,3 +5082,78 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     `grep | head` — `head` closes the pipe, the output file stays empty, and a
     finished run looks like a hang.
 - **Next:** S2.13b2 (booking notification to the owner's inbox).
+
+## S2.13b2 — the booking lands in the owner's inbox too (2026-08-13)
+
+- **Shipped:** a visitor's appointment now reaches the site owner twice: in
+  their Agenda calendar the instant it is taken (S2.13b), and within half a
+  minute as an ordinary message in their own inbox.
+  - **The claim** (`site_booking_notify`, the third sibling of
+    `site_form_notify` and `site_order_notify`): one statement marks rows
+    notified as it reads them (`FOR UPDATE SKIP LOCKED`, at-most-once), and
+    returns the tenant, the site's creator, the service, the time, the visitor
+    and the answers — everything delivery needs, so no second read can widen
+    past what the sweep claimed.
+  - **Only a completed reservation is offered**: `status = 'booked'` **and**
+    `event_id IS NOT NULL`. The reservation commits before its calendar event
+    and is withdrawn again if that event cannot be written, so a row without an
+    event is one the visitor was never confirmed — announcing it would announce
+    a booking that does not exist. Pinned by a test that nulls an `event_id`
+    and proves the row is neither claimed nor marked told.
+  - **Migration `0315`**: the partial claim index
+    (`created_at, id WHERE notified_at IS NULL AND status='booked' AND event_id
+    IS NOT NULL`), the sibling of `site_orders_pending_notification`. Without
+    it the every-30-seconds question is a scan of every appointment ever taken.
+  - **The message** (`alo-jmap` `site_booking_notify`): INTERNAL delivery
+    through the owner's account door — never outbound SMTP. From is a display
+    identity on the site's own subdomain, `Reply-To` is the visitor, so
+    confirming an appointment is one deliberate reply on the owner's normal
+    send path. The body says what was booked, when — the wall clock of the
+    service's own zone, with the zone named, so an owner reading it abroad is
+    not guessing — who booked it, their answers under the labels they read, and
+    that it is already in the calendar. Body base64, headers only through the
+    RFC 2047 path: a visitor's name cannot become a header.
+  - **Wired** in `main.rs` as a 30-second sweep beside the form and order
+    notifiers.
+- **Verified:**
+  - `cargo clippy -p alo-store -p alo-jmap --all-targets` clean (one
+    pre-existing warning in `meet.rs`, another module's file — flagged below,
+    not touched).
+  - `cargo test -p alo-store --lib --test site_bookings_public --test
+    site_bookings_tenancy`: 1197 + 9 + 6 green, including the new
+    `a_new_appointment_is_offered_to_its_owner_for_notification_exactly_once`
+    (two tenants booking at once: each notification carries its own tenant,
+    owner and subdomain; the service, the instants, the zone and the answers
+    are what the owner needs; a second sweep offers neither again; the
+    appointment rows are untouched by the claim; an event-less row is skipped).
+  - `cargo test -p alo-jmap --lib --test site_booking_notify --test site_notify
+    --test sites_bookings_http`: 667 + 1 + 1 + 3 green. The new end-to-end
+    suite is the whole arc on the real routers: the owner builds and publishes
+    the service through `/sites/*`, an anonymous visitor reads the day page on
+    `alo-sites`, picks the first offered radio and POSTs `/b/{id}`, and only
+    then does the sweep run — one message in owner A's inbox naming Ada and
+    carrying her phone answer, one in owner B's naming Grace, neither
+    containing the other's words, and a second sweep delivering nothing.
+  - Migration applied and index live in the local database (`\d
+    site_booking_appointments` shows `site_booking_appointments_pending_
+    notification`); 20 appointments carried a non-NULL `notified_at` after the
+    runs.
+- **Cuts/flags:**
+  - **Two suites now claim the same global queue**, so both are in
+    `.config/nextest.toml`'s `serial` group: alo-store's `site_bookings_public`
+    and alo-jmap's `site_booking_notify` would otherwise claim each other's
+    appointments and each fail on rows the other took. This is the same reason
+    `site_publish_schedule_tenancy` is already there. `cargo test` does not read
+    that config — run those two binaries in separate commands, as this
+    iteration did.
+  - **English-only**, like the form notification, the order notification and
+    the calendar RSVP mail: the web i18n catalogs do not reach this process.
+    Localizing server-generated mail stays a wave-review item.
+  - **Pre-existing warning left alone**: `platform/alo-store/src/meet.rs:430`
+    binds an unused `guest`. It is Meet's file, not this track's, and it
+    predates this item (last commit there is `0f8721b`). One character to fix
+    (`_guest`) whenever its owner is next in that file.
+  - **No UI.** Nothing in the editor mentions the notification; there is
+    nothing to configure. S2.13c owns the booking screens.
+- **Next:** S2.13c (booking UI: visible Agenda connection, preview, booking
+  management link, dependency/error states).
