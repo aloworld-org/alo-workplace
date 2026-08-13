@@ -1,5 +1,5 @@
 //! Golden-HTML pinning of the renderer: one golden per section type plus a
-//! full-page golden of a themed site carrying all twelve sections. Run with
+//! full-page golden of a themed site carrying all fifteen sections. Run with
 //! `UPDATE_GOLDENS=1` to re-bless after a deliberate markup change, then
 //! review the diff like any code change.
 #![allow(clippy::unwrap_used)]
@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 use alo_sites::render::{EN, ImageSources, PageRenderContext, SiteRenderContext, render_page};
 use alo_store::id::{BlobId, CalendarId, SiteBookingId, SiteCatalogId, SiteCollectionId};
+use alo_store::site_custom_code::{CustomCodeCapabilities, CustomCodeSection};
 use alo_store::site_model::{
     BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqItem,
     FaqSection, FeatureItem, FeaturesSection, FooterSection, GallerySection, HeroSection,
@@ -129,11 +130,29 @@ fn full_sections() -> Vec<Section> {
             heading: Some("On the counter".to_owned()),
             category: None,
         }),
+        Section::CustomCode(custom_code_block()),
         Section::Footer(FooterSection {
             text: Some("© Nordwind Coffee Roasters".to_owned()),
             links: vec![link("Imprint", "/imprint"), link("Privacy", "/privacy")],
         }),
     ]
+}
+
+/// The corpus's custom-code block: markup, style, and a script, with the one
+/// capability that runs the script.
+fn custom_code_block() -> CustomCodeSection {
+    CustomCodeSection {
+        heading: Some("Roast timer".to_owned()),
+        title: "A timer counting down the current roast".to_owned(),
+        html: "<p id=\"left\">12:00</p><button type=\"button\" id=\"go\">Start</button>".to_owned(),
+        css: Some("#left { font-size: 3rem; }".to_owned()),
+        js: Some("document.getElementById('go').addEventListener('click', () => {});".to_owned()),
+        capabilities: CustomCodeCapabilities {
+            scripts: true,
+            inline_images: false,
+        },
+        height_px: 220,
+    }
 }
 
 /// A framed photo: the right two-thirds of the source, focal point on the
@@ -298,7 +317,7 @@ fn assert_golden(name: &str, actual: &str) {
 #[test]
 fn one_golden_per_section_type() {
     let sections = full_sections();
-    assert_eq!(sections.len(), 14, "corpus must cover every variant");
+    assert_eq!(sections.len(), 15, "corpus must cover every variant");
     for section in sections {
         let kind = section.kind();
         let html = render_default(vec![section]);
@@ -604,6 +623,114 @@ fn search_defaults_golden_uses_page_site_and_theme_logo() {
         bookings: &HashMap::new(),
     };
     assert_golden("seo_defaults.html", &render_page(&site, &page));
+}
+
+/// The custom-code block's frame, checked as a contract rather than as a
+/// picture: the isolation is a handful of attribute values, and every one of
+/// them is asserted here. A change that quietly hands the frame its origin
+/// back, or drops the policy, fails this test long before it reaches a site.
+#[test]
+fn a_custom_code_block_is_served_inside_a_locked_frame() {
+    let html = render_default(vec![Section::CustomCode(custom_code_block())]);
+
+    // The block is a frame with an accessible name, sized by the author, and
+    // sandboxed with the one token its declared capability earns.
+    assert!(html.contains("<iframe class=\"custom-frame\""), "{html}");
+    assert!(
+        html.contains("title=\"A timer counting down the current roast\""),
+        "the frame must carry its accessible name: {html}"
+    );
+    assert!(html.contains("sandbox=\"allow-scripts\""), "{html}");
+    assert!(html.contains("style=\"height:220px\""), "{html}");
+    for escape in [
+        "allow-same-origin",
+        "allow-top-navigation",
+        "allow-popups",
+        "allow-modals",
+        "allow-downloads",
+    ] {
+        assert!(
+            !html.contains(escape),
+            "the frame was handed {escape}: {html}"
+        );
+    }
+
+    // The document inside is carried in `srcdoc`, so the page makes no second
+    // request — and it declares the closed policy before anything else.
+    //
+    // The quotes are escaped twice on purpose, because there are two parsers:
+    // the page's parser turns `&amp;#39;` back into `&#39;` when it reads the
+    // attribute, and the frame's own parser turns that into `'` when it reads
+    // the policy. One layer of escaping would leave the policy value ending at
+    // its first quote.
+    assert!(
+        html.contains(
+            "srcdoc=\"&lt;!doctype html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;\
+             &lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta http-equiv=\
+             &quot;Content-Security-Policy&quot; content=&quot;default-src &amp;#39;none&amp;#39;; \
+             base-uri &amp;#39;none&amp;#39;; form-action &amp;#39;none&amp;#39;; style-src \
+             &amp;#39;unsafe-inline&amp;#39;; script-src &amp;#39;unsafe-inline&amp;#39;&quot;&gt;"
+        ),
+        "the frame's document must open with the capability policy: {html}"
+    );
+
+    // The block's own code is inside the frame's document and nowhere else:
+    // the page around it never gains a script or a style of the tenant's.
+    assert!(
+        html.contains("&lt;script&gt;document.getElementById(&#39;go&#39;)"),
+        "{html}"
+    );
+    assert!(
+        !html.contains("<script>document.getElementById"),
+        "the block's script escaped into the page itself: {html}"
+    );
+    assert!(
+        !html.contains("<p id=\"left\">12:00</p>"),
+        "the block's markup escaped into the page itself: {html}"
+    );
+}
+
+/// A block that declares nothing gets a frame that can do nothing: an empty
+/// `sandbox`, a policy with no `script-src`, and — the part worth pinning — no
+/// `<script>` block at all, rather than bytes the browser is required to
+/// ignore.
+#[test]
+fn a_custom_code_block_without_capabilities_carries_no_script() {
+    let mut block = custom_code_block();
+    block.js = None;
+    block.capabilities = CustomCodeCapabilities::default();
+    let html = render_default(vec![Section::CustomCode(block)]);
+
+    assert!(html.contains("sandbox=\"\""), "{html}");
+    assert!(!html.contains("script-src"), "{html}");
+    assert!(!html.contains("&lt;script&gt;"), "{html}");
+    assert!(
+        html.contains(
+            "content=&quot;default-src &amp;#39;none&amp;#39;; base-uri &amp;#39;none&amp;#39;; \
+             form-action &amp;#39;none&amp;#39;; style-src &amp;#39;unsafe-inline&amp;#39;&quot;"
+        ),
+        "{html}"
+    );
+}
+
+/// Defense in depth for a snapshot published before the write gate forbade it:
+/// a stored part that would close its own `<style>`/`<script>` block is dropped
+/// rather than inlined, so the frame's document cannot be re-parsed into
+/// something else.
+#[test]
+fn stored_code_that_would_close_its_own_block_is_dropped() {
+    let mut block = custom_code_block();
+    block.css = Some("body { color: red; }</style><p>escaped".to_owned());
+    block.js = Some("const x = 1;</script><p>escaped".to_owned());
+    let html = render_default(vec![Section::CustomCode(block)]);
+
+    assert!(
+        !html.contains("escaped"),
+        "a part that closes its own block must be dropped whole: {html}"
+    );
+    // The frame is still there, still locked, still named.
+    assert!(html.contains("sandbox=\"allow-scripts\""), "{html}");
+    assert!(html.contains("&lt;style&gt;html,body{margin:0"), "{html}");
 }
 
 #[test]

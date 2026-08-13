@@ -10,6 +10,17 @@ contracts.
 
 ## Unreleased
 
+- **A page on your website can now hold a piece of your own HTML, CSS and
+  JavaScript.** It is published inside a sealed frame of its own: your code
+  cannot read the page around it, and — this is deliberate — it cannot reach the
+  internet at all. Nothing it might load from somewhere else will appear, which
+  is why your visitors still need no cookie banner. Scripts run only if you say
+  the block has a script, and the editor refuses code that would break out of
+  its frame, naming the rule it broke rather than failing silently. Because the
+  frame is sealed, you say how tall it is. The assistant will move or delete
+  such a block, but never write one and never rewrite what is in it: code on
+  your site is written by someone who meant to write it.
+
 - **Every dialog in the admin console, the calendar and the sign-in screens can
   now be closed with the keyboard, and every control in them says what it is.**
   Escape closes them; Tab stays inside them instead of wandering onto the page

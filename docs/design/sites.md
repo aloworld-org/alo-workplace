@@ -846,6 +846,62 @@ neutralisation the submissions export uses. There is deliberately **no
 tenant-side create route**: the only writer of an order is the public door,
 which prices it from the publish.
 
+### Sandboxed custom code (S2.14a)
+
+ADR 0036 ruled custom code out of the **first** wave; `docs/features.md` carries
+it back at tier `[S+]` as "custom-code blocks (sandboxed)". Both halves of that
+phrase are honoured: what the ADR forbids without a time limit — third-party
+embeds and trackers of any kind — stays forbidden, because **no capability
+opens a network**. A block cannot fetch, cannot load a remote script, font, or
+pixel, and cannot phone home. The "no cookies, no banner" promise the analytics
+model rests on therefore survives a tenant pasting a snippet from the internet;
+what it costs is the YouTube embed, and that is a decision, not an oversight.
+
+The block is a **document, not a fragment** (`alo_store::site_custom_code`):
+
+- `html`, `css`, and `js` are stored **apart**, so nothing is smuggled — a
+  `<script>` inside the markup is a validation error, not a surprise. So are the
+  document's own tags (`<html>`, `<head>`, `<body>`, `<base>`, `<meta>`),
+  anything that loads or embeds (`<link>`, `<iframe>`, `<object>`, `<embed>`),
+  and `<form>` (its post has nowhere to go — that is what the contact form
+  section is for).
+- **Capabilities are explicit and default-deny.** There are two: `scripts` (the
+  block's `js` runs) and `inline_images` (`data:` images decode). A script
+  without its capability is refused, and so is the capability without a script —
+  least privilege is checked, not merely offered.
+- **The contract is computed, not written twice.**
+  `CustomCodeCapabilities::sandbox_attribute` and `content_security_policy` are
+  the exact strings the renderer emits, so the write gate's promise and the
+  browser's instruction cannot drift. The policy floor is `default-src 'none';
+  base-uri 'none'; form-action 'none'; style-src 'unsafe-inline'`, and each
+  declared capability adds exactly one directive.
+- **Sizes are bytes**: 16 KiB of markup, 8 KiB each of style and script, 24 KiB
+  together — under the sum, so one page cannot carry fifty maximal blocks past
+  the page budget. Height is authored (40–2 000 px): a sandboxed frame cannot be
+  measured from the page without sharing an origin with it, which is the one
+  thing that must never happen.
+
+The renderer serves the block as `<iframe sandbox="…" srcdoc="…">` carrying a
+complete document with the policy in a `<meta http-equiv>`. `allow-same-origin`
+is unreachable from any capability, and so are `allow-top-navigation`,
+`allow-popups`, and `allow-modals` — a block cannot read the page around it,
+move it, or cover it. The quotes in the policy are escaped **twice**, because
+there are two parsers between the source and the browser's policy engine.
+
+**Where the boundary is.** The isolation is the browser's: an opaque origin plus
+a closed policy. The write-gate refusals are the *helpful error* — they catch
+the snippet that would silently do nothing and the shapes that would break the
+wrapper document (`</` inside an inlined block, a control byte). Security that
+depends on string-matching hostile input is not security, and the module says so
+rather than implying otherwise.
+
+**Two things the assistant may not do.** It may not write a custom-code block
+(`alo-ai` refuses a generated draft that contains one, and refuses `add_section`
+/ `set_prop` / `rewrite_copy` on one), and a template may not ship one — a
+template is code we put in other people's sites, and shipping executable
+JavaScript that way would make the catalog a supply chain. Moving and deleting a
+block stay allowed: both are reversible arrangement that changes no code.
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):
@@ -904,9 +960,11 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
   has since shipped as order-by-form, and the booking *model* — the service,
   its week, its questions, and the Agenda seam — landed with S2.13a; reading
   availability and taking a reservation are S2.13b, the editor screens S2.13c.
-- Free-form design tools / pixel canvas, custom code injection,
-  template marketplace, third-party embeds or trackers of any kind
-  (ADR 0036 non-goals; the analytics promise depends on it).
+- Free-form design tools / pixel canvas, template marketplace,
+  third-party embeds or trackers of any kind (ADR 0036 non-goals; the
+  analytics promise depends on it). Custom code was on this list for v1
+  and has since shipped **sandboxed** at tier `[S+]` — with no network,
+  so the embeds-and-trackers half of the ADR is untouched (above).
 - Version history, rollback, whole-site AI translation, scheduled
   publishing, password-protected pages and responsive image derivatives
   have since shipped and are described above.

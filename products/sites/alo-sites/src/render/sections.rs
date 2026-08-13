@@ -6,6 +6,7 @@
 //! `<img>` carries `alt` (empty means decorative, straight from the model).
 //! All text goes through [`esc`], every link target through [`safe_href`].
 
+use alo_store::site_custom_code::CustomCodeSection;
 use alo_store::site_model::{
     BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqSection,
     FeaturesSection, FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection,
@@ -108,7 +109,84 @@ pub(super) fn body_section(
         Section::Collection(s) => collection(out, site, s, page.collections),
         Section::Catalog(s) => catalog(out, site, s, page.catalogs, index),
         Section::Booking(s) => booking(out, site, s, page.bookings, index),
+        Section::CustomCode(s) => custom_code(out, site, s),
     }
+}
+
+/// A `custom_code` section: the tenant's own markup, style, and script, served
+/// as a **complete document inside a sandboxed frame** rather than as part of
+/// this page.
+///
+/// The frame is where the isolation lives. `sandbox` never carries
+/// `allow-same-origin`, so the document inside gets an opaque origin and cannot
+/// read this page, its cookies, or its storage; the policy it declares starts
+/// at `default-src 'none'`, so it cannot fetch anything, from anywhere. Both
+/// strings come from [`CustomCodeCapabilities`] rather than from this file, so
+/// what the write gate promised and what the browser is told can never drift.
+///
+/// The whole document is `srcdoc`, attribute-escaped: there is no second URL to
+/// serve, nothing to cache separately, and no way for the value to end the
+/// attribute it sits in. Independently of the write gate, a stored part that
+/// would close its own `<style>`/`<script>` block is dropped here with a
+/// warning — a snapshot published before that rule existed still renders inert.
+fn custom_code(out: &mut String, site: &SiteRenderContext<'_>, section: &CustomCodeSection) {
+    out.push_str("<section class=\"s-custom-code\">\n");
+    push_opt_heading(out, section.heading.as_deref());
+    out.push_str(&format!(
+        "<iframe class=\"custom-frame\" title=\"{}\" sandbox=\"{}\" loading=\"lazy\" \
+         style=\"height:{}px\" srcdoc=\"{}\"></iframe>\n",
+        esc(&section.title),
+        section.capabilities.sandbox_attribute(),
+        section.height_px,
+        esc(&custom_code_document(site, section))
+    ));
+    out.push_str("</section>\n");
+}
+
+/// The document inside the frame, before attribute escaping.
+fn custom_code_document(site: &SiteRenderContext<'_>, section: &CustomCodeSection) -> String {
+    let mut doc = format!(
+        "<!doctype html><html lang=\"{}\"><head><meta charset=\"utf-8\">\
+         <meta http-equiv=\"Content-Security-Policy\" content=\"{}\">\
+         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
+         <style>html,body{{margin:0;font-family:inherit}}",
+        esc(site.locale),
+        esc(&section.capabilities.content_security_policy()),
+    );
+    if let Some(css) = section.css.as_deref().and_then(|css| inlinable("css", css)) {
+        doc.push_str(css);
+    }
+    doc.push_str("</style></head><body>");
+    doc.push_str(&section.html);
+    // A script is inlined only when the capability that runs it was declared:
+    // without `allow-scripts` the frame would not execute it anyway, and
+    // shipping bytes the browser is contractually required to ignore is a lie
+    // in the page source.
+    if section.capabilities.scripts
+        && let Some(js) = section.js.as_deref().and_then(|js| inlinable("js", js))
+    {
+        doc.push_str("<script>");
+        doc.push_str(js);
+        doc.push_str("</script>");
+    }
+    doc.push_str("</body></html>");
+    doc
+}
+
+/// The write gate's `</` rule, re-checked at render time: a value inlined into
+/// a `<style>` or `<script>` block may not end that block. A stored part that
+/// does is dropped whole — the block renders without its style or its
+/// behaviour, which is visibly wrong and therefore fixable, rather than
+/// half-parsed.
+fn inlinable<'a>(field: &'static str, value: &'a str) -> Option<&'a str> {
+    if value.contains("</") {
+        tracing::warn!(
+            field,
+            "stored custom code would close its own block; dropping it"
+        );
+        return None;
+    }
+    Some(value)
 }
 
 /// A `catalog` section: what the site offers, exactly as it was frozen into

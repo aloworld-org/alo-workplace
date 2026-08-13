@@ -493,6 +493,17 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   cursor: pointer;
 }
 
+/* A custom-code block. The page styles the box around the frame and nothing
+   inside it: the frame is another document, and the site's tokens deliberately
+   do not reach in. Its height is authored (a sandboxed frame cannot be
+   measured from here), so only the width is ours. */
+.s-custom-code .custom-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+
 /* Text beside image; sides swap by modifier, stack on small screens. */
 .s-text-image { display: grid; gap: 2rem; align-items: center; }
 .s-text-image img { border-radius: 0.75rem; }

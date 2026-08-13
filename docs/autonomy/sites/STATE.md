@@ -5249,3 +5249,128 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     review may prefer the catalog's typed-string-parsed-server-side pattern.
 - **Next:** S2.14a (sandboxed custom-code model: capabilities, size caps, CSP
   contract, validation against host-page escape).
+
+## 2026-08-13 — S2.14a sandboxed custom-code model
+
+- **Scope gate first.** ADR 0036 lists "custom code injection" under **Non-goals
+  (v1)**, and `docs/features.md` carries "custom-code blocks (sandboxed)" at
+  tier `[S+]`. The two are read together rather than one over the other: the
+  wave-limited half (custom code) is what S+ lifts; the unlimited half
+  (third-party embeds and trackers *of any kind*) is not. That reading is what
+  the whole item is built on — see the cut below — and it is written into
+  `docs/design/sites.md` so the next item does not relitigate it.
+- **Shipped:**
+  - **`platform/alo-store/src/site_custom_code.rs`** — the block as a
+    *document, not a fragment*. `html`, `css` and `js` are stored apart (a
+    `<script>` in the markup is a refusal, not a surprise), plus a required
+    frame `title` (a frame with no accessible name is announced as "frame"), an
+    optional page-level `heading`, and an authored `height_px` (40–2 000): a
+    sandboxed frame cannot be measured from the page without sharing an origin
+    with it, which is the one thing that must never happen.
+  - **Capabilities, default-deny and exactly two.** `scripts` (the block's `js`
+    runs) and `inline_images` (`data:` images decode). A script without its
+    capability is refused, **and so is the capability without a script** —
+    least privilege is checked, not merely offered. `#[serde(default,
+    deny_unknown_fields)]`: an absent capability is denied, an invented one
+    (`"network": true`) is a 422 rather than a silently ignored key.
+  - **The contract is computed once.** `sandbox_attribute()` and
+    `content_security_policy()` live with the capabilities and are the exact
+    strings the renderer emits, so the write gate's promise and the browser's
+    instruction cannot drift. Floor: `default-src 'none'; base-uri 'none';
+    form-action 'none'; style-src 'unsafe-inline'`; each declared capability
+    adds exactly one directive. A test walks the whole capability space and
+    asserts no combination ever yields `allow-same-origin`,
+    `allow-top-navigation`, `allow-popups`, `allow-modals`, `allow-downloads`,
+    or any policy source that could reach a network.
+  - **Size in bytes** (16 KiB markup, 8 KiB style, 8 KiB script, 24 KiB
+    together — under the sum on purpose, so one page cannot carry fifty maximal
+    blocks past the page budget), and refusals for control characters, `://`
+    anywhere, `javascript:`/`vbscript:`, `@import`, `</` in an inlined part, and
+    every tag that would declare the document or embed something.
+  - **The renderer** (`alo-sites`): `<iframe class="custom-frame" title=…
+    sandbox=… loading="lazy" style="height:Npx" srcdoc="…">` carrying a
+    complete document with the policy in a `<meta http-equiv>`. The quotes are
+    escaped **twice** on purpose — the page's parser reads the attribute, the
+    frame's parser reads the policy — and the golden pins it. Independently of
+    the write gate, a stored part containing `</` is dropped with a warning
+    rather than inlined (a snapshot published before that rule still renders
+    inert), and the script block is omitted entirely when the capability that
+    would run it is absent, rather than shipping bytes the browser is required
+    to ignore. One stylesheet rule styles the box around the frame and nothing
+    inside it.
+  - **Two refusals about authorship.** `alo-ai` will not write code into a
+    site: a generated draft containing a `custom_code` section is refused, and
+    `add_section` / `set_prop` / `rewrite_copy` on one are refused by name
+    ("custom code is written by hand, not by the assistant"). Moving and
+    deleting stay allowed — reversible arrangement that changes no code. And a
+    **template may not ship one**: a template is code we put in other people's
+    sites, and shipping executable JavaScript that way would make the catalog a
+    supply chain.
+- **Verified** (all foreground, real exit codes):
+  - `cargo fmt` on the four crates; `SQLX_OFFLINE=true cargo clippy -p
+    alo-store -p alo-ai -p alo-sites --all-targets -- -D warnings` and the same
+    for `alo-jmap` — both clean.
+  - `cargo nextest run -p alo-store -E 'kind(lib) or binary(site_sections) or
+    binary(site_templates)'` → **1 220 green**, including the new module's
+    thirteen unit tests and the envelope-level write-gate test; plus
+    `binary(site_generation_tenancy|site_collection_publish|
+    site_catalog_publish|site_versions_tenancy|site_publish_schedule_tenancy)`
+    → 14 green.
+  - `cargo test -p alo-ai` → 106 green (the two authorship tests among them);
+    `cargo test -p alo-sites` → whole suite green, goldens re-blessed and
+    reviewed by eye (`full_page.html` gains the frame, `site.css` the one rule,
+    new `section_custom_code.html`).
+  - **On the wire**, through the real router and the real database:
+    `cargo test -p alo-jmap --test sites_http` → 23 green, including the new
+    `a_custom_code_block_is_stored_and_its_refusals_reach_the_wire` — a block
+    posted to `POST /sites/{id}/pages/{p}/sections` comes back with
+    `capabilities.inline_images: false` (denied, not absent), the page read
+    returns it byte-identical, and four refusals arrive as `422` whose `detail`
+    is the rule verbatim, e.g. `custom_code section: html may not contain
+    <script>: put JavaScript in the block's script field, not in its markup` and
+    `… js may not reference another address — the block runs with no network
+    access, so anything it loads from elsewhere would silently fail to appear`.
+    A refused write leaves the stored block untouched.
+- **Cuts/flags:**
+  - **No network capability, ever — and therefore no YouTube embed.** This is
+    the item's central decision. Opening even one host would end the "no
+    cookies, no banner" promise and re-enter the ADR's unlimited non-goal. If a
+    tenant asks for an embed, that is a *typed section* for that provider, with
+    its own privacy answer — not a hole in this one.
+  - **No `forms` capability.** A form inside the frame has nowhere to post
+    (`form-action 'none'`), and the contact-form section already exists with a
+    server that knows what to do with a submission. `<form>` in the markup is
+    refused by name, pointing there.
+  - **The renderer shipped here, not in S2.14b.** A CSP/sandbox contract that
+    nothing emits cannot be verified, and a section that saves but never
+    appears is a dead control. S2.14b is now the editor half: the web section
+    mirror, the three-field form with capability switches, the draft preview,
+    and the visible risk boundary. **Until it lands, `web/src/sites` does not
+    know the `custom_code` kind** — `sectionInfo.ts`'s exhaustive switches
+    return `undefined` for such a section, so a page carrying one (only
+    reachable by a direct API call today) would show a blank card label rather
+    than crash. First thing S2.14b fixes.
+  - **Corpus staleness fixed in passing.** `site_model`'s "exhaustive" test
+    corpus covered 13 of 16 variants and `site_sections.rs` had fixtures for 14
+    of 16 — both asserted completeness they no longer had, since catalog and
+    booking landed without extending them. Added the missing catalog,
+    booking and custom_code entries plus two fixtures, so
+    "one golden per section type, no gaps" is true again. The **full-page**
+    fixture still carries only twelve section types and claims "every section
+    type in page order"; leaving that for the wave review rather than
+    regenerating a shared fixture inside this item.
+  - **One character in another track's file.** `alo-store/src/meet.rs:430` bound
+    an unused `guest`, which made `clippy -D warnings` fail for the whole
+    crate and therefore blocked this gate; changed to `_guest`. No behaviour
+    change, flagged here because it is outside the Sites areas.
+  - **`cargo nextest` cannot list this workspace's larger test sets on this
+    machine.** Any run covering more than a handful of test binaries hangs with
+    ~16 `--list --format terse` child processes stuck at 0% CPU forever (`-p
+    alo-sites` alone reproduces it; `--test-threads` does not help). Filtered
+    runs (`-E 'binary(x) or binary(y)'`) work and are fast, and `cargo test`
+    works. That is what the runs above use. **This cost most of this
+    iteration's wall clock** and is worth a human look before the next
+    all-crates gate — LOOP's "just use nextest" advice does not hold here as
+    written.
+- **Next:** S2.14b (the editor half — section mirror, prop form with capability
+  switches, draft preview, visible risk boundary).
