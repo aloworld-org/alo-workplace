@@ -112,6 +112,35 @@ pub struct UiStrings {
     /// Catalog price: whether the currency leads the amount (`€ 12.50`) or
     /// follows it (`12,50 €`).
     pub price_symbol_leads: bool,
+    /// Booking section: label of the day field a visitor picks before seeing
+    /// free times.
+    pub booking_choose_day: &'static str,
+    /// Booking section: button that asks for a day's free times.
+    pub booking_see_times: &'static str,
+    /// Booking page: heading of the free-times document.
+    pub booking_times_title: &'static str,
+    /// Booking page: shown when a chosen day has nothing free.
+    pub booking_no_times: &'static str,
+    /// Booking section/page: the unit an appointment length is written in.
+    pub booking_minutes: &'static str,
+    /// Booking section/page: label before where the appointment happens.
+    pub booking_where: &'static str,
+    /// Booking page: label of the group of offered times.
+    pub booking_pick_time: &'static str,
+    /// Booking page: submit button that takes the appointment.
+    pub booking_book: &'static str,
+    /// Booking result page: title after an appointment was reserved.
+    pub booking_booked_title: &'static str,
+    /// Booking result page: body after an appointment was reserved.
+    pub booking_booked_text: &'static str,
+    /// Booking result page: title when the appointment was not reserved.
+    pub booking_not_booked_title: &'static str,
+    /// Booking section: shown when the service takes no bookings right now.
+    pub booking_closed: &'static str,
+    /// Booking result page: title under the per-client rate limit.
+    pub booking_rate_limited_title: &'static str,
+    /// Booking result page: body under the per-client rate limit.
+    pub booking_rate_limited_text: &'static str,
     /// Protected page: heading of the unlock screen (and its `<title>`).
     pub protected_title: &'static str,
     /// Protected page: explanation above the password field.
@@ -176,6 +205,20 @@ pub const EN: UiStrings = UiStrings {
     decimal_separator: ".",
     group_separator: ",",
     price_symbol_leads: true,
+    booking_choose_day: "Choose a day",
+    booking_see_times: "See free times",
+    booking_times_title: "Free times",
+    booking_no_times: "Nothing free on that day. Please try another one.",
+    booking_minutes: "minutes",
+    booking_where: "Where",
+    booking_pick_time: "Pick a time",
+    booking_book: "Book this time",
+    booking_booked_title: "Appointment booked",
+    booking_booked_text: "Thanks — your appointment is in our calendar. Reply to us if anything changes.",
+    booking_not_booked_title: "Appointment not booked",
+    booking_closed: "This is not taking bookings at the moment.",
+    booking_rate_limited_title: "Too many attempts",
+    booking_rate_limited_text: "Please wait a few minutes before trying again.",
     protected_title: "This page is protected",
     protected_text: "Enter the password to open this page.",
     protected_password: "Password",
@@ -234,6 +277,20 @@ pub const FR: UiStrings = UiStrings {
     decimal_separator: ",",
     group_separator: "\u{202f}",
     price_symbol_leads: false,
+    booking_choose_day: "Choisissez un jour",
+    booking_see_times: "Voir les heures libres",
+    booking_times_title: "Heures libres",
+    booking_no_times: "Rien de libre ce jour-là. Essayez un autre jour.",
+    booking_minutes: "minutes",
+    booking_where: "Lieu",
+    booking_pick_time: "Choisissez une heure",
+    booking_book: "Réserver cette heure",
+    booking_booked_title: "Rendez-vous réservé",
+    booking_booked_text: "Merci — votre rendez-vous est dans notre agenda. Répondez-nous si quelque chose change.",
+    booking_not_booked_title: "Rendez-vous non réservé",
+    booking_closed: "Aucune réservation possible pour le moment.",
+    booking_rate_limited_title: "Trop de tentatives",
+    booking_rate_limited_text: "Veuillez patienter quelques minutes avant de réessayer.",
     protected_title: "Cette page est protégée",
     protected_text: "Saisissez le mot de passe pour ouvrir cette page.",
     protected_password: "Mot de passe",
@@ -292,6 +349,20 @@ pub const NL: UiStrings = UiStrings {
     decimal_separator: ",",
     group_separator: ".",
     price_symbol_leads: true,
+    booking_choose_day: "Kies een dag",
+    booking_see_times: "Bekijk vrije tijden",
+    booking_times_title: "Vrije tijden",
+    booking_no_times: "Niets vrij op die dag. Probeer een andere dag.",
+    booking_minutes: "minuten",
+    booking_where: "Waar",
+    booking_pick_time: "Kies een tijd",
+    booking_book: "Dit tijdstip boeken",
+    booking_booked_title: "Afspraak geboekt",
+    booking_booked_text: "Bedankt — uw afspraak staat in onze agenda. Laat het ons weten als er iets verandert.",
+    booking_not_booked_title: "Afspraak niet geboekt",
+    booking_closed: "Hier kan op dit moment niet geboekt worden.",
+    booking_rate_limited_title: "Te veel pogingen",
+    booking_rate_limited_text: "Wacht een paar minuten voordat u het opnieuw probeert.",
     protected_title: "Deze pagina is beveiligd",
     protected_text: "Voer het wachtwoord in om deze pagina te openen.",
     protected_password: "Wachtwoord",

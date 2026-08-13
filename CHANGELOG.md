@@ -22,6 +22,25 @@ contracts.
   access is being removed. Selects and text boxes in these screens are a little
   taller, matching the rest of the product, and they show a proper focus ring.
 
+- **Visitors can now book an appointment on a published website, and it lands
+  in your calendar.** A page carries what you offer — the name, how long it
+  takes, where it happens — and a day field. Choosing a day shows exactly the
+  times you are still free: your opening hours for that day, minus whatever is
+  already in the bound calendar, minus the appointments other visitors have
+  taken, with the gap you asked to keep between appointments and the notice you
+  asked for respected. The visitor picks a time, gives a name and an address,
+  answers your own questions, and presses one button. Nothing about it needs
+  JavaScript, so it works on any browser and any phone. The moment it is taken
+  the appointment appears in your calendar — with the visitor's address and
+  their answers in the event, so you can simply reply — and it disappears from
+  what the next visitor is offered. Two people pressing *book* on the same time
+  in the same second cannot both get it: one is confirmed, the other is told
+  the time has just been taken and shown what is still free. Times are always
+  shown on your own clock, including on the two days a year the clocks change:
+  an hour that does not exist is never offered, and an hour that happens twice
+  is offered once. Nothing about a visitor's connection is recorded — an
+  appointment is what they typed, and the time it is for.
+
 - **A website can now describe what it can be booked for, in the calendar you
   already keep.** A booking service says what it is called, how long it takes,
   which of your calendars the appointment belongs in, and the hours of the week

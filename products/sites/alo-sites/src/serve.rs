@@ -35,6 +35,7 @@
 mod analytics;
 mod beacon;
 mod blog;
+mod bookings;
 mod cache;
 pub mod config;
 mod conversion;
@@ -142,6 +143,12 @@ pub fn app(state: Arc<AppState>) -> Router {
             post(orders::place).layer(DefaultBodyLimit::max(orders::ORDER_BODY_MAX_BYTES)),
         )
         .route(
+            "/b/{booking_id}",
+            get(bookings::offer)
+                .post(bookings::book)
+                .layer(DefaultBodyLimit::max(bookings::BOOKING_BODY_MAX_BYTES)),
+        )
+        .route(
             "/_alo/collect",
             post(beacon::collect).layer(DefaultBodyLimit::max(beacon::BEACON_BODY_MAX_BYTES)),
         )
@@ -244,12 +251,20 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                     return unavailable();
                 }
             };
+            let bookings = match state.store.published_bookings(&resolved).await {
+                Ok(bookings) => bookings,
+                Err(error) => {
+                    tracing::error!(host = %public_host, %error, "booking snapshot read failed");
+                    return unavailable();
+                }
+            };
             let built = Arc::new(RenderedSite::build(
                 &public_host,
                 &resolved,
                 &snapshots,
                 &collections,
                 &catalogs,
+                &bookings,
             ));
             tracing::info!(
                 host = %public_host,
@@ -258,6 +273,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                 pages = snapshots.len(),
                 collections = collections.len(),
                 catalogs = catalogs.len(),
+                bookings = bookings.len(),
                 "rendered publish into cache"
             );
             state.cache.put(&public_host, Arc::clone(&built));

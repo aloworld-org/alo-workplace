@@ -739,6 +739,59 @@ editor screens are S2.13c.
   needs no model and no screen, and it offers a stranger 03:00 on Sunday
   whenever the week happens to be empty.
 
+### The public booking flow (S2.13b)
+
+The `booking` section is the fourteenth section type, and it carries only the
+stable service id and an optional heading. Everything a visitor reads about the
+service — its name, its length, where it happens, the questions it asks — comes
+from `site_booking_snapshots`, frozen at publish exactly as a catalog is: an
+owner who shortens a consultation on Tuesday afternoon has not changed what the
+page promised on Tuesday morning. A service switched off before the publish
+renders the sentence that says so, rather than a form that could only fail.
+
+- **Free time is never frozen and never cached.** A published page is bytes
+  held per publish; a Tuesday afternoon is not. So the section renders what is
+  offered plus a day field, and the free times live one navigation away on
+  `GET /b/{booking id}?date=…` — `no-store`, read live, no JavaScript at all.
+  The visitor picks a time, answers the questions, posts to the same path, and
+  lands on a confirmation. Two requests, exactly like the order form's one.
+- **Slots are arithmetic, and the arithmetic is pure.** `site_booking_slots`
+  takes the published week, the busy intervals, a day and an instant, and
+  returns the free slots. A window is cut into appointment-plus-buffer steps;
+  the notice and the horizon trim both ends; a busy interval removes what it
+  overlaps once the buffer is applied on both sides. Wall times are resolved
+  through the service's own zone, so the hour that does not exist on the day
+  the clocks go forward is never offered and the hour that happens twice is
+  offered once — a property that is cheap to test precisely because nothing
+  here touches a database.
+- **Busy means the calendar *and* the ledger.** Availability subtracts the
+  bound calendar's events — read through the `site_agenda` seam, so recurrence
+  expansion and moved occurrences stay Agenda's to decide, and nothing but a
+  start and an end ever crosses — plus every live appointment already taken on
+  that calendar. The second half is what keeps availability correct in the
+  instant between committing a reservation and writing its calendar event.
+- **Two visitors, one slot: settled by Postgres.** A live appointment is unique
+  on `(tenant, booking, starts_at)`; the reservation takes a transaction-scoped
+  advisory lock on the calendar, re-checks for an overlap, and inserts. The
+  loser is told the time has just been taken. Six concurrent bookers of one
+  slot produce one appointment, and a test proves it.
+- **The row is the reservation; the event is the owner's view of it.** The
+  appointment is committed first, then written into Agenda through the owner's
+  own account door (`site_agenda::agenda_door` — the one place an anonymous
+  request crosses into an owner-scoped store, reachable only with a tenant and
+  a calendar owner a published row already named). If the event cannot be
+  written the reservation is withdrawn: an appointment the owner will never see
+  is worse than a visitor asked to try again.
+- **One uniform absence.** Unknown, unpublished, superseded, switched off, and
+  calendar-deleted all resolve to nothing, and the wire answers `404` for every
+  one of them — no existence leak, exactly as the order door behaves.
+- **Privacy.** An appointment stores what the visitor typed — a name, an
+  address to confirm to, and the answers, each labelled as it was read — and
+  nothing about their connection. A test asserts the ledger's schema carries no
+  IP, user agent, referrer, session or fingerprint column.
+- **Rejected:** rendering the free times into the published page. It would make
+  every page uncacheable, or wrong.
+
 ### Order forms (S2.12b)
 
 A catalog carries `orders_enabled`, and the flag is **frozen into the

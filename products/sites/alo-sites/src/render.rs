@@ -24,7 +24,7 @@ pub use strings::{EN, FR, NL, UiStrings, strings_for};
 
 use alo_store::site_model::{SECTIONS_SCHEMA_VERSION, Section, SiteImage};
 use alo_store::site_theme::SiteTheme;
-use alo_store::{SiteCatalogSnapshot, SiteCollectionSnapshot};
+use alo_store::{SiteBookingSnapshot, SiteCatalogSnapshot, SiteCollectionSnapshot};
 
 use html::{esc, img_src};
 
@@ -121,6 +121,10 @@ pub struct PageRenderContext<'a> {
     /// Immutable catalogs frozen with this publish, keyed by the stable id
     /// referenced by catalog sections. Hidden items are already absent.
     pub catalogs: &'a std::collections::HashMap<String, SiteCatalogSnapshot>,
+    /// Booking services frozen with this publish, keyed by the stable id
+    /// referenced by booking sections. What is *free* is not here: free time is
+    /// read live at the moment a visitor asks for it.
+    pub bookings: &'a std::collections::HashMap<String, SiteBookingSnapshot>,
 }
 
 /// One exact translation of the current stable page identity.

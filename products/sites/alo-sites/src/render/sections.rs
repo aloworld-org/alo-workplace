@@ -7,11 +7,13 @@
 //! All text goes through [`esc`], every link target through [`safe_href`].
 
 use alo_store::site_model::{
-    CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqSection, FeaturesSection,
-    FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection, PricingSection,
-    Section, SiteImage, TeamSection, TestimonialsSection, TextImageSection,
+    BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqSection,
+    FeaturesSection, FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection,
+    PricingSection, Section, SiteImage, TeamSection, TestimonialsSection, TextImageSection,
 };
-use alo_store::{SiteCatalogSnapshot, SiteCatalogSnapshotItem, SiteCollectionSnapshot};
+use alo_store::{
+    SiteBookingSnapshot, SiteCatalogSnapshot, SiteCatalogSnapshotItem, SiteCollectionSnapshot,
+};
 
 use crate::images::ImageSlot;
 
@@ -105,6 +107,7 @@ pub(super) fn body_section(
         Section::ContactForm(s) => contact_form(out, site, s, index),
         Section::Collection(s) => collection(out, site, s, page.collections),
         Section::Catalog(s) => catalog(out, site, s, page.catalogs, index),
+        Section::Booking(s) => booking(out, site, s, page.bookings, index),
     }
 }
 
@@ -317,6 +320,79 @@ fn push_catalog_empty(out: &mut String, site: &SiteRenderContext<'_>) {
         "<p class=\"catalog-empty\">{}</p>\n</section>\n",
         esc(site.strings.catalog_empty)
     ));
+}
+
+/// A `booking` section: something a visitor may book, as the publish froze it.
+///
+/// The page says what is offered — the name, how long it takes, where it
+/// happens — and asks for a day; the free times themselves are read live on
+/// `/b/<booking id>`, because a published page is cached bytes and a free
+/// afternoon is not. That is one navigation away from the answer and works with
+/// no JavaScript at all, which is the same trade the order form makes.
+///
+/// A service switched off before the publish says so instead of offering a form
+/// that could only fail.
+fn booking(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    section: &BookingSection,
+    snapshots: &std::collections::HashMap<String, SiteBookingSnapshot>,
+    index: usize,
+) {
+    let t = site.strings;
+    out.push_str("<section class=\"s-booking\">\n");
+    push_opt_heading(out, section.heading.as_deref());
+    let Some(snapshot) = snapshots.get(section.booking_id.as_str()) else {
+        tracing::warn!(
+            booking = %section.booking_id,
+            "published page references a missing booking snapshot"
+        );
+        out.push_str(&format!(
+            "<p class=\"booking-closed\">{}</p>\n</section>\n",
+            esc(t.booking_closed)
+        ));
+        return;
+    };
+    out.push_str(&format!("<h3>{}</h3>\n", esc(&snapshot.name)));
+    out.push_str(&format!(
+        "<p class=\"booking-length\">{} {}</p>\n",
+        snapshot.duration_minutes,
+        esc(t.booking_minutes)
+    ));
+    if let Some(description) = &snapshot.description {
+        out.push_str(&format!(
+            "<p class=\"booking-description\">{}</p>\n",
+            esc(description)
+        ));
+    }
+    if let Some(location) = &snapshot.location {
+        out.push_str(&format!(
+            "<p class=\"booking-where\">{}: {}</p>\n",
+            esc(t.booking_where),
+            esc(location)
+        ));
+    }
+    if !snapshot.active {
+        out.push_str(&format!(
+            "<p class=\"booking-closed\">{}</p>\n</section>\n",
+            esc(t.booking_closed)
+        ));
+        return;
+    }
+    out.push_str(&format!(
+        "<form class=\"booking-day\" action=\"/b/{}\" method=\"get\">\n",
+        esc(snapshot.booking_id.as_str())
+    ));
+    out.push_str(&format!(
+        "<p><label for=\"booking-{index}-date\">{}</label>\
+         <input id=\"booking-{index}-date\" name=\"date\" type=\"date\" required></p>\n",
+        esc(t.booking_choose_day)
+    ));
+    out.push_str(&format!(
+        "<p><button type=\"submit\">{}</button></p>\n",
+        esc(t.booking_see_times)
+    ));
+    out.push_str("</form>\n</section>\n");
 }
 
 fn collection(

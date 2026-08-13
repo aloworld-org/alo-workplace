@@ -406,6 +406,41 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   color: var(--muted);
 }
 
+/* What can be booked. The free times live one navigation away, so the section
+   itself is a short offer and a day field. */
+.s-booking {
+  max-width: 38rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+.booking-length { font-weight: 600; }
+.booking-description,
+.booking-where,
+.booking-closed { color: var(--muted); }
+.booking-day { margin-top: 1rem; }
+.booking-day label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+.booking-day input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+.booking-day button {
+  background: var(--primary);
+  color: var(--on-primary);
+  border: 1px solid var(--primary);
+  border-radius: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* Text beside image; sides swap by modifier, stack on small screens. */
 .s-text-image { display: grid; gap: 2rem; align-items: center; }
 .s-text-image img { border-radius: 0.75rem; }

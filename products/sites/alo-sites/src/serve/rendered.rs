@@ -6,7 +6,8 @@ use std::collections::{HashMap, HashSet};
 
 use alo_store::site_theme::SiteTheme;
 use alo_store::{
-    PublishedSite, SiteCatalogSnapshot, SiteCollectionSnapshot, SitePageSnapshot, SitePublishId,
+    PublishedSite, SiteBookingSnapshot, SiteCatalogSnapshot, SiteCollectionSnapshot,
+    SitePageSnapshot, SitePublishId,
 };
 
 use crate::render::{
@@ -70,6 +71,7 @@ impl RenderedSite {
         snapshots: &[SitePageSnapshot],
         collection_snapshots: &[SiteCollectionSnapshot],
         catalog_snapshots: &[SiteCatalogSnapshot],
+        booking_snapshots: &[SiteBookingSnapshot],
     ) -> Self {
         let theme = SiteTheme::from_stored(site.theme.clone());
         let base_url = format!("https://{public_host}");
@@ -82,6 +84,11 @@ impl RenderedSite {
             .iter()
             .cloned()
             .map(|snapshot| (snapshot.catalog_id.as_str().to_owned(), snapshot))
+            .collect();
+        let bookings: HashMap<String, SiteBookingSnapshot> = booking_snapshots
+            .iter()
+            .cloned()
+            .map(|snapshot| (snapshot.booking_id.as_str().to_owned(), snapshot))
             .collect();
         let mut variants: HashMap<String, Vec<(String, String)>> = HashMap::new();
         for snapshot in snapshots {
@@ -156,6 +163,7 @@ impl RenderedSite {
                 sections: &snapshot.sections,
                 collections: &collections,
                 catalogs: &catalogs,
+                bookings: &bookings,
             };
             let Some(translations) = variants.get(snapshot.page_id.as_str()) else {
                 tracing::warn!(
@@ -306,6 +314,15 @@ pub fn unknown_host_not_found(strings: &UiStrings) -> String {
 /// store validation messages, never visitor text — nothing needs escaping.
 #[must_use]
 pub fn minimal_document(lang: &str, title: &str, text: &str) -> String {
+    minimal_page(lang, title, &format!("<p>{text}</p>"))
+}
+
+/// The same self-contained little document with a body of its own — the
+/// booking flow's free-times page, which needs a form rather than a sentence.
+/// Its caller escapes every value it interpolates; nothing reaches `body`
+/// unescaped.
+#[must_use]
+pub fn minimal_page(lang: &str, title: &str, body: &str) -> String {
     format!(
         "<!doctype html>\n<html lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
@@ -313,6 +330,6 @@ pub fn minimal_document(lang: &str, title: &str, text: &str) -> String {
          <style>body{{font-family:system-ui,sans-serif;display:grid;min-height:100vh;\
          margin:0;place-items:center;background:#fafafa;color:#1a1a1a}}\
          main{{text-align:center;padding:2rem}}h1{{font-size:1.5rem}}</style>\n\
-         </head>\n<body>\n<main>\n<h1>{title}</h1>\n<p>{text}</p>\n</main>\n</body>\n</html>\n",
+         </head>\n<body>\n<main>\n<h1>{title}</h1>\n{body}\n</main>\n</body>\n</html>\n",
     )
 }

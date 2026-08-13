@@ -9,18 +9,18 @@ use std::fs;
 use std::path::PathBuf;
 
 use alo_sites::render::{EN, ImageSources, PageRenderContext, SiteRenderContext, render_page};
-use alo_store::id::{BlobId, SiteCatalogId, SiteCollectionId};
+use alo_store::id::{BlobId, CalendarId, SiteBookingId, SiteCatalogId, SiteCollectionId};
 use alo_store::site_model::{
-    CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqItem, FaqSection,
-    FeatureItem, FeaturesSection, FooterSection, GallerySection, HeroSection, ImageCrop,
-    ImageFocalPoint, ImageSide, Link, NavSection, PricingSection, PricingTier,
+    BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqItem,
+    FaqSection, FeatureItem, FeaturesSection, FooterSection, GallerySection, HeroSection,
+    ImageCrop, ImageFocalPoint, ImageSide, Link, NavSection, PricingSection, PricingTier,
     SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, SiteImage, TeamMember, TeamSection,
     Testimonial, TestimonialsSection, TextImageSection,
 };
 use alo_store::site_theme::SiteTheme;
 use alo_store::{
-    SiteCatalogSnapshot, SiteCatalogSnapshotCategory, SiteCatalogSnapshotItem, SiteCollectionItem,
-    SiteCollectionSnapshot,
+    SiteBookingSnapshot, SiteBookingWindow, SiteCatalogSnapshot, SiteCatalogSnapshotCategory,
+    SiteCatalogSnapshotItem, SiteCollectionItem, SiteCollectionSnapshot,
 };
 use serde_json::json;
 
@@ -274,6 +274,7 @@ fn render_default(sections: Vec<Section>) -> String {
         sections: &value,
         collections: &collection_snapshots(),
         catalogs: &catalog_snapshots(),
+        bookings: &HashMap::new(),
     };
     render_page(&site, &page)
 }
@@ -334,8 +335,72 @@ fn empty_collection_has_a_stable_public_golden() {
         sections: &value,
         collections: &collections,
         catalogs: &HashMap::new(),
+        bookings: &HashMap::new(),
     };
     assert_golden("section_collection_empty.html", &render_page(&site, &page));
+}
+
+/// A booking section renders what is offered and the day field that leads to
+/// the free times — never the times themselves, which are live state and would
+/// be wrong the moment the page was cached.
+#[test]
+fn booking_section_has_a_stable_public_golden() {
+    let theme = SiteTheme::new();
+    let value = envelope_value(vec![Section::Booking(BookingSection {
+        booking_id: SiteBookingId::new("studio-consultation"),
+        heading: Some("Come and talk to us".to_owned()),
+    })]);
+    let site = SiteRenderContext {
+        name: SITE_NAME,
+        base_url: BASE_URL,
+        locale: "en",
+        theme: &theme,
+        strings: &EN,
+        images: ImageSources::PublicPaths,
+    };
+    let snapshot = SiteBookingSnapshot {
+        booking_id: SiteBookingId::new("studio-consultation"),
+        name: "Consultation".to_owned(),
+        description: Some("Half an hour, in the studio.".to_owned()),
+        calendar: CalendarId::new("cal-owner"),
+        time_zone: "Europe/Brussels".to_owned(),
+        duration_minutes: 30,
+        buffer_minutes: 0,
+        notice_minutes: 120,
+        horizon_days: 60,
+        location: Some("Second floor, ring the bell".to_owned()),
+        hours: vec![SiteBookingWindow {
+            weekday: 3,
+            start_minute: 540,
+            end_minute: 660,
+        }],
+        fields: Vec::new(),
+        active: true,
+    };
+    let bookings = HashMap::from([(snapshot.booking_id.as_str().to_owned(), snapshot.clone())]);
+    let page = PageRenderContext {
+        path: "/",
+        title: "Home",
+        seo_title: None,
+        seo_description: None,
+        sections: &value,
+        collections: &HashMap::new(),
+        catalogs: &HashMap::new(),
+        bookings: &bookings,
+    };
+    assert_golden("section_booking.html", &render_page(&site, &page));
+
+    // Switched off before the publish: the offer stands, the form does not.
+    let closed = SiteBookingSnapshot {
+        active: false,
+        ..snapshot
+    };
+    let bookings = HashMap::from([(closed.booking_id.as_str().to_owned(), closed)]);
+    let page = PageRenderContext {
+        bookings: &bookings,
+        ..page
+    };
+    assert_golden("section_booking_closed.html", &render_page(&site, &page));
 }
 
 /// A published catalog section whose snapshot holds nothing renders one calm
@@ -375,6 +440,7 @@ fn empty_catalog_has_a_stable_public_golden() {
         sections: &value,
         collections: &HashMap::new(),
         catalogs: &catalogs,
+        bookings: &HashMap::new(),
     };
     assert_golden("section_catalog_empty.html", &render_page(&site, &page));
 }
@@ -412,6 +478,7 @@ fn an_orderable_catalog_renders_a_scriptless_order_form() {
         sections: &value,
         collections: &HashMap::new(),
         catalogs: &catalogs,
+        bookings: &HashMap::new(),
     };
     let html = render_page(&site, &page);
     assert!(
@@ -460,6 +527,7 @@ fn a_catalog_section_can_show_one_category() {
         sections: &value,
         collections: &HashMap::new(),
         catalogs: &catalogs,
+        bookings: &HashMap::new(),
     };
     let html = render_page(&site, &page);
     assert!(html.contains("Harbour blend, 1 kg"), "{html}");
@@ -496,6 +564,7 @@ fn full_page_golden_with_theme_logo_and_seo() {
         sections: &value,
         collections: &collection_snapshots(),
         catalogs: &catalog_snapshots(),
+        bookings: &HashMap::new(),
     };
     let html = render_page(&site, &page);
     // The design note's byte budget for the golden site's page.
@@ -532,6 +601,7 @@ fn search_defaults_golden_uses_page_site_and_theme_logo() {
         sections: &value,
         collections: &collection_snapshots(),
         catalogs: &catalog_snapshots(),
+        bookings: &HashMap::new(),
     };
     assert_golden("seo_defaults.html", &render_page(&site, &page));
 }

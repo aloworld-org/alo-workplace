@@ -4978,3 +4978,107 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     once per iteration; it is not a hang.
 - **Next:** S2.13b (public booking flow: the `booking` section, availability
   read, race-safe reservation, internal notification).
+
+## S2.13b — the public booking flow (2026-08-13)
+
+- **Shipped:** a visitor can now book an appointment on a published alo Sites
+  page, and it lands in the owner's Agenda calendar.
+  - **The `booking` section** (`site_model`), the fourteenth section type and
+    the half S2.13a deliberately deferred: `{ booking_id, heading? }`, strict
+    validation, a golden fixture, and arms in every exhaustive match (images,
+    kind, content validation, template guards, the renderer). A template may
+    not ship one — it would have to name a calendar the tenant has not made.
+  - **Publish freeze** (`site_booking_publish`, migration `0314`): every
+    booking service a page references is copied into `site_booking_snapshots`
+    with the publish, exactly as a catalog is. Shortening a consultation in the
+    editor does not change what the live page promises; a section pointing at a
+    deleted service refuses the whole publish. `site_booking_preview` resolves
+    the draft the same way, so the editor preview and alo-jmap's version
+    preview show what that publish did (or would) freeze.
+  - **Slot arithmetic** (`site_booking_slots`), pure and DB-free: the published
+    week cut into appointment+buffer steps, trimmed by the notice and the
+    horizon, minus busy intervals buffered on both sides. Wall times resolve
+    through the service's own zone, so the hour that does not exist when the
+    clocks go forward is never offered and the hour that happens twice is
+    offered once — both pinned by tests, along with the half-open boundaries.
+  - **The public door** (`site_public_bookings`): resolves a bare service id to
+    the *current* publish's snapshot (unknown / draft / unpublished /
+    superseded / switched off / calendar-deleted are one `Ok(None)`), computes
+    free times, and takes a reservation. Busy = the bound calendar's events
+    (through the `site_agenda` seam, so recurrence expansion stays Agenda's
+    business and only a start and an end ever cross) **plus** every live
+    appointment on that calendar, which is what keeps availability correct in
+    the instant between committing a reservation and writing its event.
+  - **Race safety by construction**: a partial unique index on
+    `(tenant_id, booking_id, starts_at) WHERE status='booked'`, a
+    transaction-scoped `pg_advisory_xact_lock` on the calendar, and an overlap
+    re-check inside that transaction. Six concurrent bookers of one slot →
+    exactly one appointment, five clean `Conflict`s (test).
+  - **The row is the reservation; the event is the owner's view.** The
+    appointment commits first, then Agenda is written through the owner's own
+    account door (`site_agenda::agenda_door` — the one place an anonymous
+    request crosses into an owner-scoped store, reachable only with a tenant
+    and calendar owner a published row already named). If the event cannot be
+    written the appointment is deleted and the visitor asked to try again.
+  - **The wire** (`alo-sites`, `GET`/`POST /b/{booking_id}`): the section
+    renders the offer plus a day field; the day page lists that day's free
+    times as radios with the service's own questions, a honeypot, and one
+    button; the POST reserves and confirms. `no-store` throughout, and no
+    JavaScript anywhere in the flow. `404` for every absence, `400` for a
+    refused answer, `409` for a taken time, `413`/`429` as the order door.
+- **Verified:**
+  - `cargo clippy -p alo-store -p alo-sites -p alo-jmap --all-targets` clean.
+  - `cargo nextest run -p alo-store`: **1836 tests, 1835 passed**, one failure
+    — a wrong expectation in a new buffer test of my own (a slot beginning
+    exactly as a buffered meeting's quiet ends *is* free); corrected and
+    re-run green (`cargo test -p alo-store --lib site_booking_slots`, 9/9).
+  - `cargo nextest run -p alo-sites`: 144 tests green, including the new
+    `booking_flow` suite (day page, arc to the calendar, double-book `409`,
+    uniform absence, honeypot, refused answer, closed day) and the two new
+    render goldens.
+  - `cargo test -p alo-jmap --test sites_http --test site_versions_http --test
+    sites_bookings_http --test sites_catalogs_http`: 36 green.
+  - Wrong-tenant: a rival tenant sees no service, no preview, no appointment
+    and no event of ours (`site_bookings_public`), and the appointment ledger's
+    schema is asserted to carry no ip/user-agent/referrer/session column.
+  - **Real process, real curl** (debug `alo-sites` on `127.0.0.1:8082` against
+    docker `alo-pg`, `SITES_DOMAIN=sites.test`): the published page carried the
+    booking section and its form; `GET /b/<id>?date=2026-08-26` answered `200
+    no-store` offering 09:00, 10:00 and 10:30 — 09:30 correctly absent,
+    because an earlier appointment and a calendar event already held it; a
+    `POST` booked 09:00 for Grace Hopper (`Appointment booked`); the same slot
+    again → `409` "that time is no longer free"; the next `GET` offered only
+    10:00 and 10:30; psql showed the appointment (`booked`, `event_id` set) and
+    the calendar event `Consultation — Grace Hopper` with the visitor's address
+    in its description, in the same tenant; an unknown id → `404` on both
+    verbs.
+- **Cuts/flags:**
+  - **The owner-inbox notification is split out as S2.13b2** (queued),
+    mirroring the S1.16b → S1.16c1 split. It is a sweep of its own
+    (`claim_*_notifications` + an internal message), and nothing is silently
+    lost without it: the appointment appears in the owner's calendar the moment
+    it is taken, which is the notification a business actually acts on.
+    `site_booking_appointments.notified_at` is already in place for it.
+  - **No editor UI.** S2.13c owns the screens; until it lands, a booking
+    section is added through the section-ops API and the store's refusal
+    sentences are surfaced verbatim, as the catalog routes do.
+  - **The `/b/*` prefix is a new public path on alo-sites** — it needs no
+    Caddyfile change (alo-sites is proxied whole for site hosts), but the
+    human-inbox note from S1.15 still stands: production needs the alo-sites
+    container and wildcard DNS/TLS before any of this is reachable.
+  - **Availability against the owner's own calendar is read-then-write.** Two
+    *visitors* cannot double-book (the ledger settles that); an owner creating
+    an event in the same second as a booking can still collide, which is a race
+    no reservation system without a lock inside Agenda can win. Recorded rather
+    than hidden.
+  - **Gate measurement (this machine, 2026-08-13).** Any change to the
+    `alo-store` lib relinks ~124 test binaries (~4–9 min) and then nextest's
+    list phase pays macOS first-launch verification on each — the full
+    `-p alo-store` run took **1 442 s of test time on top of that**, ~55 min
+    wall in all. A filtered `cargo nextest -E 'test(...)'` pays the *same* list
+    phase, so it is no help for a one-line fix: use `cargo test -p alo-store
+    --lib <filter>` (one binary, seconds) for lib unit tests and reserve the
+    full nextest sweep for the end of the item. Also: never pipe a gate through
+    `grep | head` — `head` closes the pipe, the output file stays empty, and a
+    finished run looks like a hang.
+- **Next:** S2.13b2 (booking notification to the owner's inbox).
