@@ -9,6 +9,19 @@ contracts.
 
 ## Unreleased
 
+- **Every dialog in the admin console, the calendar and the sign-in screens can
+  now be closed with the keyboard, and every control in them says what it is.**
+  Escape closes them; Tab stays inside them instead of wandering onto the page
+  behind. In Users & mailboxes each admin switch names the colleague it grants
+  access to, rather than being twenty identical unlabelled boxes, and it is
+  announced as on or off instead of ticked. The role and app switches say what
+  turning them on does, out loud as well as on screen. Every text box and
+  dropdown — sharing a calendar, adding a member, adding an alias, registering
+  a domain — is now attached to the words beside it, so a screen reader reads
+  the question rather than the current answer. Removing somebody says whose
+  access is being removed. Selects and text boxes in these screens are a little
+  taller, matching the rest of the product, and they show a proper focus ring.
+
 - **A website can now describe what it can be booked for, in the calendar you
   already keep.** A booking service says what it is called, how long it takes,
   which of your calendars the appointment belongs in, and the hours of the week

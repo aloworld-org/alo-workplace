@@ -902,3 +902,162 @@ environment it does not, and the omission was only visible after the push — by
 which point fixing it would mean rewriting pushed history, which the hard
 safety rails forbid outright. Later iterations: type the trailer into the
 commit message yourself rather than trusting it to be added.
+
+## D2.05 — admin, agenda and auth migrated to `ds/`, 2026-08-13
+
+Three stylesheets off `ds/redefined.ts`: `admin/admin.module.css`,
+`agenda/AgendaModule.module.css`, `auth/TwoFactorScreen.module.css`. The list
+is down to **sixteen** files, one of which (`sites/SitesModule.module.css`) is
+the other track's and stays. CSS source is a net deletion of 240 lines
+(126 added, 366 removed across the three stylesheets); the whole change is
++963 −1 187 across 22 files, of which the three new test files are additions.
+
+**admin was the item.** It carried six of the ratchet's names — `toggle`,
+`modal`, `field`, `input`, `card`, `chip` — across nine `.tsx` files, and
+five hand-built dialogs: `DelegatesModal`, `GroupModal` (two of them),
+`ProviderModal`, `UserModal` (two of them). **Not one `onKeyDown` existed in
+any of the four files**, so Escape closed none of them and Tab walked out of
+every one onto the console behind it. All five are now `ds/Modal` and inherit
+both.
+
+Adopted:
+
+- **`ds/Modal`** ×5, each with `ds/IconButton` for its close control and a
+  `ds/Button` footer. The two create dialogs (`GroupModal`, `UserModal`) each
+  wrapped their whole panel in a `<form>`, which `ds/Modal` cannot do — head,
+  body and footer are the component's. The form moved into the body and its
+  submit button is tied to it by `form={id}` (`useId`), which is also what
+  keeps Enter in the name field creating the group. That is the one thing this
+  migration could most easily have broken silently, so it has a test.
+- **`ds/Field` + `ds/Input`/`ds/Select`** for every labelled control in those
+  dialogs. Every one was `<span class="label">` beside an `<input>` in a
+  `<div class="field">` — words next to a box, bound to nothing.
+- **`ds/Toggle`** for all three switch sites. `UsersPage` is the one D1.06
+  named: a `title` on a `<label>` with no text, so twenty rows of it announced
+  "checkbox, not checked" twenty times. Each switch now names the colleague
+  (`userAdminRoleFor`) and is announced as a switch; `UserModal`'s two
+  (accountant role, thirteen app switches) had `aria-label` on the `<label>`
+  while the visible sentence sat in a sibling `<span>`, so the words on screen
+  and the words read out were unrelated. The accountant switch's rule is now
+  its `hint`, described rather than merely drawn.
+- **`ds/Chip`** for group members, provider models and user aliases; the
+  `chipX` buttons already named what they removed, which is the one thing
+  those chips had right, so `removeLabel` keeps it.
+- **`ds/Card`** for the provider cards, the group list and the Overview links.
+- **`ds/Checkbox`** for the delegate folder-scope checklist, `ds/Select` for
+  the three unnamed pickers (delegate, member, domain), each now named by its
+  question rather than announced as its own current value.
+
+**One widening, stated in `ds/Card.tsx`.** `as` — `"div" | "section" | "form" |
+"li"`. A card is a surface, not a meaning: `auth/TwoFactorScreen`'s card *is*
+the sign-in form, `GroupsPage` draws one per list item, and `home` (D2.07) has
+three `<section class="card">` waiting. Wrapping a `<form>` in a card `<div>`
+would put the padding and the border on something that is not the thing you
+submit.
+
+Renamed, with the argument in each file:
+
+- `agenda/.chip` → `.eventPill` (and its family). **The name that was lying
+  this time.** By D1.02's law it is a chip — it is a button — but a `ds/Chip`
+  is an inline pill sized by its own content: 26px, a full radius, a gap
+  either side. This is a row of a month cell that takes the cell's whole
+  width, truncates rather than growing, stacks three deep at 12px, and carries
+  the calendar's colour as a dot or a left bar. Adopting `Chip` would have
+  deleted no rule and redrawn the calendar grid, and this queue's rule is that
+  a migration is not a restyle.
+- `auth/.badge` → `.mark` and `aria-hidden`. A 64px lock emblem over a heading
+  that already says what the screen is — the same call as `shell/ComingSoon`'s
+  `.plate` at D2.03.
+- `admin/.field` → `.block` + the surviving `.label`, for the three places
+  where the name is over a *section* (a list of aliases, thirteen app switches,
+  a set of model chips) rather than over one control. A `ds/Field` there would
+  bind its `<label>` to whichever control happened to render first, which is a
+  lie the old markup at least did not tell.
+- `admin/.cards` → `.cardGrid`, `admin/.chips` → `.chipRow`. The ratchet's
+  regex is `^\.(…)s?\b`, so a container named as the plural of a primitive
+  reads as the primitive. It is right to: a stylesheet declaring `.card` is
+  exactly what it exists to catch, and a container is not worth an exemption.
+
+**A cascade trap worth keeping.** Two local rules override a `ds/` rule they
+tie with on specificity — `agenda/.viewSwitch` over `ToolbarGroup`'s gap and
+wrap, `admin/.cardDefault` over `Card`'s `border` shorthand — and the two
+sides land in *different CSS chunks*, so which won was decided by the order
+the browser happened to receive them. Both are now written doubled
+(`.viewSwitch.viewSwitch`), with the reason in the file. Verified in the
+shipped CSS, not just the source: both doubled selectors are present in
+`dist/assets/`. A layout that depends on chunk ordering breaks on a
+build-config change nobody connects to it.
+
+**Visible changes, recorded rather than softened.** Admin dialogs move onto the
+system's backdrop and shared header. Every admin text box and select goes from
+the console's own 40px/34px to the shared control, gaining a real focus ring.
+Admin cards gain `--shadow-sm`, a lighter `--border-subtle` edge and
+`--space-5` of padding (from `--space-4`). Cancel and Close in the five dialogs
+become outlined `ghost` buttons where they were borderless text — the same
+change mail took at D2.02 and shell at D2.03. The agenda toolbar's separator
+lightens from `--border-default` to `--border-subtle` (the reconciliation
+D1.04 made), its Today button becomes a `ghost` `Button` and its two arrows
+`IconButton`s. The two-factor card loses `--radius-xl` for `--radius-lg` and
+`--shadow-md` for `--shadow-sm`, and its recovery-code box goes from 48px to
+`Input size="lg"`'s 46px on `--bg-surface` instead of `--bg-raised`. The
+Overview cards' link now covers the card, so its accessible name is the
+section rather than the section and its description read as one run-on phrase.
+
+**Not done, deliberately, and it is the item's one cut.** admin's own button
+rules — `.primary` (7 call sites), `.ghost` (13), `.iconBtn` (8), `.textBtn`
+(11) — are **not** migrated to `ds/Button`/`ds/IconButton` except where this
+item was already rewriting the markup around them. None of those names is on
+the ratchet, they have 39 call sites across nine files including several this
+item never opened, and folding them in would have doubled an item that already
+covered three areas. The result is a console that mixes `ds/Button` inside its
+dialogs with `.ghost` on its pages; they are close enough in weight that it
+reads as one product, but it is a real inconsistency and it is **flagged for
+D3.01**. `.iconTextBtn` and `.testBtn` lost their last callers here and are
+deleted.
+
+Verified: **26 behaviour tests** across three new files —
+`admin/adoption.test.tsx` (14), `agenda/adoption.test.tsx` (7),
+`auth/adoption.test.tsx` (5) — each naming what the hand-built version did
+instead: Escape closing a dialog where no file had a key handler, the Tab trap
+returning to the first control, the dialog's role/`aria-modal`/name, Enter in
+the create form still reaching the server through the footer's `form=` link,
+every field reachable by its label, the address hint actually described, the
+member and group pickers named by their question, each remove button naming
+its member, each admin switch naming its colleague and reporting its state,
+the signed-in admin's own row still disabled, the accountant switch described
+by its rule, each app switch named by its app, the alias box named rather than
+placeholder-ed, the share dialog's group/email swap and its still-choosable
+prompt option, the calendar toolbar as one named group with every control
+keeping its tab stop, the view picker as a named group with `aria-current`,
+and the sign-in card still being the `<form>` you submit. `npx tsc --noEmit`,
+`npx eslint src/admin src/agenda src/auth src/ds src/i18n --max-warnings 0`,
+`npm run build` and `npx vitest run src` (**85 files, 795 tests**) all green.
+`prettier --check` was already failing on 26 files in these areas before this
+item; the five files this item newly made non-conforming were formatted, and
+no pre-existing offender was touched — that backlog is somebody's item, not a
+thing to smuggle into a migration diff. A two-way dangling-class check across
+the three stylesheets found no `styles.x` pointing at a deleted rule and no
+rule left without a caller beyond the sixteen orphans admin already had at
+HEAD.
+
+Six i18n keys added to en/fr/nl (`UNTRANSLATED` stays empty):
+`agendaShareRemoveFor`, `agendaToolbarLabel`, `agendaViewLabel`,
+`userAdminRoleFor`, `userAliasAdd`, `adminProviderEnabledFor`.
+
+**Cut: no screenshot, the same cut as D2.01–D2.04.** Still no browser and no
+screenshot tool in this environment — no Playwright or Puppeteer in `web/`,
+checked again. What replaced it: the 26 DOM-level assertions above, the
+two-way dangling-class check, the shipped-CSS check on the two doubled
+selectors, and a production build.
+
+**For D3.01, the CSS number.** `ls -l dist/assets/*.css` after `npm run build`
+totals **930,952 bytes across 28 files**, against 936,779 across 27 at D2.04 —
+5.8 KB down, and the first item where the shipped total moved the way the
+source did. It is still not a per-item signal (one more chunk, less total
+CSS), and D3.01 still has to re-derive the baseline with a stated method and
+the vendor CSS separated out.
+
+**Still flagged for D3.01, carried forward from D2.01–D2.04:** the design
+system has no multi-line text control.
+
+**Next:** D2.06, migrate billing, chat and contacts in one commit.
