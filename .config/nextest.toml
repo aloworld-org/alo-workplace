@@ -35,3 +35,13 @@ test-group = 'serial'
 # weakened: both assert exact counts, which is the point of them.
 filter = 'binary(site_bookings_public) or binary(site_booking_notify)'
 test-group = 'serial'
+
+[[profile.default.overrides]]
+# The domain-registration sweep is the same shape: it claims paid purchases
+# across every tenant, so two of these tests running at once take each other's
+# rows and the one that lost reports "a paid purchase is offered to the sweep"
+# on a row the other is already registering. The suite holds an in-process
+# mutex for the `cargo test` fallback, which nextest's process-per-test model
+# makes inert — this is what serialises it here.
+filter = 'binary(site_domain_purchases)'
+test-group = 'serial'

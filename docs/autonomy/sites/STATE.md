@@ -5553,3 +5553,118 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.15b (domain purchase state machine: quote → explicit approval →
   payment reference → register/configure/renew, idempotency and tenant tests,
   Billing behind its owned public seam).
+
+## 2026-08-13 — S2.15b the domain purchase state machine
+
+- **Item:** S2.15b (quote → explicit approval → payment reference →
+  register/configure/renew, idempotency and tenant tests, Billing behind its
+  owned seam).
+- **Shipped:**
+  - **`migrations/0316_site_domain_purchases.sql`** — one row per purchase, and
+    the row *is* the state machine: `quoted → approved → awaiting_payment →
+    paid → registering → registered → configured`, with `cancelled` reachable
+    only before money moved and `failed` only from a registrar refusal or too
+    many interrupted attempts. Four partial unique indexes carry the rules that
+    must not be code: one live registration per name per tenant, one open
+    renewal, one purchase per `request_key`, one purchase per payment
+    reference.
+  - **`platform/alo-store/src/site_domain_purchases.rs`** — the whole arc as
+    tenant-scoped store calls: `start_site_domain_purchase` (idempotent under
+    the caller's request key), `approve_site_domain_purchase` (which names the
+    exact quote it approves), `await_site_domain_payment` /
+    `settle_site_domain_payment`, `cancel_site_domain_purchase`,
+    `configure_site_domain_purchase`, plus the reads and the deliberate
+    `site_domain_purchase_registrant`. The system-level half is the sweep:
+    `claim_site_domain_registrations` (`FOR UPDATE SKIP LOCKED`, stale claims
+    re-offered, over-attempt rows written off visibly),
+    `complete_site_domain_registration`, `retry_site_domain_registration` and
+    `fail_site_domain_registration`.
+  - **Nobody is charged a price they did not see.** Approval carries the
+    `DomainQuote` the approving person had in front of them and is refused if
+    any of its six numbers disagrees with the row — including the *renewal*
+    price, which is the half a bait price hides in. S2.15a made honest pricing
+    a type invariant at the point of sale; this is the same promise at the
+    point of charge.
+  - **A retry never buys twice, twice over.** Creating is idempotent under
+    `request_key` (a replay returns the row it already made; the same key with
+    different parameters is a conflict, never a second domain), and the
+    purchase id doubles as the registrar's idempotency key, so a sweep that
+    dies after the registry answered replays into the same registration.
+  - **Money that moved is not silently lost.** A retryable provider fault
+    returns the row to `paid` with the reason visible; at
+    `SITE_DOMAIN_PURCHASE_MAX_ATTEMPTS` (5, higher than the publish sweep's 3,
+    because here the money already moved) it fails *visibly*, keeping
+    `payment_reference` and `paid_at` on the row for the refund conversation.
+  - **Billing stays behind its own door.** The only thing Sites knows about a
+    charge is an opaque string it stores verbatim and never parses; a test
+    asserts buying a domain writes nothing into `billing_invoices`,
+    `billing_customers` or `billing_payments`.
+  - **`configured` is not a label.** Configuring writes the `site_domains`
+    claim straight to `live` in the same transaction that stamps the purchase
+    — a name alo registered on alo's nameservers needs no TXT proof — so the
+    state cannot come apart from the attachment it claims. The global
+    domain-uniqueness rule still wins: a second tenant that bought the same
+    string cannot connect it away from the first.
+  - **The registrant is not a field of the purchase.** `RegistrantContact`
+    rests in the buying tenant's own JSONB and is reachable only by the two
+    deliberate calls that need it (the review screen, and the sweep that hands
+    it to the registrar) — a list of purchases is not a place to spread
+    somebody's home address, and the type is a better guarantee than a review.
+    `site_registrar.rs` gained the `serde` derive for exactly that column, and
+    `DomainOrder::validate_shape` (the catalog-free half of `validate`) so a
+    write path with no catalog in reach still checks everything else.
+- **Verified** (all foreground, real exit codes):
+  - `bash scripts/prune-test-db.sh` (213 → 2 tenants, 82 MB); `cargo fmt -p
+    alo-store`; `SQLX_OFFLINE=true cargo clippy -p alo-store --all-targets --
+    -D warnings` clean.
+  - `cargo nextest run -p alo-store -E 'binary(site_domain_purchases)'` → **13
+    green**, the whole arc against a real Postgres and the shipped fixture
+    registrar: quote→approve→pay→claim→register→configure with the domain live
+    on the site; the replayed buy click; the state order (payment before
+    approval, a price that moved, a renewal price that moved, a stranger's
+    payment, cancelling after the charge, one payment settling one purchase); a
+    renewal refused for a name we do not manage; two sweepers claiming once;
+    the interrupted registration retried five times and then failed visibly
+    with the money still on the row; a refused registration that stops and says
+    why; the opaque payment reference with billing untouched; the wrong-tenant
+    matrix over every read and every state change, including the system-level
+    complete/retry/fail; the unknown-purchase answers; the malformed orders
+    that never become rows; the bounded list; and the registry's own expiry.
+  - `cargo nextest run -p alo-store -E 'kind(lib) or
+    binary(site_domain_purchases)'` → 1 238 tests, 1 237 green with the one
+    failure that produced the nextest note below; blast radius re-run after the
+    fix (`binary(site_registrar_fixture) or binary(site_domains_tenancy) or
+    binary(site_publish_schedule_tenancy) or binary(site_bookings_tenancy)`) →
+    **21 green**.
+- **Cuts/flags:**
+  - **No routes, no worker, no screen.** This item is the model; `/sites/*`
+    purchase routes, the background task that actually calls
+    `claim_site_domain_registrations` → `DomainRegistrar::register` →
+    `complete/retry/fail`, and the buy UI are S2.15c's — which must now carry
+    all three, not only the screen. Nothing else in the workspace referenced
+    `site_registrar` before this item, so the blast radius was the store alone.
+  - **No CHANGELOG line**, for S2.15a's reason: nothing a user or operator can
+    see changed yet. S2.15c's line covers the visible feature.
+  - **The in-process sweep mutex is inert under nextest**, which runs each test
+    in its own process — the first full-suite run failed with "a paid purchase
+    is offered to the sweep" on a row a sibling test had claimed. Fixed the way
+    the publish-schedule and booking-notify suites already were: an override in
+    `.config/nextest.toml` puts `binary(site_domain_purchases)` in the `serial`
+    group. Worth knowing for any future cross-tenant sweep: the mutex pattern
+    those suites use only serialises `cargo test`.
+  - **`cargo nextest run -p alo-store` (unfiltered) still hangs on this
+    machine** — the finding S2.14a/b and S2.15a recorded, now measured
+    precisely: it produced **zero** output in 600 s and was killed, while
+    filtered runs list and execute in about a second. Filtered-by-binary and
+    by-kind runs are the working gate here; a human look is still worth it.
+  - **Renewals are modelled, not driven.** A renewal purchase runs the same
+    machine and the sweep hands the worker `kind`, but the worker that chooses
+    `renew()` over `register()` — and the thing that notices an expiry
+    approaching — belong with the service half.
+  - **VAT is not here.** Both prices are stated VAT-exclusive, as S2.15a
+    defined them; which tax applies to a domain sold to a given tenant is
+    Billing's question and is asked behind its seam.
+- **Next:** S2.15c (domain purchase UI: search, honest renewal pricing,
+  checkout handoff, progress/recovery, automatic Sites DNS/domain attachment
+  where configured — and, per the cut above, the routes and the registration
+  worker underneath it).
