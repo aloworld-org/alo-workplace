@@ -22,6 +22,21 @@ contracts.
   access is being removed. Selects and text boxes in these screens are a little
   taller, matching the rest of the product, and they show a proper focus ring.
 
+- **You can now set up what your website takes bookings for, without leaving the
+  editor.** A Bookings screen on each website lists what can be booked, and one
+  panel holds the whole decision: what it is called, which of your calendars the
+  appointments are written into, how long it takes, the gap you keep after it,
+  the notice you ask for, how far ahead it opens, the hours you are open for it,
+  and the questions a visitor answers on top of their name and email. Beside it,
+  what a visitor will see. If your account has no calendar to book into, the
+  screen says so instead of showing an empty list to choose from; if the
+  calendar a service was booked into is deleted or unshared, that is stated
+  where you would otherwise have found out from a visitor's complaint. A link
+  goes straight to Agenda, where the appointments themselves are managed. A page
+  offers one of these services through a new Booking section, which lists what
+  your site actually has — so a page can no longer promise something that does
+  not exist. In English, Dutch and French.
+
 - **A booking on your website now also arrives in your inbox.** Within half a
   minute of a visitor taking an appointment you get an ordinary email saying
   what they booked, when — written on the clock you offered it in, with the

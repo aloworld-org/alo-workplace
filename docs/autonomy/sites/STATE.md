@@ -5157,3 +5157,95 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     nothing to configure. S2.13c owns the booking screens.
 - **Next:** S2.13c (booking UI: visible Agenda connection, preview, booking
   management link, dependency/error states).
+
+## S2.13c — the screens for what a website takes bookings for (2026-08-13)
+
+- **Shipped:** the owner's half of booking, which until now existed only as
+  routes: a Bookings screen per site, and the `booking` section in the page
+  editor.
+  - **`web/src/sites/BookingsView.tsx`** (`/sites/:id/bookings`, in the site's
+    action bar beside Catalog and Orders): the site's services on the left, one
+    panel holding the whole service on the right — name, description, where it
+    happens, the calendar it is booked into, length/buffer/notice/horizon/zone,
+    the weekly windows, the extra questions, and the on/off switch. A write
+    replaces the whole service because the route does, so the form sends every
+    field it shows every time.
+  - **The Agenda connection is visible, not implied.** The calendar picker is
+    the `booking-sources` seam: read-only shares are listed and marked rather
+    than hidden (hiding one leaves an owner hunting for a calendar that is
+    right there), and a new service defaults to the first *writable* one — or,
+    when there is none, to the first there is, so pressing Create earns the
+    store's sentence naming the rule instead of a button disabled for a reason
+    the screen never gives.
+  - **The two dependency states are stated where they happen.** No calendar at
+    all → the screen says a booking is an appointment in a real calendar and
+    Sites cannot make one, instead of a picker with nothing in it. A bound
+    calendar that no longer resolves (`calendar: null`) → the row says so, the
+    select keeps a "no longer available" option rather than silently
+    re-pointing the service, and an alert explains that the published page is
+    offering nothing until another one is chosen.
+  - **The management link.** Appointments are events in Agenda and are moved or
+    cancelled there; the panel links to it rather than growing a second, weaker
+    calendar surface here.
+  - **The preview** restates the offer as the published page words it — name,
+    length, description, where, the weekly windows, what a visitor is asked,
+    and the fact that it appears only once a page carries a booking section and
+    the site is published. Deliberately NOT free times: the slot arithmetic is
+    the server's and is computed against the calendar at the moment somebody
+    asks (see the cut below).
+  - **The `booking` section** in the web mirror (`sections.ts` — fifteen kinds
+    now), its draft, its picker tile, its summary line and its prop form. The
+    form lists the site's own services, marks a switched-off one in the option
+    itself, and says what will happen; a site with none gets the invitation and
+    a link to the Bookings screen. Like collection and catalog, the section
+    cannot be saved without naming one — a section pointing at nothing refuses
+    the whole publish (`site_booking_publish`).
+  - **`bookingSchedule.ts`** holds the only arithmetic: minutes↔"09:00",
+    weekday names through `Intl`, the default working week, and the key
+    suggested from a question's label. No rule lives there — lengths, windows,
+    zones and keys are the store's, and its refusal is what the screen shows.
+- **Verified:**
+  - `npx tsc --noEmit` clean; `npx eslint` clean on all thirteen changed files;
+    `npm run build` clean.
+  - `npx vitest run`: **805 tests in 86 files green**, including the ten new
+    ones in `Booking.test.tsx`. That suite runs the REAL API client and views
+    against a faked network, so the URLs and bodies it asserts are the ones the
+    S2.13a routes take: the no-calendar dependency state; the first-visit form
+    already open on the working week; a create that sends the complete shape in
+    one `POST` (`calendarId` = the writable calendar, the five Mon–Fri windows
+    as minutes); a 422 shown verbatim with everything typed still in the form;
+    the gone-calendar alert plus the link to `/agenda`; a question key that
+    follows its label until somebody writes one and then stops; and the section
+    form's two states.
+  - Wire contract re-read against `products/mail/alo-jmap/src/sites_bookings.rs`
+    rather than assumed: `booking_json`/`window_json`/`field_json` and
+    `BookingBody`'s `deny_unknown_fields` camelCase shape match the client's
+    types and draft field-for-field.
+  - The four unhandled errors vitest reports are pre-existing (identical count
+    on a stashed tree) and belong to `ThemeDialog`/analytics test fixtures, not
+    to this change.
+- **Cuts/flags:**
+  - **No live free-times preview.** Showing the owner "here is what a visitor
+    would be offered next Tuesday" needs an owner-side slots route (draft
+    service + calendar busy + live appointments through `free_slots`), which is
+    a Rust route with its own wire verification — a second item, not a corner of
+    this one. The preview shows the offer as published, which is honest, and
+    nothing here duplicates the arithmetic. **Suggested next item: S2.13c2 —
+    owner-side availability preview** (`GET /sites/{id}/bookings/{b}/slots`).
+  - **Styling stays in `SitesModule.module.css`.** ADR 0046 says new code is
+    Tailwind, but the generated `ds/theme.css` currently maps the type scale
+    into *colour* utilities (`--color-sm: var(--text-sm)`), so `text-sm` in a
+    new screen would be a colour, not a size. Fixing the generator is the ds
+    track's file and its queue item (D1.5); opening a Tailwind beachhead in
+    `web/src/sites/**` — which the ds track must never touch (ADR 0045) — on
+    top of a broken theme would strand it. Flagged for the ds track rather than
+    worked around silently.
+  - **No editor screen for appointments themselves.** They are calendar events
+    and Agenda owns them; this screen links there. The site's own appointment
+    ledger is not surfaced as a list anywhere yet — worth a wave-review question
+    (an owner may want "who booked what" without opening a calendar).
+  - **Number fields read an emptied box as 0**, which the store then refuses by
+    name ("appointment length must be between 5 and 480"). Honest, but a wave
+    review may prefer the catalog's typed-string-parsed-server-side pattern.
+- **Next:** S2.14a (sandboxed custom-code model: capabilities, size caps, CSP
+  contract, validation against host-page escape).
