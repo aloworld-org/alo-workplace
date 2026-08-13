@@ -1,6 +1,6 @@
 # Design note — alo Sites (marketing site + blog + forms)
 
-Status: S1 as built · 2026-08 · ADR 0036 · Sites track wave S1
+Status: S2 as built · 2026-08-13 · ADR 0036 · Sites track waves S1–S2
 
 alo Sites is the AI-native no-code website builder: "tell me about your
 business" produces a complete draft site, then editing is conversational
@@ -8,8 +8,14 @@ business" produces a complete draft site, then editing is conversational
 typed section forms. V1 ships a marketing site + blog + contact forms,
 published instantly at `<subdomain>.<SITES_DOMAIN>` and optionally on a
 live custom domain. This note records the as-built data model, web surface,
-render pipeline, two-service boundary, and privacy posture after the S1 wave
-review.
+render pipeline, two-service boundary, and privacy posture. S1 built the site,
+the blog, the forms and both domain modes; S2 added publishing in several
+languages, collections over alo Base, the restricted site collaborator,
+version history, scheduling, page passwords, image framing, the second
+generation of analytics, the catalog and its orders, bookings, sandboxed
+custom code and the domain buy-box. Each section names the item that built
+it, and the two reconciliation tables at the end account for every feature
+line the product doc promised.
 
 ## Surface
 
@@ -312,6 +318,88 @@ Dependency direction stays legal: `products/sites` depends on
 `platform/alo-store` and never on another product; the web editor
 talks only to `alo-jmap`.
 
+### Publishing in more than one language (S2.01)
+
+A European website is rarely written once. The model is **one page, several
+languages** — never one site per language, which would double every later
+edit and let the versions drift apart.
+
+- **The contract** (`sites.default_locale`, `sites.enabled_locales`, S2.01a) —
+  a site names the language it is written in and the languages it publishes
+  in, at most twelve. Tags are normalized to one spelling (`FR-BE` → `fr-be`,
+  2–3 letters then 2–8-character subtags, so `en` and `EN` can never both be
+  enabled) and validated before they reach the column, and the database keeps
+  the two structural
+  invariants itself: at least one enabled language, and the default among
+  them. Disabling a language is allowed and does not delete its translations:
+  the next publish simply stops freezing them, which is the reversible
+  reading of a decision an owner may take back.
+- **The drafts** (`site_page_locales`, S2.01b) — the page row stays the one
+  identity (nav order, home flag, the section stack the editor writes) and
+  carries `content_locale`, the language its own content is actually in.
+  Every other language is a row beside it: title, slug, SEO fields and its
+  own sections. A URL spelling is unique **per site and language**, so
+  `/contact` and `/fr/contact-nous` are both free to be the natural spelling
+  rather than a transliteration of the default. Deleting the page takes its
+  translations with it (one cascade, one identity).
+- **The publish** (S2.01c) — a publish freezes the language contract onto the
+  version and then freezes one snapshot per *page and language*: the base row
+  at its own `content_locale`, plus every translation whose language is still
+  enabled. A page nobody has translated yet is therefore absent from that
+  language rather than served in the wrong one — the same
+  unreachable-not-hidden construction the drafts/snapshots split uses.
+- **What a visitor gets** — the default language lives at `/` and `/<slug>`;
+  every other language is prefixed, `/<locale>` and `/<locale>/<slug>`.
+  Rendered pages carry `hreflang` alternates and `x-default` computed from
+  the sibling snapshots that actually exist, a canonical URL, and a language
+  switcher listing only those siblings. The sitemap and the blog feed are
+  locale-aware for the same reason.
+- **Translating by hand comes first** (S2.01d). `GET
+  /sites/{id}/translation-readiness` answers exact per-language coverage —
+  which pages and posts are translated and which are not — and the editor's
+  language controls copy the default language's content into a new language
+  as a starting draft. Nothing about publishing in five languages requires an
+  AI provider.
+- **Translating with AI is a proposal** (S2.01e). `POST
+  /sites/{id}/translation-proposals` returns a whole-site envelope — every
+  page and post, before and after — which the owner reviews and approves;
+  approval is the only write, and it lands in one transaction through the
+  same validation a hand-typed translation gets (`site_translations`). The
+  loop verified it on fixtures only.
+
+### Collections — content whose home is alo Base (S2.02)
+
+A menu, a team, a portfolio: repeatable rows that already live in a table and
+should not be retyped into a page. A **collection** (`site_collections`,
+S2.02a) binds one site to one alo Base table in the same tenant, plus a
+`mapping` from that table's **stable field ids** to the card roles the
+renderer knows — `title` (the only required one) plus optional `slug`,
+`summary`, `body`, `image`, `link` and `published_at`, each checked against
+the column's actual Base type on every write. Display names are
+deliberately not stored — a Base user may rename a column this afternoon, and
+a mapping that remembered the name would silently point at nothing. Deleting
+the Base table takes the binding with it (one cascade); a mapped field that
+has since disappeared, a row with content but no title, a bad link or a
+repeated slug **fails the publish by name** rather than quietly publishing a
+half-row — the live site stays as it was until the row is fixed.
+
+- **Publishing freezes the rows** (`site_collection_snapshots`, S2.02b). Each
+  publish copies the resolved rows into an immutable per-(publish, collection)
+  JSON snapshot, and the public service reads only that. Editing the Base
+  table afterwards therefore cannot change what visitors see until the next
+  publish — the guarantee the whole snapshot model exists for. The snapshot
+  keeps no foreign key to the draft binding, so disconnecting or deleting a
+  collection never rewrites history. An empty collection renders a calm
+  localized line rather than a hole; a row that fails validation leaves the
+  live site as it was.
+- **The screen** (`CollectionsView.tsx`, S2.02c) connects a table, maps the
+  fields, previews the exact rows the next publish would freeze, and
+  disconnects — all visible, all manual. AI can fill or translate the Base
+  rows through Base's own propose-then-approve path; nothing here needs it.
+- **The section** is one typed variant like every other (`collection`), so
+  the editor, the AI op vocabulary and the renderer's golden tests treat it
+  the way they treat a gallery.
+
 ### Version history and rollback (S2.04)
 
 Every publish already is a version — an immutable `site_publishes` row
@@ -531,6 +619,32 @@ visitor → POST /f/:form_id on alo-sites
     off (below). Nothing creates a CRM deal on its own: a lead nobody
     chose is a board full of spam.
 ```
+
+### Conversions, counted three times and never joined (S2.10a)
+
+`site_conversion_daily` is (tenant, site, day, source kind, source id, stage,
+hits) — how often a conversion point was **seen**, **started** and
+**submitted**. Three properties make it a funnel that needs no visitor
+identity:
+
+- **The id belongs to the site, not the visitor.** The source is a form id
+  the page's own markup already publishes (`<form action="/f/{id}">`), so
+  attribution needs no cookie, no tracking parameter and no visitor token —
+  there is no column one could be stored in. Cardinality is bounded the same
+  way: the id must resolve to a form of the site the Host named, and forms
+  are capped per site, so a browser cannot invent buckets the way it can with
+  a page path.
+- **Three counters, never a journey.** Nothing records that one browser did
+  two of the three, so a funnel is a ratio of totals and cannot be resolved
+  to a person. The day is the finest grain, as everywhere else in this family.
+- **The submit is counted where the row is written**, not from the page:
+  `record_public_form_conversion` runs in the submit path, because a script is
+  easier to lie to than a socket. Only *view* and *start* — the two facts a
+  server genuinely cannot see — come from the beacon.
+- `source_kind` is a word rather than a flag, so the order form and the
+  booking form can convert on their own site-owned objects later without
+  changing what today's rows mean. The id is deliberately **not** a foreign
+  key: deleting a form must not rewrite last month's report.
 
 ### The seam to CRM and Billing (S2.10b)
 
@@ -1091,6 +1205,27 @@ Public side (`alo-sites` — terse, static, no internals on the wire):
   bump aggregate} for the resolved site — no read-back surface exists
   publicly.
 
+### The restricted collaborator, as a model (S2.03)
+
+The marketing person who builds the website must not thereby read the mail,
+the files, or the customers. Two mechanisms, deliberately separate:
+
+- **The role is the global signal.** `site_editor` joins `accountant` and `hr`
+  in `tenant_user_roles`; carrying it closes every non-Sites API door in the
+  workspace by default, so a module added tomorrow is shut to a collaborator
+  without anyone remembering to shut it.
+- **The grant is the resource boundary.** `site_editor_grants` names the sites
+  that are then *open*, one row per site. Closed-by-role plus opened-by-grant
+  is what makes "this website and nothing else" expressible; the authorization
+  matrix that walks the resulting surface is the S2.16a section below.
+- **The invitation is a one-time link** (`site_editor_invites`, S2.03b). The
+  raw token exists only in the URL shown to the inviter — the database keeps
+  its SHA-256 hash, with an expiry, and a token is redeemable once and only
+  while unaccepted. The accepted row is retained so the account can be
+  recognised as invite-created, which is what lets **revoking the final site
+  grant remove the restricted account's role with it** rather than leaving a
+  member of the workspace behind with nothing to do and a login that works.
+
 ### Who may use the edit surface, as built (S2.16a)
 
 The wave review re-walked the whole authenticated surface — 85 route templates
@@ -1205,3 +1340,84 @@ shown TXT proof until verification succeeds, then CNAME a subdomain to the
 deployment ingress; an apex needs the DNS host's ALIAS/ANAME or CNAME
 flattening equivalent. Certificate issuance may take a few minutes. After
 launch, submit `alosites.com` to the Public Suffix List.
+
+## What S2 promised, and what S2 shipped (S2.16c)
+
+Every `[S2]` line in `docs/features.md` § alo Sites is reconciled here, on the
+same rule as the S1 table above: shipped, or naming its explicit dependency.
+Four `[S+]` lines were reached early in the same wave and are listed after it,
+because a promise kept ahead of time still has to be written down somewhere a
+stranger will find it.
+
+| `[S2]` feature | State | Where / narrowing |
+|---|---|---|
+| ★ Whole-site AI translation with language switcher | **Shipped**, one stated dependency | One page identity with per-language drafts (`site_page_locales`), a language contract frozen into every publish, prefixed locale URLs with `hreflang`/`x-default`/canonical, locale-aware sitemap and feed, and a switcher built from the siblings that actually exist. The **manual** path is complete on its own — readiness coverage, copy-to-new-language, publish — so multilingual publishing never requires a model. The AI proposal envelope is whole-site, before/after, approve-only, and was verified on fixtures; live calls need the tenant's configured provider. |
+| ★ Collections from alo Base (the CMS layer) | **Shipped** | A site-scoped binding to one Base table plus a field mapping by stable field id; publish freezes the resolved rows into immutable snapshots, so editing the table cannot change the live site until the next publish. Connect / map / preview / disconnect are visible manual controls. Filling or translating the rows is Base's own propose-then-approve surface, not a second copy here. |
+| Site-editor role | **Shipped** | `site_editor` closes every non-Sites door; `site_editor_grants` opens the named sites; invitations are one-time hashed tokens, and revoking the last grant removes the restricted account's role. The wave review found and fixed the defect that mattered: the role check missed the `/api` mount the browser actually uses, so collaborators were refused everywhere including their own site. Both mounts are asserted now. A collaborator does read the records the site produced (enquiries, orders, bookings) — stated in the authorization matrix above rather than left to be discovered. |
+| Version history + rollback; scheduled publishing; password-protected pages | **Shipped** | History lists and compares the immutable publishes and restores one by appending a new publish (never by re-pointing an id), with Undo; scheduling is an intention swept every 30 seconds through the scheduling user's own door; page passwords are argon2id with an opaque session version, rate limits, cache-safe responses, and protected pages kept out of the sitemap. |
+| Image handling: crop/focus, AI alt-text, responsive srcset | **Shipped**, one stated dependency | Crop and focal point are basis points of the source (never pixels, never floats) with validation that the two cannot contradict each other, `decorative` distinguishing "nothing to describe" from "not written yet"; publishing emits `srcset`/`sizes` over a 480/960/1440 ladder whose cropped fallback is the widest derivative. Alt text is typed by hand in the editor; the AI suggestion is propose-then-approve and fixture-verified, live calls needing the tenant's provider. |
+| ★ Site Insights (campaigns, countries, device class, entry/exit, read time, outbound clicks) | **Shipped**, one deployment dependency | Five dimensions are derived at the door and two more (read-time buckets, outbound domains) are reported by the page beacon, all as daily aggregates with bounded label sets. **Countries stay empty until the edge proxy sends one** — `cf-ipcountry`, `x-country` or `x-geo-country`; alo never resolves an address to a place itself, so this is a deployment step, and the screen says so rather than showing a false zero. |
+| ★ Aggregated heatmaps | **Shipped** | Clicks become cells of a fixed 32×64 grid over the whole scrollable page, scroll depth becomes one of ten tenths, viewport becomes one of three classes, and the table has **no visitor column at all**. Presentation adds a floor storage does not: nothing is drawn below twenty samples, and every shaded square is repeated in words. |
+| ★ Conversions + full-funnel attribution | **Shipped**, the stated B1/B2 seam | View/start/submit counted per site-owned form id with no visitor identity; the handoff to CRM is a person's decision creating at most one lead per enquiry, and the invoice join is stated on the wire (`invoiceRule: customerSinceLead`) rather than inferred. Deals and invoices are read live from their owners — Sites keeps one link row and copies nothing. With Billing switched off the money reads `null`, not `0`. |
+| **Non-goal:** no individual journeys, no session replay, no fingerprinting | **Held** | Every table in the analytics family is proved by a schema test to have no column for an address, a user agent, a full referrer, a query string, an exact duration, or a cross-day identity. The one visitor token that exists is day- and site-scoped and dies with the day. |
+
+Reached early, from `[S+]`:
+
+| `[S+]` feature | State | Where / narrowing |
+|---|---|---|
+| Simple catalog storefront (order-by-form, no checkout) | **Shipped** | Tenant-owned catalog/categories/items in integer minor units with the currency's own exponent, a Base import that updates what it created rather than duplicating it and refuses an ambiguous price, publish-time snapshots, and public order forms whose totals are the published ones. No payment, no reservation, no stock — exactly as ADR 0041 draws the line. |
+| Booking-page section (ties to Agenda) | **Shipped** | A Sites-owned booking service reads availability through one seam onto Agenda, reservation is race-safe, the appointment lands in the owner's calendar, and a second telling arrives in their inbox by the same claimed-once sweep the forms use. |
+| Custom-code blocks (sandboxed) | **Shipped** | A whole document in an opaque-origin `srcdoc` frame with an explicit CSP, no network, capability switches off by default, size caps, and an editor that states the boundary before the first keystroke. The ADR's no-third-party-embeds line is untouched: there is no network to embed from. |
+| Template gallery | **Shipped** | Six curated templates parsed from the build with no table and no per-tenant row, four rules asserted by the suite (no images, no claim only the customer can make, every internal link resolves, one persistence door), and a keyboard-navigable gallery beside — never behind — the description field. |
+| ★ Sell domains in-product | **Model, routes and screen shipped; not sellable** | The registrar is an injectable boundary with a fixture provider, the purchase is a state machine from quote through explicit approval to registration and attachment, and the screen shows both prices before anything is approved. **Production ships `UnconfiguredRegistrar`**: no reseller is named, `SITE_NAMESERVERS` is empty, so buying is off and the screen offers connecting a domain you already own. Naming the EU reseller and the PSP is an ADR, below. |
+| ★ alo-run authoritative DNS | **Not started** | Still `[S+]`. Nothing in S2 depends on it: custom domains verify by TXT at the customer's own DNS host, and a bought domain would be created with whatever nameservers `SITE_NAMESERVERS` configures. |
+
+**Languages.** The complete Sites surface — every S2 screen included — is
+translated in English, French and Dutch, and the catalog parity test fails the
+build when a new Sites key lacks either translation.
+
+**Human production inbox, S2 additions.** Everything in the S1 inbox above
+still applies. On top of it:
+
+- **New public paths on `alo-sites`**, all of them POST doors that must reach
+  the service rather than the SPA: `/f/{form}` (enquiries), `/o/{catalog}`
+  (orders), `/b/{booking}` (appointments) and `/_alo/collect` (the page
+  beacon). They are served on the *public site* hosts, not on the workspace
+  host — a wildcard/custom-Host route that already sends everything to
+  `alo-sites` needs no per-path rule; a rule-by-rule proxy needs these four.
+- **Workspace API prefix:** the browser reaches every authenticated Sites
+  route at `/api/sites/…`. Caddy proxies `/api/*` already; **no new top-level
+  prefix was added by S2** — the bare `/sites/*` mount is test-only.
+- **Country dimension:** set one of `cf-ipcountry`, `x-country` or
+  `x-geo-country` on the edge proxy if the country breakdown should have
+  values; without it the panel stays honestly empty.
+- **Background sweeps run inside `alo-jmap`** and need no separate process:
+  contact-form, order and booking notifications (30 s), scheduled publishing
+  (30 s), and domain registration (60 s, started only when the deployment
+  sells domains at all).
+- **Domain selling stays off** unless `SITE_REGISTRAR` names a provider
+  (only `fixture` exists today), `SITE_NAMESERVERS` lists the authoritative
+  hosts, and `SITE_PAYMENT_SETTLEMENT_SECRET` is at least 24 bytes. Any
+  one missing leaves the buy box showing the connect-a-domain path, which is
+  the correct production state until the ADR below is written.
+- **Tenant AI provider** remains the single switch for generation,
+  conversational editing, translation proposals and alt-text suggestions.
+  Every one of them degrades to a stated manual path when it is absent.
+
+**Open decisions this wave flagged, for a human.**
+
+1. **Which EU reseller, and which PSP.** ADR 0041 named the shape; the
+   provider is unnamed, and until it is, domain purchase is code without a
+   counterparty. The payment handoff records an opaque Billing reference —
+   the mint for it does not exist in alo yet either.
+2. **How wide the site-editor invitation really is.** A collaborator can read
+   the enquiries, orders and bookings the site produced, which is more than
+   the invite screen promises ("edit and publish this website"). Narrow the
+   grant or widen the sentence — a product decision, not a bug fix.
+3. **The accent ramp fails AA for small text and for the primary button**
+   (white on `--accent` is 3.09:1). Sites worked around it per rule; the fix
+   is a ds-track decision about the brand ramp, not a per-module one.
+4. **Place-of-supply VAT** for anything sold through a site is untouched by
+   design: today's catalog takes orders, never money. The tax rules table is
+   listed in wave 3 with the standing instruction that a professional reviews
+   it before it is built.

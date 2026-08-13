@@ -592,8 +592,20 @@ fast-follow · **[S+]** = later. Built by the Sites track loop
 - [S2] ★ **Aggregated heatmaps**: per-page click positions + scroll depth from anonymous coordinates never linked to a visitor — the Hotjar wow without the consent problem (privacy posture reviewed at design time; stays aggregate-only forever).
 - [S2] ★ **Conversions + full-funnel attribution**: form starts→submissions per page; submission → CRM lead (B2) → deal → invoice (B1) means alo Insights can answer "how much revenue did LinkedIn bring this quarter?" — the chain Google Analytics cannot see because it ends at the form. Site tiles join the Insights tab (ADR 0037).
 - [S2] **Deliberate non-goal, written here on purpose:** no individual visitor journeys, no session replay, no fingerprinting — surveillance features would require consent banners and contradict the brand; the aggregate line is permanent.
-- [S+] Simple catalog storefront (order-by-form, no checkout); booking-page section (ties to Agenda); custom-code blocks (sandboxed); template gallery
-- [S+] ★ **Sell domains in-product** — buy `acme.com` inside alo and mail + site + ERP are live on it in minutes, zero DNS steps, because alo hosts the zone from second one. Built as a **reseller** over an EU wholesale-registrar API (Openprovider / Realtime Register / INWX class — never own ICANN accreditation at this scale); honest flat pricing, no first-year-bait renewals. Thin margin by design: this is the onboarding/retention closer, not a profit line. **Prerequisites:** the EU PSP checkout (B2 billing extension) and alo-run authoritative DNS (below). ADR to write before build.
+> **S2 reconciliation (2026-08-13):** all nine `[S2]` lines above are
+> accounted for in [`docs/design/sites.md`](design/sites.md#what-s2-promised-and-what-s2-shipped-s216c),
+> together with the four `[S+]` lines the wave reached early (catalog
+> storefront, booking section, sandboxed custom code, template gallery).
+> Three dependencies are stated rather than hidden: AI translation and
+> alt-text suggestions need a tenant-configured provider (their manual
+> siblings do not), the country breakdown needs a country header from the
+> edge proxy, and domain **selling** stays switched off until an ADR names an
+> EU reseller and a PSP — the model, routes and screen exist behind an
+> unconfigured registrar. Automatic CRM lead creation shipped as the
+> deliberate one-click handoff rather than an automatic one.
+
+- [S+] Simple catalog storefront (order-by-form, no checkout) — **shipped in S2**; booking-page section (ties to Agenda) — **shipped in S2**; custom-code blocks (sandboxed) — **shipped in S2**; template gallery — **shipped in S2**
+- [S+] ★ **Sell domains in-product** (S2 shipped the model, the routes and the screen; production ships an unconfigured registrar, so nothing can be bought until the ADR below is written) — buy `acme.com` inside alo and mail + site + ERP are live on it in minutes, zero DNS steps, because alo hosts the zone from second one. Built as a **reseller** over an EU wholesale-registrar API (Openprovider / Realtime Register / INWX class — never own ICANN accreditation at this scale); honest flat pricing, no first-year-bait renewals. Thin margin by design: this is the onboarding/retention closer, not a profit line. **Prerequisites:** the EU PSP checkout (B2 billing extension) and alo-run authoritative DNS (below). ADR to write before build.
 - [S+] **alo-run authoritative DNS** — host customer zones ourselves (integrate a proven server, PowerDNS-class, as a sealed container per ADR 0009; alo's Rust control plane owns records). The enabler for domain selling AND the universal mail onboarding (NS-delegation instead of per-registrar record copying), one zone infrastructure for both.
 
 ---

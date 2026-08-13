@@ -10,6 +10,19 @@ contracts.
 
 ## Unreleased
 
+- **For operators: buying domains inside alo stays switched off until a
+  deployment says who sells them.** The buy box only appears when the server
+  is started with a registrar (`SITE_REGISTRAR`), the nameservers every
+  registration is created with (`SITE_NAMESERVERS`), and a settlement secret
+  of at least 24 bytes (`SITE_PAYMENT_SETTLEMENT_SECRET`) that the payment
+  bridge must present. With any of them missing — which is every deployment
+  today, since no reseller has been named — websites show the connect-a-domain
+  path instead, nothing can be paid for, and no registration worker runs.
+  Once they are set, a paid purchase is registered by a background sweep
+  inside the workspace API every sixty seconds and the name is attached to its
+  website automatically; the alo Sites design note lists the whole set of
+  Sites deployment keys in one place.
+
 - **Fixed: website analytics were unreadable on a phone, and reordering a page
   with the keyboard threw you back to the top.** On a 360px screen the analytics
   panels sat two to a row, which left no width for the labels: "Countries"

@@ -6346,3 +6346,85 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.16c (as-built docs: `docs/design/sites.md` reconciled with what
   S2 shipped, the features.md [S2] table, the CHANGELOG sweep and the
   human-inbox summary — the flags above belong in it).
+
+## 2026-08-13 — S2.16c the wave written down: what S2 promised, and what it shipped
+
+- **Item:** S2.16c — `docs/design/sites.md` reconciled with what S2 actually
+  shipped, the features.md `[S2]` table, the CHANGELOG sweep, and the
+  human-inbox summary. Documentation only: no Rust, no web, no migration, no
+  route.
+- **What the reconciliation found.** The design note had been kept current
+  per-item for everything that arrived with a screen of its own — history,
+  scheduling, passwords, images, the catalog, bookings, custom code, the
+  domain buy-box — but **four models that shipped early in the wave had never
+  been written down at all**: multilingual publishing (S2.01a–e), collections
+  over alo Base (S2.02a–c), the restricted collaborator as a *model* (S2.03,
+  as opposed to the S2.16a matrix of who may call what), and the conversion
+  counters (S2.10a, described only from the CRM seam that reads them). A
+  stranger reading the note could have found the funnel screen and not the
+  three-counter table under it. All four are now sections, written from the
+  source rather than from the queue: the locale contract and its per-language
+  page rows, the prefixed URL shape and what a publish freezes; the field
+  mapping by stable id and why display names are deliberately not stored;
+  role-closes / grant-opens and the hashed one-time invite; and why a
+  conversion needs no visitor identity.
+- **Corrections made while writing, each caught by reading the code:**
+  locale tags normalise to *lowercase* (`FR-BE` → `fr-be`), not to the
+  `fr-BE` spelling the first draft claimed; the collection mapping's roles are
+  `title` plus six optional ones checked against Base column types, not the
+  invented "title/body/image/price/link"; and a broken mapping **fails the
+  publish by name** rather than rendering an empty section.
+- **Shipped:**
+  - `docs/design/sites.md`: status line now S2-as-built, an intro that says
+    which wave built what, the four new model sections above, and a closing
+    **What S2 promised, and what S2 shipped (S2.16c)** — nine `[S2]` rows plus
+    a second table for the four `[S+]` lines the wave reached early (catalog
+    storefront, booking section, sandboxed custom code, template gallery) and
+    the two it did not finish (domain selling: model and screen without a
+    reseller; alo-run DNS: untouched).
+  - The **human production inbox, S2 additions**: the four public POST paths
+    on `alo-sites` (`/f/`, `/o/`, `/b/`, `/_alo/collect`), the fact that **S2
+    added no new top-level Caddy prefix** (the browser's door is `/api/sites/…`
+    and `/api/*` is already proxied), the country header the analytics panel
+    needs (`cf-ipcountry` / `x-country` / `x-geo-country`) or it stays honestly
+    empty, the five background sweeps that run inside `alo-jmap` and their
+    intervals, the three env keys that switch domain selling on, and the
+    tenant AI provider as the one switch behind generation, conversational
+    editing, translation proposals and alt-text.
+  - **Four open decisions for a human**, stated rather than buried: name the
+    EU reseller and the PSP (until then the buy box is code without a
+    counterparty and Billing mints no reference); decide whether the
+    site-editor invitation should keep granting read of enquiries, orders and
+    bookings or whether the invite screen's sentence should widen to match;
+    the ds-owned accent ramp that fails AA (white on `--accent` is 3.09:1);
+    and place-of-supply VAT, which stays untouched because the catalog takes
+    orders and never money.
+  - `docs/features.md`: an `[S2]` reconciliation note pointing at the table,
+    the four early `[S+]` lines marked shipped-in-S2, and the domain-selling
+    line qualified with what actually exists.
+  - `CHANGELOG.md`: one operator-voice entry for the gap the sweep found.
+- **The CHANGELOG sweep, and what it proves.** Every `feat(sites)`/`fix(sites)`
+  commit in the wave's range was checked for a CHANGELOG line in its own diff.
+  Fourteen had none; ten are model-halves whose screen-half commit carries the
+  user-visible line (locale foundation → the translation entries, the schedule
+  model → the schedule entry, image presentation → the framing entry, and so
+  on) and two are migration-ordering fixes with nothing to tell a user. The
+  four that were genuinely uncovered are the domain-commerce commits
+  (S2.15a–c2): the *screen* was written up, the **operator side never was** —
+  a deployment could not learn from the changelog that buying is off until
+  three environment keys are set, or that a paid purchase completes through a
+  sixty-second background sweep. That is now one entry.
+- **Verified:** every factual claim added here was read out of the source, not
+  recalled — `sites.normalize_locale_tag`, `site_collections`'
+  `SiteCollectionFieldMapping` and its type checks, `site_publish`'s collection
+  freeze and its refusals, migrations 0151/0158/0161/0171/0172/0173/0300/0304/
+  0307, `serve.rs`'s public route table, `serve/analytics.rs`'s country
+  headers, `serve/conversion.rs`'s two-token payload, `main.rs`'s five sweeps
+  with their intervals, `SiteDomainCommerce::from_env`'s three keys and the
+  24-byte floor, `ServeConfig::from_env`'s required variables, and the six
+  entries in the template catalog. No code gate applies: `git diff --stat` is
+  three markdown files, 246 insertions, 5 deletions.
+- **Cuts:** none. The item was documentation and is complete.
+- **Next:** S2.16d (wave review, final arcs: complete cross-service
+  transcripts on the real local stack — generate → edit → publish → serve →
+  convert → owner inbox → analytics — plus the performance/byte budgets).
