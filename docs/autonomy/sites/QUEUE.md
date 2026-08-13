@@ -102,7 +102,7 @@ Do not touch billing/crm/business areas — that's the Mac's track.
 - [x] S2.13c Booking UI: visible Agenda connection, preview, booking management link, and dependency/error states.
 - [x] S2.14a Sandboxed custom-code model: explicit HTML/CSS/JS capabilities, size caps, CSP contract, and validation that rejects unsafe host-page escape. (Shipped the published rendering too — the CSP/sandbox contract is meaningless until something emits it — so S2.14b is the editor half.)
 - [x] S2.14b Sandboxed custom-code UI: the block in the web section mirror, its editor (three fields, capability switches, height), the draft preview, and the visible risk boundary; render goldens already exist from S2.14a.
-- [ ] S2.15a Domain commerce adapter: EU registrar interface, fixture provider, availability/pricing model, and no external calls in tests.
+- [x] S2.15a Domain commerce adapter: EU registrar interface, fixture provider, availability/pricing model, and no external calls in tests.
 - [ ] S2.15b Domain purchase state machine: quote → explicit approval → payment reference → register/configure/renew states with idempotency and tenant tests; Billing remains behind its owned public seam.
 - [ ] S2.15c Domain purchase UI: search, honest renewal pricing, checkout handoff, progress/recovery, and automatic Sites DNS/domain attachment where configured.
 - [ ] S2.16 Wave review: complete browser arcs, accessibility/responsiveness/performance, language parity, privacy/security reconciliation, changelog, as-built docs, and final cross-service transcripts.

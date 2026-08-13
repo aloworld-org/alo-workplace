@@ -5459,3 +5459,97 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     still worth it before the next all-crates gate.
 - **Next:** S2.15a (domain commerce adapter: EU registrar interface, fixture
   provider, availability/pricing model, no external calls in tests).
+
+## 2026-08-13 — S2.15a the domain commerce adapter
+
+- **Item:** S2.15a (EU registrar interface, fixture provider, availability and
+  pricing model, no external calls in tests).
+- **Shipped:**
+  - **`platform/alo-store/src/site_registrar.rs`** — the whole seam a domain
+    reseller must satisfy (`DomainRegistrar`: identity, catalog, search, quote,
+    register, renew, lookup) plus the model everything above it will speak:
+    `TldCatalog`/`TldOffer`, `RegistrableDomain`, `DomainSearch` →
+    `DomainCandidate`, `DomainAvailability`, `DomainOffer`, `DomainQuote`,
+    `RegistrantContact`, `DomainOrder`, `RegisteredDomain`, `DomainLifecycle`,
+    and a typed `RegistrarError`. Boxed futures (`RegistrarFuture`), like the
+    DNS seam in `alo-auth-mail` — an `async fn` in a trait cannot be held behind
+    `dyn`, and this one lives in application state.
+  - **Honest pricing is a type invariant, not a policy page.** features.md sells
+    "honest flat pricing, no first-year-bait renewals"; a first year cheaper than
+    the renewal is refused twice — in `TldOffer::validate` when a catalog is
+    built and again in `DomainQuote::new` at the point of sale, so a live
+    provider cannot slip one past by skipping the catalog. `RetailPolicy` (15 %
+    over wholesale, 100-cent floor, rounded up) applies the **same** markup to
+    both numbers, so an honest wholesale list stays honest through our margin,
+    and a multi-year term is `n ×` the yearly price rather than one cheap year
+    plus renewals. A quote always carries the renewal price beside what is being
+    paid today; no shape of the type can hide it. The rejected alternative is
+    written in the module header: passing the provider's prices straight
+    through, which is less code and would put somebody else's bait price on an
+    alo invoice.
+  - **Sovereignty is checked, not assumed.** `RegistrarIdentity::new` refuses a
+    registrar established outside the EU/EEA — the company that ends up holding
+    our customers' registrant data must be under European law, and moving that
+    is a human's decision and an ADR, not a config value.
+    `RegistrarEnvironment::{Fixture,Sandbox,Live}` makes "can this call spend
+    money" a value the suite asserts on.
+  - **`site_registrar_fixture.rs` — the registrar that ships.** Deterministic and
+    in memory: a nine-ending European price list built by running the wholesale
+    numbers through `RetailPolicy::THIN` (so the honest rule is exercised by the
+    fixture's own construction), seeded taken/blocked/premium names, a clock that
+    only moves when a test moves it, idempotent register/renew, and a lifecycle
+    (active → expired → redemption → released) derived from the expiry rather
+    than stored. No hashing, no randomness, no clock read, no socket.
+  - **`UnconfiguredRegistrar`** answers every door with a typed `Unconfigured`,
+    the same shape as the AI paths (S1.28a), so S2.15c can hide the buy box
+    instead of showing one that fails at the price.
+  - **The S1.30b lesson is built in.** `acme`, `Acme.com`, `https://acme.com/`
+    and `acme.com.` are the same search; `acme.co.uk` reads as one name under an
+    ending we sell, not the label `acme.co`; an ending we do not sell comes back
+    as a marked, unpriced candidate rather than being dropped; and
+    `shop.acme.com` keeps the sharp refusal that names what can actually be
+    bought.
+- **Verified** (all foreground, real exit codes):
+  - `bash scripts/prune-test-db.sh` (215 → 213 tenants, 82 MB); `cargo fmt -p
+    alo-store`; `SQLX_OFFLINE=true cargo clippy -p alo-store --all-targets -- -D
+    warnings` clean.
+  - `cargo nextest run -p alo-store -E 'kind(lib) or
+    binary(site_registrar_fixture)'` → **1 234 green**, of which 23 are this
+    item: twelve unit tests (bait pricing refused in both places, retail
+    arithmetic and its rounding, duplicate/nonsense catalogs, the four ways a
+    person types a name, a subdomain refused, term multiplication and premium
+    quoting, price-iff-available, search ordering, registrant and order
+    validation without ever quoting the value back, replay fingerprints,
+    EU-only registrars, lifecycle tokens, and every `Unconfigured` door) and
+    eleven fixture tests pinning the provider contract (the shipped catalog is
+    honest on every ending, a search prices only what can be bought, taken vs
+    blocked vs unsupported, premium renews at its premium price, a purchase
+    takes the name from everybody else, a retry buys one domain while a reused
+    key with different parameters is refused and registers nothing, the
+    search-to-till race, a renewal extending from the expiry with a replay that
+    never doubles it, ageing through the lifecycle, and refusals that leave
+    nothing registered).
+- **Cuts/flags:**
+  - **No route, no screen, no row, and therefore no wrong-tenant test.** This
+    item is a pure model plus an outbound interface: it stores nothing, so there
+    is no tenant-scoped read to isolate. The tenant-scoped record — which tenant
+    asked for which domain, at which price, who approved it, and the only place
+    a `RegistrantContact` may rest — is S2.15b, and its wrong-tenant test is
+    mandatory there.
+  - **No CHANGELOG line.** Nothing a user or operator can see changed; a
+    changelog entry for a buy box nobody can open would be an advertisement.
+    S2.15c's line covers the visible feature.
+  - **Registrant data is validated here and stored nowhere.** Errors name
+    fields, never values (a test asserts an oversized name is not quoted back),
+    and no path logs.
+  - **Transfers, DNSSEC, WHOIS-privacy and trustee products are not modelled.**
+    `transfer_cents` exists because a price list has the number.
+  - **The fixture's year is 365 days**, so every expiry in a test is an exact
+    date; a live registry counts calendar years and its own dates are what the
+    state machine will store.
+  - **`nextest` still cannot list this workspace's larger test sets on this
+    machine** (S2.14a/b's finding, unchanged) — the filtered run above is fast
+    and complete for the crate this item touches.
+- **Next:** S2.15b (domain purchase state machine: quote → explicit approval →
+  payment reference → register/configure/renew, idempotency and tenant tests,
+  Billing behind its owned public seam).
