@@ -185,7 +185,7 @@ enum StylesheetRef<'a> {
 
 /// Renders one page to a complete HTML document.
 pub fn render_page(site: &SiteRenderContext<'_>, page: &PageRenderContext<'_>) -> String {
-    render_document(site, page, &StylesheetRef::Linked, &[])
+    render_document(site, page, &StylesheetRef::Linked, &[], false)
 }
 
 /// Renders a published localized page with direct language links and search
@@ -195,7 +195,7 @@ pub fn render_localized_page(
     page: &PageRenderContext<'_>,
     alternates: &[LanguageAlternate<'_>],
 ) -> String {
-    render_document(site, page, &StylesheetRef::Linked, alternates)
+    render_document(site, page, &StylesheetRef::Linked, alternates, false)
 }
 
 /// Renders one page as a self-contained draft-preview document: the same
@@ -209,7 +209,30 @@ pub fn render_page_preview(
     page: &PageRenderContext<'_>,
     css: &str,
 ) -> String {
-    render_document(site, page, &StylesheetRef::Inline(css), &[])
+    render_document(site, page, &StylesheetRef::Inline(css), &[], false)
+}
+
+/// The draft preview a person edits *on the page* (ADR 0042): the document
+/// [`render_page_preview`] produces, plus the annotations and the small script
+/// that turn every element holding exactly one typed string into a text field.
+///
+/// The annotation is a coordinate — `data-alo-text="<section index><JSON
+/// pointer>"` — and it is the same coordinate the model names in a
+/// `rewrite_copy` operation, so typing on the page and asking for a rewrite
+/// travel the identical route and produce the identical diff. Nothing here
+/// writes: the script reports the finished text to the editor through
+/// `postMessage`, and the editor applies it through the guarded edit door,
+/// which is what re-renders this document.
+///
+/// Only the editor asks for this rendering. A published page, a version
+/// preview, and the “after” view of a proposal are all rendered without it —
+/// none of them is a thing you may type into.
+pub fn render_page_editable(
+    site: &SiteRenderContext<'_>,
+    page: &PageRenderContext<'_>,
+    css: &str,
+) -> String {
+    render_document(site, page, &StylesheetRef::Inline(css), &[], true)
 }
 
 fn render_document(
@@ -217,6 +240,7 @@ fn render_document(
     page: &PageRenderContext<'_>,
     stylesheet: &StylesheetRef<'_>,
     alternates: &[LanguageAlternate<'_>],
+    editable: bool,
 ) -> String {
     let parsed = sections_lenient(page.sections);
 
@@ -224,10 +248,11 @@ fn render_document(
     let mut main = String::new();
     let mut footer = String::new();
     for (index, section) in parsed.iter().enumerate() {
+        let marks = sections::Marks::new(index, editable);
         match section {
-            Section::Nav(nav) => sections::nav(&mut header, site, nav, index),
-            Section::Footer(f) => sections::footer(&mut footer, site, f),
-            other => sections::body_section(&mut main, site, page, other, index),
+            Section::Nav(nav) => sections::nav(&mut header, site, nav, marks),
+            Section::Footer(f) => sections::footer(&mut footer, site, f, marks),
+            other => sections::body_section(&mut main, site, page, other, marks),
         }
     }
 
@@ -256,6 +281,10 @@ fn render_document(
     // and there is no second flag to forget to set.
     if matches!(stylesheet, StylesheetRef::Linked) {
         out.push_str(script::BEACON_SCRIPT);
+    }
+    if editable {
+        out.push_str(script::EDIT_STYLE);
+        out.push_str(script::EDIT_SCRIPT);
     }
     out.push_str("</body>\n</html>\n");
     out

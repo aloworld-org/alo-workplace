@@ -708,6 +708,54 @@ and optional key in Settings), and the unconfigured path degrades to
 blank-site + templates. Per-field copy operations are constrained to an
 exact stored section and JSON string pointer; proposing writes nothing.
 
+### Editing text on the page (S3.01a, ADR 0042)
+
+The preview the editor shows is not a picture of the page — it is the
+page, and its text is typed into where it sits. The rendering the edit
+API serves for the draft (`GET /sites/{id}/pages/{pid}/preview`) is the
+same document publishing produces, with two additions:
+
+- every element whose text is **exactly one typed string** carries
+  `data-alo-text="<section index><JSON pointer>"` — `2/items/0/title`,
+  `0/heading`, `12/text`;
+- a small script (`alo-sites`'s `render::script`) makes those elements
+  plain-text fields, and reports a finished edit to the app with
+  `postMessage({alo:"site-text-edit", key, text})`.
+
+That coordinate is **the same coordinate a `rewrite_copy` operation
+names**, so the edit travels the reviewed-edit door
+(`PUT /sites/{id}/pages/{pid}/ai-edits`) as a one-operation envelope —
+the identical request an approved AI proposal makes. There is no inline
+save route, no second validation, and one undo history for both paths.
+`products/mail/alo-jmap/tests/site_inline_text.rs` pins the property:
+every mark the renderer emits is an applicable `rewrite_copy` target and
+changes that property and nothing else.
+
+Three rules bound it:
+
+- **One element, one string.** An element carrying two properties (a
+  testimonial's `figcaption`, which holds the author and the role; a
+  pricing tier's price, which holds the amount and the period) is not
+  marked — one gesture may not rewrite two properties, or the diff is a
+  guess. Those keep the prop form until their markup separates them.
+  Link labels are likewise unmarked: a label and its href are one
+  decision, and that is the next slice.
+- **The page never writes.** The preview document has an opaque origin
+  inside a `sandbox="allow-scripts"` frame; it can reach nothing. The
+  editor proves the sender is its own frame (an opaque origin makes
+  `event.origin` worthless), resolves the coordinate against the sections
+  it is holding, and refuses a stale one rather than aiming a rewrite at
+  whatever moved into that index.
+- **Nothing a visitor receives changes.** Marks and script exist only in
+  the editable draft preview: not on a published page, not in a version
+  preview, not in the "after" half of a proposal — none of which is a
+  thing you may type into. A `custom_code` block is never marked either,
+  because the edit door refuses to write custom code and an outline
+  inviting a refused click is worse than no outline.
+
+Undo and redo are the same operation with the previous text, applied
+through the same door, in the editor's toolbar and on ⌘Z/Ctrl+Z.
+
 ### The template catalog (S2.11a)
 
 The manual sibling of generation, and the path a tenant without a

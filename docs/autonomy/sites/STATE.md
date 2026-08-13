@@ -6573,3 +6573,104 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   this item's brief is the one path from a description to a paid-attention
   inbox, and adding the rest would have made a slower test that proves less.
 - **Next:** S3.01a (inline text editing on the page, ADR 0042) — wave 3 begins.
+
+## 2026-08-13 — S3.01a typing on the page, and the coordinate that makes it one path
+
+- **Item:** S3.01a — inline text editing (ADR 0042). Wave 3 begins.
+- **Shipped:** the draft preview is now the thing you edit, not a picture of
+  it. `alo-sites`'s renderer gained an **editable mode**: every element whose
+  text is exactly one typed string carries
+  `data-alo-text="<section index><JSON pointer>"` (`0/heading`,
+  `2/items/0/title`, `12/text`), and a ~1.7 KB script makes those elements
+  plain-text fields that report a finished edit to the parent app with
+  `postMessage({alo:"site-text-edit", key, text})`. `alo-jmap`'s
+  `GET /sites/{id}/pages/{pid}/preview` renders that mode; every other
+  rendering — published page, version preview, the "after" half of a
+  proposal, a translation — is untouched, because none of them is a thing
+  you may type into. The editor turns a message into
+  `{"op":"rewrite_copy","target":{index,type},"pointer","text"}` and sends it
+  through `PUT …/ai-edits`, **the door an approved AI proposal already uses**.
+  Undo/redo (toolbar buttons + ⌘Z/Ctrl+Z/⇧⌘Z) is the same operation with the
+  previous text, so one history covers both paths.
+- **Why no new route.** The item asks for "the same change shape an AI edit
+  produces". The strongest available reading is not *a similar shape* but the
+  identical request: same envelope, same endpoint, same validation, same
+  atomic apply, same staleness refusal. So there is no inline-save endpoint to
+  drift from the reviewed one, and nothing new to authorize — the wire test
+  shows the neighbouring tenant getting 404 from both halves.
+- **The proof that this is one path, not two:**
+  `products/mail/alo-jmap/tests/site_inline_text.rs` renders a page carrying
+  every text-bearing section type, harvests **31 marks**, and for each one
+  builds a `rewrite_copy` from the mark alone and applies it through
+  `alo_ai::apply_site_edit`: every mark is an applicable target, each changes
+  its own property **and nothing else** (put the old value back and the page
+  is byte-identical — which is exactly what undo asks of it). A second test
+  pins the 31 coordinates as a list, so a section type that loses or gains
+  editable text is a diff to review rather than a surprise on a customer's
+  screen. On the web side `InlineText.test.tsx` asserts the envelope the
+  gesture builds is `toEqual` **and byte-identical** to the recorded AI
+  proposal for the same change: identical bytes on the wire cannot produce a
+  different diff behind it.
+- **Verified:** `cargo nextest run -p alo-sites` → **149 green** (15.4 s);
+  `-p alo-jmap -E 'binary(sites_http) or binary(site_inline_text)'` → **28
+  green**; the whole `-p alo-jmap` package → **1 033 green in 138.8 s**. `SQLX_OFFLINE=true cargo clippy -p alo-sites -p alo-jmap
+  --all-targets` clean; `rustfmt --edition 2024` on the changed files only
+  (`cargo fmt` on a crate here still rewrites hundreds of pre-existing lines).
+  Web: `npx tsc --noEmit` clean, `npx eslint` on the changed files clean,
+  `npm run build` clean, `npx vitest run src/sites` → **228 green in 23
+  files**, i18n parity `locale.test.ts` → 65 green with the seven new strings
+  in en/fr/nl.
+- **Wire transcript** (`sites_http::a_coordinate_from_the_preview_edits_the_page_through_the_reviewed_door`,
+  real router, real Postgres):
+  ```
+  PUT  /sites/{id}/pages/{pid}/sections   hero + faq            → 200
+  GET  /sites/{id}/pages/{pid}/preview                          → 200
+       contains data-alo-text="0/heading"
+       contains data-alo-text="1/items/0/answer"
+       contains site-text-edit
+  PUT  /sites/{id}/pages/{pid}/ai-edits   rewrite_copy
+       1/items/0/answer → "Across the EU, and to Norway."       → 200
+       stored answer changed; hero heading and the question unchanged
+  PUT  … same operation, old text                               → 200 (undo)
+  PUT  … target type "hero" at index 1 (stale)                  → 422
+  GET  /sites/{id}/pages/{pid}/preview      other tenant        → 404
+  PUT  /sites/{id}/pages/{pid}/ai-edits     other tenant        → 404
+  ```
+- **Cuts, all recorded in `docs/design/sites.md`:**
+  - **One element, one string.** A testimonial's `figcaption` holds the author
+    *and* the role; a pricing tier's `<p class="price">` holds the amount *and*
+    the period. Marking either would let one gesture rewrite two properties and
+    the diff would be a guess, so both keep the prop form until their markup
+    gives each string its own element. Splitting them is a markup change to
+    published pages and belongs in its own item, not smuggled into this one.
+  - **Link labels are not marked.** A label and its href are one decision;
+    editing the words without the destination is half a gesture.
+  - **`custom_code` is never marked**, and that is not a cut but a rule: the
+    edit door refuses to write custom code (`alo_ai::site_edits`), so an
+    outline inviting a click the server would refuse is worse than no outline.
+    A test asserts the two agree.
+  - **Localized editing keeps the forms.** The translation view writes whole
+    localized drafts, not section ops, so the preview it renders is not
+    annotated and the undo history is cleared when the language or page
+    changes.
+- **A React trap worth remembering.** The message handler first read `sections`
+  from a `useCallback` closure and was permanently one page behind — in the
+  editor test it saw `[]` while the stack on screen had two rows. `waitFor`
+  observes the committed DOM, but **passive effects had not flushed**, so a
+  `useEffect`-synced ref was equally stale. The fix that holds is
+  `useLayoutEffect` for the "latest value" ref: it runs at commit, before any
+  event can reach a handler. Any future handler that must answer against
+  *current* state — the drag-reorder of S3.01b will — should use the same ref,
+  not a dependency array.
+- **Gate health.** The full `cargo nextest run -p alo-jmap` again sat at 0 %
+  CPU with `syspolicyd` burning a core: the dyld/notarization cost of ~60
+  freshly linked ~150 MB test binaries, exactly as journalled under S2.16d. It
+  is paid once per link, not per run. Two further notes for the next
+  iteration: the alo-sites and alo-jmap suites **need `DATABASE_URL` in the
+  environment** — they default to port **5433**, and the docker Postgres here
+  is on 5432, so without it every DB test dies on a 30 s connect timeout and
+  the run looks like a mysterious slow failure. Use
+  `DATABASE_URL=postgres://alo:alo-dev-only@localhost:5432/alo`. Test database
+  pruned before the gate (686 → 492 tenants).
+- **Next:** S3.01b (reorder by dragging, with the page reflowing live and a
+  keyboard-accessible equivalent).

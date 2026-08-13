@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Website text is now edited on the page itself.** Click a heading, a
+  paragraph, a question or a price tier's name in the website preview and type:
+  Enter saves it, Escape puts the old words back, and Undo (⌘Z / Ctrl+Z, or the
+  arrows above the section list) walks back through every change. It is the same
+  change the assistant makes when you ask it to rewrite something, so both show
+  up the same way and both can be taken back the same way. Text that shares a
+  line with something else — a testimonial's author beside their role, a price
+  beside its billing period — is still edited in the section form.
+
 - **For operators: buying domains inside alo stays switched off until a
   deployment says who sells them.** The buy box only appears when the server
   is started with a registrar (`SITE_REGISTRAR`), the nameservers every

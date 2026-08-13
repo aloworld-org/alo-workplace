@@ -22,12 +22,75 @@ use super::html::{esc, safe_href};
 use super::money::format_price;
 use super::{PageRenderContext, SiteRenderContext};
 
+/// Which typed property a rendered element's text came from — the whole of
+/// direct manipulation on the editor side (ADR 0042).
+///
+/// In the editable draft preview every element whose text is **exactly one
+/// typed string** carries `data-alo-text="<section index><JSON pointer>"`,
+/// e.g. `data-alo-text="2/items/0/title"`. That is the same coordinate a
+/// `rewrite_copy` edit operation names, so a person typing on the page and a
+/// model proposing a rewrite produce the identical change — there is no second
+/// edit path (`alo_ai::SiteEditOperation::RewriteCopy`).
+///
+/// Two rules keep it honest:
+///
+/// - **One element, one string.** An element that also carries a second
+///   property (a testimonial's `figcaption`, which holds the author *and* the
+///   role; a tier's price, which holds the amount *and* the period) is not
+///   marked: making it editable would let one gesture rewrite two properties,
+///   and the resulting diff would be a guess. Those keep the prop form until
+///   their markup gives each string its own element.
+/// - **Nothing but the preview is annotated.** Published bytes are identical
+///   with and without this module: [`Marks::at`] returns the empty string
+///   unless the document is the editable preview, which the golden suite pins.
+///
+/// A pointer is built from fixed literals and array indices — never from
+/// tenant data — so it needs no escaping to sit in an attribute.
+#[derive(Clone, Copy)]
+pub(super) struct Marks {
+    /// Position of this section in the page envelope: the `index` half of an
+    /// edit target, and the id prefix sections already needed for their form
+    /// fields.
+    pub(super) index: usize,
+    editable: bool,
+}
+
+impl Marks {
+    /// Marks for the section at `index`; `editable` only in the draft preview
+    /// the editor renders.
+    pub(super) fn new(index: usize, editable: bool) -> Self {
+        Self { index, editable }
+    }
+
+    /// The same section with nothing editable: what a `custom_code` block
+    /// gets. The assistant may not write custom code either
+    /// (`alo_ai::site_edits` refuses every `set_prop`/`rewrite_copy` aimed at
+    /// one), and the two paths have to agree — an outline inviting a click the
+    /// edit door would refuse is worse than no outline.
+    pub(super) fn sealed(self) -> Self {
+        Self {
+            editable: false,
+            ..self
+        }
+    }
+
+    /// The attribute tying this element to `pointer` inside the section, ready
+    /// to sit inside a start tag (it carries its own leading space). Empty
+    /// outside the editable preview.
+    pub(super) fn at(self, pointer: &str) -> String {
+        if !self.editable {
+            return String::new();
+        }
+        format!(" data-alo-text=\"{}{pointer}\"", self.index)
+    }
+}
+
 /// A `nav` section, rendered as a `<header>` landmark. The brand link shows
 /// the theme logo when one is set, the site name otherwise; the toggle
 /// button is wired by the behavior script and hidden (menu expanded) when
 /// JavaScript is unavailable.
-pub(super) fn nav(out: &mut String, site: &SiteRenderContext<'_>, s: &NavSection, index: usize) {
-    let menu_id = format!("nav-menu-{index}");
+pub(super) fn nav(out: &mut String, site: &SiteRenderContext<'_>, s: &NavSection, m: Marks) {
+    let menu_id = format!("nav-menu-{}", m.index);
     out.push_str("<header class=\"s-nav\">\n");
     out.push_str(&format!(
         "<nav aria-label=\"{}\">\n",
@@ -63,7 +126,7 @@ pub(super) fn nav(out: &mut String, site: &SiteRenderContext<'_>, s: &NavSection
 }
 
 /// A `footer` section, rendered as a `<footer>` landmark.
-pub(super) fn footer(out: &mut String, site: &SiteRenderContext<'_>, s: &FooterSection) {
+pub(super) fn footer(out: &mut String, site: &SiteRenderContext<'_>, s: &FooterSection, m: Marks) {
     out.push_str("<footer class=\"s-footer\">\n");
     if !s.links.is_empty() {
         out.push_str(&format!(
@@ -78,7 +141,7 @@ pub(super) fn footer(out: &mut String, site: &SiteRenderContext<'_>, s: &FooterS
         out.push_str("</ul>\n</nav>\n");
     }
     if let Some(text) = &s.text {
-        out.push_str(&format!("<p>{}</p>\n", esc(text)));
+        out.push_str(&format!("<p{}>{}</p>\n", m.at("/text"), esc(text)));
     }
     out.push_str("</footer>\n");
 }
@@ -91,25 +154,25 @@ pub(super) fn body_section(
     site: &SiteRenderContext<'_>,
     page: &PageRenderContext<'_>,
     section: &Section,
-    index: usize,
+    m: Marks,
 ) {
     match section {
-        Section::Nav(s) => nav(out, site, s, index),
-        Section::Footer(s) => footer(out, site, s),
-        Section::Hero(s) => hero(out, site, s),
-        Section::Features(s) => features(out, s),
-        Section::TextImage(s) => text_image(out, site, s),
-        Section::Gallery(s) => gallery(out, site, s),
-        Section::Testimonials(s) => testimonials(out, s),
-        Section::Pricing(s) => pricing(out, s),
-        Section::Team(s) => team(out, site, s),
-        Section::Faq(s) => faq(out, s),
-        Section::Cta(s) => cta(out, s),
-        Section::ContactForm(s) => contact_form(out, site, s, index),
-        Section::Collection(s) => collection(out, site, s, page.collections),
-        Section::Catalog(s) => catalog(out, site, s, page.catalogs, index),
-        Section::Booking(s) => booking(out, site, s, page.bookings, index),
-        Section::CustomCode(s) => custom_code(out, site, s),
+        Section::Nav(s) => nav(out, site, s, m),
+        Section::Footer(s) => footer(out, site, s, m),
+        Section::Hero(s) => hero(out, site, s, m),
+        Section::Features(s) => features(out, s, m),
+        Section::TextImage(s) => text_image(out, site, s, m),
+        Section::Gallery(s) => gallery(out, site, s, m),
+        Section::Testimonials(s) => testimonials(out, s, m),
+        Section::Pricing(s) => pricing(out, s, m),
+        Section::Team(s) => team(out, site, s, m),
+        Section::Faq(s) => faq(out, s, m),
+        Section::Cta(s) => cta(out, s, m),
+        Section::ContactForm(s) => contact_form(out, site, s, m),
+        Section::Collection(s) => collection(out, site, s, page.collections, m),
+        Section::Catalog(s) => catalog(out, site, s, page.catalogs, m),
+        Section::Booking(s) => booking(out, site, s, page.bookings, m),
+        Section::CustomCode(s) => custom_code(out, site, s, m),
     }
 }
 
@@ -129,9 +192,14 @@ pub(super) fn body_section(
 /// attribute it sits in. Independently of the write gate, a stored part that
 /// would close its own `<style>`/`<script>` block is dropped here with a
 /// warning — a snapshot published before that rule existed still renders inert.
-fn custom_code(out: &mut String, site: &SiteRenderContext<'_>, section: &CustomCodeSection) {
+fn custom_code(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    section: &CustomCodeSection,
+    m: Marks,
+) {
     out.push_str("<section class=\"s-custom-code\">\n");
-    push_opt_heading(out, section.heading.as_deref());
+    push_opt_heading(out, section.heading.as_deref(), m.sealed());
     out.push_str(&format!(
         "<iframe class=\"custom-frame\" title=\"{}\" sandbox=\"{}\" loading=\"lazy\" \
          style=\"height:{}px\" srcdoc=\"{}\"></iframe>\n",
@@ -205,10 +273,10 @@ fn catalog(
     site: &SiteRenderContext<'_>,
     section: &CatalogSection,
     snapshots: &std::collections::HashMap<String, SiteCatalogSnapshot>,
-    index: usize,
+    m: Marks,
 ) {
     out.push_str("<section class=\"s-catalog\">\n");
-    push_opt_heading(out, section.heading.as_deref());
+    push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.catalog_id.as_str()) else {
         tracing::warn!(
             catalog = %section.catalog_id,
@@ -282,13 +350,13 @@ fn catalog(
                 site,
                 item,
                 &snapshot.currency,
-                ordering.then_some(index),
+                ordering.then_some(m.index),
             );
         }
         out.push_str("</ul>\n</div>\n");
     }
     if ordering {
-        push_order_fields(out, site, index);
+        push_order_fields(out, site, m.index);
         out.push_str("</form>\n");
     }
     out.push_str("</section>\n");
@@ -415,11 +483,11 @@ fn booking(
     site: &SiteRenderContext<'_>,
     section: &BookingSection,
     snapshots: &std::collections::HashMap<String, SiteBookingSnapshot>,
-    index: usize,
+    m: Marks,
 ) {
     let t = site.strings;
     out.push_str("<section class=\"s-booking\">\n");
-    push_opt_heading(out, section.heading.as_deref());
+    push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.booking_id.as_str()) else {
         tracing::warn!(
             booking = %section.booking_id,
@@ -464,7 +532,8 @@ fn booking(
     out.push_str(&format!(
         "<p><label for=\"booking-{index}-date\">{}</label>\
          <input id=\"booking-{index}-date\" name=\"date\" type=\"date\" required></p>\n",
-        esc(t.booking_choose_day)
+        esc(t.booking_choose_day),
+        index = m.index
     ));
     out.push_str(&format!(
         "<p><button type=\"submit\">{}</button></p>\n",
@@ -478,9 +547,10 @@ fn collection(
     site: &SiteRenderContext<'_>,
     section: &CollectionSection,
     snapshots: &std::collections::HashMap<String, SiteCollectionSnapshot>,
+    m: Marks,
 ) {
     out.push_str("<section class=\"s-collection\">\n");
-    push_opt_heading(out, section.heading.as_deref());
+    push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.collection_id.as_str()) else {
         tracing::warn!(
             collection = %section.collection_id,
@@ -544,12 +614,17 @@ fn collection(
     out.push_str("</ul>\n</section>\n");
 }
 
-fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection) {
+fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Marks) {
     out.push_str("<section class=\"s-hero\">\n");
-    out.push_str(&format!("<h1>{}</h1>\n", esc(&s.heading)));
+    out.push_str(&format!(
+        "<h1{}>{}</h1>\n",
+        m.at("/heading"),
+        esc(&s.heading)
+    ));
     if let Some(subheading) = &s.subheading {
         out.push_str(&format!(
-            "<p class=\"subheading\">{}</p>\n",
+            "<p class=\"subheading\"{}>{}</p>\n",
+            m.at("/subheading"),
             esc(subheading)
         ));
     }
@@ -569,24 +644,30 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection) {
     out.push_str("</section>\n");
 }
 
-fn features(out: &mut String, s: &FeaturesSection) {
+fn features(out: &mut String, s: &FeaturesSection, m: Marks) {
     out.push_str("<section class=\"s-features\">\n");
-    push_opt_heading(out, s.heading.as_deref());
+    push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(intro) = &s.intro {
-        out.push_str(&format!("<p class=\"intro\">{}</p>\n", esc(intro)));
+        out.push_str(&format!(
+            "<p class=\"intro\"{}>{}</p>\n",
+            m.at("/intro"),
+            esc(intro)
+        ));
     }
     out.push_str("<ul class=\"grid\">\n");
-    for item in &s.items {
+    for (i, item) in s.items.iter().enumerate() {
         out.push_str(&format!(
-            "<li>\n<h3>{}</h3>\n<p>{}</p>\n</li>\n",
+            "<li>\n<h3{}>{}</h3>\n<p{}>{}</p>\n</li>\n",
+            m.at(&format!("/items/{i}/title")),
             esc(&item.title),
+            m.at(&format!("/items/{i}/body")),
             esc(&item.body)
         ));
     }
     out.push_str("</ul>\n</section>\n");
 }
 
-fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSection) {
+fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSection, m: Marks) {
     let side = match s.image_side {
         ImageSide::Left => "image-left",
         ImageSide::Right => "image-right",
@@ -594,14 +675,14 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
     out.push_str(&format!("<section class=\"s-text-image {side}\">\n"));
     push_figure(out, site, &s.image, ImageSlot::Half);
     out.push_str("<div class=\"text\">\n");
-    push_opt_heading(out, s.heading.as_deref());
-    out.push_str(&format!("<p>{}</p>\n", esc(&s.body)));
+    push_opt_heading(out, s.heading.as_deref(), m);
+    out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(&s.body)));
     out.push_str("</div>\n</section>\n");
 }
 
-fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection) {
+fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m: Marks) {
     out.push_str("<section class=\"s-gallery\">\n");
-    push_opt_heading(out, s.heading.as_deref());
+    push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul class=\"grid\">\n");
     for image in &s.images {
         out.push_str("<li>");
@@ -611,14 +692,17 @@ fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection) {
     out.push_str("</ul>\n</section>\n");
 }
 
-fn testimonials(out: &mut String, s: &TestimonialsSection) {
+fn testimonials(out: &mut String, s: &TestimonialsSection, m: Marks) {
     out.push_str("<section class=\"s-testimonials\">\n");
-    push_opt_heading(out, s.heading.as_deref());
+    push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul>\n");
-    for item in &s.items {
+    for (i, item) in s.items.iter().enumerate() {
         out.push_str("<li>\n<figure class=\"testimonial\">\n");
+        // The `figcaption` below holds the author *and* the role, so neither
+        // is marked: see [`Marks`] on why one element may carry one string.
         out.push_str(&format!(
-            "<blockquote><p>{}</p></blockquote>\n",
+            "<blockquote><p{}>{}</p></blockquote>\n",
+            m.at(&format!("/items/{i}/quote")),
             esc(&item.quote)
         ));
         out.push_str(&format!("<figcaption>{}", esc(&item.author)));
@@ -630,21 +714,30 @@ fn testimonials(out: &mut String, s: &TestimonialsSection) {
     out.push_str("</ul>\n</section>\n");
 }
 
-fn pricing(out: &mut String, s: &PricingSection) {
+fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
     out.push_str("<section class=\"s-pricing\">\n");
-    push_opt_heading(out, s.heading.as_deref());
+    push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(intro) = &s.intro {
-        out.push_str(&format!("<p class=\"intro\">{}</p>\n", esc(intro)));
+        out.push_str(&format!(
+            "<p class=\"intro\"{}>{}</p>\n",
+            m.at("/intro"),
+            esc(intro)
+        ));
     }
     out.push_str("<ul class=\"tiers\">\n");
-    for tier in &s.tiers {
+    for (i, tier) in s.tiers.iter().enumerate() {
         let class = if tier.highlighted {
             "tier highlighted"
         } else {
             "tier"
         };
         out.push_str(&format!("<li class=\"{class}\">\n"));
-        out.push_str(&format!("<h3>{}</h3>\n", esc(&tier.name)));
+        out.push_str(&format!(
+            "<h3{}>{}</h3>\n",
+            m.at(&format!("/tiers/{i}/name")),
+            esc(&tier.name)
+        ));
+        // Price and period share one paragraph, so neither is marked ([`Marks`]).
         out.push_str(&format!("<p class=\"price\">{}", esc(&tier.price)));
         if let Some(period) = &tier.period {
             out.push_str(&format!(" <span class=\"period\">{}</span>", esc(period)));
@@ -652,14 +745,19 @@ fn pricing(out: &mut String, s: &PricingSection) {
         out.push_str("</p>\n");
         if let Some(description) = &tier.description {
             out.push_str(&format!(
-                "<p class=\"description\">{}</p>\n",
+                "<p class=\"description\"{}>{}</p>\n",
+                m.at(&format!("/tiers/{i}/description")),
                 esc(description)
             ));
         }
         if !tier.features.is_empty() {
             out.push_str("<ul class=\"tier-features\">\n");
-            for feature in &tier.features {
-                out.push_str(&format!("<li>{}</li>\n", esc(feature)));
+            for (f, feature) in tier.features.iter().enumerate() {
+                out.push_str(&format!(
+                    "<li{}>{}</li>\n",
+                    m.at(&format!("/tiers/{i}/features/{f}")),
+                    esc(feature)
+                ));
             }
             out.push_str("</ul>\n");
         }
@@ -672,46 +770,64 @@ fn pricing(out: &mut String, s: &PricingSection) {
     out.push_str("</ul>\n</section>\n");
 }
 
-fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection) {
+fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Marks) {
     out.push_str("<section class=\"s-team\">\n");
-    push_opt_heading(out, s.heading.as_deref());
+    push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul class=\"grid\">\n");
-    for member in &s.members {
+    for (i, member) in s.members.iter().enumerate() {
         out.push_str("<li>\n");
         if let Some(photo) = &member.photo {
             push_figure(out, site, photo, ImageSlot::Card);
         }
-        out.push_str(&format!("<h3>{}</h3>\n", esc(&member.name)));
+        out.push_str(&format!(
+            "<h3{}>{}</h3>\n",
+            m.at(&format!("/members/{i}/name")),
+            esc(&member.name)
+        ));
         if let Some(role) = &member.role {
-            out.push_str(&format!("<p class=\"role\">{}</p>\n", esc(role)));
+            out.push_str(&format!(
+                "<p class=\"role\"{}>{}</p>\n",
+                m.at(&format!("/members/{i}/role")),
+                esc(role)
+            ));
         }
         if let Some(bio) = &member.bio {
-            out.push_str(&format!("<p class=\"bio\">{}</p>\n", esc(bio)));
+            out.push_str(&format!(
+                "<p class=\"bio\"{}>{}</p>\n",
+                m.at(&format!("/members/{i}/bio")),
+                esc(bio)
+            ));
         }
         out.push_str("</li>\n");
     }
     out.push_str("</ul>\n</section>\n");
 }
 
-fn faq(out: &mut String, s: &FaqSection) {
+fn faq(out: &mut String, s: &FaqSection, m: Marks) {
     out.push_str("<section class=\"s-faq\">\n");
-    push_opt_heading(out, s.heading.as_deref());
-    for item in &s.items {
+    push_opt_heading(out, s.heading.as_deref(), m);
+    for (i, item) in s.items.iter().enumerate() {
         // <details>/<summary> is a native, scriptless accordion.
         out.push_str(&format!(
-            "<details>\n<summary>{}</summary>\n<p>{}</p>\n</details>\n",
+            "<details>\n<summary{}>{}</summary>\n<p{}>{}</p>\n</details>\n",
+            m.at(&format!("/items/{i}/question")),
             esc(&item.question),
+            m.at(&format!("/items/{i}/answer")),
             esc(&item.answer)
         ));
     }
     out.push_str("</section>\n");
 }
 
-fn cta(out: &mut String, s: &CtaSection) {
+fn cta(out: &mut String, s: &CtaSection, m: Marks) {
     out.push_str("<section class=\"s-cta\">\n");
-    out.push_str(&format!("<h2>{}</h2>\n", esc(&s.heading)));
+    out.push_str(&format!(
+        "<h2{}>{}</h2>\n",
+        m.at("/heading"),
+        esc(&s.heading)
+    ));
     if let Some(body) = &s.body {
-        out.push_str(&format!("<p>{}</p>\n", esc(body)));
+        out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));
     }
     out.push_str("<p class=\"actions\">");
     push_link(out, &s.button, "button");
@@ -723,16 +839,12 @@ fn cta(out: &mut String, s: &CtaSection) {
 /// `/f/<form_id>` and carries the fixed v1 field contract — `name`, `email`,
 /// `message`, plus the visually-hidden `website` honeypot (a submission
 /// filling it is bot traffic, silently dropped by the forms backend).
-fn contact_form(
-    out: &mut String,
-    site: &SiteRenderContext<'_>,
-    s: &ContactFormSection,
-    index: usize,
-) {
+fn contact_form(out: &mut String, site: &SiteRenderContext<'_>, s: &ContactFormSection, m: Marks) {
+    let index = m.index;
     out.push_str("<section class=\"s-contact-form\">\n");
-    push_opt_heading(out, s.heading.as_deref());
+    push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(body) = &s.body {
-        out.push_str(&format!("<p>{}</p>\n", esc(body)));
+        out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));
     }
     if let Some(form_id) = &s.form_id {
         let t = site.strings;
@@ -810,9 +922,10 @@ fn push_figure(out: &mut String, site: &SiteRenderContext<'_>, image: &SiteImage
     out.push_str(&format!(" alt=\"{}\"></figure>\n", esc(&image.alt)));
 }
 
-/// The section's optional `<h2>`.
-fn push_opt_heading(out: &mut String, heading: Option<&str>) {
+/// The section's optional `<h2>`, editable in place like every other single
+/// typed string.
+fn push_opt_heading(out: &mut String, heading: Option<&str>, m: Marks) {
     if let Some(heading) = heading {
-        out.push_str(&format!("<h2>{}</h2>\n", esc(heading)));
+        out.push_str(&format!("<h2{}>{}</h2>\n", m.at("/heading"), esc(heading)));
     }
 }

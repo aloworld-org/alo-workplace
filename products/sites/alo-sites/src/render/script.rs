@@ -152,6 +152,87 @@ pub(crate) const BEACON_SCRIPT: &str = r#"<script>(function () {
 })();</script>
 "#;
 
+/// The outline that says "this is a text field" in the editable draft preview
+/// — appended only there, never to a published page.
+///
+/// It uses `currentColor` and no colour of its own, so it inherits whatever
+/// contrast the tenant's own theme already achieves against its background
+/// instead of inventing a grey that may fail on a dark site. Focus gets a
+/// solid two-pixel ring: the same affordance the app's own fields have, and
+/// the one a keyboard user needs to know where they are.
+pub(super) const EDIT_STYLE: &str = r#"<style>[data-alo-text]{outline:1px dashed color-mix(in srgb,currentColor 40%,transparent);outline-offset:3px;border-radius:2px}[data-alo-text]:hover{outline-style:solid}[data-alo-text]:focus{outline:2px solid currentColor;outline-offset:3px}[data-alo-text]:focus-visible{outline:2px solid currentColor}</style>
+"#;
+
+/// Direct manipulation, the page's half (ADR 0042): every element the renderer
+/// marked with `data-alo-text` becomes a plain-text field, and a finished edit
+/// is *reported* to the editor rather than saved here.
+///
+/// The document has no origin — it is `srcdoc` inside a `sandbox="allow-scripts"`
+/// frame — so it cannot reach the API, and this script never tries: it posts
+/// `{alo:"site-text-edit",key,text}` to the parent, which validates the key
+/// against the sections it holds and applies the change through the same
+/// guarded edit door a model's proposal goes through. `postMessage` must target
+/// `"*"` because an opaque origin can name no other; the receiving side proves
+/// the sender instead, by comparing it to its own frame's window.
+///
+/// What the gestures are, and why:
+///
+/// - **Enter commits and leaves.** These are single-line typed properties; a
+///   newline in a heading is a surprise, not a paragraph. `Shift+Enter` still
+///   inserts one for the properties where it means something.
+/// - **Escape restores** what was there on focus, so a mistyped headline is
+///   one key away from unchanged — undo without a round trip.
+/// - **Blur commits** whatever is different, which is what clicking on the
+///   next thing you want to edit means.
+/// - **Links and forms do nothing.** In a preview a navigation cannot arrive
+///   anywhere (there is no origin behind it) and would silently discard the
+///   edit in progress; the published page keeps every one of them.
+pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
+  "use strict";
+  var MAX = 5000;
+  var fields = document.querySelectorAll("[data-alo-text]");
+  if (!fields.length) { return; }
+  var original = null;
+  function value(node) { return node.textContent.replace(/\s+$/, ""); }
+  function commit(node) {
+    var text = value(node);
+    if (original === null || text === original || text.length > MAX) { return; }
+    original = text;
+    parent.postMessage({
+      alo: "site-text-edit",
+      key: node.getAttribute("data-alo-text"),
+      text: text
+    }, "*");
+  }
+  fields.forEach(function (node) {
+    try { node.contentEditable = "plaintext-only"; } catch (ignored) { /* older engines */ }
+    if (node.contentEditable !== "plaintext-only") { node.contentEditable = "true"; }
+    node.spellcheck = true;
+    node.addEventListener("focus", function () { original = value(node); });
+    node.addEventListener("blur", function () { commit(node); original = null; });
+    node.addEventListener("paste", function (event) {
+      event.preventDefault();
+      var source = event.clipboardData || window.clipboardData;
+      var text = source ? source.getData("text/plain") : "";
+      document.execCommand("insertText", false, text.replace(/[\r\n]+/g, " "));
+    });
+    node.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); node.blur(); }
+      if (event.key === "Escape" && original !== null) {
+        event.preventDefault();
+        node.textContent = original;
+        original = null;
+        node.blur();
+      }
+    });
+  });
+  document.addEventListener("click", function (event) {
+    if (event.target.closest && event.target.closest("a")) { event.preventDefault(); }
+  }, true);
+  document.addEventListener("submit", function (event) { event.preventDefault(); }, true);
+})();</script>
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,13 +254,29 @@ mod tests {
         );
     }
 
+    /// The edit script is not part of that budget — no visitor ever downloads
+    /// it — but it is still inlined into a document, so it gets a ceiling of
+    /// its own rather than none at all.
+    #[test]
+    fn the_edit_script_stays_small_and_never_ships_to_a_visitor() {
+        assert!(
+            EDIT_SCRIPT.len() + EDIT_STYLE.len() < 4096,
+            "edit mode is {} bytes",
+            EDIT_SCRIPT.len() + EDIT_STYLE.len()
+        );
+        assert!(!BEHAVIOR_SCRIPT.contains("data-alo-text"));
+        assert!(!BEACON_SCRIPT.contains("data-alo-text"));
+    }
+
     /// Neither script may terminate its own block or interpolate anything —
     /// the reason inlining them is safe.
     #[test]
     fn neither_script_can_close_its_own_block() {
-        for script in [BEHAVIOR_SCRIPT, BEACON_SCRIPT] {
+        for script in [BEHAVIOR_SCRIPT, BEACON_SCRIPT, EDIT_SCRIPT] {
             assert_eq!(script.matches("</script>").count(), 1);
             assert!(script.ends_with("</script>\n"));
         }
+        assert_eq!(EDIT_STYLE.matches("</style>").count(), 1);
+        assert!(EDIT_STYLE.ends_with("</style>\n"));
     }
 }
