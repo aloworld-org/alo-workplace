@@ -6233,3 +6233,116 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.16c (as-built docs: `docs/design/sites.md` reconciled with what
   S2 shipped, the features.md [S2] table, the CHANGELOG sweep and the
   human-inbox summary).
+
+## 2026-08-13 — S2.16b2 the half that needed eyes: 360px, Tab, and a colorimeter
+
+- **Item:** S2.16b2 — every sites screen opened in a real browser at 360px and
+  driven by keyboard alone, the half S2.16b cut because "the loop has no
+  browser". It has one now: `playwright-core` driving the Mac's own Chrome
+  (installed in the scratchpad, NOT added to `web/package.json` — the loop
+  needs a browser, the product does not), against the real local stack —
+  docker `alo-pg` on database `alo`, the debug `alo-jmap` on
+  `127.0.0.1:8080`, `npm run dev` on 5173, a fresh tenant from `identityctl
+  bootstrap-admin`, and a site created through the UI from the "Restaurant or
+  café" template. Fourteen screens, screenshotted, walked with Tab, and
+  measured: horizontal overflow, text clipped to zero width, and the WCAG
+  contrast of every text node against its composited background.
+- **Found — four real defects, none of them visible in the source:**
+  1. **The analytics screen could not be read on a phone at all.** The ranking
+     panels are `repeat(auto-fit, minmax(var(--control-width-wide), 1fr))` and
+     `--control-width-wide` is 8.5rem, so two panels fit a 360px screen at
+     ~144px each. Inside a panel the row is `label | bar | count` with the bar
+     (3.5rem) and the count fixed, and the label's `minmax(0, 1fr)` is the only
+     thing that can give — so it gave all of it. Measured: **29 labels at width
+     0**. "Countries" was four bars and four numbers with no country named
+     anywhere on the screen. The heatmap, funnel, catalog, orders, bookings,
+     collections, domains, history, submissions and posts screens clipped
+     nothing — the whole defect was this one grid.
+  2. **The Languages panel on the site screen was 404px wide inside a 360px
+     screen**, because `.languageName` asks for a fixed 12rem. The page does
+     not scroll sideways, so "Default", "Ready" and the row's actions were
+     simply off the edge and unreachable.
+  3. **Reordering a section from the keyboard threw focus to `<body>`.** A move
+     replaces the whole list with the server's answer, so React unmounts the
+     row that had focus. Measured in the browser: press "move down" once and
+     the caret is at the top of the document, ~10 Tab presses from the button
+     that was just pressed. Moving a section two places is therefore a gesture
+     nobody does twice. Nothing announced the move either — reordering is the
+     one edit on that screen whose only result is the stack reflowing.
+  4. **Twenty buttons, four names.** Every section row rendered "Move up",
+     "Move down", "Edit section", "Delete section" with nothing to say which
+     section — five sections is that list five times, and a screen-reader rotor
+     shows exactly that.
+  Plus a contrast sweep: the accent (#e76f51) is used as a text colour in ~20
+  places in this module and never reaches 4.5:1 on any ground the module uses.
+  Worst was the editing-language chip at **2.28:1** (accent on accent-tint).
+- **Shipped:**
+  - Phone rules for the two layouts: one ranking panel per row and the bar
+    moved under its own label; `.languageRow` wraps and `.languageName` drops
+    its floor. Both measured after: **0 clipped labels on all twelve screens**,
+    language row 404px → 312px.
+  - `PageEditorView`: the four controls are named after their section
+    (`sitesMoveUp`/`sitesMoveDown`/`sitesEditSection`/`sitesDeleteSection` are
+    now functions of the section name, in en/fr/nl), each carries a
+    `data-section-control` marker, focus follows the section to its new row
+    (falling back to the sibling control when the new position disables the one
+    that was pressed — the last row has no "move down"), and a `role="status"`
+    line says "Hero moved to position 2 of 5.".
+  - Contrast: accent text on the ivory panes → `--accent-active` (5.1:1);
+    accent text on an accent ground (the language chip, the selected template
+    tab, the onboarding choice, the page-lock badge, the preview compare
+    toggle) → `--text-primary`, since the tint is what marks the state anyway;
+    `.liveLink` on the sunken publish bar → `--text-primary` with a permanent
+    underline; `.badge` and the AI panel's two hint lines off `--text-tertiary`
+    (4.1:1 on the warm grounds) onto `--text-secondary`; two hover rules whose
+    affordance is the background lost their colour change.
+  - `SectionStackKeyboard.test.tsx` (4 tests) — distinct names per row, focus
+    following the section, the disabled-button fallback, and the announcement.
+- **The focus fix took three attempts, and the first two were wrong in a way
+  worth writing down.** Focusing in an effect keyed on `[sections]` failed
+  ~1 run in 4: the control is disabled while the op is in flight, and
+  `setSections` (in `try`) and `setWorking(false)` (in `finally`) commit one
+  microtask apart, so the effect could run against a stack that was still
+  disabled — or, in the other order, against the OLD list, focusing the section
+  that happened to be at that index before the move. Gating on `working` alone
+  still failed. What works is holding the list as it was when the move was
+  asked for and refusing to act until `sections` is a different array: the
+  condition is "the new order is on screen", so state it, rather than timing it.
+  A 12-run probe reproduced it at ~1/12 and is green 36/36 after.
+- **Verified** (foreground, real exit codes): `npx tsc --noEmit` clean; `npx
+  eslint src/sites src/i18n` clean; `npx vitest run src/sites src/i18n` **282
+  tests, 23 files, green — three consecutive runs**; `npm run build` clean.
+  Three of the four new tests were run against the unfixed component first and
+  **failed**. In the browser, after the fix: label "Move Hero down", focus after
+  the move on "Move Hero down" in row 1 (was `<body>`), live region reading
+  "Hero moved to position 2 of 5.". Analytics at 360px now shows
+  "summer-terrace 756", "Netherlands 882" — labels that did not exist on screen
+  before. **`prefers-reduced-motion` passes as it stood**: one global media
+  query flattens every transition and animation to 1e-05s, verified with
+  Chrome's reduced-motion emulation on. No Rust touched, no new route, no
+  migration.
+- **Flags — for the human inbox, ALL of them ds-owned (ADR 0045 forbids this
+  track from touching `web/src/ds/**`, and these are token-level, not sites):**
+  - **The primary button fails AA everywhere in alo.** White on `--accent`
+    (#e76f51) is **3.09:1** — every "Publish", "New website", "Open Drive",
+    "Write in alo Docs" in the product, and the avatar initials with it. This
+    is a decision about the brand ramp, not about sites: the fix is a darker
+    `--accent` or a rule that the primary button uses `--accent-active`.
+  - **The accent ramp has no step that carries small text on the warm
+    grounds.** `--accent-active` (verdigris-700) is 5.1:1 on `--bg-surface` but
+    4.39:1 on `--bg-sunken` and 4.07:1 on `--bg-raised`, and 3.81:1 on
+    `--accent-tint`. Sites worked around it per rule; a `--text-accent` (or a
+    verdigris-800 step) would let every module stop guessing.
+  - **`--success` (#2e8b57) and `--text-tertiary` (#6b7280) fail as small
+    text** on the warm grounds — 3.35:1 for "Ready" on the language panel,
+    4.11:1 for a 12px tertiary line. Sites moved its tertiary lines to
+    `--text-secondary`; `--success` has no darker sibling to move to, so the
+    translation-ready line is still 3.35:1 and is left for the ds track.
+  - Accent icons on accent tints are 2.28:1 as *icons* (the modal icons, the
+    empty-state art, the panel icons). Each sits beside text that says the same
+    thing, so 1.4.11 is arguably not engaged; left alone rather than churned.
+  - The bottom rail overflows its own width at 360px (Drive, Billing and the
+    avatar sit past the right edge). It scrolls, and it is `shell/`, not sites.
+- **Next:** S2.16c (as-built docs: `docs/design/sites.md` reconciled with what
+  S2 shipped, the features.md [S2] table, the CHANGELOG sweep and the
+  human-inbox summary — the flags above belong in it).

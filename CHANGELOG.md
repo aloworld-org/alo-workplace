@@ -10,6 +10,21 @@ contracts.
 
 ## Unreleased
 
+- **Fixed: website analytics were unreadable on a phone, and reordering a page
+  with the keyboard threw you back to the top.** On a 360px screen the analytics
+  panels sat two to a row, which left no width for the labels: "Countries"
+  showed four bars and four numbers with no country named against any of them,
+  and 29 labels across the screen were drawn at zero width. The panels now take
+  the full width of a phone and each bar sits under its own label. The Languages
+  panel on a website's screen ran 44px off the side, taking the state of every
+  language with it; it now wraps. In the page editor, the buttons on each
+  section are now named after the section they act on — "Move Hero down", not a
+  fifth button called "Move down" — moving a section keeps the cursor on that
+  section instead of dropping it at the top of the page, and the move is
+  announced for anyone who cannot see the page reflow. Several small labels, the
+  editing-language chip and the status colours across the website screens were
+  darkened to stay legible.
+
 - **Fixed: the website dialogs can now be used without a mouse, and they fit a
   phone.** Opening a dialog — new website, new page, theme, publish, the picker
   you add a section from, any of them — now moves the cursor into it, keeps Tab
