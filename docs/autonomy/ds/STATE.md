@@ -518,7 +518,7 @@ mid-migration.
 
 **Next:** D2.03, migrate shell.
 
-## LOOP HALT: two loop invocations are running on this one checkout
+## RESOLVED HALT: two loop invocations are running on this one checkout
 
 Nothing was built this iteration, and nothing should have been. Two headless
 `claude -p "… execute exactly ONE iteration of the loop for track 'ds' …"`
@@ -652,7 +652,7 @@ completes the item commits it with the implementation.
 
 **Next:** D2.03, unchanged.
 
-LOOP HALT: a second, orphaned loop worker (PID 25244) owns this checkout and is mid-D2.03; the previous halt marker was a markdown heading, so run-loop.sh's anchored `^LOOP HALT` never matched it and the wrapper restarted anyway.
+RESOLVED HALT: a second, orphaned loop worker (PID 25244) owns this checkout and is mid-D2.03; the previous halt marker was a markdown heading, so run-loop.sh's anchored `^LOOP HALT` never matched it and the wrapper restarted anyway.
 
 ## D2.03 — shell
 
@@ -785,3 +785,26 @@ document. For the human: fix those two, confirm 25244 is gone, then delete the
 marker and restart.
 
 **Next:** D2.04, migrate drive (3 stylesheets — chip, dialog, input).
+
+## Halts cleared, 2026-08-13 04:40 — by the operator's session, not the loop
+
+Both markers above are resolved and rewritten as `RESOLVED HALT:` so the
+wrapper can start.
+
+**The orphan was mine.** Stopping the loop at 00:45 killed the *wrapper* and
+left its *worker* alive, so the restart put two workers on one checkout. That
+is the correct thing for the loop to have halted on, and the lesson is that
+stopping a loop means killing the worker as well as the wrapper — a `pkill -f
+run-loop.sh` does not reach the child.
+
+**The invisible marker was mine too.** The anchored `^LOOP HALT` I added
+yesterday stopped the wrapper reading a *prose* mention as a real marker, and in
+doing so stopped it reading a marker somebody had written as a heading. Both
+wrappers now accept an optional heading prefix, which the journal's own
+quoting style keeps unambiguous. Verified against this file: two real markers
+seen, four prose mentions ignored.
+
+**Also carried forward for D3.01:** the shipped CSS figure in the queue (252 KB)
+does not match what the build actually emits (909.8 KB across four files). The
+review item should re-derive it rather than compare against a number this
+session wrote down wrongly.

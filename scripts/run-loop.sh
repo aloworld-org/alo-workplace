@@ -56,10 +56,15 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   # The real marker is appended as its own line, so anchoring tells the record
   # of a decision apart from the decision.
   state="$(cat "$STATE_FILE" 2>/dev/null || true)"
-  if grep -qE '^LOOP COMPLETE' <<<"$state"; then
+  # `^` alone missed a marker somebody wrote as a heading — `## LOOP HALT: …` —
+  # and the wrapper restarted over the top of it. Allowing an optional heading
+  # prefix keeps prose out (the journal quotes these markers mid-sentence,
+  # always behind a quote or a backtick) while seeing a real one whichever way
+  # it was written.
+  if grep -qE '^#{0,6} *LOOP COMPLETE' <<<"$state"; then
     echo "[loop] queue complete — stopping."; break
   fi
-  if grep -qE '^LOOP HALT' <<<"$state"; then
+  if grep -qE '^#{0,6} *LOOP HALT' <<<"$state"; then
     echo "[loop] halted by the agent — fix the reason in STATE.md, remove the marker, restart."; break
   fi
 
