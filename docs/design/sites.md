@@ -672,6 +672,15 @@ every other Sites object, and the tenant edits them here. Both exist on purpose
   from the published copy rather than filtered out of it by the renderer. That
   is the same construction the drafts/snapshots split uses: unreachable, not
   hidden.
+- **A photograph carries its own words (S2.12c3).** An item's picture is a
+  tenant blob (`image_blob_id`, uploaded through Drive like every other picture
+  in Sites) plus `image_alt`, what it shows. The two are one decision: the
+  store refuses a description without a picture, replacing or removing the
+  picture clears the description, and the published card falls back to the item
+  *name* when nobody has written one — never to an empty `alt`, which would
+  claim the photograph says nothing. The Base import maps no description
+  column, so it keeps a hand-written one for exactly as long as the picture is
+  unchanged and drops it when the attachment is replaced.
 - **The Base import is a seam, not a binding.** `site_catalog_import` copies a
   mapped table into the catalog once; each imported row remembers its Base
   record in `source_key`, so a second import updates what it created before

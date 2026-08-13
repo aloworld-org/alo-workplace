@@ -172,8 +172,9 @@ fn collection_snapshots() -> HashMap<String, SiteCollectionSnapshot> {
 }
 
 /// The one frozen catalog the corpus renders: two groupings, a sold-out item,
-/// an item with no price, and one that belongs to no category — every branch
-/// the section has, pinned in one golden.
+/// an item with no price, one that belongs to no category, a photograph the
+/// owner described and one nobody described yet — every branch the section
+/// has, pinned in one golden.
 fn catalog_snapshots() -> HashMap<String, SiteCatalogSnapshot> {
     let snapshot = SiteCatalogSnapshot {
         catalog_id: SiteCatalogId::new("harbour-menu"),
@@ -199,6 +200,7 @@ fn catalog_snapshots() -> HashMap<String, SiteCatalogSnapshot> {
                 price_cents: Some(350),
                 price_note: Some("per cup".to_owned()),
                 image: None,
+                image_alt: None,
                 sold_out: false,
             },
             SiteCatalogSnapshotItem {
@@ -209,6 +211,7 @@ fn catalog_snapshots() -> HashMap<String, SiteCatalogSnapshot> {
                 price_cents: Some(4_250),
                 price_note: None,
                 image: None,
+                image_alt: None,
                 sold_out: true,
             },
             SiteCatalogSnapshotItem {
@@ -219,6 +222,9 @@ fn catalog_snapshots() -> HashMap<String, SiteCatalogSnapshot> {
                 price_cents: Some(123_450),
                 price_note: None,
                 image: Some(BlobId::new("9hK3vQ2mR8pT1xWz4bC5dg")),
+                // Described by the owner: the `alt` is what the photograph
+                // shows, not the name printed under it.
+                image_alt: Some("A kraft bag of whole beans on the counter".to_owned()),
                 sold_out: false,
             },
             SiteCatalogSnapshotItem {
@@ -228,7 +234,10 @@ fn catalog_snapshots() -> HashMap<String, SiteCatalogSnapshot> {
                 description: Some("Tell us how much you drink; we work it out.".to_owned()),
                 price_cents: None,
                 price_note: None,
-                image: None,
+                // A photograph nobody described yet: the card falls back to the
+                // item name rather than publishing an empty `alt`.
+                image: Some(BlobId::new("Undescr1b3dPh0t0aaaaaa")),
+                image_alt: None,
                 sold_out: false,
             },
         ],

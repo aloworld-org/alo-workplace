@@ -9,6 +9,17 @@ contracts.
 
 ## Unreleased
 
+- **Anything you offer can now be photographed.** An item in a catalog takes a
+  picture — chosen from your computer, kept in Drive like every other image on
+  your site — and the card on the published page shows it. Beside it you say
+  what the photo shows, in a line read aloud to visitors who cannot see it;
+  until you write one, the card falls back to the item's name rather than
+  publishing a picture nobody described. Items without a photo are not
+  second-class: they still appear, with their name, price and description, and
+  the form says so instead of looking unfinished. Replacing or removing a photo
+  takes its description with it, so nothing is left describing a picture that
+  is no longer there.
+
 - **A catalog can now be put on a page, and what visitors order arrives in a
   screen made for answering it.** The section picker gains Catalog: choose
   which price list the page shows and, if you want, a single group of it — the

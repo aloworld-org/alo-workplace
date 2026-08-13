@@ -4738,3 +4738,110 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     would be the second copy of it.
 - **Next:** S2.12c3 (catalog item photo via the Drive picker), then S2.13a
   booking section model.
+
+## 2026-08-13 — S2.12c3 a photograph of what you offer, and the words for it
+
+- **Item:** S2.12c3 — the picture of one catalog item: the picker in the item
+  dialog (deferred twice, from S2.12c1 and again from S2.12c2), the published
+  card's image, its alt text and the no-photo empty state. The store, the route
+  and the renderer already carried `image_blob_id`; what they carried was a
+  picture **nobody could choose and nobody had described** — the published
+  `<img>` spelled its `alt` with the item's own name, which names the thing on
+  offer and says nothing about the photograph of it.
+- **Shipped:**
+  - **`image_alt` on the item (migration 0312, expand-only).** A nullable
+    column, `NULL` meaning *not written*, so every row and every snapshot
+    frozen before it keeps its exact published shape. Validation lives with the
+    other item rules: trimmed, capped at `SITE_CATALOG_IMAGE_ALT_MAX_CHARS`
+    (the section image cap — the same sentence in a different place), and a
+    description **without a picture is refused** by name, exactly as a price
+    note without a price is. It rides the whole-replace write like every other
+    field, and is frozen into `site_catalog_snapshots` beside the blob id.
+  - **The renderer falls back to the name, never to `alt=""`.** An undescribed
+    photograph publishes `alt="<item name>"`, which is honest and searchable;
+    an empty `alt` would claim the picture carries nothing. The golden catalog
+    now pins **both** branches — a described item and an undescribed one — and
+    the corpus-wide `every_img_carries_alt` rule still holds.
+  - **The Base import keeps what it did not write.** The import has no
+    description column and replaces items whole, so a hand-written description
+    would have been erased by the next run. `import_existing_item` now also
+    reads the row's picture and its description: same picture → the words are
+    kept; replaced or removed picture → they go with it, rather than describing
+    a photograph that is no longer there.
+  - **`imageAlt` on the wire** (`/sites/{id}/catalogs/{c}/items`, both verbs and
+    every read), beside the `imageBlobId` that was already there.
+  - **`PhotoField` in the item dialog** — upload through Drive (the file stays a
+    Drive file, like the theme logo and every section image), a preview of the
+    stored blob, replace, remove, and the description input **only** once there
+    is something to describe. Three rules are in the code:
+    - **No photo is a good answer**, so the empty state says what happens
+      without one (*an item without a photo still appears, with its name, price
+      and description*) instead of looking unfinished; it occupies the same
+      rectangle the preview will, so choosing one does not make the dialog jump.
+    - **A new picture is not the old one**: replacing or removing it clears the
+      description in the same change, which is also what keeps the form from
+      saving into a refusal.
+    - **An undescribed photo says so** — *nobody has described this photo yet;
+      until then the card falls back to the item name* — rather than leaving a
+      blank field to scroll past.
+  - **A picture that was already there is no longer dropped by an edit.** The
+    item draft did not carry `imageBlobId` at all, and the route replaces the
+    item whole: any edit of an imported item silently removed its photograph.
+    Nobody had hit it because no screen could set one; the draft now carries it
+    and a test pins it.
+  - **`useImageSource` moved out of `ImageFields.tsx`** into `imageSource.ts`.
+    The catalog dialog is its second caller, and a copy would have been a second
+    thing to fix the day the image route moves.
+  - **i18n** — 10 new keys in **en, fr and nl** (no `UNTRANSLATED` entries).
+- **Verified:** `bash scripts/prune-test-db.sh` (7 882 tenants, 88 MB — nothing
+  to prune); `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-jmap -p alo-sites --all-targets` clean (the workspace's only warning
+  stays the pre-existing `meet.rs:430` unused `guest`, the business track's
+  file); `cargo nextest run` — **2 929 tests, all passing** (`alo-store` 1 801
+  in 17 s, `alo-jmap` + `alo-sites` 1 128 in 62 s), including
+  - store (`site_catalog_tenancy`): the description trimmed and round-tripped,
+    blank stored as *not written*, over the cap refused, **refused outright
+    without a picture** with a sentence naming what is missing, and a rival
+    tenant's blob still a `NotFound` that leaves the owner's picture untouched;
+  - store (`site_catalog_tenancy`, import): a hand-written description survives
+    a re-import of the same attachment and is dropped when the attachment
+    changes;
+  - store (`site_catalog_publish`): the picture **and** its words frozen into
+    the publish snapshot;
+  - jmap (`sites_catalogs_http`, new `an_item_photograph_travels_with_the_words…`):
+    set in one write, read back trimmed on the item and in the catalog read,
+    rewritten alone, cleared together with the picture by the same whole
+    replace, and a description without a picture answered `422` naming the rule;
+  - alo-sites goldens re-blessed: a described card and an undescribed one.
+  Web: `npx tsc --noEmit`, `npx eslint` on every changed file, `npm run build`
+  all clean; `npx vitest run src/i18n src/sites` — **236 passing** (was 232),
+  the four new ones being the no-photo empty state, the Drive upload sending
+  the blob id with the words about it, an edit **keeping** the photo it already
+  had, and a removal taking the description with it.
+- **Cuts/flags:**
+  - **No curl pass this iteration, deliberately** — same reasoning as S2.12c2:
+    the item adds no route, `/sites/*` is already proxied by the production
+    Caddyfile and `web/vite.config.ts`, and the one wire change (`imageAlt`) is
+    driven through the real router over the real Postgres by the new suite.
+  - **No crop, focal point or "decorative" state on a catalog photo.** Section
+    images have all three (S2.07a–c); a card is a fixed 4∶3 `object-fit: cover`
+    tile, so a crop would be a second framing model for one rectangle, and
+    "decorative" would mean publishing `alt=""` on the only picture a card has.
+    Both are deliberate, not deferred.
+  - **No AI-drafted description here.** The section form offers one (it can see
+    the surrounding copy); a catalog item's neighbours are a price and a
+    handle, and a model that has not seen the photograph would be guessing from
+    the name — which is precisely the fallback it would be replacing.
+  - **Pre-existing, unrelated:** `npx vitest run src/i18n src/sites` reports the
+    same **4 unhandled errors** on a pristine checkout (`SiteView.tsx:131`,
+    `readiness.languages` read on an undefined readiness in tests that stub it
+    away). Not this item's; worth an item of its own.
+  - **The local gate needs `DATABASE_URL`.** `platform/alo-store/tests/common`
+    defaults to port **5433**, and this machine's `alo-pg` listens on **5432**:
+    without `DATABASE_URL=postgres://alo:alo-dev-only@localhost:5432/alo` every
+    database-touching test fails after a 30 s `PoolTimedOut` and reads like a
+    connection-pool exhaustion. Also: `cargo nextest run` for all three crates
+    in one call blew the 600 s ceiling on a cold test build — compiling with
+    `--no-run` first, then running per crate, keeps every call well inside it.
+- **Next:** S2.13a (booking section model: the availability-source binding and
+  booking-field schema over a Sites-owned seam into Agenda).

@@ -264,10 +264,13 @@ fn catalog_item(
         esc(&item.slug)
     ));
     if let Some(image) = &item.image {
+        // What the picture shows, when the owner wrote it. Without it the
+        // name is the honest fallback — it names the thing photographed, and
+        // an empty `alt` here would claim the picture carries nothing.
         out.push_str(&format!(
             "<img src=\"{}\" alt=\"{}\">\n",
             site.images.src(image.as_str()),
-            esc(&item.name)
+            esc(item.image_alt.as_deref().unwrap_or(&item.name))
         ));
     }
     out.push_str(&format!("<h4>{}</h4>\n", esc(&item.name)));
