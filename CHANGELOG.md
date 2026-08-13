@@ -9,6 +9,21 @@ contracts.
 
 ## Unreleased
 
+- **A catalog can now be put on a page, and what visitors order arrives in a
+  screen made for answering it.** The section picker gains Catalog: choose
+  which price list the page shows and, if you want, a single group of it — the
+  lunch menu, the double rooms — and the page carries an order form whenever
+  that catalog takes orders. The orders themselves get their own inbox beside
+  the contact one: the queue on the left, the order beside it with what was
+  asked for, how many, the price each and the total in the catalog's own
+  currency. Move an order between New, Confirmed, Done and Cancelled in one
+  click and in either direction — an order cancelled by mistake is confirmed
+  again rather than re-typed — filter the queue by state, and export the lot
+  as a spreadsheet, one row per ordered line so the numbers can be summed.
+  An item that carries no price is shown as on request and adds nothing to the
+  total, rather than counting as free. Deleting an order removes the customer's
+  name, phone number and request for good, so it asks once first.
+
 - **A website can now be given a catalog of what it offers, from a screen
   rather than from the database.** Sites gains a Catalog screen: create a
   price list, give it a currency, add the dishes, rooms, services or courses

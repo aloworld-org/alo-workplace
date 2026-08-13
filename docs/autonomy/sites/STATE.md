@@ -4644,3 +4644,97 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   - **No new route prefix**: `/sites/*` is already proxied by the production
     Caddyfile and by `web/vite.config.ts`. Nothing needed at the next deploy.
 - **Next:** S2.12c2, catalog section mapping + order inbox UI.
+
+## 2026-08-13 — S2.12c2 the catalog on a page, and the orders it brings back
+
+- **Item:** S2.12c2 — the catalog section in the page editor (which catalog,
+  optionally which group) and the per-site order inbox over S2.12b's
+  `/sites/{id}/orders*` routes. Until this iteration a catalog could be built
+  but never shown: `catalog` was a valid section in the store, the renderer
+  and the publish snapshot, and the only vocabulary missing it was the
+  browser's. And an order could be placed but only read with `psql`.
+- **Shipped:**
+  - **The section, end to end in the web vocabulary** — `sections.ts` gains
+    `CatalogSection` (`catalog_id`, optional `heading`, optional `category`),
+    the kind list, `sectionDrafts` (draft ⇄ wire), `sectionInfo` (name,
+    picker line, and a card summary that says *One group: breads* when the
+    section is narrowed), and a picker thumbnail. Fourteen kinds now, not
+    thirteen.
+  - **`CatalogFields` in `SectionForm.tsx`** — the form asks two questions and
+    states the two facts that surprise people. Two rules are in the code
+    because both are wrong-by-default otherwise:
+    - **A group is named by its HANDLE, and a handle belongs to its catalog.**
+      Choosing a different catalog clears `category` in the same change, so a
+      page can never publish a group handle from a catalog it no longer shows.
+      The handles come from a read of the chosen catalog rather than being
+      typed, and a stored handle whose group has since been deleted stays
+      selectable and is labelled *(no longer a group)* — silently widening the
+      section to the whole catalog would publish something nobody asked for.
+    - **Ordering is the catalog's switch, not the section's.** The form says
+      which of the two states the chosen catalog is in and where the orders
+      land, rather than offering a control that does not exist here.
+  - **`OrdersView.tsx`** — the inbox, shaped like the contact inbox next door
+    (queue left, the order beside it). Lines with quantity, price each and
+    line total; the order total; the four workflow words as a button group
+    that moves in **both** directions; a state filter carrying its own counts;
+    CSV export through the server's own renderer; and delete, armed once, with
+    the sentence saying what goes with it. Two honesty rules: an item quoted by
+    hand shows *On request* and adds nothing to the total (never zero), and
+    every figure is formatted from the server's minor units — the browser does
+    no money arithmetic.
+  - **`currencyExponent` on the order wire (jmap)** — `order_json` now sends
+    it beside the currency, exactly as a catalog does. Without it the screen
+    would have had to guess how many decimals a currency has; a yen order
+    would have been shown a hundredfold wrong. The store already owns the ISO
+    4217 exception table (`currency_exponent`), and it stays the only copy.
+  - **A refusal that names the four words (store)** — `SiteOrderStatus::parse`
+    answered `posted is not an order status`, which is shown to the owner
+    verbatim and left them guessing what would have been right. It now names
+    new, confirmed, fulfilled and cancelled, like the availability refusal
+    next door.
+  - **i18n** — 45 new keys in **en, fr and nl** (no `UNTRANSLATED` entries).
+- **Verified:** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+  alo-jmap --all-targets` clean (the workspace's only warning stays the
+  pre-existing `meet.rs:430` unused `guest`, the business track's file);
+  `cargo nextest run -p alo-store -p alo-jmap` — **2 790 tests, all passing**
+  (63 s), including the new `tests/sites_orders_http.rs` (four): the whole
+  owner arc over the real router — a site published with an orderable catalog,
+  two orders written by the **anonymous public door**, the inbox reading them
+  newest-first with `currencyExponent: 2`, a total of 1 350 for 3 × 450 with
+  the unpriced line adding nothing, all four status transitions in both
+  directions, a non-status refused as `422` naming the four words, a
+  wrong-shaped body as `400`, and a delete that takes the lines with it and
+  `404`s the second time; the export as one row per line with the right
+  filename, `no-store`, and a note beginning `=` neutralised; `401` on all
+  four verbs with the owner's row untouched after; and a **rival tenant**
+  `404`ing on list, export, status and delete with the owner's order, status,
+  total and lines unchanged.
+  Web: `npx tsc --noEmit`, `npx eslint` on every changed file, `npm run build`
+  all clean; `npx vitest run src/i18n src/sites` — **232 tests passing**,
+  including the new `Orders.test.tsx` (10: the empty state that says where
+  orders come from; lines, total and the on-request line; the workflow moving
+  new → confirmed → cancelled → confirmed; the server's refusal sentence shown
+  as-is; delete asking once and saying what goes; the export saved as
+  `orders-<subdomain>.csv`; the filter counts; and for the section — the
+  no-catalog empty state, the handle actually saved, and the handle **dropped**
+  when the catalog changes).
+- **Cuts/flags:**
+  - **No curl pass this iteration, deliberately.** The item adds no HTTP
+    route: `/sites/{id}/orders*` already existed and `/sites/*` is already
+    proxied by the production Caddyfile and `web/vite.config.ts`. The one wire
+    change (`currencyExponent`) and the whole arc — publish → public order →
+    owner inbox → status → export → delete — are driven through the real
+    router over the real Postgres by the new suite, which is the same wire.
+  - **The item photo is still not in the Catalog dialog.** S2.12c1 folded the
+    Drive picker into this item; it did not fit beside the section vocabulary
+    and the inbox at full depth. The route accepts `imageBlobId` and the
+    renderer publishes it, so nothing is blocked — the picker is a UI gap, now
+    listed as **S2.12c3** rather than left in a journal entry.
+  - **No drag-reorder of catalog items** — unchanged from S2.12c1, still a
+    natural sibling of S3.01b.
+  - **The order inbox has no notification badge.** An order already sends the
+    owner an internal message (S2.12b), so nothing is silent; a count on the
+    rail entry is a shell-wide pattern nobody has yet, and inventing one here
+    would be the second copy of it.
+- **Next:** S2.12c3 (catalog item photo via the Drive picker), then S2.13a
+  booking section model.
