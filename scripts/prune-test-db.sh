@@ -31,17 +31,34 @@ CONTAINER="${ALO_PG_CONTAINER:-alo-pg}"
 KEEP_EMAILS="'disan@alomails.com','admin@alomails.com'"
 BATCH=5000
 
-psql_q() { docker exec "$CONTAINER" psql -U alo -d alo -t -c "$1" 2>/dev/null | tr -d ' '; }
+# Errors are NOT swallowed. The first version of this script sent stderr to
+# /dev/null, so when the delete failed it printed an empty string, the caller
+# read that as "nothing to prune", and the script reported success while doing
+# nothing for hours. A maintenance script that cannot fail loudly is worse than
+# no maintenance script.
+psql_q() { docker exec "$CONTAINER" psql -U alo -d alo -t -v ON_ERROR_STOP=1 -c "$1" | tr -d ' '; }
+
+# The prunable set: old enough that no running suite can still be using it, and
+# not one of the bootstrap accounts the local backend signs in as.
+PRUNABLE="created_at < now() - make_interval(hours => $HOURS)
+          AND id NOT IN (SELECT tenant_id FROM users WHERE email IN ($KEEP_EMAILS))"
 
 before=$(psql_q "select count(*) from tenants;")
 echo "tenants before: ${before:-unknown}"
 
+# `bank_matches` holds ON DELETE RESTRICT foreign keys to `billing_payments`
+# and `fin_entries`, so deleting a tenant that ever reconciled a bank line
+# fails on the constraint. That is a real defect in the erasure path — queued
+# as B7.02, because `delete_tenant` is what a GDPR request runs — and until it
+# is fixed the matches must be cleared first or nothing here can proceed.
+# Remove this block when B7.02 lands; the delete below should stand alone.
+cleared=$(psql_q "DELETE FROM bank_matches WHERE tenant_id IN
+                    (SELECT id FROM tenants WHERE $PRUNABLE);" | grep -oE '[0-9]+$' || echo 0)
+[ "${cleared:-0}" -gt 0 ] && echo "  cleared $cleared bank_matches (B7.02 workaround)"
+
 while :; do
   deleted=$(psql_q "DELETE FROM tenants WHERE id IN (
-      SELECT id FROM tenants
-      WHERE created_at < now() - make_interval(hours => $HOURS)
-        AND id NOT IN (SELECT tenant_id FROM users WHERE email IN ($KEEP_EMAILS))
-      LIMIT $BATCH);" | grep -oE '[0-9]+$' || echo 0)
+      SELECT id FROM tenants WHERE $PRUNABLE LIMIT $BATCH);" | grep -oE '[0-9]+$' || echo 0)
   [ "${deleted:-0}" -eq 0 ] && break
   echo "  pruned $deleted"
 done
