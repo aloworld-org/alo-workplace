@@ -4,12 +4,27 @@ Forty-three stylesheets still declare a primitive that `ds/` should own, and
 `web/src/ds/primitives.test.ts` names every one of them. This queue empties
 that list.
 
-**Read `docs/decisions/0045-design-system-owns-the-primitives.md` first.** The
-short version: token discipline here is excellent — 7,422 `var(--token)`
-references against 108 hard-coded colours — so the values were never the
-problem. What was missing is the layer above them, and CSS Modules made the
-duplication invisible rather than caused it. Do not "improve" this by reaching
-for Tailwind or a rewrite; that argument is settled in the ADR.
+**Read ADR 0045 and then ADR 0046 — in that order, because the second changes
+half of the first.**
+
+0045 diagnosed the failure: token discipline here is excellent — 7,422
+`var(--token)` references against 108 hard-coded colours — so the values were
+never the problem. What was missing is the layer above them, and CSS Modules
+made the duplication invisible rather than caused it. **That diagnosis stands,
+and it is why this queue exists**: a utility class string composes no better
+than a stylesheet, so `ds/` still owns the primitives and
+`primitives.test.ts` still enforces it.
+
+0046 (2026-08-13, owner decision) changed the styling mechanism underneath:
+**styles are now Tailwind utilities**, generated from these same tokens by
+`web/scripts/gen-tailwind-theme.mjs`, so `--bg-surface` and `bg-surface` are
+one definition with two spellings. 0045's paragraph rejecting Tailwind no
+longer applies; its composition argument still does.
+
+For this queue that means: **no new `.module.css` file is created**, the
+primitives are restyled to Tailwind first (wave D1.5), and every module
+migration after that adopts components which are already Tailwind — so a
+migration deletes a stylesheet instead of trading one for another.
 
 ## The loop for every migration item
 
@@ -54,6 +69,58 @@ trap.
 - [x] D1.04 `Toolbar` — eleven copies. The row of controls above a list or an editor; the interesting part is how it wraps at narrow widths.
 - [x] D1.05 `Select` — seven copies. A native `<select>` styled to match `Input`, not a bespoke listbox; a custom one is a large accessibility liability for no gain here.
 - [x] D1.06 `Toggle` — seven copies. A checkbox that looks like a switch, with the label bound and the state announced. Shipped as `Toggle` **and** `Checkbox`: only two of the seven drew a switch, four drew a checkbox row under the same name.
+
+## Restyle the primitives to Tailwind first (wave D1.5)
+
+ADR 0046 made Tailwind the styling mechanism. These come **before** the
+remaining module migrations for one reason: every migration below adopts these
+components, so converting them first means each migration deletes a stylesheet
+rather than adopting a component that still carries one. Doing it the other way
+round would migrate eleven areas onto CSS-Modules primitives and then restyle
+underneath them, touching every area twice.
+
+**What must not change:** the component's props, its behaviour, and its tests.
+The accessibility work in these — focus traps, arrow-key movement, ARIA names,
+the label bound to its control — was the expensive part and is untouched by a
+styling change. A restyle that edits a test has changed behaviour and is wrong;
+if a test genuinely must change, say why in the commit message.
+
+**What changes:** the component's `.module.css` is deleted and its classes
+become utilities from the generated theme. Use semantic utilities only
+(`bg-surface`, `text-primary`, `border-subtle`) — the raw scale is deliberately
+not exposed, and an arbitrary value (`bg-[#e76f51]`) is a defect, not a
+shortcut. Where a component needs a value the theme lacks, add the token to
+`ds/tokens.css` and re-run `node scripts/gen-tailwind-theme.mjs`; never inline
+the literal.
+
+**Verify by looking**, as everywhere else in this queue: one screenshot per
+item, opened and read, plus `npx vitest run src` green and
+`node scripts/gen-tailwind-theme.mjs --check` passing.
+
+- [ ] D1.51 Restyle the **form** primitives — `Input`, `Field`, `Select`,
+  `Checkbox`, `Toggle`. The set a form is built from, and the one where a
+  visual regression is most obvious. Done when: their `.module.css` files are
+  gone, `Select.test.tsx` and `Toggle.test.tsx` are unedited and green, and a
+  screenshot of a real form (Billing customer dialog) is read and reported.
+- [ ] D1.52 Restyle the **container** primitives — `Card`, `Modal`, `Dialog`.
+  Overlay, elevation and focus trap are behaviour; only the surface, padding
+  and radius are style. Done when: `Modal.test.tsx` is unedited and green and a
+  screenshot of an open dialog shows the same elevation and scrim as before.
+- [ ] D1.53 Restyle the **data** primitives — `Table`, `Toolbar`. Zebra rows,
+  header weight, alignment and the empty state; the keyboard movement in
+  `Toolbar` is behaviour and stays. Done when: `Table.test.tsx` and
+  `Toolbar.test.tsx` are unedited and green, and a dense screen (Inventory
+  stock by location) is screenshotted and read.
+- [ ] D1.54 Restyle the **small** primitives — `Button`, `IconButton`, `Badge`,
+  `Chip`, `Avatar`, `Spinner`, `Menu`, `DatePicker`, `ResizeHandle`. Several
+  are a handful of rules each; keep them one commit so the shared button
+  proportions are reconciled once. Done when: `Chip.test.tsx` is unedited and
+  green, no `.module.css` remains under `ds/`, and a screenshot of the shell
+  (rail, header, a menu open) is read.
+- [ ] D1.55 Wave check: `ds/` declares no `.module.css` at all; the generated
+  theme is current (`--check`); `rg "\[#" web/src/ds` finds no arbitrary
+  values; `npm run build` clean; and one screenshot each of a form, a dialog
+  and a table sit in the journal with what was looked at written down.
 
 ## Migrate, area by area
 
