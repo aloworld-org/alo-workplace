@@ -895,3 +895,10 @@ the vendor CSS (katex, BlockNote, Collabora) separated out.
 system has no multi-line text control.
 
 **Next:** D2.05, migrate admin, agenda and auth in one commit.
+
+**A trailer the harness did not append.** D2.04's commit (8c0dc8c) has no
+`Co-Authored-By: Claude …` line. CLAUDE.md says the harness adds it; in this
+environment it does not, and the omission was only visible after the push — by
+which point fixing it would mean rewriting pushed history, which the hard
+safety rails forbid outright. Later iterations: type the trailer into the
+commit message yourself rather than trusting it to be added.
