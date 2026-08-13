@@ -50,8 +50,12 @@ const ProjectsModule = lazy(() => import("../projects").then((m) => ({ default: 
 const SitesModule = lazy(() => import("../sites").then((m) => ({ default: m.SitesModule })));
 const ControlConsole = lazy(() => import("../control").then((m) => ({ default: m.ControlConsole })));
 
+function ModuleLoading() {
+  return <div className="flex h-full min-h-0 flex-1" aria-label={strings.chatLoading} role="status"><aside className="w-96 shrink-0 border-r border-subtle bg-surface p-6"><span className="mb-8 block h-8 w-24 animate-pulse rounded-md bg-raised" /><span className="mb-4 block h-11 animate-pulse rounded-lg bg-raised" /><span className="mb-3 block h-12 animate-pulse rounded-lg bg-raised" /><span className="block h-12 animate-pulse rounded-lg bg-raised" /></aside><main className="flex flex-1 items-center justify-center bg-surface"><span className="text-sm text-tertiary">{strings.chatLoading}</span></main></div>;
+}
+
 const deferred = (Component: ComponentType) => () => (
-  <Suspense fallback={null}>
+  <Suspense fallback={<ModuleLoading />}>
     <Component />
   </Suspense>
 );
