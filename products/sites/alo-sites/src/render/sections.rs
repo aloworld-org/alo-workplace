@@ -7,6 +7,7 @@
 //! All text goes through [`esc`], every link target through [`safe_href`].
 
 use alo_store::site_custom_code::CustomCodeSection;
+use alo_store::site_layout::GridColumns;
 use alo_store::site_model::{
     BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqSection,
     FeaturesSection, FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection,
@@ -111,6 +112,23 @@ impl Marks {
 /// property of the renderer rather than of sixteen remembered call sites.
 pub(super) fn open_section(out: &mut String, tag: &str, class: &str, m: Marks) {
     out.push_str(&format!("<{tag} class=\"{class}\"{}>\n", m.block()));
+}
+
+/// The section's classes with its chosen layout appended — the one place a
+/// resize (ADR 0042, S3.01c) becomes markup. An unset choice appends nothing,
+/// so a page stored before the schema gained the property renders exactly the
+/// bytes it always did, and the stylesheet's own default is what a section
+/// without a class gets.
+fn with_layout(base: &str, layout: Option<&'static str>) -> String {
+    match layout {
+        Some(class) => format!("{base} {class}"),
+        None => base.to_owned(),
+    }
+}
+
+/// The class for a card grid's chosen column count.
+fn columns_class(columns: Option<GridColumns>) -> Option<&'static str> {
+    columns.map(GridColumns::class)
 }
 
 /// A `nav` section, rendered as a `<header>` landmark. The brand link shows
@@ -673,7 +691,12 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
 }
 
 fn features(out: &mut String, s: &FeaturesSection, m: Marks) {
-    open_section(out, "section", "s-features", m);
+    open_section(
+        out,
+        "section",
+        &with_layout("s-features", columns_class(s.columns)),
+        m,
+    );
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(intro) = &s.intro {
         out.push_str(&format!(
@@ -700,7 +723,15 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
         ImageSide::Left => "image-left",
         ImageSide::Right => "image-right",
     };
-    open_section(out, "section", &format!("s-text-image {side}"), m);
+    open_section(
+        out,
+        "section",
+        &with_layout(
+            &format!("s-text-image {side}"),
+            s.split.map(alo_store::site_layout::ColumnSplit::class),
+        ),
+        m,
+    );
     push_figure(out, site, &s.image, ImageSlot::Half);
     out.push_str("<div class=\"text\">\n");
     push_opt_heading(out, s.heading.as_deref(), m);
@@ -709,7 +740,12 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
 }
 
 fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m: Marks) {
-    open_section(out, "section", "s-gallery", m);
+    open_section(
+        out,
+        "section",
+        &with_layout("s-gallery", columns_class(s.columns)),
+        m,
+    );
     push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul class=\"grid\">\n");
     for image in &s.images {
@@ -799,7 +835,12 @@ fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
 }
 
 fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Marks) {
-    open_section(out, "section", "s-team", m);
+    open_section(
+        out,
+        "section",
+        &with_layout("s-team", columns_class(s.columns)),
+        m,
+    );
     push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul class=\"grid\">\n");
     for (i, member) in s.members.iter().enumerate() {
@@ -940,7 +981,14 @@ fn push_link(out: &mut String, link: &Link, class: &str) {
 /// bytes inline and offers neither attribute.
 fn push_figure(out: &mut String, site: &SiteRenderContext<'_>, image: &SiteImage, slot: ImageSlot) {
     let (src, srcset) = site.images.figure_src(image);
-    out.push_str(&format!("<figure><img src=\"{src}\""));
+    match image
+        .shape
+        .and_then(alo_store::site_layout::ImageShape::class)
+    {
+        Some(shape) => out.push_str(&format!("<figure class=\"{shape}\">")),
+        None => out.push_str("<figure>"),
+    }
+    out.push_str(&format!("<img src=\"{src}\""));
     if let Some(srcset) = srcset {
         out.push_str(&format!(" srcset=\"{srcset}\" sizes=\"{}\"", slot.sizes()));
     }

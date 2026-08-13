@@ -802,6 +802,59 @@ A move is a step in the same undo history as a text edit
 through the same door, so ⌘Z covers both gestures in the order they
 happened.
 
+### Resizing a section within its constraints (S3.01c, ADR 0042)
+
+The third gesture, and the one that decides whether the editor stays an
+editor or becomes a canvas. ADR 0042 allows "resize within the section's
+own constraints" — so the constraints are **written down as data**, in
+`alo_store::site_layout`, and everything else reads them:
+
+- **The vocabulary is words, never numbers.** `ColumnSplit`
+  (`wide_image | half | wide_text`), `GridColumns` (`two | three |
+  four`) and `ImageShape` (`natural | wide | square | tall`) are serde
+  enums stored on the sections that offer them — `text_image.split`,
+  `features/gallery/team.columns`, `SiteImage.shape`. A percentage, a
+  pixel count or a fraction is not a value the schema can hold, so "no
+  gesture can produce free positioning" is a property of the type, not a
+  rule an editor is trusted to keep (`site_layout.rs`,
+  `a_free_value_is_not_expressible`).
+- **One declaration, served.** `layout_controls(kind)` names, per
+  section type, each resizable property, the JSON pointer it lives at,
+  its values *in order* and what an absent value means. `GET
+  /sites/config` publishes it as `sectionLayouts`; the editor renders one
+  choice per declared value and can therefore offer nothing else. It is
+  served rather than mirrored in TypeScript so the declaration and the
+  validation cannot drift apart.
+- **A resize is a `set_prop`.** The same operation an approved AI
+  proposal carries, through the same `PUT …/ai-edits` door, recorded as
+  one step in the same undo history (`kind:"layout"`, inverted by
+  swapping its two declared values). No resize endpoint exists, because a
+  second door would be a second thing to get wrong.
+- **The gesture on the page carries a direction.**
+  `Alt`+`ArrowLeft`/`ArrowRight` on the focused section posts
+  `{alo:"site-section-layout", index, step}` with `step` ∈ {-1, +1}. The
+  preview document is never told what the values *are*, so nothing
+  running inside it can name a ratio; the app resolves the direction
+  against the declaration and the section it is holding. The visible
+  choices live beside the section in the stack, in the language of the
+  person editing.
+- **Absent renders as it always did.** Every property is optional and
+  every `None` emits no class, so a page nobody has resized is
+  byte-identical to the page it was before this schema gained them
+  (`an_unset_layout_adds_nothing_to_the_page`).
+- **The choice is a ceiling, not a promise.** The stylesheet gives a
+  phone one column and a tablet at most two whatever was chosen.
+  `layout_responsive.rs` resolves the generated sheet at 360, 768 and
+  1280 px for every declared choice and pins the resulting column counts
+  and track lists as a golden — mobile stays good by construction, and
+  the proof is a test rather than an intention.
+
+What was deliberately left out: a pointer drag on a splitter. The edit
+stylesheet is layout-neutral by construction (above), a handle would need
+`position`, and HTML5 drag does not fire on phones — the choice row and
+the keyboard step cover both without a preview that lays the page out
+differently from the published one.
+
 ### The template catalog (S2.11a)
 
 The manual sibling of generation, and the path a tenant without a

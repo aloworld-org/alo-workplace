@@ -221,6 +221,21 @@ pub(super) const EDIT_STYLE: &str = r#"<style>[data-alo-text]{outline:1px dashed
 ///   focused section itself (each is `tabindex="0"`). It is the same message
 ///   and therefore the same operation — there is no keyboard-only path to
 ///   drift.
+///
+/// # Resizing a section (S3.01c)
+///
+/// `Alt+ArrowLeft`/`Alt+ArrowRight` on the focused section steps its first
+/// declared layout property — a two-column split between its allowed ratios,
+/// a grid between its allowed column counts (`alo_store::site_layout`).
+///
+/// **What travels is a direction, never a size.**
+/// `{alo:"site-section-layout",index,step}` where `step` is -1 or +1: this
+/// document is never told what the values *are*, so no gesture inside it —
+/// and no script that ever got into it — can name a ratio, a percentage or a
+/// pixel. The editor resolves the direction against the server's declaration
+/// and the section it is holding, which is where "the editor offers only the
+/// declared values" is actually enforced (ADR 0042). The visible choices live
+/// in the app beside the section, in the language of the person editing.
 /// - **The words come from the app, not from here.** A section's accessible
 ///   name is posted in by the editor (`{alo:"site-edit-chrome",labels,focus}`)
 ///   because it is *editor* chrome: it must be in the language of the person
@@ -328,6 +343,13 @@ pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
       } else if (event.key === "ArrowDown" && position < list.length - 1) {
         event.preventDefault();
         ask(node, neighbour(list, position + 2));
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        parent.postMessage({
+          alo: "site-section-layout",
+          index: at(node),
+          step: event.key === "ArrowLeft" ? -1 : 1
+        }, "*");
       }
     });
   });

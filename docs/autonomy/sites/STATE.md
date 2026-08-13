@@ -6786,3 +6786,131 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S3.01c (constrained resize: each section type declares its allowed
   ratios and shapes, responsive goldens at phone/tablet/desktop, and a test
   that no gesture can produce free positioning).
+
+## 2026-08-13 — S3.01c the sizes a section has, and nothing between them
+
+- **Item:** S3.01c — each section type declares its allowed ratios and shapes,
+  the editor offers only those, responsive goldens at phone/tablet/desktop, and
+  a test that no gesture can produce free positioning (ADR 0042).
+- **Shipped:** the third gesture on the page, and the boundary that keeps it
+  from becoming a canvas. `platform/alo-store/src/site_layout.rs` is the new
+  module: three serde enums — `ColumnSplit` (`wide_image|half|wide_text`),
+  `GridColumns` (`two|three|four`), `ImageShape` (`natural|wide|square|tall`) —
+  stored on `text_image.split`, `features/gallery/team.columns` and
+  `SiteImage.shape`, all optional, all absent by default. **The vocabulary is
+  words, never numbers**, so a percentage or a pixel is not a value the schema
+  can hold; `a_free_value_is_not_expressible` applies `0.37`, `37`, `"37%"`,
+  `"1.5fr"`, `"half "` and an object to every declared pointer of every
+  resizable type and asserts the envelope refuses each one. That is the item's
+  "no gesture can produce free positioning" test, and it is a property of the
+  type rather than a rule an editor is trusted to keep.
+- **One declaration, served rather than mirrored.** `layout_controls(kind)`
+  names per section type each resizable property, its JSON pointer, its values
+  *in order* and its default; `GET /sites/config` publishes it as
+  `sectionLayouts` (additive field on an existing route — no new prefix, no
+  Caddy change). The editor renders one button per served value and therefore
+  cannot offer a value the store would refuse. A TypeScript mirror was
+  rejected: two spellings of one vocabulary is exactly the drift this item is
+  supposed to prevent.
+- **A resize is a `set_prop`.** Through the same `PUT …/ai-edits` door inline
+  text uses, recorded as one step in the same undo history (`kind:"layout"`,
+  inverted by swapping its two declared values). No resize endpoint exists.
+- **The gesture on the page carries a direction, never a size.**
+  `Alt`+`ArrowLeft`/`ArrowRight` on the focused section posts
+  `{alo:"site-section-layout", index, step}` with `step` ∈ {-1,+1}. The preview
+  document is never told what the values *are* — so nothing running inside it,
+  hostile or not, can name a ratio — and the app resolves the direction against
+  the declaration in `web/src/sites/sectionLayout.ts`. Stepping stops at both
+  ends rather than wrapping. The visible choices are a radio row under each
+  section in the stack (`SectionLayoutControls.tsx`), in the editor's language.
+- **Responsive goldens, resolved rather than eyeballed.**
+  `products/sites/alo-sites/tests/layout_responsive.rs` carries a small reader
+  for the shapes this sheet actually uses (compound class selectors, one level
+  of descendant, `@media (min|max-width)`), resolves `grid-template-columns`
+  for every declared choice at 360/768/1280 px and pins the column counts and
+  track lists as `tests/golden/layout-responsive.txt`. Two assertions beyond
+  the golden: **a phone always gets one column** whatever was chosen, and no
+  section ever renders more columns than were asked for. A trap worth
+  recording: a `/* comment */` immediately before an `@media` makes a naive
+  reader treat the whole block as unconditioned — which *hides* a broken
+  breakpoint instead of showing one. Comments are stripped first.
+- **Absent renders as it always did.** No choice made emits no class, so every
+  published site's bytes are unchanged (`an_unset_layout_adds_nothing_to_the_page`);
+  and `sectionDrafts.ts` now carries `split`/`columns`/`shape` through the prop
+  form, which would otherwise have silently erased a resize on the next save.
+- **Verified:** `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-sites -p
+  alo-jmap --all-targets` clean; `rustfmt --edition 2024` on the ten changed
+  Rust files. `cargo nextest run -p alo-sites` → **152 green** (16.3 s),
+  including the three new `layout_responsive` tests and the re-blessed
+  `site.css` golden. `cargo test -p alo-store --lib` → **1 236 green** (0.95 s,
+  the 7 new `site_layout` tests among them), plus `--test site_sections` (6),
+  `--test site_image_presentation` (2), `--test site_templates` (4). alo-jmap:
+  `--test sites_http` → **26 green** (the new wire test among them),
+  `site_section_move` 4, `site_inline_text` 5, `sites_final_arc` 1,
+  `sites_generate_http` 7. Web: `npx tsc --noEmit` clean, `npx eslint` on the
+  changed files clean, `npm run build` clean, `npx vitest run src/sites` →
+  **320 green in 26 files** (14 new), i18n parity 65 green with the sixteen new
+  strings in en/fr/nl. Test database pruned before the gate (1 665 → 1 006
+  tenants, 83 MB).
+- **Gate finding, for the next iteration — two of them, both expensive:**
+  1. **`pkill -f "[c]argo nextest"` does not match `cargo nextest`.** The
+     process is `cargo-nextest nextest run …` — one word, with a hyphen — so
+     the pattern with a space matches nothing and the run survives. One did:
+     it held `target/debug/.cargo-lock` for **59 minutes** while every
+     subsequent cargo command sat waiting for the lock with no output, which
+     looked exactly like a hung test suite and cost most of an hour. Kill it by
+     pid, and verify with `pgrep -fl nextest` (no character class needed once
+     the pattern is right) before concluding anything about a slow gate.
+  2. **On this Mac, the FIRST execution of a freshly linked test binary costs
+     one to two minutes of `syspolicyd` scanning** — the debug binaries are
+     30 MB (`alo-store` lib) to 157 MB (`sites_http`), and Gatekeeper reads
+     each one whole before it runs. Warm, the same binaries run in ~1 s. This
+     makes `cargo nextest run -p alo-store` unusable after any change to the
+     crate: nextest *lists* all ~185 binaries before filtering, so the listing
+     phase alone pays the scan 185 times (>1 hour) — the `-E` filter does not
+     help, because the filter is applied after the listing. What works is
+     naming the binaries: `cargo test -p <crate> --lib` and `--test <name>`,
+     which touches only what is asked for. The suites above were chosen that
+     way — the lib (where both changed modules live) plus every binary a
+     section-schema or renderer change can reach; the remaining ~160
+     `alo-store` binaries (billing, crm, mail, drive) cannot see an optional
+     field on a sections envelope.
+- **Wire transcript**
+  ```
+  GET  /sites/config                                               → 200
+       sectionLayouts.text_image[0] = split /split
+         ["wide_image","half","wide_text"] default "half"
+       sectionLayouts.gallery[0]    = columns ["two","three","four"]
+       sectionLayouts.faq           = absent (nothing to resize)
+  GET  /sites/config          (no token)                           → 401
+  PUT  /sites/{id}/pages/{pid}/sections   text_image + gallery     → 200
+       stored envelope carries no "split" (nothing written until asked)
+  PUT  /sites/{id}/pages/{pid}/ai-edits   set_prop /split wide_text→ 200
+       stored: split = "wide_text"
+  GET  /sites/{id}/pages/{pid}/preview                             → 200
+       contains class="s-text-image image-left split-wide-text"
+       contains site-section-layout
+  PUT  … ai-edits  set_prop /split "37%" | 0.37 | 37 | "1.5fr"     → 422 ×4
+  PUT  … ai-edits  set_prop /split "four"                          → 422
+  PUT  … ai-edits  set_prop /columns two   (gallery)               → 200
+       stored: both choices kept
+  PUT  … ai-edits                          other tenant            → 404
+  ```
+- **Cuts (recorded, not smuggled):**
+  - **No pointer drag on a splitter.** The editing stylesheet is
+    layout-neutral by construction (S3.01b) — a handle needs `position`, which
+    would make a section the containing block of any absolutely positioned
+    descendant and lay the draft out differently from the published page — and
+    HTML5 drag does not fire on phones anyway. The choice row (pointer) and the
+    keyboard step (Alt+←/→) cover both without a preview that lies.
+  - **The keyboard step walks the section's FIRST declared control.** On a
+    `text_image` that is the split; its image's shape is chosen in the stack.
+    A second modifier for the second control is a gesture nobody asked for.
+  - **Gallery images have no per-image shape**, because a static declaration
+    cannot name `/images/{i}/shape`; only the sections with exactly one image
+    (hero, text_image) declare a shape. An indexed control is its own item.
+  - **The AI generation prompt was not taught the new props.** The edit path
+    already reaches them through `set_prop`; teaching generation to choose a
+    layout is a prompt change with its own fixtures.
+- **Next:** S3.01d (section palette: drag a new section in, previewed with the
+  tenant's own content rather than lorem ipsum; keyboard path and goldens).

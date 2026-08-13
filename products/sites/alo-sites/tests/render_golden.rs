@@ -59,12 +59,14 @@ fn full_sections() -> Vec<Section> {
                 body: "Your batch goes in the drum after you order.".to_owned(),
                 icon: Some("flame".to_owned()),
             }],
+            columns: None,
         }),
         Section::TextImage(TextImageSection {
             heading: Some("The roastery".to_owned()),
             body: "A 1962 Probat drum, rebuilt by hand.".to_owned(),
             image: image.clone(),
             image_side: ImageSide::Left,
+            split: None,
         }),
         Section::Gallery(GallerySection {
             heading: Some("Inside the roastery".to_owned()),
@@ -72,6 +74,7 @@ fn full_sections() -> Vec<Section> {
             // spells in a `srcset`, and that its `src` fallback is the framed
             // derivative rather than the unframed original.
             images: vec![image.clone(), cropped_image()],
+            columns: None,
         }),
         Section::Testimonials(TestimonialsSection {
             heading: Some("What cafés say".to_owned()),
@@ -102,6 +105,7 @@ fn full_sections() -> Vec<Section> {
                 photo: Some(image.clone()),
                 bio: Some("Twenty years at the drum.".to_owned()),
             }],
+            columns: None,
         }),
         Section::Faq(FaqSection {
             heading: Some("Questions".to_owned()),

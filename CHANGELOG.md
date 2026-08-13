@@ -10,6 +10,18 @@ contracts.
 
 ## Unreleased
 
+- **Website sections can now change shape, within the shapes they have.** A
+  text-and-image section moves between a wider image, equal halves and wider
+  text; a features, gallery or team section shows two, three or four cards
+  across on a wide screen; an image can be shown as uploaded, wide, square or
+  tall. Pick a size under the section in the list, or move through the preview
+  to a section and hold Alt with the left or right arrow. Whatever you choose,
+  a phone still shows one column and a tablet at most two — the choice is a
+  ceiling for big screens, not something that can break the page on a small
+  one. It is the same kind of change the assistant makes, so it shows up the
+  same way and Undo (⌘Z / Ctrl+Z) takes it back like any other. Websites you
+  have never resized look exactly as they did.
+
 - **Website sections are now moved by dragging them on the page.** Pick a
   section up in the preview and the page rearranges as you drag, so you see the
   new order rather than imagining it from a list. With the keyboard, move

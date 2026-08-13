@@ -512,6 +512,32 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   .s-text-image.image-right figure { order: 2; }
 }
 
+/* Constrained resize (ADR 0042): the ratios and shapes a section declares in
+   `alo_store::site_layout`, and nothing between them. Every rule here is a
+   ceiling rather than a promise — a phone gets one column and a tablet at
+   most two whatever was chosen, which is what keeps mobile good by
+   construction on a page somebody has resized. */
+@media (min-width: 48rem) {
+  .s-text-image.split-wide-image.image-left,
+  .s-text-image.split-wide-text.image-right { grid-template-columns: 3fr 2fr; }
+  .s-text-image.split-wide-image.image-right,
+  .s-text-image.split-wide-text.image-left { grid-template-columns: 2fr 3fr; }
+  .s-text-image.split-half { grid-template-columns: 1fr 1fr; }
+  .cols-2 .grid,
+  .cols-3 .grid,
+  .cols-4 .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 70rem) {
+  .cols-3 .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cols-4 .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+figure.shape-wide img,
+figure.shape-square img,
+figure.shape-tall img { width: 100%; object-fit: cover; }
+figure.shape-wide img { aspect-ratio: 16 / 9; }
+figure.shape-square img { aspect-ratio: 1 / 1; }
+figure.shape-tall img { aspect-ratio: 3 / 4; }
+
 /* Testimonials. */
 .s-testimonials ul {
   list-style: none;
