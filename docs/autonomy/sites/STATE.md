@@ -5668,3 +5668,151 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   checkout handoff, progress/recovery, automatic Sites DNS/domain attachment
   where configured — and, per the cut above, the routes and the registration
   worker underneath it).
+
+## 2026-08-13 — S2.15c1 the domain buy API
+
+- **Item:** S2.15c1 (the `/sites/domain-*` price surface and the
+  `/sites/{id}/domain-purchases*` routes over S2.15b's state machine). Split
+  from S2.15c on arrival: that item asked for the routes, the registration
+  worker *and* the screen — three items' worth, and S2.15b's journal had
+  already said so. The queue now carries S2.15c1 (this), S2.15c2 (payment
+  handoff + registration worker) and S2.15c3 (the UI).
+- **Shipped:**
+  - **`products/mail/alo-jmap/src/sites_domain_purchases.rs`** — seven routes:
+    `GET /sites/domain-catalog` (the endings sold, both prices on each, plus
+    who the reseller is and whether its calls spend money), `GET
+    /sites/domain-search?q=&tlds=`, `GET`/`POST
+    /sites/{id}/domain-purchases`, `GET …/{purchase}`, `GET
+    …/{purchase}/registrant`, `POST …/{purchase}/approve`, `POST
+    …/{purchase}/cancel`. A module of its own rather than more of `sites.rs`:
+    those routes attach a name the tenant already owns, these spend money to
+    acquire one.
+  - **The price is never posted.** A create request names a domain and a term
+    and carries no number at all; what it costs is asked of the registrar in
+    that same request and stored from that answer. The wire check below posts
+    `"firstTermCents": 1` beside a two-year `.com` and the row reads 2 416 —
+    the seller's 1 208 × 2.
+  - **Approval echoes the six numbers that were on screen**, and the store
+    refuses any disagreement. A tampered *renewal* price is refused as loudly
+    as a tampered first term, which is the point: that is the half a bait price
+    hides in.
+  - **Buying is the site owner's, not the site editor's.** The whole surface is
+    behind `require_site_manager` (now `pub(crate)` with the reason written on
+    it) — a site-editor collaborator (S2.03a) may write the website and may
+    neither spend the tenant's money nor read a registrant's home address. Six
+    verbs, all `403` for a colleague who did not create the site.
+  - **`SiteDomainCommerce`** — the registrar and the nameservers as one
+    injectable router boundary (`app_with_site_boundaries`, beside the existing
+    TXT-lookup injection). A struct rather than two extensions so a test builds
+    one value and reads no environment: process-wide environment mutation is
+    not something a suite can do safely across threads. `from_env` reads
+    `SITE_REGISTRAR` (only `fixture` is recognised) and `SITE_NAMESERVERS`;
+    the default is `UnconfiguredRegistrar`, so **production sells nothing until
+    an ADR names a reseller**.
+  - **An unconfigured deployment says so, twice over.** No registrar *or* no
+    nameservers → `503 {"reason":"unconfigured"}` with a sentence that offers
+    the thing that still works ("You can still connect a domain you already
+    own"), the same typed shape the AI paths established. A name we cannot
+    point anywhere is a name we do not sell.
+  - **The registrant keeps its own door.** Absent from the purchase JSON and
+    from the list (a test greps the list body for the street and the e-mail),
+    present only at `…/registrant` — the deliberate read S2.15b's storage
+    promised, for the person checking what they are about to submit to a
+    registry.
+  - **`docs/design/sites.md`** gained the "Buying a domain name (S2.15)"
+    section: the route table, the three properties above, and the two
+    environment variables.
+- **Verified** (all foreground, real exit codes):
+  - `bash scripts/prune-test-db.sh` (40 tenants, 78 MB); `cargo fmt -p
+    alo-jmap`; `SQLX_OFFLINE=true cargo clippy -p alo-jmap --all-targets -- -D
+    warnings` clean.
+  - `cargo nextest run -p alo-jmap -E 'binary(sites_domain_purchases_http)'` →
+    **14 green**: the unconfigured deployment on every door and nothing
+    recorded on the way through it; `401` on the price surface; the catalog's
+    honest pricing on every ending and `.eu`'s EEA requirement; a search that
+    prices only what can be bought (typed as `https://Acme.com/`, with an
+    unsupported ending answered rather than dropped) and the two refusals an
+    empty or impossible query gets; buying at the seller's price with a
+    client-invented one ignored; the replayed buy click, the same key for a
+    different name, and a key too short to be one; the taken name and the
+    unsold ending as two different sentences; a registrant a registry would
+    reject leaving no row and no value quoted back; approval refusing both
+    tampered prices and then agreeing, twice, idempotently; cancel and the
+    approval that cannot raise it; the colleague refused on all six verbs; and
+    the wrong-tenant matrix — another tenant's site is `404` on every verb, A's
+    purchase id under B's own site is `404`, and A's row is untouched.
+  - Blast radius: `cargo nextest run -p alo-jmap -E 'binary(sites_http) or
+    binary(site_editor_role_http) or binary(sites_catalogs_http) or
+    binary(sites_orders_http) or kind(lib)'` → **703 green**.
+  - **On the wire** — local debug `alo-jmap` on `127.0.0.1:8080` against docker
+    `alo-pg` (database `alo`), two tenants from `identityctl bootstrap-admin`,
+    tokens from `POST /auth/token`, `SITE_REGISTRAR=fixture`
+    `SITE_NAMESERVERS=ns1.alosites.com,ns2.alosites.com`:
+
+    ```
+    GET  /sites/domain-catalog              (no token) → 401
+    GET  /sites/domain-catalog                         → 200 EUR, buyable, .eu 750 /
+         750 eea_presence, .nl 805, .com 1208 … register >= renew on every ending
+    GET  /sites/domain-search?q=acme&tlds=com,eu,xyz   → acme.com taken (no price),
+         acme.eu taken, acme.xyz unsupported — nothing unavailable carries a price
+    GET  /sites/domain-search?q=wire16366.com          → available, 1208 now and
+         1208 every year after
+    GET  /sites/domain-search?q=                       → 422 "type the name you
+         would like, such as acme"
+    GET  /sites/domain-search?q=shop.acme.com          → 422 "a domain is bought as
+         one name plus its ending … addresses below that are yours to create"
+    POST /sites/{site}/domain-purchases  (+ "firstTermCents":1, years 2)
+                                                       → 200 quoted, 2416 = 1208×2,
+         renewal 1208, nameservers ns1/ns2, approvedAt null, moneyMoved false
+    POST … same requestKey                             → 200 the SAME purchase id
+    POST … acme.com                                    → 422 reason=unavailable
+    POST … thing.xyz                                   → 422 reason=unsupported tld=xyz
+    POST … requestKey "short"                          → 422 "an idempotency key is
+         8-64 letters, digits, hyphens or underscores"
+    GET  …/domain-purchases                            → the one purchase, no street,
+         no e-mail anywhere in the body
+    GET  …/{purchase}/registrant                       → the eight fields
+    POST …/{purchase}/approve  (renewal 1208 → 1)      → 422 "the price of that
+         domain changed; check it again before approving"
+    POST …/{purchase}/approve  (as shown)              → 200 approved, approvedBy set,
+         moneyMoved still false
+    GET/POST every route as tenant B                   → 404 "no such site"
+    POST …/{purchase}/cancel                           → 200 cancelled
+    POST …/{purchase}/approve                          → 422 "this domain purchase was
+         called off"
+    psql: state=cancelled, first_term_cents=2416, renewal=1208, payment_reference NULL
+    Restarted with SITE_REGISTRAR unset (the production default):
+    GET  /sites/domain-catalog | domain-search | POST domain-purchases
+                                                       → 503 reason=unconfigured
+    ```
+- **Cuts/flags:**
+  - **No payment, no worker, no screen.** `checkout` (recording Billing's
+    opaque reference) and `settle` are S2.15c2's along with the registration
+    sweep and the automatic attachment; the buy box is S2.15c3's. Nothing here
+    charges anybody: the furthest a purchase can travel through these routes is
+    `approved`.
+  - **No CHANGELOG line**, for S2.15a/b's reason — with production
+    unconfigured and no screen, nothing a user can see changed yet. S2.15c3's
+    line covers the visible feature.
+  - **Human inbox — two new deployment keys.** A deployment that wants to sell
+    domains needs `SITE_NAMESERVERS` (the alo authoritative nameservers, ADR
+    0013) and, once an ADR names a reseller, a `SITE_REGISTRAR` value for it.
+    Leaving both unset is safe and is what production does today. No new
+    top-level route prefix: everything is under `/sites`, which the Caddyfile
+    already proxies.
+  - **The local test database default port is 5433, the docker `alo-pg`
+    container publishes 5432.** Every `alo-jmap` suite fails with
+    `PoolTimedOut` after 30 s unless `DATABASE_URL` is set — including suites
+    this item never touched, so it is the machine, not the change. Gates here
+    ran with
+    `DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo`; worth a
+    human deciding whether the default or the container's port should move.
+  - **`RegistrarError::Conflict` maps to `422`, not `409`**, matching the rest
+    of the `/sites` surface (the module header of `sites.rs` explains why).
+  - **The fixture registrar is selectable in a deployment.** Deliberate — it is
+    what made this transcript real — but it is visible: the catalog answers
+    `environment: "fixture"` and `spendsMoney: false`, which the S2.15c3 buy
+    box should badge rather than hide.
+- **Next:** S2.15c2 (payment handoff + the registration worker: the checkout
+  route recording Billing's reference, the settle path, the sweep calling
+  `register`/`renew`, and the automatic domain attachment on success).

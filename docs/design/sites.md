@@ -920,6 +920,51 @@ own `sandbox="allow-scripts"` frame can only *narrow* what the block's nested
 frame is granted, so what the owner sees is never more capable than what the
 internet gets.
 
+### Buying a domain name (S2.15)
+
+Connecting a domain you already own (`/sites/{id}/domains`, S1.25) and *buying*
+one are two different surfaces, deliberately. The first proves ownership with a
+TXT record; the second spends money, hands a registry somebody's home address,
+and has a state machine behind it — `alo_store::site_domain_purchases`, whose
+row *is* the state (`quoted → approved → awaiting_payment → paid → registering
+→ registered → configured`, with `cancelled` reachable only before money moved).
+
+The edit-side routes (`products/mail/alo-jmap/src/sites_domain_purchases.rs`):
+
+| Route | What it does |
+|---|---|
+| `GET /sites/domain-catalog` | the endings sold, both prices on each, plus who the reseller is and whether its calls spend money |
+| `GET /sites/domain-search?q=&tlds=` | one offer per candidate: available/taken/blocked/unsupported, priced **only** when available |
+| `GET`/`POST /sites/{id}/domain-purchases` | this website's purchases; start one |
+| `GET /sites/{id}/domain-purchases/{p}` | one purchase |
+| `GET /sites/{id}/domain-purchases/{p}/registrant` | the personal data, behind its own door |
+| `POST /sites/{id}/domain-purchases/{p}/approve` | agree to **this exact price** |
+| `POST /sites/{id}/domain-purchases/{p}/cancel` | call it off, before money moved |
+
+Three properties are the reason this is a module of its own:
+
+- **The price is never posted.** A create request names a domain and a term;
+  what it costs is asked of the registrar in that same request and stored from
+  that answer. No client bug and no tampered body can put a number on a
+  purchase that the seller did not state. Approval is the mirror image: it
+  *must* echo the six numbers that were on screen, and the store refuses any
+  disagreement — a price that moved stops there rather than being silently
+  re-quoted. The renewal price is one of the six, because that is the half a
+  bait price hides in.
+- **Buying is the site owner's, not the site editor's.** The whole surface sits
+  behind the same guard collaborator management uses (admin, or the person who
+  created the site), so a site-editor collaborator (S2.03a) may write the
+  website and may neither spend the tenant's money nor read a registrant.
+- **An unconfigured deployment says so.** Two environment variables decide:
+  `SITE_REGISTRAR` (`fixture` selects the deterministic in-memory reseller for
+  local development; anything else, including unset, is the
+  `UnconfiguredRegistrar`) and `SITE_NAMESERVERS` (comma separated — a name we
+  cannot point anywhere is a name we do not sell). Without them every door
+  answers `503` with `{"reason":"unconfigured"}`, the same typed shape the AI
+  paths use, so a buy box can hide itself instead of failing at the price.
+  **Production leaves `SITE_REGISTRAR` unset**: wiring a real reseller is an
+  ADR, not a deployment guess.
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):
