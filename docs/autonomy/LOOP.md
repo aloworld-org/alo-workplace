@@ -67,8 +67,17 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      `alo-jmap` binary (`DATABASE_URL=postgres://alo:alo-dev-only@localhost:5432/alo`,
      `ALO_BLOB_DIR=<repo>/.localdev/blobs`, `ALO_JMAP_ADDR=127.0.0.1:8080`,
      `ALO_IDENTITY_ISSUER=http://localhost:5173`; bootstrap once with
-     `identityctl bootstrap-admin` + `register-client web` as in
-     `.localdev/start.sh`). ALWAYS kill any running `alo-jmap` BEFORE
+     `identityctl bootstrap-admin` + `register-client web`). **Register both
+     dev ports in that one command** — `register-client` replaces the list
+     rather than adding to it (`SET redirect_uris = $4`), so:
+     `register-client web "alo web" http://localhost:5173/auth/callback
+     http://localhost:5174/auth/callback`. The redirect URI is validated
+     before anything else on `POST /oauth/authorize`, so an agent running a
+     second dev server on 5174 against a client registered only for 5173
+     cannot log in at all — it gets `redirect_uri mismatch` and never reaches
+     the screen it came to look at. Two agents on this machine is the normal
+     condition; one of them being unable to sign in is not.
+     ALWAYS kill any running `alo-jmap` BEFORE
      starting your test server — not only before rebuilding: a stale server
      from a killed iteration squats the port for days and fails every bind
      (found: one survived 19 hours and poisoned a whole night). Kill it before rebuilding too
