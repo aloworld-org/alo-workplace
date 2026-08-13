@@ -10,6 +10,20 @@ contracts.
 
 ## Unreleased
 
+- **Your website now has a Domains screen, and it tells you what a domain really
+  costs.** Connect a domain you already own — add it, publish the exact record
+  shown at your DNS host, press Check, and if it has not travelled yet the screen
+  says so instead of calling it an error — or search for a new one. Wherever a
+  price appears, both halves appear: what the name costs today and what it costs
+  every year after it. Buying is two deliberate steps, and no price ever travels
+  from your browser: you fill in who the domain is registered to, alo asks the
+  seller what it costs, and you approve those exact amounts. After that the
+  record of the purchase says what is happening and what happens next, right
+  through to the name serving your website — and if something goes wrong you get
+  the registrar's own sentence about it, including what it means for the money.
+  A workspace where domain selling has not been switched on says so plainly and
+  points you at connecting one you own.
+
 - **The custom-code block can now be written in the website editor.** Add it
   from the section picker like any other block: a heading for the page, the name
   a screen reader reads out, and the markup, style and script in three separate

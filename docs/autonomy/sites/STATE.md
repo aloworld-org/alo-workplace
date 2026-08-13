@@ -5968,3 +5968,107 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   registrant form, the approve-then-pay handoff, progress and recovery states
   over the S2.15c1/c2 routes, and the connect-a-domain path where the
   deployment is unconfigured).
+
+## 2026-08-13 — S2.15c3 the screen where a domain is actually bought
+
+- **Item:** S2.15c3 — the domain purchase UI over the S2.15c1/c2 routes: search
+  with the full name and its price as it is typed, honest renewal pricing beside
+  what is paid today, the registrant form, the approve step, progress and
+  recovery states, and the connect-a-domain path where the deployment sells
+  nothing.
+- **Shipped** — `/sites/{id}/domains`, reached from the publish bar beside the
+  line that says where the website lives. Web only; no Rust touched.
+  - **`DomainsView.tsx`** composes three panels in the order of the decision:
+    the website's alo address (which always works and is never presented as a
+    problem), the domain somebody already owns, then buying one.
+  - **`ConnectedDomains.tsx`** gives S1.25a/b's routes their first screen. The
+    TXT proof is the server's own three strings, copied one at a time; a check
+    that has not found the record is `sitesDomainNotYet` — a sentence about DNS
+    travel time with the record still on screen — not a red failure, because
+    that answer is a normal `200` carrying an unchanged claim. Once verified,
+    the CNAME/ALIAS last step is stated out loud with the site's own host in it:
+    proving ownership is not pointing the domain at anything, and that gap is
+    where an afternoon goes.
+  - **`DomainBuyPanel.tsx`** searches 400 ms after the last keystroke and sends
+    what was typed verbatim (the server understands `acme`, `Acme.com` and a
+    pasted URL — S1.30b's lesson lives in `DomainSearch::parse`, not here). It
+    computes nothing at all: every number shown came from the answer being
+    displayed, both halves of every price appear in one line, and an offer
+    nobody can buy carries none. A fixture reseller is badged from
+    `registrar.spendsMoney` rather than hidden; `buyable: false` leaves prices
+    readable and buying off.
+  - **The unconfigured deployment — which is production — gets the server's own
+    sentence** ("You can still connect a domain you already own") in place of
+    the buy box, branching on `reason: "unconfigured"` exactly as the AI paths
+    established, and the connect-a-domain half above it is untouched.
+  - **`DomainPurchaseDialog.tsx`** is two deliberate steps. Step one posts
+    `{domain, years, autoRenew, requestKey, registrant}` — **no price of any
+    kind** — and holds one `crypto.randomUUID()` replay token for its lifetime,
+    so a network wobble cannot buy a second name. Step two shows the stored
+    quote, both numbers, and approving echoes its exact six values.
+  - **`DomainPurchaseList.tsx`** is the record and the recovery surface, since
+    the last three states happen with nobody watching. Approving a `quoted` row
+    and calling off anything before `moneyMoved` live here too, so closing the
+    dialog strands nothing; past payment there is no button, because there is no
+    route, and a failure prints the server's own sentence about the refund.
+  - **`domainPurchaseState.ts`** is the only place a state becomes a sentence,
+    and `canCancelPurchase` reads the server's `open`/`moneyMoved` pair rather
+    than keeping a second list of states in the browser.
+  - **Buying is the owner's, not the site editor's** — the panels are rendered
+    on `canManageCollaborators`, which is the same predicate
+    `require_site_manager` guards the routes with, so a restricted editor is
+    never shown a money door whose every request would answer `403`, and the
+    purchases/catalog reads are not even attempted.
+  - 117 new strings in **English, French and Dutch** (the catalog parity
+    ratchet is green; nothing went on `UNTRANSLATED`), a CHANGELOG entry in the
+    user's voice, and `docs/design/sites.md` gained "The screen (S2.15c3)".
+- **Verified** (all foreground, real exit codes):
+  - `npx tsc --noEmit` clean; `npx eslint src/sites src/i18n` clean;
+    `npm run build` clean.
+  - `npx vitest run`: **825 tests in 88 files green**, twice in a row and with
+    no unhandled errors, including the 13 new ones in `Domains.test.tsx`. That
+    suite runs the REAL API client and the REAL views against a faked network,
+    so the URLs and bodies it asserts are the ones the S2.15c1/c2 routes take:
+    the unconfigured deployment keeping the connect path; the three TXT fields
+    exactly as composed; a check that finds nothing; the CNAME line; a `422`
+    shown verbatim; a search that prices the free name in both halves and the
+    taken one not at all; a create whose body has exactly five keys and no
+    price, with `NL` normalised to `nl`; an approve carrying the six values;
+    the row-level approve; a paid purchase with no call-off button; a failed
+    one reading the registrar's sentence; the arm-then-confirm cancel; and the
+    restricted editor who never even asks for the money routes.
+  - Wire contract re-read against `sites_domain_purchases.rs` and `sites.rs`
+    rather than assumed: `purchase_json`, `quote_json`, `offer_json`,
+    `requirement_json`, `site_domain_json` and the four request bodies
+    (`NewPurchaseBody`, `RegistrantBody`, `AgreedQuoteBody`, `SiteDomainBody`)
+    match the client's types and drafts field for field.
+- **Cuts/flags:**
+  - **No pay button, deliberately.** `…/checkout` records a payment reference
+    *some bridge minted*, and nothing in alo mints one yet (S2.15c2's own flag:
+    "what settles a charge is still a seam, not a provider"). A browser-minted
+    reference would be a fabricated row saying a payment exists. So the screen
+    states the arc instead — approve, then payment, then automatic registration
+    and attachment — and the states after `approved` are shown as they arrive.
+    Wiring a real PSP is ADR work and has S3.04c's shape; the door is built, it
+    just has nobody knocking yet. **Suggested item when a PSP lands: the
+    checkout handoff in the screen.**
+  - **The registrant read route has no screen.** `…/{purchase}/registrant`
+    exists (S2.15c1) and nothing here calls it: the form knows what it just
+    sent, and re-fetching somebody's home address to show it back is spreading
+    personal data for no gain. It belongs to a later "manage this domain" view.
+  - **A country typed in capitals is lowercased before sending.** The store
+    demands lowercase ISO-3166 and refuses `NL` with a sentence about the case,
+    which is a refusal nobody learns anything from. This is the form
+    normalising its input, not a second copy of a rule — the *rule* stays the
+    store's, and everything else the registrant form sends is untouched.
+  - **Styling stays in `SitesModule.module.css`** for S2.13c's reason
+    (ADR 0046 vs the ds track's `theme.css` generator, D1.5), and
+    `web/src/sites/**` is this track's alone (ADR 0045).
+  - **No new route prefix**: `/sites/*` already proxied; nothing for the
+    production Caddyfile. The three deployment keys S2.15c1/c2 recorded
+    (`SITE_REGISTRAR`, `SITE_NAMESERVERS`, `SITE_PAYMENT_SETTLEMENT_SECRET`)
+    are still unset in production, which is exactly what this screen's
+    unconfigured path is written for.
+- **Next:** S2.16 (wave review: complete browser arcs, accessibility,
+  responsiveness, performance, language parity, privacy/security
+  reconciliation, changelog, as-built docs, final cross-service transcripts).

@@ -1001,6 +1001,44 @@ deployment that sells domains at all:
   `failed`: the tenant does hold the name, and saying otherwise would be a lie
   about their money.
 
+#### The screen (S2.15c3)
+
+`web/src/sites/DomainsView.tsx`, at `/sites/{id}/domains` and reached from the
+publish bar — beside the line that says where the website lives, not among the
+content screens. It composes three panels in the order of the decision:
+
+- **`ConnectedDomains.tsx`** — the path that works on every deployment. The TXT
+  proof is the server's own three strings, copyable one by one; a check that has
+  not found the record is a normal answer with a sentence about DNS travel time,
+  never a red failure; and the CNAME/ALIAS last step is stated out loud once the
+  claim is verified, because proving ownership is not pointing the domain at
+  anything.
+- **`DomainBuyPanel.tsx`** — search as you type (400 ms after the last key,
+  sent verbatim: the server understands `acme`, `Acme.com` and a pasted URL).
+  It computes nothing. Every number on screen came from the answer being
+  displayed, both halves of every price appear together, and an offer nobody can
+  buy carries none. A fixture reseller is badged from `registrar.spendsMoney`
+  rather than hidden, and `buyable: false` disables buying while leaving prices
+  readable. On `503 unconfigured` the panel becomes the server's own sentence,
+  which already names the way on — this is what production shows today.
+- **`DomainPurchaseDialog.tsx`** — two deliberate steps. Step one sends no price
+  at all (`domain`, `years`, `autoRenew`, `requestKey`, `registrant`) and holds
+  one replay token for its lifetime, so a network wobble cannot buy a second
+  name; a country typed in capitals is lowercased rather than refused, which is
+  a form normalizing its input, not a second copy of a rule. Step two shows the
+  stored quote and approves by echoing its exact six values.
+- **`DomainPurchaseList.tsx`** — the record and the recovery surface, since half
+  the arc happens with nobody watching. Each row states what is happening and
+  what happens next (`domainPurchaseState.ts`, the only place a state becomes a
+  sentence), a failure reads the server's own words about the money, and the two
+  actions that still have routes — approve a `quoted` price, call off anything
+  before `moneyMoved` — live here so closing the dialog strands nothing.
+
+**No pay button.** `…/checkout` records a reference a payment bridge minted, and
+nothing in alo mints one yet (S2.15c2), so the screen states the arc — approval,
+then payment, then automatic registration and attachment — rather than offering
+a button no route completes. Wiring a real PSP is ADR work (S3.04c's shape).
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):
