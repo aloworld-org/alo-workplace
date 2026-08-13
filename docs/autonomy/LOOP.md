@@ -67,16 +67,28 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      `alo-jmap` binary (`DATABASE_URL=postgres://alo:alo-dev-only@localhost:5432/alo`,
      `ALO_BLOB_DIR=<repo>/.localdev/blobs`, `ALO_JMAP_ADDR=127.0.0.1:8080`,
      `ALO_IDENTITY_ISSUER=http://localhost:5173`; bootstrap once with
-     `identityctl bootstrap-admin` + `register-client web`). **Register both
-     dev ports in that one command** — `register-client` replaces the list
-     rather than adding to it (`SET redirect_uris = $4`), so:
-     `register-client web "alo web" http://localhost:5173/auth/callback
-     http://localhost:5174/auth/callback`. The redirect URI is validated
-     before anything else on `POST /oauth/authorize`, so an agent running a
-     second dev server on 5174 against a client registered only for 5173
-     cannot log in at all — it gets `redirect_uri mismatch` and never reaches
-     the screen it came to look at. Two agents on this machine is the normal
-     condition; one of them being unable to sign in is not.
+     `identityctl bootstrap-admin` + `register-client web`).
+
+     **The web app has one local port and it is 5173.** Not a default to drift
+     from — the only one. `register-client web "alo web"
+     http://localhost:5173/auth/callback`, and nothing else: the redirect URI
+     is checked before anything else on `POST /oauth/authorize`, so a dev
+     server on any other port fails at the login form with `redirect_uri
+     mismatch` rather than quietly working. That is the point. Two dev servers
+     that both work are two stacks identical on screen, which is what the
+     `dev :5173` badge exists to undo; registering a second port would put the
+     confusion back and make the badge the only thing standing between you and
+     screenshotting the wrong stack. One agent wants the browser at a time —
+     hand 5173 over rather than starting a second server beside it.
+
+     **Check which database your server is on before you conclude anything
+     about it.** Each checkout has its own: `alo_loop`, `alo_ficina`, `alo`,
+     plus every scratch database on the box. An hour went into "proving" a
+     redirect URI change on the wire that had been applied to a database
+     nothing was reading — the request under test never touched the row that
+     was edited, and both the change and the control looked like they passed.
+     `select datname from pg_stat_activity where backend_type='client backend'`
+     names the one your running binary actually holds open.
      ALWAYS kill any running `alo-jmap` BEFORE
      starting your test server — not only before rebuilding: a stale server
      from a killed iteration squats the port for days and fails every bind
