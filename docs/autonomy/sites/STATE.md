@@ -5816,3 +5816,155 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S2.15c2 (payment handoff + the registration worker: the checkout
   route recording Billing's reference, the settle path, the sweep calling
   `register`/`renew`, and the automatic domain attachment on success).
+
+## 2026-08-13 — S2.15c2 the payment handoff and the registration worker
+
+- **Item:** S2.15c2 — the checkout route recording Billing's opaque reference,
+  the settle path, the sweep that hands paid purchases to
+  `DomainRegistrar::register`/`renew`, and the automatic Sites domain
+  attachment that follows a successful registration.
+- **Shipped** — the arc S2.15b's storage was built for, end to end on one
+  process for the first time: `quoted → approved → awaiting_payment → paid →
+  registering → registered → configured`, with the last three done by a
+  machine and none of them by the buyer.
+  - **Two doors on opposite sides of the money.** `POST
+    /sites/{id}/domain-purchases/{p}/checkout` is the tenant's: it records the
+    opaque reference their payment bridge minted and moves an approved purchase
+    to `awaiting_payment`. Recording a reference charges nobody, so it sits
+    behind the same site-owner guard as the rest of the surface. `POST
+    /sites/domain-payments/settle` is **not** a tenant's route — "the money
+    arrived" is the one statement a buyer may not make about their own
+    purchase, because it is what queues the registration, and a tenant who
+    could say it would register domains nobody paid for. It carries no user
+    token; it presents the deployment secret
+    (`SITE_PAYMENT_SETTLEMENT_SECRET`, header `X-Alo-Settlement`, compared
+    without leaking where it differs) and names the charge by tenant + payment
+    reference, which the schema already made unique per tenant.
+  - **Unset secret is a closed door, not an open one.** No secret, or one
+    shorter than 24 characters, reads as absent → `503
+    {"reason":"unconfigured"}`. Production settles nothing, exactly as it sells
+    nothing.
+  - **The machine still writes as a person.** Two system-level store reads —
+    `Store::site_domain_purchase_approver` and
+    `site_domain_purchase_awaiting_payment` — let the settle door and the sweep
+    act through the door of whoever approved that exact price. A row that says
+    a machine did it is a row that says nobody did; both are tenant-checked as
+    hard as the account doors (another tenant's purchase is `NotFound`, and so
+    is one nobody approved).
+  - **`site_domain_worker`** (alo-jmap), ticking every 60 s from `main.rs` and
+    only where `SiteDomainCommerce::sells_domains()` — an installation that
+    sells no domains starts no worker for them. Claim (at-most-once, `FOR
+    UPDATE SKIP LOCKED`) → `register`/`renew` under the purchase id as
+    idempotency key → `complete` → `configure`. A retryable provider fault (and
+    `Unconfigured`, so a registrar unwired under a paid purchase is not a
+    refund conversation) goes back in the queue, bounded by
+    `SITE_DOMAIN_PURCHASE_MAX_ATTEMPTS`; anything else fails terminally with a
+    sentence about the refund. A registration whose bookkeeping fails leaves
+    the claim to go stale — the registrar replays under the same key rather
+    than buying a second name — and an attachment that is refused leaves the
+    purchase `registered`, never `failed`: the tenant does hold the name.
+  - **The name attaches itself**, written straight to `live` in `site_domains`
+    (alo registered it, on alo's nameservers — there is no TXT ownership left
+    to prove), which is the whole reason to buy inside alo rather than beside
+    it.
+  - **`docs/design/sites.md`** gained the two new rows in the route table and
+    the "payment handoff and the registration sweep" subsection.
+- **Verified** (all foreground, real exit codes):
+  - `bash scripts/prune-test-db.sh` (103 tenants, 78 MB); `cargo fmt -p
+    alo-store -p alo-jmap`; `SQLX_OFFLINE=true cargo clippy -p alo-store -p
+    alo-jmap --all-targets -- -D warnings` clean.
+  - `cargo nextest run -p alo-store -E 'binary(site_domain_purchases) or
+    binary(site_domains_tenancy) or binary(site_registrar_fixture) or
+    binary(site_publish_schedule_tenancy) or kind(lib)'` → **1 258 green**,
+    including the new `the_machine_doors_find_a_purchase_only_inside_its_own_tenant`
+    (no approver before approval; a reference nobody is waiting for and a
+    malformed one refused differently; both lookups `NotFound` under a stranger
+    tenant, with the purchase untouched).
+  - `cargo nextest run -p alo-jmap -E 'binary(sites_http) or
+    binary(site_editor_role_http) or binary(sites_catalogs_http) or
+    binary(sites_orders_http) or binary(site_domain_registration) or
+    binary(sites_domain_purchases_http) or binary(site_booking_notify) or
+    kind(lib)'` → **728 green**, including five new HTTP tests (checkout
+    records without charging, the same reference twice vs a second one, an
+    unapproved purchase refused, the colleague `403` and the other tenant `404`
+    on checkout, only the bridge may settle, and a deployment with no bridge
+    settling nothing) and the new `site_domain_registration` suite: the sweep
+    registering and attaching for two tenants at once, a name taken while the
+    payment was in flight ending in a refund sentence with nothing attached,
+    and a registrar that is briefly down keeping the purchase (`paid`,
+    attempts 1) and finishing it when it returns.
+  - **On the wire** — local debug `alo-jmap` on `127.0.0.1:8080` against docker
+    `alo-pg` (database `alo`), two fresh tenants, `SITE_REGISTRAR=fixture`,
+    `SITE_NAMESERVERS=ns1/ns2.alosites.com`,
+    `SITE_PAYMENT_SETTLEMENT_SECRET=wire-settlement-secret-0123456789`:
+
+    ```
+    POST /sites/{s}/domain-purchases                    → 200 quoted, 1208 / 1208
+    POST …/{p}/checkout            (before approval)    → 422 "nobody has approved
+         the price of this domain purchase yet"
+    POST …/{p}/approve             (the price shown)    → 200 approved, approvedBy set
+    POST …/{p}/checkout  pi_wire_…                      → 200 awaiting_payment,
+         moneyMoved false, paidAt null
+    POST …/{p}/checkout  pi_wire_… (again)              → 200 the same row
+    POST …/{p}/checkout  pi_wire_other                  → 422 "already waiting for
+         another payment"
+    POST /sites/domain-payments/settle  (no secret)     → 401
+    POST … (wrong secret)                               → 401
+    POST … (the tenant's own bearer token)              → 401  ← a buyer may not
+         settle their own charge
+    POST … (right secret, unknown reference)            → 404 "no domain purchase is
+         waiting for that payment"
+    POST … (right secret, the OTHER tenant)             → 404, the same sentence
+    psql: state=awaiting_payment, paid_at NULL          ← nothing moved through those
+    POST … (right secret, tenant A)                     → 200 paid, moneyMoved true
+    POST … (the same webhook again)                     → 200 the same purchase, paid
+    POST …/{p}/cancel                                   → 422 "has been paid for and
+         is being registered"
+    … 60 s later, the sweep:
+    psql: state=configured attempts=1 provider_reference=fixture-000002
+          lifecycle=active registered_at≠null configured_at≠null
+    psql site_domains: wire….com | live | verified_at≠null
+    Restarted with every domain variable unset (production's posture):
+    POST /sites/domain-payments/settle (with the secret) → 503 reason=unconfigured
+    GET  /sites/domain-catalog                           → 503 reason=unconfigured
+    log: no "domain registration sweep" line at all — the worker is not started
+    ```
+- **Cuts/flags:**
+  - **No screen.** The buy box, the registrant form and the approve-then-pay
+    handoff are S2.15c3's; this item is the plumbing under them. Consequently
+    **no CHANGELOG line**, for S2.15a/b/c1's reason: with production
+    unconfigured and nothing visible, no user can see a change yet. S2.15c3's
+    line covers the visible feature.
+  - **Human inbox — a third deployment key.** A deployment that wants to sell
+    domains now needs `SITE_PAYMENT_SETTLEMENT_SECRET` (≥ 24 characters) beside
+    `SITE_REGISTRAR` and `SITE_NAMESERVERS`, and needs to give it to whatever
+    charges the tenant. Leaving it unset is safe and is what production does.
+    No new top-level route prefix: everything is under `/sites`, which the
+    Caddyfile already proxies.
+  - **What settles a charge is still a seam, not a provider.** Nothing in alo
+    charges a tenant for a domain today: `checkout` records a reference some
+    bridge minted and `settle` believes whoever holds the deployment secret.
+    Wiring a real PSP is ADR work (S3.04c's shape), and the door was built so
+    that work has somewhere to arrive rather than something to undo.
+  - **Three test binaries are now one serial group** in `.config/nextest.toml`
+    (`site_domain_purchases`, `site_domain_registration`,
+    `sites_domain_purchases_http`). The sweep claims paid purchases across
+    every tenant — that is what a sweep is — so a suite that settles a charge
+    and a suite that sweeps cannot run beside each other. The new suite also
+    holds the same in-process mutex the store suite uses, for the `cargo test`
+    fallback. Sweep counts are asserted as `>= n` rather than `== n`: rows an
+    earlier run left in the shared database are legitimately swept too.
+  - **The full `cargo nextest run -p alo-store` wedged on this machine** —
+    ~16 test binaries sat at `--list --format terse` at 0 % CPU with nothing in
+    Postgres waiting, twice, and again after `pkill`. Not the change (the same
+    scoped runs finish in 3.5 s and 21.6 s), and worth a human's attention: it
+    looks like a process/handle limit hit when nextest lists ~185 binaries at
+    once. The gate here ran scoped to the sites/store blast radius instead.
+  - **`DATABASE_URL` still has to be set by hand** for every alo-jmap and
+    alo-store suite on this machine (default port 5433 vs the container's
+    5432), exactly as S2.15c1 recorded.
+- **Next:** S2.15c3 (the domain purchase UI: search with the full name and its
+  price as it is typed, honest renewal pricing beside today's charge, the
+  registrant form, the approve-then-pay handoff, progress and recovery states
+  over the S2.15c1/c2 routes, and the connect-a-domain path where the
+  deployment is unconfigured).

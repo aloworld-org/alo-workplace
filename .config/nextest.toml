@@ -42,6 +42,12 @@ test-group = 'serial'
 # rows and the one that lost reports "a paid purchase is offered to the sweep"
 # on a row the other is already registering. The suite holds an in-process
 # mutex for the `cargo test` fallback, which nextest's process-per-test model
-# makes inert — this is what serialises it here.
-filter = 'binary(site_domain_purchases)'
+# makes inert — this is what serialises it here. `site_domain_registration`
+# (alo-jmap) drives the same sweep end to end, so it belongs to the same group:
+# either suite sweeping beside the other registers rows it did not create.
+# `sites_domain_purchases_http` joins them because it settles charges: a paid
+# purchase is a row waiting for whichever sweep runs next, and a sweep landing
+# between that suite's settle and its next read would answer for a state it did
+# not choose.
+filter = 'binary(site_domain_purchases) or binary(site_domain_registration) or binary(sites_domain_purchases_http)'
 test-group = 'serial'

@@ -939,7 +939,9 @@ The edit-side routes (`products/mail/alo-jmap/src/sites_domain_purchases.rs`):
 | `GET /sites/{id}/domain-purchases/{p}` | one purchase |
 | `GET /sites/{id}/domain-purchases/{p}/registrant` | the personal data, behind its own door |
 | `POST /sites/{id}/domain-purchases/{p}/approve` | agree to **this exact price** |
+| `POST /sites/{id}/domain-purchases/{p}/checkout` | record the payment's opaque reference; nothing is charged by this |
 | `POST /sites/{id}/domain-purchases/{p}/cancel` | call it off, before money moved |
+| `POST /sites/domain-payments/settle` | **not a tenant's route** — the payment bridge saying a charge arrived |
 
 Three properties are the reason this is a module of its own:
 
@@ -964,6 +966,40 @@ Three properties are the reason this is a module of its own:
   paths use, so a buy box can hide itself instead of failing at the price.
   **Production leaves `SITE_REGISTRAR` unset**: wiring a real reseller is an
   ADR, not a deployment guess.
+
+#### The payment handoff and the registration sweep (S2.15c2)
+
+"The money arrived" is the one statement a buyer may not make about their own
+purchase: it is what queues the registration, so a tenant who could say it would
+register domains nobody paid for. The two doors therefore sit on opposite sides
+of the money. `…/checkout` is the tenant's and only records the opaque reference
+whatever charges them minted — recording a reference charges nobody.
+`/sites/domain-payments/settle` carries no user token at all; it presents the
+deployment's secret (`SITE_PAYMENT_SETTLEMENT_SECRET`, in the `X-Alo-Settlement`
+header) and names the charge by tenant and payment reference, which the schema
+makes unique per tenant. **Unset secret → `503 unconfigured`**, never an open
+door. The settlement is still written through the door of the person who
+approved that exact price: a row that says a machine did it is a row that says
+nobody did.
+
+`site_domain_worker` then does the rest, one tick a minute, and only in a
+deployment that sells domains at all:
+
+- the claim marks each paid purchase `registering` in the statement that reads
+  it, so two sweepers never register one name twice; the registrar call carries
+  the purchase id as its idempotency key, so a sweep that dies after the
+  registry answered replays rather than buys again;
+- a fault that repeating could survive (provider timeout, a registrar unwired
+  under a paid purchase) goes back in the queue, bounded by
+  `SITE_DOMAIN_PURCHASE_MAX_ATTEMPTS` so it ends visibly instead of circling;
+  a refusal is terminal with a sentence about the refund, because a person now
+  has to act and a retry loop only delays them finding out;
+- a registered name **attaches itself**: the custom-domain claim is written
+  straight to `live` (alo registered it, on alo's nameservers — there is nothing
+  left to prove by TXT record), which is the whole point of buying inside alo.
+  An attachment that is refused leaves the purchase `registered` rather than
+  `failed`: the tenant does hold the name, and saying otherwise would be a lie
+  about their money.
 
 ## Errors
 
