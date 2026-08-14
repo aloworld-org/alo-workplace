@@ -14,7 +14,23 @@ wrapper script immediately starts the next iteration.
 | **ds** | `docs/autonomy/ds/QUEUE.md` + `ds/STATE.md` | the design system: `web/src/ds/**`, and the `.module.css` of any module it migrates. Touches many modules by design, so it must not run beside another track editing the same web areas — and never `web/src/sites/**` (ADR 0045) |
 | **agents** | `docs/autonomy/agents/QUEUE.md` + `agents/STATE.md` | an agent in every product (ADR 0034): `platform/alo-ai/**` except its sites modules, `chat_agents.rs`, `alo-jmap`'s `agent*.rs` and `chat_agent*.rs`, migrations **`04xx`**. Store-and-API only — `web/src/chat/**` is being rebuilt by another agent and is off limits |
 
-Two loops run in parallel on different machines, both pushing to `main`.
+**Several streams push to `main` at once, and how many is not a constant — so
+find out rather than assume.** Counting them in this file was wrong within a
+day of being written. Two ways to see who is live, both cheap enough to do at
+the top of an iteration:
+
+```
+git log --format='%h %ad %s' --date=format:'%m-%d %H:%M' -1 origin/main -- docs/autonomy/<track>/STATE.md
+git log --format='%h %ad %s' --date=format:'%m-%d %H:%M' -12 origin/main
+```
+
+A journal touched in the last hour is a loop mid-wave. **A commit in an area no
+journal claims is a human or an interactive agent working outside the loops** —
+they do not read this file, will not honour your track's boundaries, and are
+the likeliest source of a conflict. Treat their area as owned by them for as
+long as they are in it, and keep your own commits small enough that a rebase
+over their work stays trivial.
+
 **Never touch the other track's areas.** The deliberately-shared files
 (`i18n/en.ts`, `CHANGELOG.md`, route registration in `server.rs`, `mod`
 lines in `lib.rs`) only ever receive ADDITIVE lines from either track — on a
