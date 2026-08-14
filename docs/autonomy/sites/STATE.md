@@ -6914,3 +6914,115 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     layout is a prompt change with its own fixtures.
 - **Next:** S3.01d (section palette: drag a new section in, previewed with the
   tenant's own content rather than lorem ipsum; keyboard path and goldens).
+
+## 2026-08-14 — S3.01d shipped: the section palette, seeded from the tenant's own website
+
+- **What shipped.** ADR 0042 §4's palette, all three layers. This iteration
+  found the item mid-built and uncommitted in the working tree — a previous
+  invocation evidently died before its gates — audited every file against the
+  item's contract, finished the missing pieces (below), and gated the whole.
+  - **Store** (`platform/alo-store/src/site_seed.rs`): a pure seeding module —
+    given a `SeedContext` (site name, pages, every section already on the
+    site, the first catalog/collection/bookable service), `seed_section(kind)`
+    answers what a new block of that type would be, made ONLY of the tenant's
+    own content: pages become nav/footer links and feature cards, the site's
+    name and its own line the hero, its images the gallery. What only the
+    owner can write (quotes, prices, team, answers) is copied from their
+    existing sections or answered as `NeedsInput(Writing|Picture|Catalog|…)`
+    — never invented. `SECTION_KINDS` published on `site_model` pins the
+    vocabulary (a test holds it equal to the golden corpus). Tests prove:
+    every ready seed passes the `SectionsEnvelope` write gate; **every string
+    in every seed is a member of the corpus the tenant wrote** (the
+    lorem-ipsum rule as a test); a blank site asks rather than invents; a
+    seeded contact form never borrows another section's `form_id` (two pages'
+    messages must not land in one inbox). Palette goldens
+    (`tests/golden/site_palette_{written,new}.json`) pin the sixteen-tile
+    result.
+  - **Edit API** (`products/mail/alo-jmap/src/sites_palette.rs`): two reads —
+    `GET /sites/{id}/pages/{pid}/palette` (one tile per type, seeded from the
+    caller's own website, the page being edited first) and
+    `GET …/palette/{kind}/preview` (the seeded section rendered through the
+    SAME renderer that publishes, in the site's own theme, `no-store`; `422`
+    when there is nothing of the tenant's to show, `404` for an unknown
+    kind). Nothing writes; dropping a tile goes through the existing
+    `POST …/sections`.
+  - **Web** (`SectionPalette.tsx`, `palette.ts`, `sectionThumbnails.tsx`,
+    `PageEditorView.tsx`; `SectionPicker.tsx` deleted): a panel beside the
+    stack, not a dialog — you cannot drag out of a modal onto what it covers.
+    Tiles drag onto the page (drop lands the block before that row, or on the
+    end zone), and the identical request is available by keyboard alone: a
+    "Where it goes" control plus pressing the tile — a test proves both paths
+    produce the same `POST` body. Hover/focus renders the tile's preview in a
+    sandboxed iframe. Unseedable tiles say what is missing and open the prop
+    form at the chosen position (`insertAt` rides through the form). The wire
+    is read defensively (`readPalette` drops anything unrecognizable; a failed
+    palette costs the seeding, never the ability to add a section). Adds are
+    announced (`sitesSectionAdded`) and focus lands on the new row's control.
+    en/fr/nl strings shipped together.
+- **A real bug found and fixed while gating:** the palette pulls the caret
+  onto its first tile once seeded tiles arrive — and that can land AFTER the
+  user already closed it (Escape before the server answered). The focused
+  tile then unmounts and the caret fell to the top of the document — the
+  exact bug class the dialog-keyboard suite exists to prevent, observed live
+  in the test run (focusout traced to `SectionPalette.tsx`'s autofocus
+  effect). Fixed in `PageEditorView`: the `picking` effect's cleanup catches
+  a caret the palette took down with it and returns it to the Add-section
+  control. `SectionPalette.test.tsx` pins the close-before-load arc.
+- **Adapted suites:** `DialogKeyboard.test.tsx` (the picker dialog is gone;
+  the palette's own keyboard contract lives in `SectionPalette.test.tsx`),
+  and `PageEditor`/`CustomCode`/`ImageEditor`/`SitesModule` tests now add via
+  palette tiles; a palette add always carries an explicit `index` in the
+  `POST` body (asserted; edits still carry none).
+- **Verified:** test DB pruned first (190 → 2 tenants). `SQLX_OFFLINE=true
+  cargo clippy -p alo-store -p alo-jmap --all-targets` → zero warnings from
+  this track's files (see flag below). rustfmt (edition 2024) on the ten
+  changed Rust files. `cargo test -p alo-store --lib --test site_sections
+  --test site_palette` → **1246 + 7 + 3 green** (0.9 s warm); `cargo test -p
+  alo-jmap --test site_palette_http --test sites_http` → **4 + 26 green**
+  (5.3 s, real Postgres; wrong-tenant and 401 tests among them). Web: `npx
+  tsc --noEmit` clean, eslint on every changed file clean, `npm run build`
+  clean, `npx vitest run src/sites src/i18n` → **328 green in 27 files**
+  (10 palette tests among them; i18n parity green with the new strings in
+  en/fr/nl). The gate was slow for a NEW reason this time: the rebase pulled
+  47 commits (Meet grew ~30 files), so the first clippy was a cold ~40-minute
+  build — not the tenant-bloat trap, which the prune ruled out first.
+- **Wire transcript** (fresh tenants `nordwind`/`globex` on docker `alo-pg`
+  database `alo` — confirmed via `pg_stat_activity` — debug `alo-jmap` on
+  `127.0.0.1:8080`, authorization-code + PKCE tokens; server killed before
+  and after):
+  ```
+  GET  /sites/{id}/pages/{pid}/palette          (no token)  → 401
+  GET  …/palette   (blank site)                             → 200, 16 tiles
+       hero ready, heading = "Nordwind Coffee Roasters"
+       nav / contact_form / footer ready
+       testimonials → needs "writing"; catalog → needs "catalog";
+       custom_code → needs "code"
+  GET  …/palette/hero/preview                               → 200
+       text/html; charset=utf-8, cache-control: no-store,
+       tenant's own name in the document ×4, zero data-alo-text
+  GET  …/palette/pricing/preview                            → 422
+  GET  …/palette/parallax/preview                           → 404
+  POST …/sections  testimonials, hero (the owner writes)    → 200, 200
+  GET  …/palette                                            → 200
+       testimonials now ready, quoting the owner's own author
+       contact_form tile carries NO form_id (never borrowed)
+  POST …/sections  {contact tile, index: 1}                 → 200
+       order: [testimonials, contact_form, hero]; form record
+       auto-created for the dropped section (S1.16c2 arc holds)
+  GET  …/palette + …/palette/hero/preview   (other tenant)  → 404, 404
+  ```
+- **Cuts (recorded, not smuggled):**
+  - Tile previews are fetched per kind on first hover/focus, not prefetched
+    sixteen-wide — opening the palette costs one list read.
+  - No drag preview inside the iframe pane; the stack shows the insertion
+    point (S3.01b's editing stylesheet stays layout-neutral).
+  - The AI generation prompt is still not taught the palette vocabulary
+    (same cut as S3.01c, unchanged).
+- **Flag for the business track (not fixed here — meet.rs is yours):**
+  `cargo clippy -p alo-store` emits 2 `clippy::type_complexity` warnings in
+  `platform/alo-store/src/meet.rs:185` and `:319` (tuple rows). They arrived
+  with the Meet commits this iteration rebased onto; the sites gate reports
+  its own files clean but the crate is no longer warning-free.
+- **Next:** S3.01e (editor arc review: one browser arc from blank page to
+  published site using only direct manipulation, checked for accessibility,
+  mobile and the reviewable-diff property).

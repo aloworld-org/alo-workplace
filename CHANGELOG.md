@@ -10,6 +10,17 @@ contracts.
 
 ## Unreleased
 
+- **New website sections start as your website, not as filler.** The Add
+  section panel now shows every block filled with what you have already
+  written — your pages become the menu and the footer, your name and your own
+  line the banner, your pictures the gallery — and picking a tile shows it
+  rendered in your website's own look before you add it. Drag a tile onto the
+  page where you want it, or choose the position and press the tile; both do
+  exactly the same thing. A block nothing of yours fits yet — a quote, a
+  price, your team — says what it needs instead of inventing one, and opens
+  the familiar form. Nothing is ever written for you: every word a tile
+  carries is one you already put on the website.
+
 - **Website sections can now change shape, within the shapes they have.** A
   text-and-image section moves between a wider image, equal halves and wider
   text; a features, gallery or team section shows two, three or four cards
