@@ -10,6 +10,11 @@ contracts.
 
 ## Unreleased
 
+- **The website screen now works on a phone.** The site's page (with
+  publishing, collaborators, languages, and the page list) scrolls as one
+  document on a small screen, so the page list is reachable again, and the
+  Publish button no longer sits past the edge of the screen when the site is
+  live.
 - **New website sections start as your website, not as filler.** The Add
   section panel now shows every block filled with what you have already
   written — your pages become the menu and the footer, your name and your own

@@ -7026,3 +7026,103 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
 - **Next:** S3.01e (editor arc review: one browser arc from blank page to
   published site using only direct manipulation, checked for accessibility,
   mobile and the reviewable-diff property).
+
+## 2026-08-14 — S3.01e the arc driven for real: blank page to published site by touching it
+
+- **Item:** S3.01e — one browser arc from blank page to published site using
+  only direct manipulation, checked for accessibility, mobile and the
+  reviewable-diff property (ADR 0042). The browser is the S2.16b2 rig:
+  `playwright-core` driving the Mac's own Chrome from the scratchpad, against
+  the real local stack — docker `alo-pg` database `alo` (confirmed the server's
+  own connection, not assumed), debug `alo-jmap` on `127.0.0.1:8080`, `npm run
+  dev` on 5173, `alo-sites` on `127.0.0.1:8091` for the published half, a fresh
+  tenant (`lighthouse-arc`) from `identityctl bootstrap-admin`.
+- **The arc, as a visitor-turned-owner would do it.** New website → "Start
+  with a template" → name typed, address self-suggested and previewed live
+  (S1.30b holds) → **Blank site** → Create → landed straight in the page
+  editor with Home open and "Add your first section" (S1.30c holds). Then the
+  four ADR 0042 gestures, each done as a real gesture and each read off the
+  wire:
+  1. **Palette**: hero added by pressing the tile; contact form added by
+     POINTER-DRAGGING its tile onto the hero's row. Both arrive as
+     `POST …/sections {section: <typed>, index: n}` — the drag and the press
+     are one request shape.
+  2. **Reorder on the page**: the hero picked up INSIDE the preview document
+     (`data-alo-section`, grabbed off-text at its edge) and dropped above the
+     contact form → `POST …/sections/1/move {"to":0}` — the same door the
+     stack's buttons use.
+  3. **Inline text**: clicked the hero headline on the page, typed, Enter →
+     `PUT …/ai-edits {rewrite_copy, pointer:/heading}` — the reviewed AI door,
+     byte-shape identical. Undo re-sent the op with the old text; redo with
+     the new. Three requests, one envelope.
+  4. **Constrained resize**: a features block dragged in (its owner-input form
+     opened at the drop position, server 422 shown verbatim in it when fed
+     garbage — S1.30b's promise holding inside the palette flow), then resized
+     by the choice row (`set_prop /columns "two"`) and by `Alt+ArrowRight` on
+     the focused section in the preview (`set_prop /columns "three"`). A
+     direction travels, never a size; only declared values ever appear.
+  Then Publish on the site screen → `POST …/publish {}` → **served from
+  `alo-sites` with the Host header**: 200, the typed headline live, `cols-3`
+  from the keyboard step, the auto-created form's real `/f/{id}` action
+  (S1.16c2 arc intact), and ZERO `data-alo-text`/`data-alo-section` in the
+  published HTML — the editing chrome provably never ships.
+- **Keyboard pass** (no pointer): 6 Tabs from the editor's top to Add section;
+  palette opens with focus on the first tile; the "Where it goes" select
+  carries real positions ("At the top", "After the Hero", …, "At the end");
+  Enter on a tile → `POST …/sections {…, index:3}`, focus lands on the new
+  row's control, `role=status` says "Navigation bar added as section 4 of 4."
+  Tab reaches the preview frame (4 stops past the stack); `Alt+ArrowUp` on a
+  section inside it moved it — `POST …/sections/2/move {"to":1}` — announced
+  as "Contact form moved to position 2 of 4." Every keyboard door lands on the
+  byte-same route as its gesture twin.
+- **Mobile pass (360×740) — two real defects found and fixed, both invisible
+  to the source-reading audits:**
+  1. **The site screen could not scroll at all on a phone.** `SiteView` reuses
+     `.page` (the list-screen viewport column, `overflow:hidden`) but is a
+     panel STACK; once publishing + collaborators + languages outgrew the
+     viewport, everything below — including the entire pages table — was
+     unreachable by wheel or touch. The only shrinkable child, `.tableWrap`
+     (`flex:1; min-height:0`), collapsed to its own padding: a 16px-tall
+     nested scroll trap whose sticky `<th>` covered the one row, so tapping
+     "Home" hit the header. Playwright simply could not tap the page link —
+     that failed tap is what surfaced all of it. Fixed with the module's own
+     pattern (`analyticsContent`): a `.pageBody` scroller below the header,
+     and a `.tableWrapStatic` (natural height, `flex-shrink:0`, horizontal
+     scroll only) for tables inside scrolling bodies — used by SiteView and
+     FunnelView; the sites LIST keeps the flex-fill wrap it was designed
+     around (PostsView too — it is a genuine list screen; an over-broad first
+     edit there was reverted).
+  2. **"Publish changes" was off-screen on a live site** — `.publishActions`
+     never wrapped, so the fourth button sat at x=362 of a 360px viewport
+     with no horizontal scroll to reach it. One `flex-wrap: wrap`.
+  Verified after: real wheel scroll reaches the pages table, the tap on
+  "Home" opens the editor, Publish changes at x=130–256. The editor screen
+  itself was already clean at 360: zero horizontal overflow, zero clipped
+  labels, all 16 palette tiles visible and pressable, 40×40 row controls,
+  choice row on-screen (wrapped), preview at 342px. The only off-screen text
+  is the shell rail's Drive/Billing — the known ds/shell flag from S2.16b2,
+  not sites.
+- **Verified:** `npx tsc --noEmit` clean; `npx eslint` on the three changed
+  files clean; `npx vitest run src/sites src/i18n` → **328 green in 27
+  files**; `npm run build` clean. No Rust touched, no route, no migration, no
+  new strings. Local servers (`alo-jmap`, `alo-sites`, vite) killed at exit.
+- **Cuts and honest gaps (recorded, not smuggled):**
+  - The palette's END drop zone appears only mid-drag, and Playwright's drag
+    pipeline resolves its target before dragging starts — so "drop at the
+    end" was proven by keyboard ("At the end" → index 3) and the pointer drop
+    was proven onto a row. A human thumb can of course do both.
+  - Inline-text and Alt-resize keyboard REACHABILITY inside the sandboxed
+    preview could not be watched from outside (the srcdoc frame is opaque to
+    the harness); reorder-by-keyboard inside the frame was observed working,
+    contenteditable fields are in Chrome's tab order by construction, and the
+    resize keystroke was proven from a focused section. Nothing suggests a
+    gap; the observation limit is the tool's, and is written down rather than
+    glossed.
+  - FunnelView's table swap to `.tableWrapStatic` is structural (it sits in
+    the `analyticsContent` scroller, where flex-fill is the same trap) but
+    was not re-walked at 360 with live funnel data.
+  - Console noise chased to ground: the only 4xx on the whole arc are
+    `favicon.ico` (dev artifact) and the shell's `/control/me` probe —
+    neither sites-owned.
+- **Next:** S3.02a (chatbot grounding model: the corpus is the published site
+  plus a named Public knowledge collection; ADR 0040).
