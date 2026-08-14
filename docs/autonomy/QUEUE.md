@@ -194,3 +194,19 @@ without it.
   from are not met (B6.12b, finding 3). Done when: an approved absence appears
   in the team's Agenda view for its dates and disappears when the request is
   withdrawn; the wrong-tenant test covers the feed.
+- [ ] B7.04 Consolidate the integration-test binaries. Every file under
+  `platform/alo-store/tests/` (~115) and `products/mail/alo-jmap/tests/` (~60)
+  links its own binary against the whole crate, so any change to the crate
+  triggers ~40 minutes of relinking — which no longer fits the build loop's
+  600 s per-command ceiling and cost one iteration 130 of its 138 minutes in
+  kill-retry cycles (2026-08-14). Restructure each tests/ directory into a
+  handful of harness binaries (`tests/store_suite/main.rs` declaring the
+  existing files as `mod`s, grouped by area) so the files, their names and
+  every test stay exactly as they are and only the binary count changes.
+  nextest keeps running per-test; the serial group in `.config/nextest.toml`
+  keeps working (retarget its filter from `binary(...)` to the test names).
+  Done when: `ls target/debug/deps` shows single-digit test binaries per
+  crate, a touch of `alo-store/src/lib.rs` followed by `cargo nextest run
+  -p alo-store --no-run` completes inside 10 minutes, the full suite is green
+  with the same test count as before the change, and the LOOP.md build
+  exception added on 2026-08-14 is deleted because nothing needs it.
