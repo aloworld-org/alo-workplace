@@ -134,8 +134,8 @@ export DATABASE_URL="postgres://alo:alo-dev-only@localhost:5432/alo_loop" \
   ALO_IDENTITY_ISSUER="http://localhost:5173" ALO_JMAP_ADDR="127.0.0.1:8080" \
   SQLX_OFFLINE=true
 # Meet needs these three or it reports "not configured" (correctly):
-export ALO_MEET_URL="ws://localhost:7880" ALO_MEET_API_KEY="devkey" \
-  ALO_MEET_API_SECRET="devsecretdevsecretdevsecretdevsecret"
+export ALO_MEET_URL="ws://localhost:7880" ALO_MEET_API_KEY="alo-dev-key" \
+  ALO_MEET_API_SECRET="alo-dev-secret-placeholder-not-for-production"
 nohup ./target/debug/alo-jmap.exe > /tmp/jmap.log 2>&1 &
 # Dropping the three ALO_MEET_* variables does not fail — Meet just reports
 # itself unconfigured, which reads as a bug in Meet. Keep them on the line.

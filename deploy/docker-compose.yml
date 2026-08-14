@@ -143,6 +143,10 @@ services:
     command: --config /etc/livekit.yaml
     volumes:
       - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50019:50000-50019/udp"
     networks: [alo]
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7880/ || exit 1"]
