@@ -17,14 +17,51 @@ Above them sits the **"Ask alo" orchestrator** (ADR 0029) that routes across
 products. One shared framework (the `alo-ai` crate + a tool registry + the
 propose/approve UI); each agent is a thin, product-scoped tool set + prompt.
 
-- [L] ★ **Mail agent** — triage, summarize a thread, draft / smart-reply, extract tasks, "why flagged" *(largely built)*
-- [L] ★ **Tasks agent** — propose action items, "what's on my plate", prioritise *(built, ADR 0023)*
-- [L] ★ **Docs agent** — write / edit / clean-paste / inline-diff, agent mode *(built, ADR 0029/0031)*
+### How an agent behaves — the three rules that shape every one of them
+
+- [L] ★ **A question is answered, not proposed.** Propose-then-approve governs
+  *changing* things. Asking "is the X100 in stock?" or "are we still in contact
+  with ABC?" returns the answer in the room, immediately, with the record it
+  came from. Only a write — send, book, invoice, publish — waits for a tap.
+  Making a read wait for approval is the difference between a colleague and a
+  form.
+- [L] ★ **Each agent has its own eyes.** An agent's retrieval is scoped to its
+  own product: the Mail agent searches correspondence, the Inventory agent
+  queries stock. A shared full-text search over the whole workspace answers
+  every question equally badly, and makes "per-product agent" a name rather
+  than a capability.
+- [L] ★ **The asker's door, always.** An agent reads and writes only what the
+  person who asked already could — in a DM, in a private channel, and in a
+  cross-org channel. An agent is an identity, never an authority (ADR 0034).
+
+### Where you meet an agent
+
+- [L] ★ **In its own product** — the in-module assistant.
+- [L] ★ **In a channel** — `@mention` it where the work is discussed, so the
+  answer lands in front of everyone who needed it.
+- [2] ★ **One-to-one** — a DM with an agent, like a DM with a colleague. The
+  place to ask the thing you would not put in the team channel.
+- [3] ★ **In a meeting** — see Meet, below.
+
+### The agents
+
+- [L] ★ **Mail agent** — triage, summarize a thread, draft / smart-reply, extract tasks, "why flagged"; **answer from correspondence** ("are we in contact with ABC?", "who last replied to them?") *(largely built)*
+- [L] ★ **Tasks agent** — propose action items, "what's on my plate", prioritise, chase *(built, ADR 0023)*
+- [L] ★ **Docs agent** — write / edit / clean-paste / inline-diff, agent mode *(built in the editor; contributes no chat tools yet)*
 - [2] ★ **"Ask alo" — the top-level agent** — not just search: a workspace-wide agent you ask in plain language to **answer AND act** across products ("summarise the Acme thread and draft a reply", "block two hours tomorrow and email the team"), running multi-step tasks by orchestrating the product agents below — cited, propose-then-approve, access-scoped. The universal command bar for the whole workspace *(cross-product cited search + doc AI built today; acting/orchestration is the growth)*
-- [2] ★ **Agenda (Calendar) agent** — find times, schedule, summarize the day/week, prep a meeting, propose events from mail
+- [2] ★ **Agenda (Calendar) agent** — find times, schedule, summarize the day/week, prep a meeting, propose events from mail *(reads built)*
+- [2] ★ **Chat agent** — catch up on a room, find what was said and where it was decided *(reads built)*
+- [2] ★ **Drive agent** — find & organise files, summarize a document, extract from attachments *(find built)*
 - [2] ★ **Sheet agent** — formulas from intent, analysis, clean/transform data, chart-from-intent
-- [2] ★ **Drive agent** — find & organise files, summarize a document, extract from attachments
-- [2] ★ **Chat agent(s)** — first-class chat participants, @mentionable, reply/react (see → Chat)
+- [2] ★ **Website (Sites) agent** — answer from the live site ("what do we promise on pricing?"), draft and edit a page, translate the whole site, review SEO; publishing is proposed, never silent (ADR 0036)
+- [2] ★ **Insights agent** — answer from the numbers, explain a change, build a report
+- [L] ★ **Billing agent** — invoice, convert a quote, chase *(built, wave B1)*
+- [L] ★ **CRM agent** — deals from a thread, move a stage, follow up *(built, wave B2)*
+- [L] ★ **Projects agent** — log time, status, timesheet from calendar *(built, wave B3)*
+- [L] ★ **Finance agent** — categorise, VAT summary, flag anomalies *(built, wave B4)*
+- [L] ★ **Inventory agent** — reorder proposals, and **stock answers in the room** ("is the X100 in stock?") *(built, wave B5)*
+- [L] ★ **HR agent** — who is off, draft a letter from the company's own template *(built, wave B6)*
+- [3] ★ **Meet agent** — after a meeting, minutes and actions into the meeting's thread, where they can become tasks and events like any other agent output. A **live** in-call participant that hears the room and answers mid-call is a separate decision (own ADR) — a media path, not a tool set.
 - [3] Per-agent skills users can create and share; the browseable agent directory
 
 ---

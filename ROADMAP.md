@@ -489,6 +489,68 @@ Session replay / individual tracking: permanent non-goal.
 
 ---
 
+## Agent track — an agent in every product (ADR 0034) ⇄ runs alongside Phases 3–6
+
+The framework is built and six product agents already have tools, but they all
+share one brain: an agent's tool set and its retrieval are not scoped to its
+product, and every tool — including the read-only ones — arrives as a proposal
+to approve. So "the Inventory agent" is a name on the same generic assistant,
+and asking it whether something is in stock offers a button instead of an
+answer.
+
+A1 fixes that for every agent at once and gates the rest: nothing below is
+worth building on an agent that cannot answer a question or tell its own
+product from anyone else's.
+
+### Wave A1 — what makes an agent a *product* agent
+
+- [ ] A1.1 Reads answer, writes propose: a read-only tool returns its answer in the room immediately; only a tool that changes something waits for approval. Both paths audited; the split is a property of the tool, not of the caller
+- [ ] A1.2 A product on the agent record, and the tool registry scoped by it — an agent is offered its own product's tools and no others, refused at the execution boundary as well as in the prompt
+- [ ] A1.3 Product-scoped retrieval: each agent grounds its answer in its own product's records, not one shared workspace search. Cross-product questions belong to Ask alo, the only agent allowed to look everywhere
+- [ ] A1.4 One-to-one with an agent: a DM whose counterpart is an agent rather than a colleague — its own channel kind, since a DM key of two user ids cannot express it
+- [ ] A1.5 The default set: every tenant gets its agents without an admin registering handles by hand; a module a tenant cannot open has no agent (per-user module access already decides this)
+- [ ] A1.6 A wrong-tenant and wrong-user test per agent surface — channel, DM and in-module — proving an agent reaches nothing the asker could not
+
+### Exit gate — A1 done when:
+
+- [ ] In a channel, `@mail are we in contact with ABC?` answers from correspondence with the messages behind it, and `@inventory is the X100 in stock?` answers from the stock record — both with no button in between
+- [ ] The same two questions in a DM with each agent answer identically
+- [ ] An agent asked for something outside its product declines and names the agent that owns it, rather than answering from a search snippet
+- [ ] A colleague who cannot open Billing gets no answer from the Billing agent, in any surface
+
+### Wave A2 — the agents with no tools yet
+
+Each item is that agent's read tools **and** its writes, to the depth of the
+implement skill — an agent that can only answer is half a product.
+
+- [ ] A2.1 ★ Website (Sites) agent: answer from the live site, draft and edit a page, translate the site, review SEO — publishing proposed, never silent (`alo-ai/site_edits.rs` and `site_translation.rs` are the foundation)
+- [ ] A2.2 ★ Sheet agent: formula from intent, explain a formula, clean a column, answer from the data with the cells cited, chart from intent
+- [ ] A2.3 ★ Docs agent in chat and DM: the editor's agent mode reachable from a room — draft a section, rewrite a selection, translate a document
+- [ ] A2.4 ★ Insights agent: answer from the numbers, explain a change, build a report
+- [ ] A2.5 Drive agent beyond `find_file`: summarise a document, extract from an attachment, propose a move or a rename
+- [ ] A2.6 Agenda agent beyond reads: find a time across several diaries, prep a meeting from its thread and attachments, reschedule
+- [ ] A2.7 Tasks agent beyond `create_task`: what is on my plate, prioritise, chase an overdue owner, extract actions from a thread
+
+### Exit gate — A2 done when:
+
+- [ ] Every module in the rail has an agent that answers a real question about that module from the record, in all three surfaces
+- [ ] Each agent's refusals are as tested as its answers: it declines to guess rather than answering from a snippet
+
+### Wave A3 — orchestration, and the meeting
+
+- [ ] A3.1 ★ Ask alo orchestrates rather than owns: it routes to the product agents and runs multi-step work across them — one approval surface, a visible plan, a working **Stop**
+- [ ] A3.2 ★ Meet, after the fact: minutes, decisions and actions into the meeting's thread, where they become tasks and events through the ordinary agent path
+- [ ] A3.3 Meet, live — **ADR first**: an agent as a LiveKit participant that hears the room and answers in-call. A media path, not a tool set, and not to be started before it is decided
+- [ ] A3.4 The agent directory: what each agent is for, what it may touch, and what it has done — browseable, per tenant
+
+### Exit gate — Agent track done when:
+
+- [ ] "Summarise the Acme thread, draft a reply, and block an hour to review it" runs as one request across three agents, with one approval and a working Stop
+- [ ] A meeting ends and its actions are in the right people's task lists, each traceable to the minute it came from
+- [ ] Every agent's audit trail names the asker, the tool, the record it read, and the approval that let it write
+
+---
+
 When every box in a phase is checked, mark the phase header — DONE and record
 the date of the gate in git history, not in this file. The file stays about
 what; git stays about when.
