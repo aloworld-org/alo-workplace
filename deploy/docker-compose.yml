@@ -28,12 +28,25 @@ networks:
 
 volumes:
   pg_data:
+  redis_data:
   garage_meta:
   garage_data:
   synapse_data:
   smtp_spool:
 
 services:
+  redis:
+    image: redis:7.4.6-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks: [alo]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   postgres:
     image: postgres:16.14
     environment:
@@ -148,12 +161,44 @@ services:
       - "7881:7881"
       - "50000-50019:50000-50019/udp"
     networks: [alo]
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7880/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  meet-egress:
+    profiles: ["recording"]
+    image: livekit/egress:v1.10.0
+    restart: unless-stopped
+    cap_add: [SYS_ADMIN]
+    environment:
+      EGRESS_CONFIG_BODY: |
+        api_key: ${ALO_MEET_API_KEY:-alo-dev-key}
+        api_secret: ${ALO_MEET_API_SECRET:-alo-dev-secret-placeholder-not-for-production}
+        ws_url: ws://livekit:7880
+        insecure: true
+        redis:
+          address: redis:6379
+        s3:
+          access_key: ${ALO_MEET_RECORDING_S3_ACCESS_KEY:-}
+          secret: ${ALO_MEET_RECORDING_S3_SECRET:-}
+          region: ${ALO_MEET_RECORDING_S3_REGION:-garage}
+          endpoint: ${ALO_MEET_RECORDING_S3_ENDPOINT:-http://garage:3900}
+          bucket: ${ALO_MEET_RECORDING_S3_BUCKET:-alo-meet-recordings}
+          force_path_style: true
+    depends_on:
+      livekit:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    networks: [alo]
 
   meet-transcriber:
     profiles: ["transcription"]

@@ -12,3 +12,5 @@ keys:
   alo-dev-key: alo-dev-secret-placeholder-not-for-production
 logging:
   level: info
+redis:
+  address: redis:6379
