@@ -31,6 +31,14 @@ the likeliest source of a conflict. Treat their area as owned by them for as
 long as they are in it, and keep your own commits small enough that a rebase
 over their work stays trivial.
 
+**A prerequisite that is not in the queue item does not exist.** `features.md`
+and a guide both said in bold that an ADR had to be written before the
+domain-selling build; no S2.15 item mentioned it, so five items shipped the
+feature without it (ADR 0049 is the retrospective review). A loop cannot honour
+a gate it was never given. When authoring a queue item, copy its prerequisites
+into the item itself — a gate recorded where the work is *described* but not
+where the work is *ordered* is not a gate.
+
 **Never touch the other track's areas.** The deliberately-shared files
 (`i18n/en.ts`, `CHANGELOG.md`, route registration in `server.rs`, `mod`
 lines in `lib.rs`) only ever receive ADDITIVE lines from either track — on a
