@@ -63,8 +63,24 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     $cliArgs = @("-p","`"$prompt`"","--dangerously-skip-permissions")
   }
   # Transcript dir for this repo (path with [:\ ] as '-'), where activity shows.
-  $projKey = ($RepoPath -replace "[:\\ ]", "-")
+  #
+  # Resolve-Path first, because the key is derived from the path AS TYPED. A
+  # -RepoPath given with forward slashes yields "C-/dev/repo"; no such folder
+  # exists, $newest below stays null, and $idleMin silently becomes total
+  # elapsed time — so the idle kill turns into a hard timer that stops honest
+  # work at exactly $IdleKillMin minutes however busy it is. Two iterations
+  # died that way before anyone noticed the timer was measuring the wrong
+  # thing, and the log said "silent for 45 min" about a worker that had been
+  # writing files the whole time.
+  $projKey = ((Resolve-Path $RepoPath).Path -replace "[:\\ ]", "-")
   $transcripts = Join-Path $env:USERPROFILE ".claude\projects\$projKey"
+  if (-not (Test-Path $transcripts)) {
+    # Refuse rather than degrade. A missing transcript folder means the idle
+    # detector cannot see anything, and a watchdog that cannot observe its
+    # subject must not be trusted to kill it.
+    Write-Host "[loop] no transcript folder at $transcripts - the idle detector would be blind, so this would become a $IdleKillMin-min hard timer. Check -RepoPath."
+    exit 2
+  }
   $started = Get-Date
 
   $proc = Start-Process -FilePath $file -ArgumentList $cliArgs -NoNewWindow -PassThru
