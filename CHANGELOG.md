@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **Ask an agent a question and get the answer, not a button.** "Is the X100 in
+  stock?", "what's on tomorrow?", "who's off next week?" — the agent now looks
+  it up while it is answering you and replies with the figure, citing the record
+  it read. Only a tool that *changes* something — sending mail, creating a task,
+  moving a deal — still asks you to approve it first, which was always the point
+  of the approval. An agent may look things up a few times for one question; if
+  that is not enough it says what it could not find out rather than guessing.
+  Everything it runs, looked up or approved, is recorded against your own
+  account, and it still reaches only what you can reach.
+
 - **The website screen now works on a phone.** The site's page (with
   publishing, collaborators, languages, and the page list) scrolls as one
   document on a small screen, so the page list is reachable again, and the
