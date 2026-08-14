@@ -155,6 +155,26 @@ services:
       retries: 5
       start_period: 15s
 
+  meet-transcriber:
+    profiles: ["transcription"]
+    build:
+      context: ..
+      dockerfile: products/meet/alo-transcriber/Dockerfile
+    restart: unless-stopped
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: ${ALO_MEET_API_KEY:-alo-dev-key}
+      LIVEKIT_API_SECRET: ${ALO_MEET_API_SECRET:-alo-dev-secret-placeholder-not-for-production}
+      ALO_TRANSCRIPTION_PROVIDER: ${ALO_TRANSCRIPTION_PROVIDER:-}
+      ALO_TRANSCRIPTION_MODEL: ${ALO_TRANSCRIPTION_MODEL:-}
+      ALO_TRANSCRIPTION_LANGUAGE: ${ALO_TRANSCRIPTION_LANGUAGE:-multi}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      livekit:
+        condition: service_healthy
+    networks: [alo]
+
   collabora:
     image: collabora/code:25.04.9.4.1
     environment:

@@ -39,6 +39,24 @@ public tracker exists (nothing here is silently skipped):
   "Drive & Docs"). `COLLABORA_ALIASGROUP1` must then name Drive's
   public host.
 
+## Live captions
+
+Meet captions use a separate STT-only LiveKit agent. It follows LiveKit's
+multi-user pattern: every human participant gets an isolated transcription
+session, so a busy meeting does not collapse into one anonymous transcript.
+The worker has no LLM and never speaks.
+
+Choose `deepgram` or `openai` in `.env`, provide that provider's API key, then:
+
+```
+docker compose --profile transcription up -d --build meet-transcriber
+```
+
+The profile is deliberately opt-in. Without it, the ordinary stack starts with
+no transcription process and cannot create provider charges. Caption segments
+are published on LiveKit's native transcription stream; alo's API persists them
+with the meeting record.
+
 ## Rules
 
 - Never patch an engine image; a source patch requires an ADR first
