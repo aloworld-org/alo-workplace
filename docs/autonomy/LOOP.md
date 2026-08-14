@@ -160,6 +160,18 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
        done` — the poll exits on the condition, never on a count. Once built,
        run the tests themselves in the FOREGROUND; they fit with room to
        spare.
+     **You run in one-shot mode: there are no notifications, and ending your
+     turn ends the PROCESS.** Never background a command and then finish your
+     message with "I'll wait for the completion notification" — no
+     notification will ever arrive, the wrapper will see you exit and start a
+     fresh iteration, and your uncommitted work sits in the tree waiting to be
+     re-adopted. That is exactly what iteration 114 did on 2026-08-15: it
+     backgrounded clippy, announced it would wait, and died 25 minutes in.
+     The ONLY way to wait is inside a tool call that returns when the wait is
+     over — the `until grep` poll above, run as a normal foreground command.
+     If a poll call itself is killed at the 600 s ceiling, issue the same
+     poll again as your next command; the marker file survives between
+     calls.
      History, kept because each sentence was paid for: the first version of
      this rule said "everything fits, 5 min 34 s" (2026-08-11) and was false
      a day later after 61 new test binaries landed; the second said
