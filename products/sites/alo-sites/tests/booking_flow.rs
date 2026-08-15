@@ -475,7 +475,7 @@ async fn json_body(response: Response) -> serde_json::Value {
 async fn booking_from_the_conversation_reserves_and_is_reversible_by_its_links() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "chat-book").await;
-    let (_site, booking, subdomain) =
+    let (site, booking, subdomain) =
         live_site_with_booking(&owner, "chat-book", &[], true).await;
     let day = wednesday_ahead();
     let date = day
@@ -507,6 +507,19 @@ async fn booking_from_the_conversation_reserves_and_is_reversible_by_its_links()
     let ics = booked["icsPath"].as_str().unwrap().to_owned();
     assert!(manage.starts_with("/b/manage/"));
     assert!(ics.ends_with("/calendar.ics"));
+
+    // The owner's transcript records the act with the published fact it
+    // used — the service and the instant, never the visitor (S3.03e).
+    let transcript = owner.site_chat_actions(&site).await.unwrap();
+    assert_eq!(transcript.len(), 1);
+    assert_eq!(transcript[0].kind, alo_store::SiteChatActionKind::Booked);
+    assert_eq!(transcript[0].fact.as_deref(), Some("Consultation"));
+    let slot_instant = time::OffsetDateTime::parse(
+        &slot,
+        &time::format_description::well_known::Rfc3339,
+    )
+    .unwrap();
+    assert_eq!(transcript[0].slot_at, Some(slot_instant));
 
     // The slot is gone for the next visitor…
     let after = body_string(get_day(&state, booking.as_str(), &date).await).await;

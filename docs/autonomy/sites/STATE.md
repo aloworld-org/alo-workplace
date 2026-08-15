@@ -7954,3 +7954,75 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   route prefix (`/_alo/*` already reaches alo-sites); `cargo fmt`
   deliberately not run (machine memory: rustfmt 1.9.0 divergence).
 - **Next:** S3.03e — the tenant-facing transcript of what the bot did.
+
+## 2026-08-15 — S3.03e The tenant reads what the assistant did, and never what anyone said
+
+- **Item:** S3.03e — a tenant-facing transcript showing each action, the
+  fact it used and the page that fact came from.
+- **What shipped:**
+  - **The ledger** (migration `0328`, store `site_chat_actions.rs`): one
+    bounded, tenant-scoped transcript of the assistant's acts and offers —
+    `answered` (with its citations: the published pages the answer drew on,
+    title + site-relative path, path null for a knowledge document),
+    `refused`, `booking_offered`/`booked` (the published service's name, and
+    the instant for `booked`), `lead_offered`/`lead_saved`/`lead_known`. The
+    `NewChatAction` constructors are the only shapes an entry can take, so a
+    call site cannot attach a visitor's words; the table has **no question
+    column, no answer-text column, no visitor identity of any kind** — the
+    columns-of-the-table proof pins it, the `CalendarBusySpan` trick applied
+    a third time. Every write prunes the site to its newest
+    `CHAT_ACTIONS_KEPT` (200) entries, so the anonymous surface can churn
+    the transcript but never grow it; unknown stored kinds are skipped on
+    read (later releases add kinds additively).
+  - **The writes** (alo-sites `chat.rs`/`chat_book.rs`/`chat_lead.rs`):
+    recorded beside spend/conversion at each act — answer (the same
+    citations the visitor was shown, resolved once), consulted-model
+    refusal (the free retrieval refusal deliberately records nothing, same
+    line spend draws: off-topic strangers must not churn the ledger),
+    booking offer, reservation (service + instant), lead saved/known. All
+    log-and-continue: the transcript is accountability, never the visitor's
+    answer.
+  - **The route** (`GET /sites/{id}/chat-actions`, `sites_chat.rs`):
+    newest first, owner-only like the rest of the assistant screen (the
+    transcript says which published facts the public voice hands out);
+    foreign site id is the uniform 404.
+  - **The screen** (`AssistantView.tsx`, "What the assistant did"): one
+    sentence per entry with icon and local time — the answer naming its
+    pages verbatim ("Pricing (/pricing), Opening hours"), the booking
+    naming its service and instant — empty state as onboarding, unknown
+    kinds skipped; strings in en/fr/nl (parity ratchet green).
+- **Verified:** clippy on alo-store/alo-sites/alo-jmap — zero warnings from
+  this item (the two pre-existing `meet.rs` type_complexity survivors remain
+  the business track's; one clippy run was cut at the 600 s ceiling and
+  finished as a harness-backgrounded task, 23m28s). Test-binary build via
+  the sanctioned background+marker form (24m23s; two polls re-issued at the
+  ceiling), then foreground `cargo nextest run -p alo-store -p alo-sites
+  -p alo-jmap`: **3 348/3 348 green** (1 pre-existing skip, 98 s;
+  prune-test-db first — 758 pruned). New proof: store round-trip of every
+  kind newest-first, the mandatory wrong-tenant wall (foreign read NotFound,
+  foreign transcript untouched), the 200-entry bound (oldest shed, newest
+  kept), the columns-of-the-table privacy proof; in-process on the real
+  router+postgres: an answer records exactly the pages the visitor was
+  shown, the free retrieval refusal records nothing while the consulted
+  refusal records one entry, lead saved→known record their two entries on
+  the serving Host's tenant only, and the existing conversation-booking arc
+  now also proves the `booked` entry (service + instant, no visitor). Web:
+  tsc, eslint, vitest (6 assistant tests incl. transcript rendering,
+  skipped-unknown-kind, empty state; 65-test language parity ratchet),
+  `npm run build` — all clean. Wire transcript on the local backend (fresh
+  `transcript-arc` tenant via `identityctl bootstrap-admin`, PKCE token,
+  debug `alo-jmap` on `127.0.0.1:8080`, killed before and after): no token
+  → 401; unknown site → 404; empty site → `{"actions":[]}`; two seeded
+  entries → newest first with fact/slotAt/citations exactly as designed;
+  a second tenant's token on the same site id → 404. Stale-binary gotcha
+  journaled: `identityctl` built before 0328 fails `could not run
+  migrations` against a database the test run already migrated — rebuild
+  it, nothing is wrong with the database.
+- **Cuts/flags:** none. Reading journaled: "each action" = the acts and
+  offers (the two verbs and their outcomes) plus answers and consulted
+  refusals — answers are what carry "the page that fact came from", and
+  citations are the fact's page by construction (ADR 0040 §1). Free
+  retrieval refusals are deliberately unrecorded (cost rule, ledger-churn
+  rule — both would be broken otherwise). No new route prefix (`/sites/*`
+  already proxied); no Caddy note needed.
+- **Next:** S3.04a — Billing-owned read seam for published catalog items.

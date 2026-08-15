@@ -38,9 +38,9 @@ use serde::Deserialize;
 use serde_json::json;
 use time::OffsetDateTime;
 
-use alo_store::{BookingRequest, StoreError, local_wall_clock};
+use alo_store::{BookingRequest, NewChatAction, StoreError, local_wall_clock};
 
-use super::chat::{rate_limited, state_json, valid_visitor};
+use super::chat::{rate_limited, record_action, state_json, valid_visitor};
 use super::forms::client_key;
 use super::{AppState, host};
 
@@ -140,6 +140,16 @@ pub(super) async fn book(State(state): State<Arc<AppState>>, request: Request) -
         .await
     {
         Ok(Some(reserved)) => {
+            // The tenant's transcript (S3.03e): the assistant booked this
+            // service at this instant — the published fact, never the
+            // visitor (who lives in the appointment row the owner already
+            // has).
+            record_action(
+                &state,
+                &resolved,
+                &NewChatAction::booked(&reserved.booking_name, reserved.starts_at),
+            )
+            .await;
             let when = match local_wall_clock(reserved.starts_at, &reserved.time_zone) {
                 Some((day, (hour, minute))) => format!("{day} {hour:02}:{minute:02}"),
                 None => body.slot.trim().to_owned(),

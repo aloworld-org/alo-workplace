@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- **You can now see what your site's assistant did.** The assistant screen
+  shows a transcript of its actions — each answered question with the pages
+  the answer was drawn from, each declined question, the free times it
+  offered, the meetings it booked and the leads it saved — newest first.
+  What visitors typed is never stored, and no entry says who a visitor was:
+  the transcript shows the act, the published fact it used, and the page
+  that fact came from.
 - **A visitor who asks the site assistant to be contacted can now leave
   their details in the conversation — and the lead is on your sales board
   before you have read anything.** The assistant only ever offers the form;

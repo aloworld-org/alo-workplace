@@ -44,7 +44,10 @@
 //! Privacy: the visitor token and client address key the in-memory limiters
 //! transiently ([`super::rate`]) and are never stored or logged; the
 //! question itself is sent to the tenant's configured backend and nowhere
-//! else, and is never logged either.
+//! else, and is never logged either. What the tenant can audit afterwards is
+//! the action transcript (S3.03e, [`alo_store::site_chat_actions`]): each
+//! act or offer with the published fact it used and the page that fact came
+//! from — never the conversation's words, never the visitor.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -59,8 +62,8 @@ use serde_json::json;
 
 use alo_ai::{SiteChatError, SiteChatRefusal, SiteChatReply, SiteChatVoice};
 use alo_store::{
-    ChatGate, PublicBookingService, PublishedSite, SiteChatAppearance, chat_month_key, local_day,
-    local_wall_clock,
+    ChatActionCitation, ChatGate, NewChatAction, PublicBookingService, PublishedSite,
+    SiteChatAppearance, chat_month_key, local_day, local_wall_clock,
 };
 use time::OffsetDateTime;
 
@@ -234,14 +237,19 @@ async fn answer(
     match alo_ai::answer_site_question(&config, question, &corpus, &service_names, &voice).await {
         Ok(SiteChatReply::Answer { text, citations }) => {
             record_spend(state, site, month).await;
-            let citations: Vec<serde_json::Value> = citations
+            // The fact's sources, resolved once: what the wire cites is
+            // exactly what the tenant's transcript records (S3.03e).
+            let cited: Vec<ChatActionCitation> = citations
                 .iter()
-                .map(|citation| {
-                    json!({
-                        "title": citation.title,
-                        "path": alo_ai::citation_path(&citation.citation, &site.default_locale),
-                    })
+                .map(|citation| ChatActionCitation {
+                    title: citation.title.clone(),
+                    path: alo_ai::citation_path(&citation.citation, &site.default_locale),
                 })
+                .collect();
+            record_action(state, site, &NewChatAction::answered(&cited)).await;
+            let citations: Vec<serde_json::Value> = cited
+                .iter()
+                .map(|citation| json!({"title": citation.title, "path": citation.path}))
                 .collect();
             state_json(
                 StatusCode::OK,
@@ -255,7 +263,15 @@ async fn answer(
         Ok(SiteChatReply::OfferBooking { service }) => {
             record_spend(state, site, month).await;
             match services.get(service - 1) {
-                Some(service) => booking_state(state, service).await,
+                Some(service) => {
+                    record_action(
+                        state,
+                        site,
+                        &NewChatAction::booking_offered(&service.published.name),
+                    )
+                    .await;
+                    booking_state(state, service).await
+                }
                 // The list changed between the read and the reply.
                 None => unavailable_state(state, site).await,
             }
@@ -268,13 +284,19 @@ async fn answer(
         Ok(SiteChatReply::OfferLead) => {
             record_spend(state, site, month).await;
             record_lead_offer(state, site).await;
+            record_action(state, site, &NewChatAction::lead_offered()).await;
             state_json(StatusCode::OK, json!({"state": "lead"}))
         }
         Ok(SiteChatReply::Refusal(refusal)) => {
             // An off-topic question refused at retrieval never reached the
             // backend and costs nothing; the model's own refusals did.
+            // The transcript follows the same line (S3.03e): a consulted
+            // model's refusal is an act worth showing the tenant, while the
+            // free retrieval refusal would let off-topic strangers churn
+            // the bounded ledger for nothing.
             if !matches!(refusal, SiteChatRefusal::NoSources) {
                 record_spend(state, site, month).await;
+                record_action(state, site, &NewChatAction::refused()).await;
             }
             let contact_path = contact_path(state, site).await;
             state_json(
@@ -393,6 +415,21 @@ async fn record_spend(state: &Arc<AppState>, site: &PublishedSite, month: &str) 
         .await
     {
         tracing::error!(site = %site.site, %error, "chat spend record failed");
+    }
+}
+
+/// Appends one entry to the tenant's transcript of what the assistant did
+/// (S3.03e). Logged and never failed on: the transcript is the tenant's
+/// accountability surface, never part of the visitor's answer. What it
+/// records is the act and the tenant's own published facts — the type
+/// cannot carry the question, the answer text, or the visitor.
+pub(super) async fn record_action(
+    state: &Arc<AppState>,
+    site: &PublishedSite,
+    action: &NewChatAction,
+) {
+    if let Err(error) = state.store.record_chat_action(site, action).await {
+        tracing::error!(site = %site.site, %error, "chat action record failed");
     }
 }
 

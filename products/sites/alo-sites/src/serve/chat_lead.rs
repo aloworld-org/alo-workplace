@@ -40,10 +40,11 @@ use serde_json::json;
 use time::OffsetDateTime;
 
 use alo_store::{
-    ConversationLead, ConversionStage, PipelineSeed, PublishedSite, StageSeed, StoreError,
+    ConversationLead, ConversionStage, NewChatAction, PipelineSeed, PublishedSite, StageSeed,
+    StoreError,
 };
 
-use super::chat::{rate_limited, state_json, valid_visitor};
+use super::chat::{rate_limited, record_action, state_json, valid_visitor};
 use super::forms::client_key;
 use super::{AppState, host};
 
@@ -215,12 +216,15 @@ pub(super) async fn capture(State(state): State<Arc<AppState>>, request: Request
     {
         Ok(alo_store::CapturedLead::Created(_)) => {
             record_captured(&state, &resolved).await;
+            record_action(&state, &resolved, &NewChatAction::lead_saved()).await;
             state_json(StatusCode::OK, json!({"state": "lead_saved"}))
         }
         // Which record made the lead unnecessary — and that it was a deal at
         // all — stays inside the tenant: the stranger only hears "we know
-        // you". Nothing new was raised, so the funnel does not move.
+        // you". Nothing new was raised, so the funnel does not move. The
+        // tenant's transcript records the same one bit (S3.03e).
         Ok(alo_store::CapturedLead::AlreadyKnown(_) | alo_store::CapturedLead::AlreadyCustomer) => {
+            record_action(&state, &resolved, &NewChatAction::lead_known()).await;
             state_json(StatusCode::OK, json!({"state": "lead_known"}))
         }
         Err(StoreError::Validation(detail)) => state_json(
