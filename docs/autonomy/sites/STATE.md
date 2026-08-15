@@ -7696,3 +7696,61 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   needs nothing.
 - **Next:** S3.03a — Agenda-owned public seam for published availability
   (first item of "the chatbot that acts").
+
+## 2026-08-15 — S3.03a the calendar answers the public in spans, and a site lists what it offers
+
+- **Item:** S3.03a — **Agenda-owned**: a public seam exposing published
+  availability for a site, without exposing the calendar behind it.
+- **What shipped:**
+  - **Agenda's availability seam** (`platform/alo-store/src/calendar_availability.rs`,
+    new module — written as Agenda's own per ADR 0040 §4; `calendar.rs` itself
+    untouched, `lib.rs` lines additive): `CalendarAvailability::open(pool,
+    blobs, tenant, owner)` → `busy_spans(calendar, from, to)` returning
+    `CalendarBusySpan { from, to }` — a type with no field a title, guest or
+    note could travel in, so the "never contents" rule holds by construction
+    rather than by convention. Expansion rides Agenda's own
+    `events_in_range` (recurrence, moved/cancelled occurrences, share
+    visibility all stay Agenda's single implementation); a foreign tenant's,
+    ungranted colleague's, deleted or never-existing calendar are all one
+    empty answer.
+  - **The public read path rewired** (`site_public_bookings.rs::busy_in`):
+    slot subtraction now asks the Agenda seam instead of opening the owner's
+    whole account door — the anonymous path can no longer hold a full
+    `CalendarEvent`. `site_agenda.rs` shrinks to the picker reads and the
+    WRITE half (`agenda_door`, still what puts the appointment in the
+    owner's calendar); its `site_calendar_busy` is gone, docs updated in
+    `site_agenda.rs` and `site_public.rs`.
+  - **Site-level published availability** (`site_public_bookings.rs`):
+    `SitePublicStore::published_availability(&PublishedSite)` — every ACTIVE
+    booking service frozen into the publish the site is currently serving,
+    name order, owner joined like `public_booking`, calendar-deleted services
+    dropping out (nothing bookable rather than an empty week). This is the
+    site-level entry S3.03b's conversation needs: no page-carried service id,
+    and the returned services are the same resolved shape
+    `public_booking_slots`/`reserve_public_booking` already take.
+- **Verified:** `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-sites
+  -p alo-jmap --all-targets` — zero warnings from this item (the two
+  pre-existing `meet.rs` type_complexity survivors remain the business
+  track's). Test-binary build via the sanctioned background+marker form
+  (9m02s), then foreground `cargo nextest run -p alo-store`: **1 973/1 973
+  green** (1 pre-existing skip, 19.3 s; DATABASE_URL exported per the
+  machine note; prune-test-db first — 1 602 tenants pruned). New
+  `site_availability_seam` suite: spans-only answer with recurrence expanded
+  (three occurrences + one plain event, exact instants), calendar/owner/
+  tenant scoping (sibling calendar excluded, ungranted colleague empty,
+  foreign tenant empty — the mandatory wrong-tenant proof), publish scoping
+  (inactive excluded, draft-only service invisible until republish, deleted
+  calendar drops out), two-tenant isolation of the site-level list, and the
+  listed service answering its four slots straight away. All 15 existing
+  booking tests green over the rewired path.
+- **Cuts/flags:** no scope cut. No migration (read-only seam over existing
+  rows), no HTTP route (the seam is store-level; S3.03b wires it into the
+  conversation), no web strings. `cargo fmt` deliberately not run per the
+  machine memory (rustfmt 1.9.0 divergence); new code written in-style.
+  Reading journaled: "Agenda-owned" executed by this track because no loop
+  track owns Agenda and the item exists only in this queue — honoured by
+  writing the seam as Agenda's own module (new file + additive `lib.rs`
+  lines, `calendar.rs` never edited) rather than by widening a Sites module.
+- **Next:** S3.03b — booking from the conversation (create the meeting,
+  confirmation, visitor-calendar invite, cancellation link, reversible-only
+  enforced in code).

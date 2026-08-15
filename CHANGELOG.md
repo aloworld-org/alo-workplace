@@ -10,6 +10,14 @@ contracts.
 
 ## Unreleased
 
+- **Your calendar now tells your website even less.** When a visitor looks
+  at free appointment times — on a booking page today, in the site
+  assistant's conversation next — the calendar behind the service answers
+  through a seam that can only say *busy from–to*. Event titles, guests and
+  notes structurally cannot cross it, and the published site can now list
+  everything bookable on it in one read, which is what will let the
+  assistant offer real times instead of guessing.
+
 - **Shaping your website's assistant is now a screen with a live preview.**
   The assistant page shows the real widget beside the fields — the same
   markup your visitors get, wearing your site's theme, updating as you

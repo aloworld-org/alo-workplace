@@ -146,7 +146,7 @@ reserved through their owner, never stored again (ADR 0041).
 
 ### The chatbot that acts (ADR 0040)
 
-- [ ] S3.03a **Agenda-owned**: a public seam exposing published availability for a site, without exposing the calendar behind it.
+- [x] S3.03a **Agenda-owned**: a public seam exposing published availability for a site, without exposing the calendar behind it.
 - [ ] S3.03b Booking from the conversation: create the meeting, send the confirmation, put it in the visitor's calendar, and include a cancellation link — with the reversible-only rule enforced in code rather than in the prompt.
 - [ ] S3.03c **CRM-owned**: a public seam to create a contact and a lead from a site conversation.
 - [ ] S3.03d Lead capture through that seam, storing aggregate attribution only and no individual visitor journey.
