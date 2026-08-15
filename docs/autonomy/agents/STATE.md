@@ -712,3 +712,171 @@ agent. Reuse `tenant_user_module_denials` (migration 0208) rather than inventing
 a second gate; note that `mail` and `workspace` have no denial row. Check the
 migrations directory again immediately before committing: `0402` is this track's
 highest, and the sites loop is climbing through `03xx`.
+
+## A1.5 — the default agent set, and the module gate applied (2026-08-15)
+
+**What shipped.** A tenant now *has* its agents, and a module a person cannot
+open has none. Two halves of one item, because a default set that ignored the
+admin console's switches would have handed every person fifteen agents including
+the apps they were deliberately not given.
+
+- **Migration `0403_chat_agent_seeds.sql`** — the ledger recording that a
+  tenant's default set has run, `inv_seeds`' shape reused whole. The directory
+  was re-checked immediately before committing: the sites loop is at `0322` and
+  `0402` was the highest of ours, so `0403` is free.
+- **`platform/alo-store/src/chat_agent_seed.rs`** (new) — `agents_or_seed`
+  (first-use, transactional, `ON CONFLICT DO NOTHING` per agent so a tenant's own
+  `@mail` is kept), `agent_seed_ran`, and `default_handle` (the product word,
+  `alo` for `workspace`). The file states the **shape**: which agents exist and
+  what each is addressed by. It states no names — those are user-facing strings
+  and arrive from the caller, `inv_locations`' split exactly.
+- **`products/mail/alo-jmap/src/chat_agent_names.rs`** (new) — EN/FR/NL tables,
+  primary-subtag fallback to EN, `?lang=` on the list route. Each name is the
+  **rail's own word for the module** (Sales, People, Websites, alo), taken from
+  `web/src/i18n/{en,fr,nl}.ts`, so the agent and the app a person clicks are
+  recognisably the same thing.
+- **The module gate, stated once**: `AGENT_VISIBLE` in `chat_agents.rs`, a single
+  SQL fragment pasted into `agents`, `agent` and `channel_agents`, joining
+  `tenant_user_module_denials` on `d.module = a.product`. The two vocabularies
+  are the same words by construction (a test in `agent_product` holds it), and
+  the two products that are **not** modules — `mail`, `workspace` — are exactly
+  the two the 0208 CHECK will not store, so they can never match a denial row.
+  `NOT u.is_admin` is `AccessFacts::may_open`'s admin arm spelled in SQL rather
+  than repeated as a judgement. `AGENT_COLUMNS` was rewritten for the `a` alias
+  the fragment correlates on, so a query that forgot the alias would not compile.
+- Because `agent(id)` is the chokepoint, `add_agent_to_channel` and
+  `open_agent_dm` inherit the gate without restating it.
+  `channel_agent_counterpart` was the one path that did not go through it (it
+  reads `chat_channels.agent_id`) and now does: a one-to-one opened before the
+  switch was thrown stays readable and nobody answers in it.
+- **`create_agent` refuses a product the caller cannot open** (422, the store's
+  own words). Without it the route would have answered 200 and then 404 on the
+  agent it had just made, because `agent(id)` would no longer hand it back.
+
+**How verified.**
+
+- `cargo fmt` clean. `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap
+  --all-targets` — zero errors, zero new warnings (the same two pre-existing
+  `type_complexity` warnings in `alo-store/src/meet.rs`, another track's file).
+- **`cargo nextest run -p alo-store` — 1954/1954 green** (60 s), including
+  `platform/alo-store/tests/chat_agent_seed.rs`: the set arrives once with every
+  product scoped correctly; a colleague's first read is not a second seeding; two
+  simultaneous first reads produce one set (`tokio::join!`, the ledger primary
+  key deciding); a tenant's own `@mail` survives the seed with its name; a
+  malformed seed is refused *without* claiming the ledger, so the next good read
+  still seeds; **all thirteen modules switched off leaves exactly `["alo",
+  "mail"]`**; an admin with a denial row keeps every agent and loses it the
+  moment `set_admin(false)` lands; and the mandatory wrong-tenant test — seeding
+  A does not seed B, a denial in A says nothing about B, and A's agent id is
+  `NotFound` from B both before and after B has its own.
+- **`cargo nextest run -p alo-jmap --no-fail-fast` — 1075/1076**, the one
+  failure being the sites track's known
+  `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`. Re-run
+  alone and confirmed to be the same clock-resolution flake as the last three
+  entries, digits visible: left `…614616`, right `…6146168` — Windows' 100 ns
+  clock against Postgres' microsecond `timestamptz`. Their file, reported and
+  not touched.
+- **On the wire**, against the local backend (real Postgres, the real router,
+  the scripted local socket as the model — no external call), in
+  `products/mail/alo-jmap/tests/agent_seed_http.rs`. The transcripts below are
+  copied out of an instrumented run of these same three tests:
+
+  - `GET /chat/agents` on a tenant **nobody had administered** →
+    `{"agents":[…15…]}`, alphabetical by handle, each carrying its product and
+    its words:
+
+    ```json
+    {"handle":"agenda","name":"Agenda","product":"agenda","disabled":false,
+     "description":"Ask about your diary: what is next, when everyone is free, what a meeting is for."}
+    {"handle":"alo","name":"alo","product":"workspace",
+     "description":"Ask anything across the whole workspace — it finds the right agent and works across them."}
+    {"handle":"crm","name":"Sales","product":"crm", …}
+    {"handle":"hr","name":"People","product":"hr", …}
+    ```
+
+    A second `GET /chat/agents?lang=fr` returns the **same ids** and still says
+    `"Sales"`: the seed ran once and nothing retranslates a tenant's agents.
+    `?lang=nl-BE` on a *fresh* tenant gives `Mensen`, `Verkoop`, `Financiën`
+    with the handles unchanged; `?lang=de` falls back to English.
+  - The denial, end to end. Anna and Ben share a public room with `@inventory`
+    in it; the admin switches Inventory off for Anna through the same store call
+    the console writes through. Afterwards: her `GET /chat/agents` is 14 agents
+    with no `inventory`; her `GET /chat/channels/{room}/agents` has none while
+    **Ben's view of the same room still does**; `POST
+    /chat/agents/{inventory}/dm` is **404**; `POST /chat/agents
+    {"handle":"stockroom","product":"inventory"}` is **422** saying
+    `… cannot open inventory`.
+  - **The question, and the two answers.** Anna posts the item's own sentence,
+    `{"body":"@inventory is the X100 in stock?"}`. Three seconds later her feed
+    holds exactly one message — her own — and the scripted model has been called
+    **zero** times:
+
+    ```json
+    [{"authorKind":"user","body":"@inventory is the X100 in stock?","seq":1,"proposal":null}]
+    ```
+
+    Ben posts the identical sentence in the identical room and is answered:
+
+    ```json
+    {"authorKind":"agent","author":"bE1adyC0IOfR-UWhzHsr4w","authorEmail":"Inventory",
+     "body":"I should never be asked.","onBehalfOf":"LHRjX0DujyxPTe3ZfRRIVw","seq":3,"proposal":null}
+    ```
+
+    and the model has now been called exactly **once**. Zero-then-one is the
+    whole assertion: the refusal happened before the turn rather than inside the
+    answer, and the gate is per person rather than per room.
+
+**Cuts / flags.**
+
+- **`chat_messages`' mention expansion is not gated, deliberately.** The join in
+  `chat_messages.rs:619` turns a stored agent id into `@handle` for **display of
+  past messages**. A person who lost Inventory still reads the text a colleague
+  typed last week; hiding it would edit history rather than withhold access, and
+  no agent is reachable through it. Named here so the next reader does not take
+  the omission for an oversight.
+- **`agent_records()` is not gated either** — it aggregates counts keyed by
+  agent id, and its only caller decorates an already-filtered list, so the extra
+  map entries are never read. Left alone rather than adding a second place the
+  rule has to be remembered.
+- **The retire verb is still missing**, and A1.4's flag stands: `open_agent_dm`'s
+  refusal of a retired agent remains code without a test because nothing can set
+  `disabled_at`. A1.5 did not add one — it is a route and an authorisation rule
+  of its own, and this item was already two halves. It belongs to A3.3 (the
+  agent directory) unless A1.6 wants it first.
+- **Every default agent is seeded, including the ones with no tools yet**
+  (`insights`, `meet`, `sites`). They answer from their product's grounding today
+  and gain tools in A2. What this keeps is the invariant ADR 0034 states in a
+  sentence — every product has an agent — which is worth more than a roster that
+  grows silently as tools land.
+- **No new top-level route prefix** — `/chat` already exists, so nothing is owed
+  to the production Caddyfile. **No `i18n/en.ts` line**: the strings this item
+  adds are seeded into the database from the API edge's own tables, not rendered
+  by the web app.
+- **Environment.** Docker is still unresponsive (`docker ps` returns nothing, no
+  `alo-pg`), so `scripts/prune-test-db.sh` still cannot run — its first statement
+  is a `docker exec` — and every command ran against `alo_agents_test` on the
+  native **5432** server. The suites finished in 60 s and 115 s, so the database
+  has not bloated.
+- **Disk.** C: was at **100%, 1.9 GB free** at the top of the iteration.
+  Deleting this checkout's own `target/debug/**/*.pdb` (397 files) freed it to
+  9.0 GB; two full test-binary builds took it back to 1.3 GB, and dropping
+  `target/debug/incremental` freed it to 8.6 GB again. Every command carried
+  `CARGO_PROFILE_TEST_DEBUG=0`, so no PDB came back.
+- **Two test-binary builds, 8 m 43 s and 8 m 56 s**, both in the LOOP-sanctioned
+  background+marker form; both polls were killed at the 600 s ceiling and
+  re-issued, and the marker survived between calls exactly as documented. The
+  second build was bought by one unit test: **`cargo check` does not build
+  `cfg(test)`**, so a missing `Debug` bound on a private struct surfaced only in
+  the test build, nine minutes later. Run `cargo check -p <crate> --all-targets`
+  before starting the linking build — it is seconds, and it would have saved all
+  nine.
+
+**Next:** A1.6 — the isolation tests, one per surface (channel, agent DM,
+in-module). Wrong tenant and wrong user both prove an agent reaches nothing the
+asker could not, including a private channel the asker is not in and a
+colleague's diary. Note that the wrong-tenant half of the agent **roster** is
+already landed (A1.5, `chat_agent_seed.rs`) and of the agent **DM** (A1.4,
+`chat_agent_dm.rs`); what A1.6 owes is the **grounding and tool-execution**
+half — that a turn cannot read a room or a diary its asker cannot. Check the
+migrations directory again immediately before committing: `0403` is this track's
+highest, and the sites loop is climbing through `03xx`.

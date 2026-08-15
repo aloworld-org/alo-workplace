@@ -10,6 +10,21 @@ contracts.
 
 ## Unreleased
 
+- **Your agents are simply there now.** Open the agent list and every part of
+  alo already has one — Mail, Agenda, Tasks, Chat, Drive, Billing, Sales,
+  Projects, Finance, Inventory, People, Insights, Meet, Websites, and alo itself
+  across all of them — each named the way the app it belongs to is named, in
+  your language, with a line saying what asking it is good for. Nobody has to
+  register handles first. If you had already made your own agent for something,
+  it is left exactly as you wrote it, and you are given the rest.
+
+- **An app you have not been given has no agent either.** If your administrator
+  has switched an app off for you, its agent is not in your list, cannot be
+  opened, and does not answer you — including in a room you share with a
+  colleague who does still have that app, where it goes on answering them
+  normally. Nothing you could not already open becomes reachable by asking an
+  agent about it.
+
 - **You can now have a one-to-one with an agent, the way you have one with a
   colleague.** Open a conversation with the Mail agent and simply ask — no `@`,
   no room to set up, nothing to invite it to. Everything you say there is for

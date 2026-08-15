@@ -96,6 +96,34 @@ product besides.
   has already decided, instead of a second permission system that can disagree
   with the first. `mail` and `workspace` have no module — mail cannot be denied,
   and `workspace` is not a module.
+
+  **That gate is now applied** (A1.5). Every agent read joins the denial table
+  on `d.module = a.product`, so a person who cannot open Inventory has no
+  `@inventory`: not in the list, not by id, not in a room they share with a
+  colleague who does have it, and not as the counterpart of a one-to-one they
+  opened before the switch was thrown (its history stays readable; nobody
+  answers in it). Defining one is refused with a 422 rather than made and
+  hidden, because an agent its author cannot then see would be a 200 followed by
+  a 404. `NOT u.is_admin` is in the predicate: an administrator is never denied,
+  which is `AccessFacts::may_open`'s own rule and exists so an admin who
+  switched an app off for themselves can still reach the console.
+- `chat_agent_seeds` (migration 0403) — the ledger recording that a tenant has
+  been **given its default agents**: one per product, on the first read of
+  `GET /chat/agents`, with nobody registering a handle by hand. Handles are the
+  product words (`@mail`, `@sites`, …) except `workspace`, which is `@alo`.
+
+  The names and descriptions come from the API edge's language tables
+  (`chat_agent_names.rs`, `?lang=`), never from the store: an agent called
+  `Websites` in a French tenant is a hardcoded English string in a European
+  product. Each name is the **rail's own word for the module** — Sales, People,
+  Websites — so the agent and the app a person clicks are recognisably the same
+  thing.
+
+  A ledger rather than "are there any agents yet", for the reason `inv_seeds`
+  gives: once has to survive what it wrote, so a tenant that retires an agent is
+  not handed it back the next morning. Each insert is `ON CONFLICT DO NOTHING`
+  besides, so a tenant that had already registered its own `@mail` keeps theirs,
+  name and all, and is given the fourteen it was missing.
 - `chat_channels.kind` gains **`agent_dm`** and `chat_channels.agent_id`
   (migration 0402, ADR 0048) — a one-to-one between one person and one agent.
   A DM could not hold one: `dm_key` is "both member ids sorted and joined", two
@@ -138,8 +166,8 @@ product besides.
 
 | Route | Does |
 |---|---|
-| `GET /chat/agents` | The tenant's agents — for the composer's `@` list and the member sheet. Each carries its `product` and its **record**: answers given and actions approved, counted **only over rooms the caller can see**, so two people can legitimately be shown different numbers for the same agent. An aggregate leaks too, just more slowly — a tally that included private rooms would answer "is that agent busy somewhere I cannot see?" |
-| `POST /chat/agents` `{handle, name, description?, product}` | Define an agent. `product` is **required** and has no default: the only sensible default would be `workspace`, which is every tool in the workspace, and the widest agent must not be the one you get by forgetting. An unknown word is a 422 naming the accepted set |
+| `GET /chat/agents[?lang=nl]` | The tenant's agents that **this caller** may see — for the composer's `@` list and the member sheet. **Seeds the default set on the tenant's first read**, named in `lang` (that language is the tenant's from then on; the seed runs once and nothing retranslates an agent a human may have renamed). Each carries its `product` and its **record**: answers given and actions approved, counted **only over rooms the caller can see**, so two people can legitimately be shown different numbers for the same agent. An aggregate leaks too, just more slowly — a tally that included private rooms would answer "is that agent busy somewhere I cannot see?" |
+| `POST /chat/agents` `{handle, name, description?, product}` | Define an agent. `product` is **required** and has no default: the only sensible default would be `workspace`, which is every tool in the workspace, and the widest agent must not be the one you get by forgetting. An unknown word is a 422 naming the accepted set, and so is a product this caller cannot open |
 | `POST /chat/agents/{id}/dm` | Open the caller's one-to-one with an agent (ADR 0048), creating it once and returning the same room every time after. A route of its own rather than a third shape of `POST /chat/channels`, whose DM branch takes `{with}` — a **user** id; naming an agent there is the same confusion the schema refused. 404 for an agent this tenant does not have, 422 for a retired one |
 | `POST /chat/channels/{id}/agents` · `DELETE …/agents/{agent}` | Add or remove an agent from a room (owner only, like any member) |
 | `GET /chat/channels/{id}/turns` | Agent turns running in this room right now, so a room does not look idle while a model thinks |
@@ -161,6 +189,7 @@ already is.
 | A lookup belonging to another product | Refused at the boundary and reported back to the model as the tool's result, so the agent answers by saying which agent owns the question. Never a proposal: a button on a lookup is the bug ADR 0047 removed |
 | Approving one already decided | 422 saying what it became |
 | Mentioning an agent that is not in the room | Nothing. Plain text, exactly as an unresolved `@person` is today |
+| Mentioning an agent of a module you cannot open | The same nothing, and **no model call**. To that person the room has no such member to name, so there is no turn to refuse partway through — while the colleague beside them who still has the module is answered in the very same room |
 | No AI provider configured | The agent posts nothing and the asker is told once. Matching `/ai/agent`'s soft answer, not the 503 other AI routes give — an unconfigured model must not make chat look broken |
 | The model is unreachable | Same: said once, in the room, as the agent |
 
