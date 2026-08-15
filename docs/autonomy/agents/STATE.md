@@ -2311,3 +2311,126 @@ than of new parsing — do not build a second attachment path. If the item opens
 `alo-store` for the free/busy read anyway, pay the `agent_ground.rs:31` comment
 debt in the same commit. Check the migrations directory again immediately before
 committing; `0405` is this track's highest and the sites loop was at `0324`.
+
+## A2.6 — the Agenda agent past its own diary: a time across several, a meeting prepared, a meeting moved
+
+**Shipped.** Three tools, and the whole of the item: `find_a_time` (read),
+`meeting_prep` (read) and `reschedule_event` (write). The Agenda set is now four
+reads and two writes; the registry is 60 tools, 27 of them reads.
+
+- **`find_a_time` looks only at the diaries already shared with the asker, and
+  says whose it could not read.** `AccountStore::calendars()` already lists
+  exactly the calendars a person may open (owned, or granted directly or through
+  a group), so the reach question was answered by the store and no new store
+  method was needed — which is why this item cost an `alo-ai` + `alo-jmap` gate
+  (5 m 27 s of linking) rather than `alo-store`'s ~115 relinks. A named colleague
+  whose calendar is not among them comes back in `couldNotCheck` with the reason,
+  `complete` is `false`, and their meetings are not in the arithmetic: an
+  unreadable diary is never a free one. The candidates a name resolves against
+  are the owners of those visible calendars, labelled through
+  `TenantStore::emails_of` — **no directory is searched**, so "no diary of X's is
+  shared with you" is word-for-word the same answer for a colleague who keeps
+  their calendar private and for somebody who is in no tenant at all. A colleague
+  whose diary is readable but who was not named blocks nothing, which a test
+  pins.
+- **The free-slot arithmetic is pure and tested without a database.**
+  `free_gaps(window, busy, least)` is the whole of it; the case it exists for is
+  a meeting *inside* another meeting, where a naive cursor re-opens the time it
+  sits in and offers a slot in the middle of somebody's afternoon. All-day
+  entries are reported beside the slots and never against them, on `am_i_free`'s
+  reasoning ("Leave" and "Company offsite" are the same row shape).
+- **The working window is UTC and says so.** There is no timezone database in
+  this workspace; `today_where` already tells the model the asker's zone, so
+  `earliest`/`latest` are UTC `HH:MM` the model converts, and the answer repeats
+  the window it actually looked inside.
+- **`meeting_prep` reads the mail itself, because Agenda is not offered Drive's
+  tools.** The boundary (`offers`) refuses `attachment_read` to an Agenda agent,
+  so a prep that told the model "ask the Drive agent" would be a dead end for the
+  person who asked. It gathers the event, the caller's own `workspace_search`
+  hits of kind `message` (metadata for up to ten, opened for the nearest three),
+  each opened message's body preview and attachment list, and the text of up to
+  two *readable* attachments — `readable` asks the same two facts
+  `attachment_read` does, so a PDF is refused by the Agenda agent exactly as the
+  Drive agent refuses it. One message's bytes are fetched once and the body, the
+  attachment list and the attachment text are all read out of them.
+- **`reschedule_event` moves the time and nothing else.** Title, guests, place,
+  notes and reminder ride across on the existing row; a move with no `end` keeps
+  the meeting as long as it already was (taking `create_event`'s one-hour default
+  would silently shorten a workshop). One sitting of a series is moved with
+  `override_occurrence` on its own `RECURRENCE-ID` slot, so the rest of the
+  series stays — proved by reading the whole week back. Editability is asked with
+  `can_edit_calendar` **before** anything is written, so a colleague's diary
+  shared at `viewer` earns a sentence rather than a store error; at `editor` the
+  same call moves it. An all-day entry is refused by name. There is deliberately
+  no way for an agent to cancel a meeting.
+- **A meeting is named, never identified.** `resolve_meeting` is written once for
+  both tools: the title verbatim, plus `on` when the diary holds it more than
+  once, over `on`'s day or [today − 7, today + 60]. Several sittings is a refusal
+  that lists their days ("say which day"), because choosing the next one
+  reschedules the wrong Tuesday.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-ai -p alo-jmap
+--all-targets` clean (the two pre-existing `clippy::type_complexity` warnings in
+`alo-store/src/meet.rs` are not this track's and were not touched); `cargo
+nextest run -p alo-ai` **208/208**; `cargo nextest run -p alo-jmap --lib`
+**731/731**; the whole `alo-jmap` suite **1 388 tests in 161 s, 1 386 passed**
+(the two failures were this item's own unit test, since fixed and green, and the
+sites track's known one below). The new wire test is
+`products/mail/alo-jmap/tests/agent_agenda_http.rs` — 10 tests: the slot found
+across two diaries in a room with no button in between (asserting the model was
+shown a slot at 09:00, none starting inside the colleague's meeting, and one at
+11:00 where an *unnamed* colleague's workshop sits), the unshared diary reported
+and never counted free, the stated window and every range refusal, the all-day
+entry beside the slots, the meeting prepared from its mail with the CSV read and
+the PDF named-not-read, the title that matches nothing or several sittings, the
+move proposed then approved then checked in the store with its length and its
+other fields intact, one sitting of a `FREQ=DAILY;COUNT=4` series moved with the
+rest of the week unmoved, the four refusals a move earns plus the viewer→editor
+pair, and the isolation sweep across a tenant boundary and a colleague's private
+diary for both meeting tools and for `find_a_time`.
+
+- **The one pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime` at
+  100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision (`…743863` vs `…7438633`). Identical to the failure the
+  last six iterations recorded; the file is theirs and the fix on their side is
+  comparing at microsecond precision.
+- **`cargo fmt -p alo-ai` reformatted the sites track's `site_chat.rs`, and the
+  change was reverted before committing.** Nothing this item wrote touched that
+  file; the formatter simply found it unformatted (their loop must have committed
+  it unformatted, or a rustfmt version differs). Reverting is right — a
+  formatting-only diff in another track's file is a rebase conflict waiting to
+  happen and is not this item's to make — but check `git status` for it after
+  every `cargo fmt -p alo-ai`, because it will come back.
+- **The `agent_ground.rs:31` documentation debt is still NOT paid**, for the
+  third item running and for the same reason: this item never opened `alo-store`
+  (the reach question was already answered by `calendars()`), and a one-comment
+  change there would have bought ~115 relinks. It moves on to the next item that
+  opens the crate for a real reason.
+- **Environment.** C: opened at **5.9 GB free, 99 % full**. Deleting this
+  checkout's 82 `alo-jmap` test binaries **before** the build — they were stale
+  the moment the crate changed and cargo relinks them anyway — took it to 11 GB;
+  the build ended at 1.3 GB and the newest-per-name sweep plus the `.pdb` sweep
+  took it back to 6.3 GB. Deleting the about-to-be-relinked binaries up front is
+  worth recording: it is the only sweep that reliably frees GBs on this box now
+  that `CARGO_PROFILE_TEST_DEBUG=0` keeps the symbols away, and it costs nothing
+  the build was not going to spend. Docker is still unresponsive (`docker ps`
+  returns nothing, no containers), so `scripts/prune-test-db.sh` still cannot
+  run; everything ran against `alo_agents_test` on the native **5432** server,
+  and 1 388 tests in 161 s says the database has not bloated. No migration: the
+  Agenda agent has been a seeded product since A1.5, and this item added no
+  column. `0405` is still this track's highest.
+
+**Next:** A2.7 — the Tasks agent beyond `create_task`: what is on my plate,
+prioritise, chase an overdue owner, extract actions from a thread. Two things to
+read first. The Tasks set is a single write today (`agent_tasks.rs`), so this is
+the same shape A2.5 and A2.6 had: reads that answer in the turn, added beside a
+write that already exists — check what `alo-store`'s task surface exposes for
+*other people's* tasks before assuming "chase an overdue owner" is reachable,
+because that is the same access question `find_a_time` had and the same fork
+between a two-crate gate and an `alo-store` one. And "extract actions from a
+thread" already has both readers it needs: `catch_up_room` for a conversation and
+this item's mail-joining for correspondence — do not build a third. Check the
+migrations directory again immediately before committing; `0405` is this track's
+highest and the sites loop was at `0324`.

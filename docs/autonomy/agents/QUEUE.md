@@ -71,7 +71,7 @@ of them ends with a real question asked and answered on the wire.
 - [x] A2.3 ★ Docs agent reachable from a room: draft a section, rewrite a selection, translate a document — the editor's agent mode, addressable as an agent.
 - [x] A2.4 ★ Insights agent: answer from the numbers, explain a change, build a report.
 - [x] A2.5 Drive agent beyond `find_file`: summarise a document, extract from an attachment, propose a move or a rename.
-- [ ] A2.6 Agenda agent beyond reads: find a time across several diaries, prep a meeting from its thread and attachments, reschedule.
+- [x] A2.6 Agenda agent beyond reads: find a time across several diaries, prep a meeting from its thread and attachments, reschedule.
 - [ ] A2.7 Tasks agent beyond `create_task`: what is on my plate, prioritise, chase an overdue owner, extract actions from a thread.
 - [ ] A2.8 Mail agent's answer half, explicitly: correspondence questions answered from the record — "are we in contact with X", "who last replied", "what did we promise them" — cited to the messages, never to a snippet.
 

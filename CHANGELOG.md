@@ -19,6 +19,24 @@ contracts.
   your details") instead of being filed twice. Your website funnel counts
   how often the form was offered and how many leads it raised — as plain
   totals with no visitor identity, like all site analytics.
+
+- **`@agenda` can now find a time across several diaries, prepare a meeting,
+  and move one.** Ask when you and a colleague are both free and it looks in
+  both diaries and offers real slots — and a colleague whose calendar has not
+  been shared with you comes back named, with the reason, instead of being
+  counted as free, so a slot is never offered over somebody's afternoon you
+  could not see. Ask what you need for a meeting and it gathers the meeting
+  itself, the emails whose subject matches it and the text of what was
+  attached to them, so a briefing is written from the correspondence rather
+  than from the meeting's title. Ask it to move a meeting and it proposes the
+  move for your tap: the meeting keeps its length unless you say otherwise,
+  everything else about it — title, guests, place, notes, reminder — is left
+  alone, and one sitting of a repeating meeting moves on its own while the
+  rest of the series stays. A meeting whose title is in your diary twice is a
+  question about which day, never a guess; an all-day entry has no time to
+  move and is refused by name; and a diary you can read but not change is
+  refused rather than half-changed.
+
 - **Visitors can now book an appointment inside the site assistant's
   conversation — and undo it themselves.** When someone asks the assistant
   to book, it offers your published services and their *real* free times
