@@ -727,15 +727,18 @@ model proposes are one letter.
 
 ### The billing agent (as built, B1.25)
 
-Three tools, added to the one agent of ADR 0034 rather than to a second
-assistant: `create_invoice_draft`, `quote_to_invoice`,
-`draft_payment_reminder`. The framework is unchanged — a product agent is a
-**tool list plus a paragraph** (`alo-ai/src/agent_billing.rs`, spliced into the
-system prompt by `alo_ai::system_prompt`) and **executors** in the product's own
-module (`alo-jmap/src/agent_billing.rs`, dispatched from the one
-`POST /ai/agent/execute`). `alo_ai::is_agent_tool` is the single allowlist
-across products, so a tool cannot be described to a model without being
-executable, or the reverse; a test asserts the two sets are equal.
+Three tools: `create_invoice_draft`, `quote_to_invoice`,
+`draft_payment_reminder`. A product agent is a **tool list plus a paragraph**
+(`alo-ai/src/agent_billing.rs`) and **executors** in the product's own module
+(`alo-jmap/src/agent_billing.rs`, dispatched from the one
+`POST /ai/agent/execute`). Since A1.2 those three are Billing's rather than
+everybody's: `alo_ai::agent_product` maps the product on the agent's record to
+its tool sets, `alo_ai::system_prompt_for` renders that product's prompt, and
+`alo_ai::offers` is what the execution boundary asks before running anything —
+so the Billing agent raises an invoice and the Inventory agent cannot.
+`alo_ai::is_agent_tool` remains the allowlist of what exists at all, so a tool
+cannot be described to a model without being executable, or the reverse; a test
+asserts the two sets are equal.
 
 Every tool ends in a **draft**. None issues a document, assigns a number, or
 puts mail on the wire — the three irreversible acts of billing stay where a

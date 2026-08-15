@@ -291,3 +291,141 @@ file and their area, so it is reported rather than fixed.
 registry scoped by it, refused at the execution boundary rather than in the
 prompt. Check the migrations directory again immediately before committing: the
 sites loop is climbing through `03xx`.
+
+---
+
+## A1.2 — a product on the agent record, and the boundary that means it (2026-08-15)
+
+**Shipped and gated.** An agent is now the agent *of* something, and that is a
+permission rather than a label.
+
+**What shipped.**
+
+- **The fact.** `chat_agents.product` (migration `0401`), `NOT NULL DEFAULT
+  'workspace'`, CHECKed against the rail's own module ids plus `mail` and
+  `workspace`. `AgentProduct` in `platform/alo-store/src/agent_product.rs` reads
+  and writes it, and `AgentProduct::module()` maps each product to the
+  `AppModule` migration 0208 already gates per user — which is what A1.5 will
+  ask, rather than inventing a second permission system that can disagree with
+  the first. `Mail` and `Workspace` map to none: mail cannot be denied, and
+  `workspace` is not a module.
+  - `workspace` is a **word**, not a NULL. A nullable column would make "nobody
+    said" and "deliberately every tool" the same state, and that failure would be
+    silent and wide.
+  - The migration **backfills by handle**: an agent somebody named `@inventory`
+    was created to be the Inventory agent, and the handle is the only evidence of
+    intent the table holds. An unrecognised handle is left as `workspace` —
+    exactly the reach it has today — rather than guessed at.
+  - `create_agent` takes the product as a **required argument**, and
+    `POST /chat/agents` requires the field: the only sensible default is
+    `workspace`, and the widest agent must not be the one you get by forgetting.
+- **The registry.** `platform/alo-ai/src/agent_product.rs` is one table mapping a
+  product to its tool sets. Making it truthful meant splitting the old
+  undifferentiated "core" list, which had mail, tasks and calendar tools in one
+  const because there was one agent: `agent_mail.rs` and `agent_tasks.rs` are new,
+  `create_event` moved to `agent_agenda.rs` beside the two diary reads, and the
+  address book (`agent_contacts.rs`) is Mail's. Each of the eleven products owns
+  its tools exactly once; `insights`, `meet` and `sites` own none yet (A2.1, A2.4,
+  A3.2) and say so in their prompt rather than borrowing another product's.
+  33 tools, 11 products, no tool in two.
+- **The prompt.** `system_prompt_for(product)` replaces `system_prompt()`. It
+  names the agent ("You are the alo Inventory agent…"), describes that product's
+  tools and no others, renders the ADR 0047 read/write split from that product's
+  declarations, and — for every agent but Ask alo — tells it to say which agent
+  owns a question rather than answering it from a search snippet. The general
+  rules lost the sentence about email `source` numbers, which moved to Mail's
+  guidance: an agent with no email tool was being told how to fill in an argument
+  it would never have. The folder list is likewise only rendered for a product
+  that actually has `move_to_folder`.
+- **The boundary — the part that matters.** `execute_tool` asks
+  `alo_ai::offers(product, tool)` before anything is dispatched, and the product
+  comes from **the agent's own row**, read through the caller's store, never from
+  whoever built the `ToolRun`. A caller that could state its own scope is one
+  refactor away from stating a wider one, and every test would still pass because
+  the tools would still run. It fails closed: an agent that cannot be read runs
+  nothing.
+- **A refused lookup is not a button.** Product scope is deliberately *not*
+  checked in `agent_turn::step`. A read belonging to another product takes the
+  read path, is refused at the boundary, and the refusal is handed back to the
+  model as that tool's result — so the turn ends with the agent saying which agent
+  owns the question. Checking it in the turn as well would be a second copy of a
+  permission rule, and would put a button on a lookup, which is the bug ADR 0047
+  exists to remove.
+
+**How verified.**
+
+- `cargo fmt` clean. `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-ai -p
+  alo-jmap --all-targets` — zero errors, zero new warnings (the same two
+  pre-existing `type_complexity` warnings at `alo-store/src/meet.rs:185` and
+  `:319`, another track's file, untouched).
+- **`cargo nextest run -p alo-store` — 1923/1923 green** (57 s), including the new
+  `platform/alo-store/tests/chat_agent_product.rs` and its **mandatory
+  wrong-tenant test**, `an_agent_and_its_product_are_never_another_tenants`:
+  tenant B holding tenant A's agent id gets `NotFound` — the same answer an id
+  that was never issued gets, so the refusal is not an oracle — and the same
+  handle in the other tenant is a different agent with its own product.
+- The boundary rule itself, over the whole registry, with no database and no
+  model: `an_agent_may_use_only_its_own_products_tools` in `alo-jmap/src/agent.rs`
+  checks `offers(product, tool)` for every (product, tool) pair that exists —
+  15 × 33 — and that an approval never widens *which* product's tools an agent
+  has, only *who* may run them.
+- **On the wire**, in a real room, against the local backend, with a scripted
+  local socket as the model (no external call — the shape `insights_ask_http.rs`
+  established), in `products/mail/alo-jmap/tests/agent_reads_answer_http.rs`:
+  - `a_lookup_from_another_product_is_refused_and_the_agent_says_who_owns_it`:
+    the Inventory agent's model asks for `whats_on`; the room gets the sentence
+    "That's the Agenda agent's — ask @agenda what's on." with `proposal: null`;
+    the model's **second** call is asserted to carry `this lookup did not run:
+    whats_on is not a tool the inventory agent has`; its **first** call is
+    asserted to contain `- stock_answer:` and **not** `- whats_on:`, so the
+    prompt and the boundary are provably reading one registry. One audit row,
+    `whats_on`, `ok = false`, and `reads == 0`.
+  - `approving_another_products_change_still_runs_nothing`: the same agent's
+    model asks for `create_task`; it arrives as a pending proposal as any write
+    does; the asker's own tap returns **403** naming the tool and the product,
+    the personal project holds **no task**, and the audit row is
+    `create_task`/`write`/`ok = false`.
+- **`cargo nextest run -p alo-jmap -p alo-ai --no-fail-fast` — 1178/1179** (158 s
+  after a cold build), the one failure being the sites track's known
+  `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`, flagged in
+  the previous entry: Windows' 100 ns clock against Postgres' microsecond
+  `timestamptz`, so it fails about nine runs in ten regardless of the change
+  under test. Re-run on its own here, it **passed** — which is the same
+  behaviour, not a fix. Still their file and still reported rather than touched.
+  The build did not fit one `Bash` call and the run was finished from the
+  background marker form the LOOP sanctions; every assertion this item rests on
+  was then re-run in the **foreground** (155 agent tests, then the four wire
+  tests plus the two boundary tests, all green).
+
+**Cuts / flags.**
+
+- No new HTTP route prefixes, so nothing is owed to the production Caddyfile.
+  `POST /chat/agents` gained a **required** field, which is a break in the
+  narrowest sense — but its only caller is this repo's tests (the web app reads
+  `GET /chat/agents` and never creates one), and defaulting it would hand every
+  tool in the workspace to a client that forgot. Recorded here rather than
+  versioned for that reason.
+- `agent_json` gained `product` (additive) and `GET /chat/agents` carries it, so
+  the chat rebuild can put an agent beside its module without a second mapping.
+  No `web/src/chat/**` file was opened.
+- The existing wire tests were re-pointed at agents whose product actually owns
+  the tool they exercise (`catch_up_room` → a Chat agent, `create_task` → a Tasks
+  agent) instead of an "Inventory" agent doing everything. That is the feature
+  working, not a weakening: under A1.2 those two tests would otherwise have been
+  asserting that scope is not enforced.
+- `agent_agenda`'s `nothing_here_can_change_a_diary` became
+  `nothing_but_create_event_can_change_a_diary`, naming the one write rather than
+  counting to zero, so a second write slipped into that list still fails it.
+- **The test database is still the one on 5432, not the container on 5433.**
+  Docker remains unresponsive (`docker ps` prints nothing and returns), and C: is
+  at **100%, ~4 GB free** — the same disk pressure the last entry diagnosed. The
+  gate ran against `alo_agents_test` on the live 5432 server, which the previous
+  iteration created; migration `0401` applied to it cleanly from `sqlx migrate
+  run`. Every command carried `CARGO_PROFILE_TEST_DEBUG=0`, without which
+  `alo-jmap` cannot link at all on this box.
+
+**Next:** A1.3 — product-scoped retrieval, so each agent grounds in its own
+product's records rather than one shared `workspace_search_terms`, with Ask alo
+keeping the workspace-wide view. The seam it needs is already in place: `Turn`
+and `AgentAsk` both carry the product, and `agent_product.rs` is the one table a
+per-product retrieval belongs in.

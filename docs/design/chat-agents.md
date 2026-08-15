@@ -68,9 +68,34 @@ product besides.
 
 ## Data model
 
-- `chat_agents` — tenant_id, id, handle (`alo`), name, description,
+- `chat_agents` — tenant_id, id, handle (`alo`), name, description, **product**,
   created_at, disabled_at. The identity an agent posts as. Tenant-scoped, so a
   tenant can name its own.
+
+  `product` (migration 0401) is what the agent is the agent **of**: one of the
+  rail's own module ids (`mail`, `agenda`, `tasks`, `chat`, `drive`, `billing`,
+  `crm`, `projects`, `finance`, `inventory`, `hr`, `insights`, `meet`, `sites`),
+  or `workspace` for "Ask alo". It is the value everything else scopes by, and
+  it is read in two places that must not be confused:
+
+  - the **prompt** offers an agent its own product's tools and describes it as
+    that product's agent (`alo-ai`'s `agent_product`);
+  - the **execution boundary** refuses every other product's tools, whatever the
+    model returned, reading the product off the agent's own row rather than
+    taking it from whoever built the run.
+
+  Only the second is a permission. A prompt that asks nicely is not one: the
+  model is the untrusted party, and an injected turn will name a tool it was
+  never offered. A refused tool leaves an audit row with `ok = false`, and a
+  refused *lookup* is handed back to the model as its result, so the turn ends
+  with the agent naming the agent that owns the question rather than putting a
+  button on a lookup (which ADR 0047 removed).
+
+  Sharing the vocabulary with `tenant_user_module_denials` (migration 0208) is
+  deliberate: it is what lets an agent be gated on the module access an admin
+  has already decided, instead of a second permission system that can disagree
+  with the first. `mail` and `workspace` have no module — mail cannot be denied,
+  and `workspace` is not a module.
 - `chat_messages.author_kind` — `user` (default) | `agent`. `author_id` already
   has no foreign key to `users`, so an agent id lives there without schema
   violence. A reader tells them apart by `author_kind` and never by parsing an
@@ -92,7 +117,8 @@ product besides.
 
 | Route | Does |
 |---|---|
-| `GET /chat/agents` | The tenant's agents — for the composer's `@` list and the member sheet. Each carries its **record**: answers given and actions approved, counted **only over rooms the caller can see**, so two people can legitimately be shown different numbers for the same agent. An aggregate leaks too, just more slowly — a tally that included private rooms would answer "is that agent busy somewhere I cannot see?" |
+| `GET /chat/agents` | The tenant's agents — for the composer's `@` list and the member sheet. Each carries its `product` and its **record**: answers given and actions approved, counted **only over rooms the caller can see**, so two people can legitimately be shown different numbers for the same agent. An aggregate leaks too, just more slowly — a tally that included private rooms would answer "is that agent busy somewhere I cannot see?" |
+| `POST /chat/agents` `{handle, name, description?, product}` | Define an agent. `product` is **required** and has no default: the only sensible default would be `workspace`, which is every tool in the workspace, and the widest agent must not be the one you get by forgetting. An unknown word is a 422 naming the accepted set |
 | `POST /chat/channels/{id}/agents` · `DELETE …/agents/{agent}` | Add or remove an agent from a room (owner only, like any member) |
 | `GET /chat/channels/{id}/turns` | Agent turns running in this room right now, so a room does not look idle while a model thinks |
 | `POST /chat/channels/{id}/turns/{turn}/stop` | Stop a running turn — **only the person who asked**, for the same reason only they may approve what it proposes. Answers 204 even when nothing was found: the turn may have just finished, and what the caller wanted is true either way |
@@ -108,6 +134,8 @@ said.
 | Case | Answer |
 |---|---|
 | Approving someone else's proposal | **403** naming the rule — the room can see it, so there is no secret to keep, only a permission |
+| Approving a proposal for another product's tool | **403** naming the tool and the agent's product, and **nothing runs**. Approval widens *who* may run a tool, never *which product's* tools an agent has. The attempt is audited with `ok = false` |
+| A lookup belonging to another product | Refused at the boundary and reported back to the model as the tool's result, so the agent answers by saying which agent owns the question. Never a proposal: a button on a lookup is the bug ADR 0047 removed |
 | Approving one already decided | 422 saying what it became |
 | Mentioning an agent that is not in the room | Nothing. Plain text, exactly as an unresolved `@person` is today |
 | No AI provider configured | The agent posts nothing and the asker is told once. Matching `/ai/agent`'s soft answer, not the 503 other AI routes give — an unconfigured model must not make chat look broken |

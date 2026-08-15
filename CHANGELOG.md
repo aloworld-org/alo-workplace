@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **An agent now belongs to a product, and only does that product's work.** Each
+  agent is created as the agent *of* something — Mail, Agenda, Inventory, People
+  and so on — and is given that product's tools and no others. Ask the Inventory
+  agent what is in your diary and it tells you that is the Agenda agent's
+  question rather than answering from whatever a search turned up; if it reaches
+  for another product's tool anyway, nothing runs, including when you approve
+  it. "Ask alo" is unchanged: it is the one assistant that deliberately works
+  across every product. Existing agents keep the reach they have today unless
+  their handle already named a product.
+
 - **Ask an agent a question and get the answer, not a button.** "Is the X100 in
   stock?", "what's on tomorrow?", "who's off next week?" — the agent now looks
   it up while it is answering you and replies with the figure, citing the record
