@@ -3578,3 +3578,28 @@ warning holds for the next `alo-store` gate: 5.8 GB is below what a full
 **Still LOOP COMPLETE (with blockers).** The chart decision is a human's: adopt
 a licensed plugin under an ADR, build charts natively as their own feature, or
 drop chart-from-intent. Recommendation unchanged — drop it.
+
+## Sixth empty re-entry — this track needs its wrapper stopped by hand (2026-08-15)
+
+Same three checks, same answers: pull already up to date and the tree clean;
+nothing under `docs/decisions/` or in `docs/features.md` since 08-14 (`51e2bb08`
+is still the newest, and it is the domain-selling ADR, not a chart decision);
+nothing under `web/src` importing `sheets-chart`, `engine-chart` or
+`SHEET_CHART`. A2.2b's premise is untouched, its one sanctioned re-attempt is
+spent, every item above it is `[x]`. **No code shipped, and none should have.**
+
+The only new fact is a negative one, and it is about the wrapper rather than the
+work: the previous entry's warning went out at 22:38 and **changed nothing** —
+the loop was re-entered again immediately, so the five journal-only commits at
+22:12, 22:33, 22:34, 22:35 and 22:38 now have a sixth behind them. A loop cannot
+stop its own wrapper, and no amount of writing that down in the journal will.
+**A human has to stop the `agents` wrapper**; until then this track will keep
+emitting one commit a minute that says nothing.
+
+Deliberately short for the same reason. Disk unchanged at **C: 5.8 GB free**,
+which also confirms nothing has built on this box since the sweep two entries
+ago; the standing warning for the next `alo-store` gate holds.
+
+**Still LOOP COMPLETE (with blockers).** The chart decision is a human's: adopt
+a commercially licensed plugin under an ADR, build charts natively as their own
+feature, or drop chart-from-intent. Recommendation unchanged — drop it.
