@@ -1023,3 +1023,167 @@ model — the rig A1.1–A1.6 used. Docker has been unresponsive for four
 iterations, so plan for the native 5432 server rather than `alo-pg`. Check the
 migrations directory again immediately before committing: `0403` is this track's
 highest, and the sites loop is climbing through `03xx`.
+
+## A1.7 — the two questions, end to end on the wire (2026-08-15)
+
+**Item.** A1.7, the last of wave A1: `@mail are we in contact with ABC?` answered
+from the correspondence with the messages behind it, and `@inventory is the X100
+in stock?` answered from the stock record with **no button in between** — both
+asked on the wire against the local backend, with the actual request and response
+recorded here rather than claimed.
+
+**What shipped.** One test file,
+`products/mail/alo-jmap/tests/agent_two_questions_http.rs` (2 tests), and **no
+production code** — A1.1–A1.6 built the behaviour; this item is the proof that a
+person asking these two questions gets these two answers. Everything runs through
+the product's own path:
+
+- the agents are the ones a first `GET /chat/agents` seeds (A1.5) — nothing here
+  registers a handle, so an agent this test could not find is one a person could
+  not find either;
+- the room is `POST /chat/channels`, the agent joins with
+  `POST /chat/channels/{id}/agents`, and the question is an ordinary
+  `POST /chat/channels/{id}/messages`;
+- the records both answers come from are real rows: three ingested RFC 5322
+  messages and a saved contact for Mail; a stocked product, a seeded warehouse, a
+  12-unit receipt through `record_move` and a minimum-of-4 reorder rule for
+  Inventory — all written through the same store functions the Mail and Inventory
+  screens use.
+
+**On the wire**, against the local backend (real Postgres, the real axum router,
+the scripted local socket as the model — the standing rail forbids a paid or
+external AI call, so the model is the fixture backend that records what it was
+shown). The transcripts below are printed by the tests themselves, not by
+instrumentation added and then removed:
+`cargo nextest run -p alo-jmap --test agent_two_questions_http --no-capture`.
+
+The first question, verbatim:
+
+```
+POST /chat/channels/mQnaJn6GNoJkiGyyL9J8tg/messages
+     {"body":"@mail are we in contact with ABC?"}
+--- what the model was shown (call 1 of 1, user turn) ---
+Today's date is 2026-08-15. The person's timezone is unknown, so any datetime you produce is read as UTC — say which hour you assumed in your `say` line..
+Request: @mail are we in contact with ABC?
+
+Sources:
+[1] email "Re: our quote for ABC Supplies"
+[2] email "ABC Supplies - your March delivery"
+[3] contact "Ilse Vermeer"
+
+--- what the model replied ---
+{"answer":"Yes — ABC Supplies. Ilse Vermeer wrote on 6 August about the revised quote and will confirm on Friday [1], and their March delivery left the warehouse on the 3rd [2].","kind":"answer"}
+--- GET /chat/channels/{id}/messages, the agent's message ---
+{"authorEmail":"Mail","authorKind":"agent","body":"Yes — ABC Supplies. Ilse Vermeer wrote on 6 August about the revised quote and will confirm on Friday [1], and their March delivery left the warehouse on the 3rd [2].","channel":"mQnaJn6GNoJkiGyyL9J8tg","createdAt":"2026-08-15T05:29:29.701981Z","id":"tAoRTaCMBXPLVT72ZUoQYQ","kind":"text","onBehalfOf":"4ZWT_gOHLDoUj9cL38fgoQ","proposal":null,"seq":2}
+--- the messages behind it: x3zMDJjOXiV7VuAzKqaVsQ, Ygt1qlWnfX66eFgbmlkpPQ ---
+```
+
+The second, verbatim (the tool result is the whole `stock_answer` payload,
+abridged here only where the product row repeats itself; the figures are the
+shelf's own):
+
+```
+POST /chat/channels/r_PlciRQEcroYvO_laoIQg/messages
+     {"body":"@inventory is the X100 in stock?"}
+--- what the model was shown (call 1 of 2, user turn) ---
+Request: @inventory is the X100 in stock?
+
+Sources:
+
+--- what the model replied (call 1) ---
+{"action":{"args":{"product":"X100"},"tool":"stock_answer"},"kind":"action","say":"Let me check the stock."}
+--- what the model was shown (call 2 of 2, user turn) ---
+Request: @inventory is the X100 in stock?
+
+Sources:
+[1] tool result "stock_answer" — {"availableQtyMilli":12000,"committedQtyMilli":0,"id":"8AxbW0RTM6jk9CK-BJb1VQ","kind":"stockAnswer","onHandQtyMilli":12000,"onOrderQtyMilli":0,"product":{...,"name":"Vulcan X100 drill","sku":"X100","stocked":true,"unitPriceCents":24900,"vatRateBp":2100},"stock":[{"locationCode":"MAIN","locationId":"tZlE-bOwkDwAW3f36u8mvg","locationKind":"stock","locationName":"Hoofdmagazijn","qtyMilli":12000,"real":true,"sku":"X100","valueCents":174000}],"title":"Vulcan X100 drill","valueCents":174000,"watched":[{"belowMinimum":false,"locationCode":"MAIN","locationName":"Hoofdmagazijn","minQtyMilli":4000,"onHandQtyMilli":12000,"targetQtyMilli":20000}]}
+
+The last source above is the result of a tool you just ran. ANSWER the request from it now if it contains what you need — that is what you looked it up for. Only run one more reading tool if the answer genuinely needs a second lookup.
+--- what the model replied (call 2) ---
+{"answer":"Yes — 12 on the shelf at Hoofdmagazijn, none on order and none promised out, so 12 available. Your minimum there is 4, so you are above it.","kind":"answer"}
+--- GET /chat/channels/{id}/messages, the agent's message ---
+{"authorEmail":"Inventory","authorKind":"agent","body":"Yes — 12 on the shelf at Hoofdmagazijn, none on order and none promised out, so 12 available. Your minimum there is 4, so you are above it.","channel":"r_PlciRQEcroYvO_laoIQg","createdAt":"2026-08-15T05:29:28.339095Z","id":"h5OfjOZHmbmmDrbRKbtgmQ","kind":"text","onBehalfOf":"9j1XS1MyPEFOCytRoagrOA","proposal":null,"seq":2}
+--- audited: stock_answer / read / ok=true ---
+```
+
+**What the tests assert beyond "it answered".** A transcript on its own is a
+screenshot; these are the properties pinned around it.
+
+- **`proposal` is `null` on every message in both rooms** — not merely on the
+  answer. That is the sentence the item is for: asking what is in stock produced
+  no button, and neither did asking about a correspondent.
+- **The mail answer's citations point at rows.** The numbered sources the model
+  was shown are asserted by position — `[1]` the quote thread, `[2]` the March
+  delivery — and `agent_ground(Mail, …)`, read back through the asker's own door,
+  returns exactly those two message ids, newest first. A third ingested message
+  ("lunch on Friday") is the control and appears nowhere.
+- **The stock answer's figure is the shelf's.** The second call carries
+  `onHandQtyMilli: 12000`, `availableQtyMilli: 12000`, `minQtyMilli: 4000`,
+  `belowMinimum: false` and the warehouse's own location id — the receipt this
+  test wrote. Its first call carries an **empty** `Sources:` block, which is A1.3
+  holding: Inventory grounds in nothing and reaches its records through the tool.
+- **The Inventory agent's system prompt offers `stock_answer` and not
+  `whats_on`** — the prompt half of A1.2, beside the boundary half A1.2 proved.
+- **Audit.** The stock lookup leaves one `agent_tool_runs` row, `effect = read`,
+  `ok = true`, against that agent and that room; the agent's record shows
+  `reads = 1, answers = 1, actions = 0`. The mail turn leaves **no** run row and
+  shows `answers = 1, reads = 0`.
+
+**How verified.**
+
+- `cargo fmt -p alo-jmap` clean. `SQLX_OFFLINE=true cargo clippy -p alo-jmap
+  --all-targets` — zero errors, zero warnings from `alo-jmap` (the two
+  pre-existing `type_complexity` warnings are in `alo-store/src/meet.rs`, another
+  track's file, untouched).
+- **`cargo nextest run -p alo-jmap --no-fail-fast` — 1082/1083 green in 124 s.**
+  The one failure is the sites track's known Windows-clock issue,
+  `site_schedule_http::a_publish_is_scheduled_moved_and_called_off` (a
+  `…527788` vs `…5277883` timestamp comparison — Windows' 100 ns clock against
+  Postgres' microsecond `timestamptz`), flagged in every entry since A1.3 and not
+  this track's file.
+- The two new tests, run alone with `--no-capture`, are the transcripts above.
+
+**Cuts / flags.**
+
+- **No production code, so no migration and no CHANGELOG line.** Nothing a person
+  can see behaves differently: A1.1–A1.6 shipped the behaviour and this item
+  proves it end to end. `0403` remains this track's highest; the sites loop is at
+  `0323`.
+- **"On the wire" is the in-process router over real Postgres, not a socket to a
+  spawned `alo-jmap` binary.** The standing rail forbids a live model call, and
+  the loop's binary-server recipe exists for verifying *new HTTP routes*; this
+  item adds none. Every route in both transcripts is an existing one, driven as a
+  real `Request` through the real router with a real bearer token, against real
+  rows. Said plainly rather than left to be read as more than it is.
+- **The model's words are fixtures.** The scripted backend replies with the
+  sentences written in the test — what is proved is what the model was *shown*
+  (the messages, the stock record, the tool offer) and what the product did with
+  its reply (answered in the room, no proposal, audited as a read). A live model
+  choosing those words is not something an unattended loop may buy.
+- **The X100 answer names a Dutch warehouse** because `inv_locations_or_seed`
+  takes the tenant's own seed names; nothing here is user-facing English that
+  should have gone through `i18n/en.ts`.
+- **Environment.** Docker is still unresponsive (nothing listening on 5433, no
+  `alo-pg`), so `scripts/prune-test-db.sh` still cannot run — its first statement
+  is a `docker exec` — and every command ran against `alo_agents_test` on the
+  native **5432** server. The full 1 083-test suite finished in 124 s, so the
+  database has not bloated. C: was at **99%, 7.9 GB free** at the top of the
+  iteration; every command carried `CARGO_PROFILE_TEST_DEBUG=0`, so no new PDBs
+  were written.
+
+**Wave A1 is complete** — every item `[x]`. An agent now has a product, is
+offered only its own product's tools and refused the others at the boundary,
+grounds in its own records, answers reads and proposes writes, exists without an
+admin registering a handle, reaches nothing the asker could not, and has been
+asked both of the wave's questions on the wire.
+
+**Next:** A2.1 — the Website (Sites) agent, in a **new**
+`platform/alo-ai/src/agent_sites.rs`: answer from the live site, draft and edit a
+page, translate the site, review SEO, with publishing proposed and never silent.
+Read `sites.rs`, `site_edits.rs` and `site_translation.rs` — they belong to the
+sites track and **must not be edited**; if the item cannot be done without
+editing them, `LOOP HALT` and say so rather than racing. `AgentProduct::Sites`
+currently grounds in nothing (`agent_ground.rs`, `BY_TOOL_ONLY`), so its answers
+come through its own reading tools — the same shape Inventory has above. Check
+the migrations directory again immediately before committing: `0403` is this
+track's highest and the sites loop is climbing through `03xx`.
