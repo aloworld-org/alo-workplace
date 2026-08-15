@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **A visitor who asks the site assistant to be contacted can now leave
+  their details in the conversation — and the lead is on your sales board
+  before you have read anything.** The assistant only ever offers the form;
+  what the visitor types goes straight into your CRM as a new opportunity,
+  titled and sourced after the site it came from, with your board seeded on
+  first use. Someone you already know is answered honestly ("we already have
+  your details") instead of being filed twice. Your website funnel counts
+  how often the form was offered and how many leads it raised — as plain
+  totals with no visitor identity, like all site analytics.
 - **Visitors can now book an appointment inside the site assistant's
   conversation — and undo it themselves.** When someone asks the assistant
   to book, it offers your published services and their *real* free times

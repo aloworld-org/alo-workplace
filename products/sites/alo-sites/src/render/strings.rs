@@ -194,6 +194,19 @@ pub struct UiStrings {
     pub chat_book_booked: &'static str,
     /// Assistant widget, booking: the picked time was taken meanwhile.
     pub chat_book_taken: &'static str,
+    /// Assistant widget, lead capture: the line above the in-chat details
+    /// form when the visitor asked to be contacted (ADR 0040 §2).
+    pub chat_lead_ask: &'static str,
+    /// Assistant widget, lead capture: label of the optional company field.
+    pub chat_lead_company: &'static str,
+    /// Assistant widget, lead capture: the submit button under the fields.
+    pub chat_lead_send: &'static str,
+    /// Assistant widget, lead capture: confirmation once the details are
+    /// with the business.
+    pub chat_lead_saved: &'static str,
+    /// Assistant widget, lead capture: the honest answer when the business
+    /// already knows this address — nothing was filed twice.
+    pub chat_lead_known: &'static str,
     /// Appointment pages and confirmation cards: the .ics download link.
     pub booking_add_calendar: &'static str,
     /// Appointment pages and confirmation cards: the cancel affordance.
@@ -299,6 +312,11 @@ pub const EN: UiStrings = UiStrings {
     chat_book_confirm: "Book",
     chat_book_booked: "Booked:",
     chat_book_taken: "That time has just been taken — pick another.",
+    chat_lead_ask: "Leave your details and someone will get back to you.",
+    chat_lead_company: "Company (optional)",
+    chat_lead_send: "Send my details",
+    chat_lead_saved: "Thanks — your details have been passed on. You will hear from us.",
+    chat_lead_known: "Thanks — we already have your details, and you will hear from us.",
     booking_add_calendar: "Add to your calendar",
     booking_cancel: "Cancel this appointment",
     booking_manage_title: "Your appointment",
@@ -397,6 +415,11 @@ pub const FR: UiStrings = UiStrings {
     chat_book_confirm: "Réserver",
     chat_book_booked: "Réservé :",
     chat_book_taken: "Ce créneau vient d'être pris — choisissez-en un autre.",
+    chat_lead_ask: "Laissez vos coordonnées et quelqu'un vous recontactera.",
+    chat_lead_company: "Société (facultatif)",
+    chat_lead_send: "Envoyer mes coordonnées",
+    chat_lead_saved: "Merci — vos coordonnées ont été transmises. Nous reviendrons vers vous.",
+    chat_lead_known: "Merci — nous avons déjà vos coordonnées, nous reviendrons vers vous.",
     booking_add_calendar: "Ajouter à votre agenda",
     booking_cancel: "Annuler ce rendez-vous",
     booking_manage_title: "Votre rendez-vous",
@@ -495,6 +518,11 @@ pub const NL: UiStrings = UiStrings {
     chat_book_confirm: "Boeken",
     chat_book_booked: "Geboekt:",
     chat_book_taken: "Dit tijdstip is net bezet — kies een ander.",
+    chat_lead_ask: "Laat uw gegevens achter en iemand neemt contact met u op.",
+    chat_lead_company: "Bedrijf (optioneel)",
+    chat_lead_send: "Mijn gegevens versturen",
+    chat_lead_saved: "Bedankt — uw gegevens zijn doorgegeven. U hoort van ons.",
+    chat_lead_known: "Bedankt — wij hebben uw gegevens al, u hoort van ons.",
     booking_add_calendar: "Toevoegen aan uw agenda",
     booking_cancel: "Deze afspraak annuleren",
     booking_manage_title: "Uw afspraak",

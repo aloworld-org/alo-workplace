@@ -137,6 +137,61 @@ const SCRIPT: &str = r#"<script>(function () {
     anchor(msg, body.icsPath, word("bookcal"));
     anchor(msg, body.managePath, word("bookcancel"));
   }
+  function leadForm(container) {
+    container.textContent = word("leadask");
+    var form = document.createElement("form");
+    form.className = "alo-chat-book";
+    var nameField = fieldRow(form, word("bookname"), "text", 200);
+    var mailField = fieldRow(form, word("bookemail"), "email", 254);
+    var companyField = fieldRow(form, word("leadcompany"), "text", 200);
+    companyField.required = false;
+    companyField.autocomplete = "organization";
+    var go = document.createElement("button");
+    go.type = "submit";
+    go.className = "alo-chat-send";
+    go.textContent = word("leadsend");
+    form.appendChild(go);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (busy) { return; }
+      busy = true;
+      go.disabled = true;
+      fetch("/_alo/chat/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitor: token, name: nameField.value,
+          email: mailField.value, company: companyField.value })
+      }).then(function (response) {
+        if (response.status === 429) { return { state: "rate_limited" }; }
+        return response.json();
+      }).then(function (body) {
+        busy = false;
+        var reply = bubble("bot");
+        if (body && body.state === "lead_saved") {
+          reply.textContent = word("leadsaved");
+        } else if (body && body.state === "lead_known") {
+          reply.textContent = word("leadknown");
+        } else if (body && body.state === "invalid" && typeof body.detail === "string") {
+          reply.textContent = body.detail;
+          go.disabled = false;
+        } else if (body && body.state === "rate_limited") {
+          reply.textContent = word("limited");
+          go.disabled = false;
+        } else {
+          reply.textContent = word("error");
+          go.disabled = false;
+        }
+        log.scrollTop = log.scrollHeight;
+      }).catch(function () {
+        busy = false;
+        go.disabled = false;
+        bubble("bot").textContent = word("error");
+      });
+    });
+    container.appendChild(form);
+    nameField.focus();
+    log.scrollTop = log.scrollHeight;
+  }
   var fieldSeq = 0;
   function fieldRow(form, text, type, cap) {
     var id = "alo-chat-bf-" + (++fieldSeq);
@@ -313,6 +368,8 @@ const SCRIPT: &str = r#"<script>(function () {
         cite(reply, body.citations);
       } else if (body && body.state === "booking") {
         bookingOffer(reply, body);
+      } else if (body && body.state === "lead") {
+        leadForm(reply);
       } else if (body && body.state === "refusal") {
         reply.textContent = word("refusal");
         offer(reply, body.contactPath);
@@ -443,7 +500,10 @@ fn markup(
          data-bookpick=\"{bookpick}\" data-bookmore=\"{bookmore}\" data-booknone=\"{booknone}\" \
          data-bookconfirm=\"{bookconfirm}\" data-booked=\"{booked}\" data-bookcal=\"{bookcal}\" \
          data-bookcancel=\"{bookcancel}\" data-booktaken=\"{booktaken}\" \
-         data-bookname=\"{bookname}\" data-bookemail=\"{bookemail}\">\n\
+         data-bookname=\"{bookname}\" data-bookemail=\"{bookemail}\" \
+         data-leadask=\"{leadask}\" data-leadcompany=\"{leadcompany}\" \
+         data-leadsend=\"{leadsend}\" data-leadsaved=\"{leadsaved}\" \
+         data-leadknown=\"{leadknown}\">\n\
          <button type=\"button\" id=\"alo-chat-open\" aria-expanded=\"{expanded}\" \
          aria-controls=\"alo-chat-panel\">{icon}{open}</button>\n\
          <section id=\"alo-chat-panel\" role=\"dialog\" aria-label=\"{title}\"{hidden}>\n\
@@ -484,6 +544,11 @@ fn markup(
         booktaken = esc(strings.chat_book_taken),
         bookname = esc(strings.form_name),
         bookemail = esc(strings.form_email),
+        leadask = esc(strings.chat_lead_ask),
+        leadcompany = esc(strings.chat_lead_company),
+        leadsend = esc(strings.chat_lead_send),
+        leadsaved = esc(strings.chat_lead_saved),
+        leadknown = esc(strings.chat_lead_known),
         open = esc(strings.chat_open),
         title = esc(name),
         close = esc(strings.chat_close),
@@ -595,21 +660,23 @@ mod tests {
     /// 17 KiB) when the booking flow landed in the script (S3.03b): offering
     /// real free times, the in-chat name/email form, and the confirmation
     /// card are ~5.4 KiB the assistant-on page pays for the visitor being
-    /// able to book without leaving the conversation.
+    /// able to book without leaving the conversation. Raised again (17 KiB →
+    /// 19 KiB) for the lead form (S3.03d): the details form, its five
+    /// localized words and the two outcome states are ~1.8 KiB more.
     #[test]
     fn the_widget_stays_within_its_byte_budget() {
         let default = SiteChatAppearance::default();
         for strings in [&EN, &FR, &NL] {
             let bare = fragment(strings, &default);
             assert!(
-                bare.len() < 17408,
+                bare.len() < 19456,
                 "default widget fragment is {} bytes for {}",
                 bare.len(),
                 strings.lang
             );
             let maxed = fragment(strings, &maximal());
             assert!(
-                maxed.len() < 21504,
+                maxed.len() < 23552,
                 "maximal widget fragment is {} bytes for {}",
                 maxed.len(),
                 strings.lang
@@ -657,6 +724,13 @@ mod tests {
             "aria-live=\"polite\"",
             "<label class=\"alo-chat-hide\" for=\"alo-chat-q\">",
             "maxlength=\"2000\"",
+            // The lead form's words ride as data-* like every other state's
+            // (S3.03d), so the static script stays locale-free.
+            "data-leadask=\"Leave your details and someone will get back to you.\"",
+            "data-leadcompany=\"Company (optional)\"",
+            "data-leadsend=\"Send my details\"",
+            "data-leadsaved=",
+            "data-leadknown=",
         ] {
             assert!(fragment.contains(needle), "missing {needle}");
         }

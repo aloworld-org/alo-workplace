@@ -42,6 +42,7 @@ mod bookings;
 mod cache;
 pub mod chat;
 mod chat_book;
+mod chat_lead;
 pub mod config;
 mod conversion;
 pub mod derivative;
@@ -186,6 +187,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/_alo/chat/book",
             post(chat_book::book).layer(DefaultBodyLimit::max(chat::CHAT_BODY_MAX_BYTES)),
+        )
+        .route(
+            "/_alo/chat/lead",
+            post(chat_lead::capture).layer(DefaultBodyLimit::max(chat::CHAT_BODY_MAX_BYTES)),
         )
         .fallback(serve_site)
         .with_state(state)

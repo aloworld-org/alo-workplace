@@ -30,6 +30,9 @@
 //!   next real free times, read live from the Agenda seam. The reservation
 //!   itself is `POST /_alo/chat/book` ([`super::chat_book`]) — the model can
 //!   offer, never act.
+//! - `{"state":"lead"}` — the visitor asked to be contacted (S3.03d): the
+//!   widget shows its own name-and-address form, and the capture itself is
+//!   `POST /_alo/chat/lead` ([`super::chat_lead`]) — again offer, never act.
 //! - `{"state":"refusal","contactPath":…}` — the assistant will not answer
 //!   this question (nothing retrievable, an uncited reply, a booking offer
 //!   for a service never listed, or the model's own refusal — deliberately
@@ -257,6 +260,16 @@ async fn answer(
                 None => unavailable_state(state, site).await,
             }
         }
+        // The visitor asked to be contacted (S3.03d): the widget shows its
+        // own details form and the capture is `POST /_alo/chat/lead` — the
+        // model offers, deterministic code acts, exactly as with booking.
+        // The offer itself is counted in the site's aggregate 'chat'
+        // funnel: a server-observed fact with no visitor in it.
+        Ok(SiteChatReply::OfferLead) => {
+            record_spend(state, site, month).await;
+            record_lead_offer(state, site).await;
+            state_json(StatusCode::OK, json!({"state": "lead"}))
+        }
         Ok(SiteChatReply::Refusal(refusal)) => {
             // An off-topic question refused at retrieval never reached the
             // backend and costs nothing; the model's own refusals did.
@@ -380,6 +393,23 @@ async fn record_spend(state: &Arc<AppState>, site: &PublishedSite, month: &str) 
         .await
     {
         tracing::error!(site = %site.site, %error, "chat spend record failed");
+    }
+}
+
+/// One more offered lead form in the site's aggregate 'chat' counters
+/// (S3.03d). Logged and never failed on: the counter is attribution, not the
+/// conversation.
+async fn record_lead_offer(state: &Arc<AppState>, site: &PublishedSite) {
+    if let Err(error) = state
+        .store
+        .record_public_chat_conversion(
+            site,
+            OffsetDateTime::now_utc().date(),
+            alo_store::ConversionStage::View,
+        )
+        .await
+    {
+        tracing::error!(site = %site.site, %error, "chat lead offer count failed");
     }
 }
 

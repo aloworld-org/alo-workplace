@@ -7892,3 +7892,65 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   divergence); new code written in-style.
 - **Next:** S3.03d — lead capture through this seam from the conversation,
   aggregate attribution only.
+
+## 2026-08-15 — S3.03d The conversation's stranger leaves their details, and only a number remains
+
+- **Item:** S3.03d — lead capture through the S3.03c seam, storing aggregate
+  attribution only and no individual visitor journey.
+- **What shipped:**
+  - **The second (and last) action verb** (`alo-ai/site_chat.rs`):
+    `{"contact":true}` → `SiteChatReply::OfferLead`, added exactly as `book`
+    was — `deny_unknown_fields` keeps the vocabulary closed, the prompt says
+    the visitor is shown a form so the model must never collect details
+    itself, and an ambiguous reply (book+contact, refuse+contact) refuses
+    rather than letting code choose between acts. The
+    `no_other_action_verb_can_even_be_represented` proof now names two verbs.
+  - **The offer** (`serve/chat.rs`): `OfferLead` answers `{"state":"lead"}`
+    (spend recorded — the model was contacted) and counts one aggregate
+    'chat'/'view' — the offer is a server-observed fact.
+  - **The capture** (`serve/chat_lead.rs`, `POST /_alo/chat/lead`): same
+    caps/limiters as `/_alo/chat`; the resolved Host is the whole tenant
+    scope. `SitePublicStore::capture_conversation_lead` (new
+    `site_public_leads.rs`) reads the site row's own `(tenant, created_by)`
+    pair and walks CRM's `CrmLeadCapture` door; the card's title/board seed
+    are localized to the site's default locale (words mirror alo-jmap's
+    `crm::seed_words_for`; drift affects wording of a never-opened CRM's
+    first board only — journaled, not a coupling). CRM's duplicate answer
+    reaches the wire as one bit — `lead_known`, never which record or kind —
+    so a stranger probing addresses learns nothing beyond "known", under the
+    S3.02c rate limits. Validation surfaces CRM's sentence verbatim (400).
+  - **Aggregate attribution only** (migration `0327`, the additive
+    check-constraint change 0307 announced): source_kind 'chat', keyed by
+    the site's own id; 'view' = offer shown, 'submit' = lead raised, counted
+    at the server writes. The funnel screen names the source ("Website
+    assistant", en/fr/nl) instead of "Deleted form".
+  - **The widget:** in-chat details form (name, email, optional company) on
+    the `lead` state, saved/known/invalid-verbatim/limited states; byte
+    budget 17→19 KiB with the reason in the test comment.
+- **Verified:** clippy on all three crates — zero warnings from this item
+  (the two meet.rs type_complexity survivors remain the business track's;
+  13m22s, finished as a harness-backgrounded task). Test-binary build via
+  the sanctioned background+marker form (12m25s; one poll re-issued at the
+  600 s ceiling), then foreground `cargo nextest run -p alo-store -p alo-ai
+  -p alo-sites`: **2 381/2 381 green** (1 pre-existing skip, 30 s;
+  prune-test-db first — 966 pruned). New proof: the wire arc on the real
+  router+postgres (capture → CRM card with the site's words and host as
+  source → exactly one 'chat' submit counter keyed by the site id → the
+  tenant's own funnel read reports it), Host-decides-the-tenant isolation
+  (same visitor, two tenants, two separate leads, foreign card invisible),
+  known-answers-once with a one-field reply, verbatim 422→400 detail,
+  gates-before-CRM (unknown host/token/oversized), the
+  columns-of-the-aggregate-table PII proof, the store door's
+  wrong-tenant/refused-field-writes-nothing (not even a seeded board), and
+  the exhaustive-destructure proof that `ConversationLead` cannot carry a
+  journey. Web: tsc, eslint, build clean.
+- **Cuts/flags:** the lead offer is reachable only when the model is
+  consulted, so a contact request sharing zero vocabulary with the corpus on
+  a service-less site still refuses unheard — S3.02b's no-model cost promise
+  kept over verb reachability, deliberately. The funnel's per-source "leads"
+  column counts S2.10b's person-made links, so the chat row shows captures
+  under "submits" and 0 under "leads" — widening the link table to
+  machine-made captures is its own decision, left to the wave review. No new
+  route prefix (`/_alo/*` already reaches alo-sites); `cargo fmt`
+  deliberately not run (machine memory: rustfmt 1.9.0 divergence).
+- **Next:** S3.03e — the tenant-facing transcript of what the bot did.
