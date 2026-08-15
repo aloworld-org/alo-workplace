@@ -10,6 +10,19 @@ contracts.
 
 ## Unreleased
 
+- **`@alo` now asks the right agent instead of trying to be all of them.** Ask
+  it something in a room and it first says what it is going to do — a numbered
+  plan, one line per step, naming the agent each part goes to — and then works
+  through it. Every step is answered by that product's own agent, under its own
+  name, with only that product's abilities: the stock question goes to
+  `@inventory` and the follow-up to `@tasks`. A step that would change
+  something is where the run stops: you get exactly one thing to approve, and
+  the rest of the plan waits behind it rather than piling up buttons. **Stop**
+  now ends the whole run part-way through — it says how far it got, and the
+  steps behind it do not happen. An agent for a module you cannot open is never
+  part of a plan, and if there is nobody to ask, `@alo` simply answers you
+  itself as before.
+
 - **`@mail` can now answer questions about a correspondent, not just act on an
   email.** Ask whether you are in contact with a company and it looks at the
   exchange itself — everything to and from them, newest first, both directions —

@@ -2865,3 +2865,178 @@ precedent in this codebase at all — the turn runs off the request, so stopping
 means a cancellation the chat route can signal and the loop can observe between
 calls. Check the migrations directory again immediately before committing; `0405`
 is this track's highest and the sites loop was at `0324`.
+
+---
+
+## A3.1 — Ask alo orchestrates rather than owns (2026-08-15)
+
+**What shipped.** Ask alo's first model call now chooses **agents, not tools**.
+A turn taken by an `AgentProduct::Workspace` agent in a room no longer goes
+straight to the 68-tool prompt: it plans, says the plan in the room, and then
+takes each step as an ordinary product-agent turn.
+
+- `platform/alo-ai/src/agent_plan.rs` (new) — the planner. `PlanAsk{request,
+  agents, today}` → `AgentPlan::Answer(String) | Steps(Vec<PlanStep>)`. Its
+  prompt carries a **roster** (`- @mail: You are the alo Mail agent…`, the
+  headline each product's own prompt opens with) and **no tool descriptions and
+  no sources at all** — a planner that could answer from a search snippet is the
+  failure ADR 0034 names, so it is given nothing to answer from. Three bounds
+  live in `parse_plan` rather than in the prompt, because the model is the
+  untrusted party: at most `MAX_PLAN_STEPS = 3`; a step naming a handle off the
+  roster is **dropped**; a plan with nothing left is an `Empty` error rather
+  than an empty plan posted into a room.
+- `products/mail/alo-jmap/src/agent_orchestrate.rs` (new) — the run. Roster from
+  `AccountStore::agents()` (so the module gate is the same one the agent picker
+  obeys), minus retired agents and minus every Workspace agent. It posts the
+  plan, then for each step: joins the delegate to the room, grounds in **that**
+  product, and calls the existing `agent_turn::take_turn` with
+  `TurnContext::in_room(&delegate.id, channel)`.
+- `chat_agent.rs` branches to it for a Workspace agent and falls back to the
+  ordinary turn on `NotRouted` — nobody to route to, or a planner that could not
+  be reached. A workspace with one agent still has an assistant.
+- `Spoken` gained `Stopped`; `CHAT_SOURCES`, `UNCONFIGURED`, `UNREACHABLE` and a
+  new `ground()` helper became `pub(crate)` so a step grounds exactly as the
+  same question typed at the agent directly would.
+- **No migration, no store change.** `0405` is still this track's highest.
+
+**The four properties, and where each one actually lives.**
+
+- **It routes, it does not widen.** Each step runs under the delegate's own
+  `ChatAgentId`, so `execute_tool`'s `scope()` reads *its* product off *its*
+  row. The test that proves it asks the Inventory agent for `whats_on` — an
+  Agenda read that **Ask alo is offered** — and gets back `whats_on is not a
+  tool the inventory agent has`. Had the step run at the orchestrator's scope
+  the lookup would have succeeded, so this is the assertion that separates
+  routing from widening, and it is the one that keeps A1.2 shut.
+- **Each step speaks as its own agent, and joins the room to do it.** Not
+  tidiness: `chat_agent_routes::decide_proposal` reads the run's scope off the
+  **author** of the message carrying the proposal, so a delegated write posted
+  under Ask alo's name would execute at Ask alo's scope. Joining goes through
+  `add_agent_to_channel`, which is idempotent and re-checks the module gate, so
+  a run cannot put an agent in a room its asker could not reach.
+- **One approval surface.** The run stops at the first step that proposes,
+  posts "The rest of this waits until you approve that." if there is plan
+  behind it, and returns. Two pending proposals from one question would be two
+  buttons whose order matters and which nothing enforces.
+- **Stop actually stops.** The flag `chat_turns::Turns::begin` already hands out
+  is read between every step and again after every model call. Stopped before
+  the plan was posted, the room stays silent (it never saw a plan); stopped
+  after, Ask alo says "Stopped — I did N of M steps."
+
+**The exchange, on the wire** (`agent_orchestrate_http`, real HTTP through the
+router, scripted local model — no live provider, per the safety rails):
+
+```
+POST /chat/channels/{id}/messages   {"body":"@alo restock the X100"}
+--- what came back in the room, in order ---
+agent @alo       "Here's how I'll do that:
+                  1. @inventory — is the X100 in stock?
+                  2. @tasks — add a task to reorder the X100
+                  3. @mail — tell the supplier we are reordering"
+agent @inventory "There are 42 X100 in stock."          proposal: null
+agent @tasks     "I'll add a task to reorder the X100."
+                 proposal: {"tool":"create_task","state":"pending",
+                            "args":{"title":"Reorder the X100","due":"2026-08-21"}}
+agent @alo       "The rest of this waits until you approve that. Turn it down
+                  and I'll leave it there."
+--- and step 3 never ran: @mail said nothing, and the model was called 3 times
+--- POST /chat/proposals/{id} {"approve":true} → 200, state "approved",
+    result non-null: the task was created, through the Tasks agent's own scope.
+```
+
+**What the six tests assert beyond "it ran".** The plan's sequence number is
+lower than every step's, so it really is a plan and not a summary. The
+Inventory step's system prompt starts "You are the alo Inventory agent" and does
+**not** contain `- create_task:`; the planner's prompt contains the roster and
+does not contain `create_task` at all. `GET /chat/channels/{id}/agents`
+afterwards holds `@inventory` and `@tasks` but **not** `@mail` — a step that
+never ran joins nothing. An agent whose module was switched off for the asker is
+absent from the planner's prompt, and a plan naming it anyway loses that step
+before it runs. The Stop test paces the scripted model at 500 ms so there is a
+run to interrupt rather than a race to win, waits until the first delegate has
+answered, stops, and then asserts the last step's agent never spoke and that
+nothing further arrives afterwards.
+
+One flake was found and fixed before it could be inherited: the first version of
+the plan test waited for the **proposal row**, which exists a moment before the
+sentence explaining it, so under the full 1 211-test load it read a half-written
+run. It now waits on the last thing the run says. Passing alone is not passing.
+
+**Cuts and flags.**
+
+- **No final synthesis turn.** A run's answer is its steps' answers, each said
+  by the agent that produced it; Ask alo does not take a further model call to
+  summarise them. Two reasons rather than one: a summary is a fourth call per
+  run, and summarising a delegate's answer is exactly the place where the
+  orchestrator would start speaking for records it cannot see. If a wave review
+  wants it, the honest shape is a synthesis step that quotes rather than
+  restates.
+- **Agent speech is still hardcoded English constants**, as `UNCONFIGURED` and
+  `OUT_OF_LOOKUPS` already were. The plan heading, the stopped line and the
+  waiting line follow that precedent; externalising all server-side agent
+  speech is one job, not five, and it is not this item's.
+- **A one-to-one with Ask alo can gain other agents as members.** Only the
+  channel's counterpart is triggered by a message (`channel_agent_counterpart`),
+  so a delegate joining an agent DM does not start answering there — but the
+  member list of that room does grow. Flagged rather than special-cased: the
+  `[web]` room-list work is where it would show, and that is blocked.
+- The **`agent_ground.rs:31` documentation debt is still not paid**, for the
+  sixth item running and for the same reason: this item never opened
+  `alo-store`, and a one-comment change there would have bought ~115 relinks.
+- **The sites track's pre-existing failure is still there and still theirs**:
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  compares a Windows `OffsetDateTime` at 100 ns against the same instant
+  round-tripped through Postgres at microsecond precision.
+- `cargo fmt -p alo-ai` reformatted the sites track's `site_chat.rs` again, and
+  it was reverted before committing — the fifth entry running to say so.
+
+**How verified.**
+
+- `cargo fmt -p alo-ai -p alo-jmap` clean (with the revert above).
+- `cargo clippy -p alo-ai -p alo-jmap --all-targets` — zero warnings from either
+  crate; the two `type_complexity` warnings are pre-existing in
+  `alo-store/src/meet.rs`.
+- `cargo nextest run -p alo-ai` — **229 passed** (219 before; the ten new ones
+  are the planner's).
+- `cargo nextest run -p alo-jmap --no-fail-fast` — **1 210 of 1 211 passed** in
+  146 s. The one failure is the sites-track one above.
+
+**Environment, because both halves cost time.**
+
+- **Docker is still unresponsive** — `docker version` hangs and was killed at
+  60 s, `docker ps` returns nothing — so `scripts/prune-test-db.sh` still cannot
+  run (its first statement is a `docker exec`). But **the Postgres it forwards
+  is still up**: `netstat` shows `com.docker.backend.exe` listening on 5432, so
+  every command here carried
+  `DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_agents_test`,
+  as the last several iterations did. 5433 is still refused. The suites finished
+  in 146 s, so the database has not bloated.
+- **Disk, and the thing that is now the binding constraint.** C: opened at
+  **2.4 GB free, 100 %**. The `.pdb` sweep freed nothing at first (there were
+  none) and the newest-per-name rule freed nothing either (218 binaries for 217
+  names) — what worked was deleting **this checkout's own invalidated test
+  binaries** before the build: alo-jmap's 88 (~5.0 GB) at the start, and when
+  the first build still died with `LNK1180: insufficient disk space`,
+  alo-store's 129 (~1.3 GB), which this item's gate does not need.
+  **`[profile.test] debug = 0` is already in the workspace `Cargo.toml` and is
+  not enough**: the test binaries carry no debuginfo of their own, but they link
+  dependency rlibs built under `profile.dev` that do, so `link.exe` is still
+  passed `/DEBUG` and still writes a ~60 MB `.pdb` per binary — 3.8 GB of them
+  reappeared during one build. The fix that worked is the one the last
+  iteration found: a **`.pdb` sweep running beside the build** (a loop deleting
+  `target/debug/deps/*.pdb` every ten seconds until the build writes its marker),
+  which is safe precisely because Windows refuses to delete the one link.exe is
+  holding. With it, the remaining relink finished in **1 m 00 s**.
+
+**Next:** A3.2 — Meet after the fact: minutes, decisions and actions into the
+meeting's thread, becoming tasks and events through the ordinary agent path.
+Two things to read first. `AgentProduct::Meet` is the one product whose tool set
+is still `NONE_YET` in `agent_product.rs`, so this item is a `ToolSet` plus a
+module, exactly as A2.1–A2.8 were — and once it has one, the Meet agent becomes
+routable by A3.1's planner for free, which is worth an assertion in that item
+rather than a discovery later. "Through the ordinary agent path" means the
+actions it produces are `create_task`/`create_event` proposals from the Tasks
+and Agenda agents rather than a second mechanism inside Meet; A3.1's
+one-approval-surface rule then applies to them unchanged. Check the migrations
+directory again immediately before committing; `0405` is still this track's
+highest and the sites loop was at `0328`.

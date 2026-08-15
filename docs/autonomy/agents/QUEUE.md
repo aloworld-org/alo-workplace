@@ -77,7 +77,7 @@ of them ends with a real question asked and answered on the wire.
 
 ## Wave A3 — orchestration, and the meeting
 
-- [ ] A3.1 ★ Ask alo orchestrates rather than owns: it routes to the product agents and runs multi-step work across them, with one approval surface, a visible plan, and a **Stop** that actually stops mid-run.
+- [x] A3.1 ★ Ask alo orchestrates rather than owns: it routes to the product agents and runs multi-step work across them, with one approval surface, a visible plan, and a **Stop** that actually stops mid-run. *(One cut, recorded in STATE: no final synthesis turn — each step's own agent speaks its result in the room and Ask alo does not summarise them afterwards. Everything else shipped.)*
 - [ ] A3.2 ★ Meet, after the fact: minutes, decisions and actions into the meeting's thread, becoming tasks and events through the ordinary agent path — no second mechanism.
 - [ ] A3.3 The agent directory, API side: what each agent is for, what it may touch, and what it has done, per tenant.
 
