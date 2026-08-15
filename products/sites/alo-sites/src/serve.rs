@@ -53,7 +53,7 @@ mod orders;
 pub mod rate;
 mod rendered;
 mod unlock;
-mod widget;
+pub mod widget;
 
 use std::sync::Arc;
 

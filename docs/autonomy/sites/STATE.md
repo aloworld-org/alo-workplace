@@ -7607,3 +7607,92 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   the fields, a written default welcome, suggested questions drafted from
   the published site's own headings, and the accessibility check in the
   screen.
+
+## 2026-08-15 — S3.02g the assistant's appearance is edited beside the real widget
+
+- **Item:** S3.02g — appearance UI: a live preview of the real widget beside
+  the fields, a written default welcome rather than an empty box, suggested
+  questions drafted from the site's own pages and editable, and the
+  accessibility check shown in the screen.
+- **What shipped:**
+  - Preview rendering (`products/sites/alo-sites/src/serve/widget.rs`): the
+    fragment split into `markup()` + static blocks, and a new **pub**
+    `preview_document(strings, css, appearance, avatar_src)` — the widget as
+    one complete self-contained HTML document, panel rendered OPEN, behavior
+    script omitted (a preview is a picture; the editor's iframe is fully
+    sandboxed and `/_alo/chat` does not resolve there), the site's own
+    generated stylesheet inlined so it wears the real theme tokens. Tests:
+    open-panel/no-script/css-inlined, and hostile strings stay escaped in the
+    document (`serve::widget` is now a pub module for exactly this one fn).
+  - Route (`products/mail/alo-jmap/src/sites_chat.rs`, additive registration):
+    `POST /sites/:id/chat-appearance/preview` — owner-only like the family,
+    same body shape as PUT, validated by the same model so what previews clean
+    saves clean, **stores nothing**, answers `text/html` `no-store`; the
+    avatar is inlined as a bounded `data:` URI through the tenant-scoped
+    image door. `GET /chat-appearance` now also answers a `defaults` object
+    (welcome/name/offline copy via the renderer's own `strings_for`, in the
+    SITE's default language) so the screen pre-fills a written welcome
+    without keeping a second copy of the renderer's strings.
+  - Screen (`web/src/sites/AssistantAppearance.tsx`, mounted on the assistant
+    page): all §5 fields bounded by the server's `limits` — name (placeholder
+    = written default), avatar via the Drive upload path the theme uses,
+    welcome PRE-FILLED with the written default (saving it untouched stores
+    `null`, so the widget keeps speaking the site's language; the note under
+    the box says it is the default and disappears on edit), three question
+    slots with visually-hidden labels, tone radios + voice note, corner/icon/
+    accent radios, auto-open switch with its "off by default" hint, offline
+    message. One draft builder feeds BOTH the debounced (400 ms) live preview
+    iframe and the save, so the preview can never show a value the save would
+    spell differently; stale responses are dropped by call token.
+  - "Suggest from your site" (`web/src/sites/suggestQuestions.ts`): local and
+    deterministic — FAQ questions verbatim in page order, then one canonical
+    localized question per present section kind (pricing/booking/catalog/
+    contact), deduplicated, cap- and count-bounded, filled only into EMPTY
+    slots; a site with nothing to draft from is told so. No model call.
+  - Accessibility in the screen (`web/src/sites/accentContrast.ts`): the
+    check box shows the MEASURED WCAG ratio of the chosen accent's role pair
+    on the site's own preset (mirroring `ChatWidgetAccent::role_pair`), plus
+    the standing facts (labelled dialog, Escape, live log, decorative
+    avatar); malformed input yields the server-guarantee sentence, never a
+    made-up number.
+  - i18n: ~45 new strings in en/fr/nl (parity ratchet green); CHANGELOG entry.
+- **Verified:** clippy `-p alo-sites -p alo-jmap --all-targets` — zero
+  warnings from this item (the two `meet.rs` type_complexity survivors remain
+  the business track's). `cargo nextest run -p alo-sites -p alo-jmap`:
+  **1 287/1 287 green** (DATABASE_URL exported per the machine note). Web:
+  `tsc`, `eslint` (changed files, zero warnings), full `vitest` **918/918**
+  incl. the new panel suite (pre-filled default welcome saved as null, edited
+  welcome saved verbatim, drafting fills only empty slots, contrast number
+  shown, preview sends the same draft the save would, 422 detail verbatim)
+  and the drafter/contrast unit suites; `npm run build` clean. **Wire
+  transcript** (fresh tenants on docker `alo-pg` database `alo` — confirmed
+  via `pg_stat_activity` — debug `alo-jmap` on `127.0.0.1:8080`, `/auth/token`
+  grants, server killed before and after):
+  ```
+  GET  /sites/{id}/chat-appearance            (no token) → 401
+  GET  …                                      (owner)    → 200 + limits + defaults
+  POST …/preview                              (no token) → 401
+  POST …/preview {}                           (owner)    → 200 text/html: default
+        welcome, aria-expanded="true", zero <script>
+  POST …/preview {Marie draft}                           → 200: <h2>Marie</h2>,
+        data-side="left", question pill, --alo-chat-accent:var(--surface…)
+  DB after both previews: site_chat_settings rows for site = 0  (stored NOTHING)
+  PUT  … {Marie draft}                                   → 200; GET echoes
+  POST …/preview botName ×61                             → 422 "assistant
+        appearance: bot_name must be at most 60 characters"
+  POST …/preview accent "#ffff00"                        → 422 naming
+        `primary`, `text`, `surface`
+  GET/POST …                                  (tenant B) → 404, 404
+  DB: appearance→bot_name=Marie, enabled=f (appearance ↛ enablement)
+  ```
+- **Cuts/flags:** none of the item's scope cut. Two readings journaled: the
+  queue said "drafted from the published site's own headings" — the drafter
+  reads the DRAFT pages (the editor's view, what the next publish freezes);
+  published snapshots expose no section JSON on the edit surface, and
+  drafting from what the owner is editing is the more useful reading. And
+  `cargo fmt` was deliberately not run per the machine memory (rustfmt 1.9.0
+  divergence rewrites unrelated lines); the new code was written in-style.
+  No new route *prefix* (`/sites` is already proxied) — production Caddyfile
+  needs nothing.
+- **Next:** S3.03a — Agenda-owned public seam for published availability
+  (first item of "the chatbot that acts").

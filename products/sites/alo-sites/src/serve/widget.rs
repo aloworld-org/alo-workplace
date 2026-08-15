@@ -250,6 +250,28 @@ fn launcher_icon(icon: ChatLauncherIcon) -> &'static str {
 /// tenant's choices as escaped content, then the static style and script.
 #[must_use]
 pub(super) fn fragment(strings: &UiStrings, appearance: &SiteChatAppearance) -> String {
+    let avatar_src = appearance.avatar.as_ref().map(|avatar| {
+        format!(
+            "{}{}",
+            crate::images::IMAGE_PATH_PREFIX,
+            esc(avatar.as_str())
+        )
+    });
+    markup(strings, appearance, avatar_src.as_deref(), false) + STYLE + SCRIPT
+}
+
+/// The widget's markup alone — everything but the static style and script
+/// blocks. `avatar_src` is the already-escaped image URL to show in the
+/// header (the public path in production, a `data:` URI in the editor's
+/// preview, absent when no avatar is set); `panel_open` renders the panel
+/// visible, which only [`preview_document`] wants — the real widget always
+/// starts closed and lets the script (or `data-open`) decide.
+fn markup(
+    strings: &UiStrings,
+    appearance: &SiteChatAppearance,
+    avatar_src: Option<&str>,
+    panel_open: bool,
+) -> String {
     let name = appearance.bot_name.as_deref().unwrap_or(strings.chat_title);
     let welcome = appearance
         .welcome
@@ -259,12 +281,8 @@ pub(super) fn fragment(strings: &UiStrings, appearance: &SiteChatAppearance) -> 
         .offline_message
         .as_deref()
         .unwrap_or(strings.chat_unavailable);
-    let avatar = appearance.avatar.as_ref().map_or(String::new(), |avatar| {
-        format!(
-            "<img class=\"alo-chat-avatar\" src=\"{}{}\" alt=\"\" width=\"28\" height=\"28\">",
-            crate::images::IMAGE_PATH_PREFIX,
-            esc(avatar.as_str())
-        )
+    let avatar = avatar_src.map_or(String::new(), |src| {
+        format!("<img class=\"alo-chat-avatar\" src=\"{src}\" alt=\"\" width=\"28\" height=\"28\">")
     });
     let suggested = if appearance.suggested_questions.is_empty() {
         String::new()
@@ -290,9 +308,9 @@ pub(super) fn fragment(strings: &UiStrings, appearance: &SiteChatAppearance) -> 
          data-thinking=\"{thinking}\" data-sources=\"{sources}\" \
          data-refusal=\"{refusal}\" data-unavailable=\"{unavailable}\" data-contact=\"{contact}\" \
          data-limited=\"{limited}\" data-error=\"{error}\">\n\
-         <button type=\"button\" id=\"alo-chat-open\" aria-expanded=\"false\" \
+         <button type=\"button\" id=\"alo-chat-open\" aria-expanded=\"{expanded}\" \
          aria-controls=\"alo-chat-panel\">{icon}{open}</button>\n\
-         <section id=\"alo-chat-panel\" role=\"dialog\" aria-label=\"{title}\" hidden>\n\
+         <section id=\"alo-chat-panel\" role=\"dialog\" aria-label=\"{title}\"{hidden}>\n\
          <header class=\"alo-chat-head\"><div class=\"alo-chat-name\">{avatar}<h2>{title}</h2></div>\
          <button type=\"button\" id=\"alo-chat-close\" aria-label=\"{close}\">&#215;</button></header>\n\
          <div id=\"alo-chat-log\" role=\"log\" aria-live=\"polite\">\
@@ -303,12 +321,14 @@ pub(super) fn fragment(strings: &UiStrings, appearance: &SiteChatAppearance) -> 
          <textarea id=\"alo-chat-q\" rows=\"2\" maxlength=\"{cap}\" placeholder=\"{question}\" \
          required></textarea>\n\
          <button type=\"submit\" class=\"alo-chat-send\">{send}</button>\n\
-         </form>\n</section>\n</div>\n{STYLE}{SCRIPT}",
+         </form>\n</section>\n</div>\n",
         auto = if appearance.auto_open {
             " data-open=\"1\""
         } else {
             ""
         },
+        expanded = if panel_open { "true" } else { "false" },
+        hidden = if panel_open { "" } else { " hidden" },
         accent = accent_style(appearance.accent),
         icon = launcher_icon(appearance.launcher_icon),
         thinking = esc(strings.chat_thinking),
@@ -325,6 +345,44 @@ pub(super) fn fragment(strings: &UiStrings, appearance: &SiteChatAppearance) -> 
         question = esc(strings.chat_question),
         send = esc(strings.chat_send),
         cap = super::chat::CHAT_MAX_QUESTION_CHARS,
+    )
+}
+
+/// The widget as one complete, self-contained HTML document — the editor's
+/// live appearance preview (S3.02g). The same markup and stylesheet the
+/// public service injects into published pages, with three deliberate
+/// differences: the panel is rendered **open** (the preview's job is to show
+/// the welcome message, name, avatar and suggested questions, not to make
+/// the user click a launcher first), the behavior script is omitted (a
+/// preview is a picture — the editor shows it in a sandboxed iframe where
+/// `/_alo/chat` does not resolve), and `css` — the site's own generated
+/// stylesheet — is inlined so the widget wears the real theme tokens.
+/// `avatar_src` is the already-escaped image source (the editor inlines the
+/// tenant's blob as a `data:` URI, since public asset paths do not resolve
+/// on the edit origin).
+#[must_use]
+pub fn preview_document(
+    strings: &UiStrings,
+    css: &str,
+    appearance: &SiteChatAppearance,
+    avatar_src: Option<&str>,
+) -> String {
+    format!(
+        "<!doctype html>\n<html lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n\
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
+         <meta name=\"robots\" content=\"noindex\">\n\
+         <title>{title}</title>\n\
+         <style>{css}</style>\n\
+         <style>html,body{{height:100%;margin:0}}body{{background:var(--bg,#fff)}}</style>\n\
+         </head>\n<body>\n{markup}{STYLE}</body>\n</html>\n",
+        lang = esc(strings.lang),
+        title = esc(
+            appearance
+                .bot_name
+                .as_deref()
+                .unwrap_or(strings.chat_title)
+        ),
+        markup = markup(strings, appearance, avatar_src, true),
     )
 }
 
@@ -511,6 +569,56 @@ mod tests {
             !fragment.contains("NEVER-ON-THE-PAGE"),
             "the tone note shapes the prompt, not the page"
         );
+    }
+
+    /// The preview document is the real widget, open, dressed in the site's
+    /// own stylesheet — and inert: no behavior script, no external requests
+    /// beyond the avatar source it was handed.
+    #[test]
+    fn the_preview_document_shows_the_open_widget_without_the_script() {
+        let appearance = SiteChatAppearance {
+            bot_name: Some("Marie".to_owned()),
+            suggested_questions: vec!["When are you open?".to_owned()],
+            ..SiteChatAppearance::default()
+        };
+        let doc = preview_document(
+            &EN,
+            ":root{--primary:#123456}",
+            &appearance,
+            Some("data:image/png;base64,AAAA"),
+        );
+        assert!(doc.starts_with("<!doctype html>"));
+        assert!(doc.contains(":root{--primary:#123456}"));
+        // Open, not hidden — the preview's whole job is showing the panel.
+        assert!(doc.contains("aria-expanded=\"true\""));
+        assert!(!doc.contains(" hidden>"));
+        // The launcher is still there, so corner and icon preview too.
+        assert!(doc.contains("id=\"alo-chat-open\""));
+        assert!(doc.contains("<h2>Marie</h2>"));
+        assert!(doc.contains("class=\"alo-chat-sq\">When are you open?</button>"));
+        assert!(doc.contains("src=\"data:image/png;base64,AAAA\""));
+        // A picture, not a live chat: no script at all.
+        assert!(!doc.contains("<script>"));
+        assert!(doc.matches("</style>").count() == 3);
+    }
+
+    /// Hostile appearance strings stay inert in the preview document exactly
+    /// as they do on published pages.
+    #[test]
+    fn the_preview_document_escapes_the_tenants_strings() {
+        let hostile = SiteChatAppearance {
+            bot_name: Some("</title><script>alert(1)</script>".to_owned()),
+            welcome: Some("</style><img src=x onerror=alert(1)>".to_owned()),
+            ..SiteChatAppearance::default()
+        };
+        let doc = preview_document(&EN, "", &hostile, None);
+        assert!(!doc.contains("<script>"));
+        assert!(!doc.contains("<img src=x"));
+        // Only the document's own two style blocks plus the widget's.
+        assert_eq!(doc.matches("</style>").count(), 3);
+        // No avatar handed in, none rendered (the stylesheet's rule for the
+        // class is static and always present; the markup is what varies).
+        assert!(!doc.contains("<img class=\"alo-chat-avatar\""));
     }
 
     #[test]

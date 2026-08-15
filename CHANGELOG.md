@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Shaping your website's assistant is now a screen with a live preview.**
+  The assistant page shows the real widget beside the fields — the same
+  markup your visitors get, wearing your site's theme, updating as you
+  type. The welcome box opens with a written message in your site's
+  language rather than empty, "Suggest from your site" drafts the three
+  opening questions from your own pages (your FAQ's questions verbatim),
+  the avatar uploads from Drive, and an accessibility box states the facts
+  up front — including the measured contrast of the colour you chose.
+
 - **Your website's assistant can now look and sound like you.** The widget
   already wears your site's colours, and everything else about it is now
   yours to shape: give it a name and a face (a photo from Drive), write its
