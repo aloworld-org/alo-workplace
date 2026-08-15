@@ -7830,3 +7830,65 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   `/b/*` and `/_alo/*` already reach alo-sites.
 - **Next:** S3.03c — CRM-owned public seam for contact+lead from a site
   conversation.
+
+## 2026-08-15 — S3.03c CRM answers the conversation's stranger itself: one lead, or "we know you"
+
+- **Item:** S3.03c — **CRM-owned**: a public seam to create a contact and a
+  lead from a site conversation.
+- **What shipped:**
+  - **CRM's public lead seam** (`platform/alo-store/src/crm_lead_capture.rs`,
+    new module — written as CRM's own per ADR 0040 §4, exactly as S3.03a wrote
+    `calendar_availability.rs` as Agenda's; no CRM file edited, `lib.rs` lines
+    additive): `CrmLeadCapture::open(pool, blobs, tenant, owner)` — a
+    write-only door opened with a pair the caller must resolve from a trusted
+    row (for Sites, the site's own record; owner = `sites.created_by`) —
+    with one verb, `capture(seed, &ConversationLead) -> CapturedLead`.
+  - **CRM's own words, CRM's own writers:** the card lands on the tenant's
+    first active board — seeded via `crm_pipelines_or_seed` (the CRM screen's
+    own first-use path; strings from the caller so the edge translates) — in
+    its first live column (the lead import's default, same query), written by
+    `normalize_deal` + `share_crm_pipeline` + `insert_crm_deal_in` in one
+    transaction: the same record a typed or imported deal is. Value is 0
+    (a conversation states no number, and the assistant may never invent one
+    — ADR 0040 §2); owner is named explicitly so `normalize_deal` proves
+    tenant membership BEFORE anything (even the seed) is written.
+  - **A duplicate is an answer, not an error:** the import's own rules
+    (exact address, then non-free-mail company domain, via
+    `crm_thread_match::domain_of`/`is_free_mail_domain`) — an **open** deal
+    answers `AlreadyKnown(deal)`, a billing customer answers
+    `AlreadyCustomer`, closed deals are history and block nothing, free-mail
+    domains never fold strangers together. Snapshot-read like the import
+    (tidiness, not an invariant — journaled in the module doc).
+  - **No journey by construction:** `ConversationLead` is title, name, email,
+    company, source — no field a transcript, question or page view could
+    travel in (the `CalendarBusySpan` trick, applied to the write side).
+    Visitor email is held to the public form door's rule (shape + 254 cap).
+- **Verified:** `SQLX_OFFLINE=true cargo clippy -p alo-store --all-targets` —
+  zero warnings from this item (the two pre-existing `meet.rs`
+  type_complexity survivors remain the business track's; one clippy run was
+  cut at the 600 s ceiling and finished as a re-issued wait, 10m50s total).
+  Test-binary build via the sanctioned background+marker form (9m05s), then
+  foreground `cargo nextest run -p alo-store`: **1 989/1 989 green** (1
+  pre-existing skip, 19.9 s; prune-test-db first — 1 724 pruned). New
+  `crm_lead_seam` suite (8 tests) + 4 in-module unit tests: seeded first
+  board + landing column + the card's exact fields, case-insensitive
+  same-address answer, colleague-domain fold, free-mail never folds,
+  customer (exact + domain) answered without a card, closed history not
+  blocking, CRM's title gate holding at the seam with nothing left behind,
+  and the mandatory wrong-tenant proof (foreign tenant sees nothing, same
+  visitor raises separate leads per tenant, a forged tenant/owner pair is
+  refused writing nothing — not even a seeded board).
+- **Cuts/flags:** none. Reading journaled: in this CRM "a contact and a
+  lead" is one card — the deal IS the lead and its contact fields ARE the
+  contact record (`contacts.rs` is the per-user address book; an anonymous
+  write into a person's address book would be wrong). "CRM-owned" executed
+  by this track because no loop track owns CRM (business track dormant since
+  08-11) and the item exists only in this queue — honoured the same way
+  S3.03a honoured Agenda's: a new module in CRM's voice, CRM files untouched.
+  No migration (the seam writes CRM's existing rows), no HTTP route
+  (S3.03d wires the conversation + aggregate attribution), no web strings,
+  no CHANGELOG (nothing user-visible until S3.03d, same as S3.03a).
+  `cargo fmt` deliberately not run (machine memory: rustfmt 1.9.0
+  divergence); new code written in-style.
+- **Next:** S3.03d — lead capture through this seam from the conversation,
+  aggregate attribution only.
