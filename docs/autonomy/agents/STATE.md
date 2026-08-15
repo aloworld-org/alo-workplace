@@ -1366,3 +1366,160 @@ list), executors in `products/mail/alo-jmap/src/agent_sheets.rs` dispatched from
 one integration test that asks the question in a room and reads what the model
 was shown. Check the migrations directory again immediately before committing;
 `0403` is this track's highest.
+
+## A2.1b — how far the site's other languages got, counted and not translated (2026-08-15)
+
+**What shipped.** The half of A2.1 that was cut, in the shape A2.1b itself
+prescribed: a **read** the agent owns over the readiness the store already
+computes, with the translating left where it was.
+
+- `site_translation_status` (`platform/alo-ai/src/agent_sites.rs`), declared a
+  **read** in the registry — the Website agent's fourth, and the fifteenth in
+  the workspace. Its prompt line says outright that the model **cannot**
+  translate: whole-site translation is something the user starts on the
+  website's Languages screen, where every proposed page is shown beside its
+  original, and the guidance paragraph repeats it in the tense a model actually
+  reaches for ("never say you translated, are translating, or will translate").
+- The executor (`products/mail/alo-jmap/src/agent_sites.rs`,
+  `execute_site_translation_status`) resolves the site the same way every other
+  Website tool does — out of `account.acc.sites()`, never out of an id the model
+  stated — and calls `site_translation_readiness`, which is **two queries
+  whatever the page count**. That bound is why this is answerable about a
+  200-page site at all.
+- The result carries figures and reason codes, never sentences: `totalPages`,
+  and per language `translatedPages` / `missingPages` / `ready` / `isDefault`,
+  plus `languagesShort` and `findings` of `oneLanguageOnly`, `noPages` or
+  `everyLanguageComplete`. The default language sorts first, then whichever
+  language is furthest behind — the order the question is asked in. One extra
+  field, `agentCanTranslate: false`, sits beside the numbers on purpose: the
+  numbers are exactly what would otherwise tempt an offer to fix them.
+- **Coverage is exact.** A page that would fall back to another language counts
+  as missing, because a fallback is what a visitor is shown, not a translation.
+
+**How verified.**
+
+- `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-ai -p alo-jmap
+  --all-targets` clean for both crates.
+- `cargo nextest run -p alo-ai` — **127/127**. Three registry counts moved with
+  the new tool and were updated rather than loosened: the read list in
+  `agent.rs`, `all_tools().len()` 39 → 40, and `agent_turn.rs`'s
+  `every_read_runs_and_every_write_waits` 14 → 15 reads.
+- `cargo nextest run -p alo-jmap --no-fail-fast` — **1101/1102 in 129 s**, the
+  one failure pre-existing and not this track's (below).
+- **The question, on the wire** (`agent_sites_http.rs`, three new tests). Copied
+  out of `cargo nextest run -p alo-jmap --test agent_sites_http --no-capture`:
+
+```
+===== A2.1 TRANSCRIPT: @sites is the website ready in French? =====
+POST /chat/channels/W3F4KhEzD3tjcuGv22_8KA/messages
+     {"body":"@sites is the website ready in French?"}
+--- what the model was shown (call 1 of 2, user turn) ---
+Today's date is 2026-08-15. …
+Request: @sites is the website ready in French?
+
+Sources:
+
+--- what the model replied (call 1) ---
+{"action":{"args":{},"tool":"site_translation_status"},"kind":"action",
+ "say":"Let me check the languages."}
+--- what the model was shown (call 2 of 2, user turn) ---
+Request: @sites is the website ready in French?
+
+Sources:
+[1] tool result "site_translation_status" — {"agentCanTranslate":false,"defaultLocale":"en",
+"findings":[],"kind":"siteTranslationStatus","languages":[
+{"isDefault":true,"locale":"en","missingPages":0,"ready":true,"translatedPages":3},
+{"isDefault":false,"locale":"de","missingPages":3,"ready":false,"translatedPages":0},
+{"isDefault":false,"locale":"fr","missingPages":2,"ready":false,"translatedPages":1}],
+"languagesShort":2,"site":{"enabledLocales":["en","fr","de"],"name":"Juniper Bakery",
+"status":"draft",…},"totalPages":3}
+
+The last source above is the result of a tool you just ran. ANSWER the request from it now…
+--- what the model replied (call 2) ---
+{"answer":"French is two pages short of the three you have, and German has none of them yet.
+Translating a whole site is something you start on the website's Languages screen, where every
+page is shown beside the original before anything is kept.","kind":"answer"}
+--- GET /chat/channels/{id}/messages, the agent's message ---
+{"authorKind":"agent","authorEmail":"Websites","body":"French is two pages short…",
+ "proposal":null,…}
+--- audited: site_translation_status / read / ok=true ---
+===== end =====
+```
+
+The properties pinned around that exchange:
+
+- **`proposal` is `null` on every message in the room.** Asking how far the
+  languages got produced no button, and the system prompt of the same turn
+  carries the line the model reads about not being able to translate.
+- **The fixture is the shape a site actually reaches**: three pages written in
+  the default language, a second language started and stopped after one page, a
+  third enabled and never begun. The counts come back 3 / 1 / 0, in that order,
+  and `languagesShort` is 2.
+- **Nothing was written by the asking.** After the turn, French is still one
+  page — a question about coverage does not create coverage — and the run is
+  audited `site_translation_status / read / ok=true`, with the agent's record at
+  one read, one answer, zero actions.
+- **The two kinds of "nothing missing" are different answers.** A site in one
+  language answers `oneLanguageOnly`; a site whose second language is fully
+  written answers `everyLanguageComplete`. Neither is left as a bare zero for a
+  client to interpret.
+- **Wrong tenant.** The isolation test now also asserts
+  `site_translation_readiness` is `None` across the tenant boundary: a count is
+  a fact about somebody else's site as much as a passage of it is.
+
+**Cuts / flags.**
+
+- **No write, deliberately, and the prerequisite is unchanged.** Translating
+  still needs the source `alo-jmap`'s `sites.rs` assembles in the private
+  `translation_source`, and that file is the sites track's. If a write is ever
+  wanted here, the prerequisite is them exporting that assembly — ask in their
+  queue first. Nothing in this item edits or copies it.
+- **No migration, no store change.** `0403` remains this track's highest; the
+  sites loop is at `0323` (checked immediately before committing). Everything
+  here goes through `site_translation_readiness`, which already existed for the
+  publish check, so `alo-store` was not rebuilt and its ~115 test binaries were
+  not relinked.
+- **One pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime::now_utc()`
+  at 100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision — `…489008` vs `…4890082`. It fails whenever the seventh
+  fractional digit is non-zero, which is most runs, and it has nothing to do with
+  agents: the file is theirs (78781768, 2026-08-12) and this track must not edit
+  it. The fix on their side is comparing at microsecond precision rather than
+  raw equality.
+- **Two clippy warnings in `alo-store/src/meet.rs`** (`type_complexity`) are
+  pre-existing and in another track's file; nothing this item touched is in
+  `alo-store`.
+- **The stale sentence in `alo-store/src/agent_ground.rs` is still there** — it
+  still says Sites has neither grounding nor tools "yet". Same reason as last
+  time: correcting one comment costs a full `alo-store` rebuild and ~40 minutes
+  of relinking. Fold it into A2.4 (Insights), which has to touch `alo-store`
+  anyway.
+- **"On the wire" is the in-process router over real Postgres**, as in A2.1:
+  real `Request`s through the real router with a real bearer token against real
+  rows, no new HTTP route, and no live model call (the standing rail). The
+  model's words are fixtures; what is proved is what it was *shown* and what the
+  product did with its reply.
+- **Environment.** Docker is still unresponsive (`docker ps` returns nothing),
+  so `scripts/prune-test-db.sh` still cannot run — its first statement is a
+  `docker exec` — and everything ran against `alo_agents_test` on the native
+  **5432** server. The 1 102-test run took 129 s, so the database has not
+  bloated. C: was at **100%, 3.3 GB free** at the top of the iteration; deleting
+  this checkout's own `target/debug/deps/*.pdb` (81 files, 4.6 GB) took it to
+  7.8 GB, and every command carried `CARGO_PROFILE_TEST_DEBUG=0` so none came
+  back. The test-binary build after the `alo-ai` change did not fit one 600 s
+  call and was finished by waiting on that same command inside a single tool
+  call; the suites themselves ran in the foreground.
+
+**Next:** A2.2 — the Sheet agent: a formula from intent, explaining a formula,
+cleaning a column, answering from the data **with the cells cited**, and a chart
+from intent. The shape A2.1/A2.1b settled is the one to copy: a tool set in
+`platform/alo-ai/src/agent_sheets.rs` (reads and writes declared in the same
+list), executors in `products/mail/alo-jmap/src/agent_sheets.rs` dispatched from
+`agent.rs`, results carrying figures and reason codes rather than sentences, and
+one integration test that asks the question in a room and reads what the model
+was shown. Two registry counts move with every new tool (`all_tools().len()` and
+`agent_turn.rs`'s read count) — update them rather than loosening them. Check
+the migrations directory again immediately before committing; `0403` is this
+track's highest.

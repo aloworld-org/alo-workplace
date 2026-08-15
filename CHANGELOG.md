@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Ask the Websites agent how far your other languages have got.** "Is the
+  website ready in French?" now gets a straight count back: how many pages your
+  site has, how many are already written in each language you set it up in, and
+  which language is short how many. A page that would fall back to another
+  language counts as missing, because that is what a visitor would actually be
+  shown. The agent does not translate anything — whole-site translation stays
+  where you can read every proposed page beside the original before keeping it,
+  and the agent points you there instead of offering to do it for you.
+
 - **The Websites agent can now read your site, write for it, and never puts
   anything online by itself.** Ask it what your site says about your opening
   hours and it answers from the version that is actually published — the pages
