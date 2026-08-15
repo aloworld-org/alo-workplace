@@ -8026,3 +8026,55 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   rule — both would be broken otherwise). No new route prefix (`/sites/*`
   already proxied); no Caddy note needed.
 - **Next:** S3.04a — Billing-owned read seam for published catalog items.
+
+## 2026-08-15 — S3.04a The shop asks the price list, and the price list answers only what a buyer may hear
+
+- **Item:** S3.04a — Billing-owned read seam exposing published catalog items
+  and their prices to a site; no write path, no second copy.
+- **What shipped:** `billing_catalog_read.rs` — Billing's catalog seam
+  (ADR 0041), the third seam door after Agenda's (S3.03a) and CRM's (S3.03c):
+  `BillingCatalogRead::open(pool, blobs, tenant, owner)` with the pair from a
+  trusted row, able only to read. `sale_items()` — the active price list in
+  Billing's own picker order, riding `billing_products(false)`;
+  `sale_item(id)` — one item, answering `None` alike for archived, foreign
+  and never-existed ids (a shop can never sell the past, and a guessed id
+  confirms nothing); `currency()` — Billing's own accounting currency
+  (EUR-defaulted), so the shop never keeps a currency of its own. The
+  vocabulary type `CatalogSaleItem` carries the buyer's six facts (id, name,
+  unit, sale price cents, VAT bp, photo ref) and has no field for the
+  tenant's cost, supplier, SKU/barcode or any workspace identity;
+  `sale_item_of` destructures `Product` exhaustively so a column Billing adds
+  tomorrow fails to compile at the seam until someone decides whether it
+  crosses. `lib.rs` gains the two additive lines. No migration (the seam
+  reads Billing's existing rows), no HTTP (S3.04f/g wire the shop), no web
+  strings, no CHANGELOG (nothing user-visible yet — S3.03a precedent).
+- **Verified:** clippy `-p alo-store --all-targets` — zero warnings from this
+  item (the two `meet.rs` type_complexity survivors remain the business
+  track's; 12m57s, finished as a harness-backgrounded task). Test-binary
+  build via the sanctioned background+marker form (10m59s; one poll
+  re-issued at the 600 s ceiling), then foreground `cargo nextest run -p
+  alo-store`: **2 006/2 006 green** (1 pre-existing skip, 18.9 s;
+  prune-test-db first — 1 600 pruned). New proof (unit + `billing_catalog_seam`
+  on real rows): the exhaustive six-field vocabulary destructure, the
+  cost/SKU/barcode/identity never rendered anywhere in what the seam answers,
+  active-in-name-order with the archived item simply absent, a price edit
+  answered live at the next read (the reference is the storage), archived →
+  `None` on the same reference, the mandatory wrong-tenant wall (each door
+  lists only its own tenant; a foreign id is indistinguishable from a ghost),
+  and the currency defaulting then following Billing's settings.
+- **Cuts/flags:** reading journaled — in Billing's catalog the only publish
+  state is archival, so *published* = active; which active items a site
+  actually offers is the shop section's naming (S3.04f), stored as
+  references. `stocked` deliberately does not cross: how stock reaches a shop
+  is wave two's decision (S3.05a), through Inventory's seam. The door's reads
+  are tenant-wide today (Billing's products are tenant-wide); the owner in
+  the pair names who the door acts as, kept for seam-door symmetry and for
+  any later owner-scoped read. Gate note for future iterations on this Mac:
+  the shell had no `DATABASE_URL`, and the tests' 5433 fallback answers
+  nothing here — every DB test dies at its 30 s pool timeout while the ~1 277
+  pure tests pass first, so the failure wave surfaces mid-run in whatever
+  binaries finish next (tonight it read like agents-track failures at
+  1278/2006). Export `DATABASE_URL=postgres://alo:alo-dev-only@localhost:5432/alo`
+  before concluding anything about a red suite. `cargo fmt` deliberately not
+  run (machine memory: rustfmt divergence); new code written in-style.
+- **Next:** S3.04b — hold-with-expiry, capacity reserved before payment.
