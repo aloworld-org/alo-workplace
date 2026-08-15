@@ -8078,3 +8078,66 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   before concluding anything about a red suite. `cargo fmt` deliberately not
   run (machine memory: rustfmt divergence); new code written in-style.
 - **Next:** S3.04b — hold-with-expiry, capacity reserved before payment.
+
+## 2026-08-15 — S3.04b The seat is reserved before the money moves, and frees itself when the buyer walks away
+
+- **Item:** S3.04b — hold-with-expiry: capacity reserved *before* payment,
+  released if the buyer does not finish; concurrency proof that two
+  simultaneous buyers cannot oversell the last seat.
+- **What shipped:**
+  - **The event** (migration `0329`, `site_tickets.rs`): the dated product a
+    site sells seats to — `starts_at`, `capacity` (1..=100 000), and a
+    *reference* into Billing's price list, never a copied name/price/VAT
+    (ADR 0041: the shop keeps no second number). Create validates the
+    product through the S3.04a seam (`BillingCatalogRead::sale_item`) —
+    checked AFTER the site anchor, so a caller who cannot name the site
+    learns nothing about the price list. CRUD: list in start order, get,
+    capacity change (growth free; shrink refused below committed seats,
+    under the same per-event lock the buyers take), delete only while no
+    seat is sold; 200-events-per-site ceiling.
+  - **The hold** (`site_ticket_holds.rs`): `take_ticket_hold(site, event,
+    quantity, ttl, now)` counts committed seats and inserts as ONE decision
+    under `pg_advisory_xact_lock(tenant, event)` — the same shape as the
+    booking reservation — so the second buyer after the last seat is told
+    "sold out" (or "only N seats are left"), never given it. Expiry is a
+    **time predicate** (`state='held' AND expires_at > now`), not a
+    sweeper: an abandoned checkout frees its seats by time passing alone,
+    and a stale row reads back as Expired. `complete_ticket_hold` (the
+    S3.04c settle path) flips only a live unexpired hold and is idempotent
+    for retried webhooks; a lapsed hold is refused, never given seats that
+    may have been resold. `release_ticket_hold` is the walk-away path,
+    idempotent, and refuses to undo a completed sale (refunds are a later
+    wave). `ticket_availability` = capacity − sold − live holds. Quantity
+    1..=20 per hold; ttl 1 min..=1 h. A hold stores NO buyer identity —
+    who bought lives where the sale puts it (S3.04c/d).
+  - `id.rs` gains `SiteTicketEventId`/`SiteTicketHoldId`; `lib.rs` the
+    additive mod/pub-use lines. No HTTP (S3.04c/f/g wire the shop), no web
+    strings, no CHANGELOG (nothing user-visible yet — S3.04a precedent).
+- **Verified:** clippy `-p alo-store --all-targets` zero warnings from this
+  item (the two `meet.rs` type_complexity survivors remain the business
+  track's; 13m47s as a harness-backgrounded task). Test-binary relink via
+  the sanctioned background+marker form, then foreground `cargo nextest
+  run -p alo-store`: **2 025/2 025 green** (1 pre-existing skip, 20.1 s;
+  prune-test-db first — 851 pruned). New proof (16 DB tests + unit): THE
+  race — `tokio::join!` on the last seat, exactly one winner — and the
+  crowd (8 buyers, 3 seats, exactly 3 holds); expiry freeing seats with no
+  sweeper and the lapsed buyer refused completion into the reissued seat;
+  completion permanent + webhook-retry idempotent; release immediate +
+  double-press safe; the mandatory wrong-tenant wall (every verb, plus the
+  same-tenant wrong-site wall, foreign availability NotFound, A's view
+  untouched); price-list gate (ghost and archived product refused);
+  shrink-below-committed refused naming the number; delete-after-sale
+  refused; per-site ceiling; the columns-of-the-table privacy proof (the
+  hold table has no buyer column of any kind); two events not contending.
+- **Cuts/flags:** store-only by design — which events a page offers and who
+  calls the hold from the public wire are S3.04f/S3.04c; hold ops sit on
+  `AccountStore` today and the public door picks its shape when the
+  checkout lands. No hygiene sweeper for expired holds (correctness never
+  needs one — journal if S3.04c's worker wants tidier rows). Gate lesson
+  for this Mac: launching the background+marker build and its poll in ONE
+  Bash call is a trap — the 600 s kill takes the detached child with it
+  and the build silently dies; launch in its own instant call, poll in the
+  next.
+- **Next:** S3.04c — hosted payment handoff (provider adapter + fixture,
+  order → payment-reference → paid state machine, idempotent webhooks;
+  Mollie/Adyen ahead of Stripe).
