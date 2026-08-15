@@ -43,7 +43,16 @@ contracts.
   invented prices, dates, or promises — and an off-topic question is turned
   away before it costs you anything. (The on-site chat window itself is on its
   way.)
->>>>>>> 9b26c41 (feat(sites): the chatbot answers with the page it came from, or not at all)
+
+- **The website chatbot can never run up a bill you didn't agree to.** Every
+  site has a monthly spending budget for its chatbot — set to €10 from the
+  start, never left blank — and the chatbot is off until you switch it on.
+  Strangers can't burn through it either: each visitor, and each network
+  address, is limited to a sensible number of questions. When the budget is
+  spent the chatbot doesn't fail quietly: visitors are told it is unavailable
+  and pointed to your contact form, and you get one message in your inbox —
+  once per month, not once per visitor — so you can raise the budget or let it
+  rest until next month.
 - **Your agents are simply there now.** Open the agent list and every part of
   alo already has one — Mail, Agenda, Tasks, Chat, Drive, Billing, Sales,
   Projects, Finance, Inventory, People, Insights, Meet, Websites, and alo itself

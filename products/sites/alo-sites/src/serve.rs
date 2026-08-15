@@ -1,9 +1,11 @@
 //! The public HTTP surface (ADR 0036, `docs/design/sites.md`): resolve the
 //! Host header to one tenant's live site, serve its published snapshots, and
 //! accept contact-form submissions (`POST /f/{form_id}`, the [`forms`]
-//! module), catalog orders (`POST /o/{catalog_id}`, the [`orders`] module)
-//! and page-beacon reports (`POST /_alo/collect`, the [`beacon`],
-//! [`heatmap`] and [`conversion`] modules) — nothing else. The service holds no session — its whole tenant
+//! module), catalog orders (`POST /o/{catalog_id}`, the [`orders`] module),
+//! page-beacon reports (`POST /_alo/collect`, the [`beacon`],
+//! [`heatmap`] and [`conversion`] modules) and assistant questions
+//! (`POST /_alo/chat`, the [`chat`] module, gated by rate limits and the
+//! monthly spend ceiling) — nothing else. The service holds no session — its whole tenant
 //! scope is the [`host`] lookup's result (or, for a submission, the posted
 //! form id's own resolution) — and it is deliberately terse on the wire:
 //! misses are one uniform not-found, errors carry no internals.
@@ -37,6 +39,7 @@ mod beacon;
 mod blog;
 mod bookings;
 mod cache;
+pub mod chat;
 pub mod config;
 mod conversion;
 pub mod derivative;
@@ -84,6 +87,12 @@ pub struct AppState {
     beacon_rate: rate::RateLimiter,
     /// The separate, tighter budget on password guesses at protected pages.
     unlock_rate: rate::RateLimiter,
+    /// The assistant's per-visitor-token budget ([`chat`]) — its own
+    /// instance, so chat traffic can never spend a form or unlock budget.
+    chat_visitor_rate: rate::RateLimiter,
+    /// The assistant's looser per-address budget, the bound a token-cycling
+    /// script actually hits ([`chat`]).
+    chat_ip_rate: rate::RateLimiter,
     /// Signs and checks visitor sessions on protected pages. Holds a derived
     /// key only — no session is ever stored.
     unlock: unlock::UnlockSessions,
@@ -119,15 +128,24 @@ impl AppState {
                 rate::UNLOCK_MAX_PER_WINDOW,
                 rate::UNLOCK_WINDOW,
             ),
+            chat_visitor_rate: rate::RateLimiter::with_budget(
+                chat::CHAT_VISITOR_MAX_PER_WINDOW,
+                chat::CHAT_VISITOR_WINDOW,
+            ),
+            chat_ip_rate: rate::RateLimiter::with_budget(
+                chat::CHAT_IP_MAX_PER_WINDOW,
+                chat::CHAT_IP_WINDOW,
+            ),
             unlock: unlock::UnlockSessions::new(&secret),
             analytics: analytics::VisitorHasher::new(secret),
         })
     }
 }
 
-/// The service router: `/healthz`, the three POSTs an anonymous visitor may
-/// make off a page path — a form submission, a catalog order, and a page
-/// beacon, each with its own tight body cap — and the catch-all site path.
+/// The service router: `/healthz`, the POSTs an anonymous visitor may
+/// make off a page path — a form submission, a catalog order, a page
+/// beacon, and an assistant question, each with its own tight body cap —
+/// and the catch-all site path.
 /// Every POST path carries a shape no page slug or locale tag can (`/f/…`,
 /// `/o/…`, `/_alo/…`), so none can ever shadow a page a tenant published.
 pub fn app(state: Arc<AppState>) -> Router {
@@ -151,6 +169,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/_alo/collect",
             post(beacon::collect).layer(DefaultBodyLimit::max(beacon::BEACON_BODY_MAX_BYTES)),
+        )
+        .route(
+            "/_alo/chat",
+            post(chat::ask).layer(DefaultBodyLimit::max(chat::CHAT_BODY_MAX_BYTES)),
         )
         .fallback(serve_site)
         .with_state(state)

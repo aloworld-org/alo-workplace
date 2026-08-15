@@ -7283,3 +7283,77 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.02c — cost and abuse: the defaulted per-site monthly spend
   ceiling, per-visitor/per-IP rate limits, the graceful unavailable message,
   and telling the tenant when it is hit.
+
+## 2026-08-15 — S3.02c the assistant has a budget, and strangers cannot spend it
+
+- **Item:** S3.02c — cost and abuse (ADR 0040 §3): a per-site monthly
+  **spend** ceiling defaulted rather than blank, per-visitor and per-IP rate
+  limits below it, a graceful unavailable answer that offers the contact
+  form, and the tenant told when the ceiling is hit.
+- **What shipped:**
+  - Store (`platform/alo-store/src/site_chat_limits.rs`, migration **0324**):
+    `site_chat_settings` (enabled OFF by default; `monthly_ceiling_cents`
+    defaulted to 1 000 = €10, settable 100..=1 000 000, integer cents only)
+    and the `site_chat_spend` monthly ledger keyed `(tenant, site,
+    'YYYY-MM')` — a new month is a fresh budget by key, no reset job. Tenant
+    door: `site_chat_settings` / `set_site_chat_settings` (absence reads as
+    the defaults, never blank). Public door: `chat_gate` →
+    Disabled/Ready{remaining}/Exhausted (no settings row = Disabled,
+    fail-closed; exhaustion computed LIVE from spent>=ceiling so raising the
+    ceiling reopens the assistant immediately) and `record_chat_spend` — one
+    atomic upsert that stamps `ceiling_hit_at` exactly once, in the statement
+    of the write that crosses, however many writers race. System door:
+    `claim_chat_ceiling_notifications`, at-most-once via `FOR UPDATE SKIP
+    LOCKED` + `hit_notified_at`, the form/order/booking sweep posture.
+  - Public endpoint (`products/sites/alo-sites/src/serve/chat.rs`): `POST
+    /_alo/chat` on the site's own host — per-IP limiter (60/10 min) then
+    body/token/question validation then per-visitor limiter (15/10 min; the
+    widget's opaque token, used transiently, never stored), then host
+    resolution and the gate. Off/unknown = the uniform 404 (no existence
+    leak). Past the gates the wire answer is the typed
+    `{"state":"unavailable","contactPath":...}` where `contactPath` is the
+    first published default-locale page actually carrying a `contact_form`
+    section (null when none — no dead links). The Ready arm is exactly where
+    S3.02e wires the S3.02b answering pipeline; until then unwired and
+    exhausted are deliberately indistinguishable on the wire (honest, and no
+    budget-state leak to strangers). 429 carries Retry-After; 413/400 for
+    oversized/malformed input, before any DB read.
+  - Edit surface (`products/mail/alo-jmap/src/sites_chat.rs`): `GET/PUT
+    /sites/{id}/chat-settings` — the switch and the ceiling in ONE screen's
+    write (ADR 0040 §3), returning ceiling + this month's spend +
+    `ceilingHit` + `defaultCeilingCents`. Under the existing `/sites/*`
+    prefix — no new Caddy prefix needed.
+  - The telling (`products/mail/alo-jmap/src/site_chat_notify.rs` + main.rs
+    30 s sweep): one INTERNAL inbox message per hit site-month to the site
+    creator — spend and ceiling in euros, the month, the visitor fallback,
+    and how to raise the budget. Never outbound; English-only like the
+    sibling notifiers (localization flagged for wave review).
+- **Verified:** `cargo fmt` clean; `SQLX_OFFLINE=true cargo clippy
+  --all-targets` clean on all three crates (the two surviving warnings are
+  the pre-existing `meet.rs:319` type_complexity, another track's file).
+  `cargo nextest run` green: **alo-store 1 958/1 958 (21.9 s)** incl. the new
+  `site_chat_limits_tenancy` (defaults, ceiling-range rules, wrong-tenant
+  walls both directions, positive-cents rule, stamp-once crossing, month
+  isolation, live reopen on raise, claim-once with the owning tenant+owner);
+  **alo-sites 158/158** incl. `chat_gate` (fail-closed default 404, enabled →
+  unavailable with the real contact path, exhausted same shape, no-contact
+  site → null, visitor budget across addresses, address budget against
+  token-cycling, malformed/oversized input); **alo-jmap 1 100/1 100** incl.
+  `site_chat_notify` (one message in the owning inbox only, euros+month in
+  the body, never twice, silent past the stamp, fresh month = one fresh
+  telling). **On the wire** (debug alo-jmap on 127.0.0.1:8080, docker
+  `alo-pg` db `alo` — confirmed via pg_stat_activity; two fresh
+  `identityctl` tenants): GET no token → 401; GET → 200 defaults
+  `{enabled:false, monthlyCeilingCents:1000, spentCents:0}`; PUT 50 → 422
+  "must be between 100 and 1000000 cents"; PUT not-json → 400; PUT
+  `{true, 2500}` → 200; GET → persisted (row confirmed in psql); foreign
+  tenant GET/PUT → 404. Server killed after.
+- **Cuts/flags:** none of the item's scope cut. Spend recording ships with
+  its public-door API + tests but nothing calls it in production until
+  S3.02e wires the model call into the Ready arm — by design of the slice
+  order (gates first, spend follows the first real model call). Also fixed
+  in passing: a stray `>>>>>>> 9b26c41` conflict marker an earlier keep-both
+  resolution left in CHANGELOG.md.
+- **Next:** S3.02d — source-adding UI: the screen that publishes a source to
+  the bot says *anyone on the internet will be able to read this* above the
+  button; the ceiling is set in the same screen the bot is switched on.
