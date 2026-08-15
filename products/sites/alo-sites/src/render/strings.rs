@@ -163,6 +163,10 @@ pub struct UiStrings {
     pub chat_question: &'static str,
     /// Assistant widget: send button text.
     pub chat_send: &'static str,
+    /// Assistant widget: the default welcome message, shown as the first bot
+    /// bubble when the tenant wrote none — a default is written for them
+    /// rather than left blank (ADR 0040 §5).
+    pub chat_welcome: &'static str,
     /// Assistant widget: shown while an answer is on its way.
     pub chat_thinking: &'static str,
     /// Assistant widget: prefix before an answer's source links.
@@ -255,6 +259,7 @@ pub const EN: UiStrings = UiStrings {
     chat_close: "Close",
     chat_question: "Your question",
     chat_send: "Send",
+    chat_welcome: "Hello! Ask me anything about what is published on this site.",
     chat_thinking: "Looking that up…",
     chat_sources: "From:",
     chat_refusal: "I can only answer from what is published on this site, and I could not find that.",
@@ -339,6 +344,7 @@ pub const FR: UiStrings = UiStrings {
     chat_close: "Fermer",
     chat_question: "Votre question",
     chat_send: "Envoyer",
+    chat_welcome: "Bonjour ! Posez-moi vos questions sur ce qui est publié sur ce site.",
     chat_thinking: "Je cherche…",
     chat_sources: "Source :",
     chat_refusal: "Je ne peux répondre qu’à partir de ce qui est publié sur ce site, et je n’ai rien trouvé à ce sujet.",
@@ -423,6 +429,7 @@ pub const NL: UiStrings = UiStrings {
     chat_close: "Sluiten",
     chat_question: "Uw vraag",
     chat_send: "Versturen",
+    chat_welcome: "Hallo! Stel me gerust een vraag over wat op deze site gepubliceerd is.",
     chat_thinking: "Even opzoeken…",
     chat_sources: "Bron:",
     chat_refusal: "Ik kan alleen antwoorden op basis van wat op deze site gepubliceerd is, en daarover heb ik niets gevonden.",

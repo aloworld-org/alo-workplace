@@ -678,3 +678,99 @@ async fn the_blog_carries_the_widget_too() {
     let article = body_string(get_path(&state, &sub, "/blog/rye-week").await).await;
     assert!(article.contains("id=\"alo-chat\""), "article carries it");
 }
+
+/// A valid 1×1 transparent PNG — the smallest honest image blob.
+const TINY_PNG: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+    0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0x00, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+    0x42, 0x60, 0x82,
+];
+
+#[tokio::test]
+async fn the_widget_wears_the_tenants_appearance_and_serves_its_avatar() {
+    use alo_store::{ChatLauncherCorner, ChatLauncherIcon, ChatWidgetAccent, SiteChatAppearance};
+
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "chat-look").await;
+    let (site, sub) = live_site(&acc, "chatlook").await;
+    let month = alo_store::chat_month_key(time::OffsetDateTime::now_utc());
+    acc.set_site_chat_settings(&site, true, 500, &month)
+        .await
+        .unwrap();
+
+    // The default appearance: our written welcome, right corner, no
+    // suggestions, no auto-open.
+    let response = get_path(&state, &sub, "/").await;
+    let default_etag = response.headers()[header::ETAG]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let body = body_string(response).await;
+    assert!(body.contains("Hello! Ask me anything about what is published on this site."));
+    assert!(body.contains("data-side=\"right\""));
+    assert!(!body.contains("<div id=\"alo-chat-suggest\">"));
+    assert!(!body.contains("data-open=\"1\""));
+
+    // The tenant's appearance lands on the published page — name, welcome,
+    // questions, corner, auto-open, accent, avatar — and the validator
+    // changes with it, so no cache serves the old look.
+    let avatar = acc
+        .put_blob(bytes::Bytes::from_static(TINY_PNG), Some("image/png"))
+        .await
+        .unwrap();
+    let appearance = SiteChatAppearance {
+        bot_name: Some("Marie".to_owned()),
+        avatar: Some(alo_store::BlobId::new(avatar.as_str())),
+        welcome: Some("Hi, I'm Marie. Ask me about our rye bread.".to_owned()),
+        suggested_questions: vec!["When are you open?".to_owned()],
+        launcher_corner: ChatLauncherCorner::Left,
+        launcher_icon: ChatLauncherIcon::Question,
+        auto_open: true,
+        accent: ChatWidgetAccent::Surface,
+        ..SiteChatAppearance::default()
+    };
+    acc.set_site_chat_appearance(&site, &appearance)
+        .await
+        .unwrap();
+    let response = get_path(&state, &sub, "/").await;
+    let dressed_etag = response.headers()[header::ETAG]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert_ne!(
+        default_etag, dressed_etag,
+        "an appearance change must change the validator"
+    );
+    let body = body_string(response).await;
+    assert!(body.contains("<h2>Marie</h2>"));
+    assert!(body.contains("Hi, I&#39;m Marie. Ask me about our rye bread."));
+    assert!(body.contains("class=\"alo-chat-sq\">When are you open?</button>"));
+    assert!(body.contains("data-side=\"left\""));
+    assert!(body.contains("data-open=\"1\""));
+    assert!(body.contains("--alo-chat-accent:var(--surface"));
+    let avatar_path = format!("/assets/img/{}", avatar.as_str());
+    assert!(body.contains(&format!("src=\"{avatar_path}\"")));
+
+    // The avatar rides the same live gate as the widget: served while the
+    // assistant is on, a clean 404 once it is off — and the page then
+    // carries no appearance bytes at all.
+    let response = get_path(&state, &sub, &avatar_path).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()[header::CONTENT_TYPE].to_str().unwrap(),
+        "image/png"
+    );
+    acc.set_site_chat_settings(&site, false, 500, &month)
+        .await
+        .unwrap();
+    let response = get_path(&state, &sub, &avatar_path).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::NOT_FOUND,
+        "an off assistant serves no avatar"
+    );
+    let body = body_string(get_path(&state, &sub, "/").await).await;
+    assert!(!body.contains("Marie"));
+}

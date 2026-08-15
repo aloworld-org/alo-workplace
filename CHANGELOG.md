@@ -10,6 +10,18 @@ contracts.
 
 ## Unreleased
 
+- **Your website's assistant can now look and sound like you.** The widget
+  already wears your site's colours, and everything else about it is now
+  yours to shape: give it a name and a face (a photo from Drive), write its
+  welcome message, offer up to three suggested opening questions visitors
+  can tap, choose which corner it sits in and which icon it shows, pick its
+  accent among your site's own palette roles (every choice is
+  contrast-checked — no unreadable combinations exist), and set the message
+  it shows when it cannot answer. A tone note lets you describe how your
+  business speaks — it shapes the assistant's style, never its rules: it
+  still answers only from your published pages, cites them, and never
+  invents a price or a promise.
+
 - **Your website's assistant now answers visitors, on the page.** Switch the
   assistant on and every published page of your site carries a small "Ask us"
   button in your site's own colours; visitors ask in their language, and the

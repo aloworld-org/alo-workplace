@@ -435,7 +435,16 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
                 .published_post_uses_cover(&resolved, blob_id)
                 .await
             {
-                Ok(referenced) => referenced,
+                Ok(true) => true,
+                // The assistant's avatar rides live state like the widget
+                // itself: servable exactly while the assistant is on.
+                Ok(false) => match state.store.chat_avatar_allows(&resolved, blob_id).await {
+                    Ok(allowed) => allowed,
+                    Err(error) => {
+                        tracing::error!(host = %public_host, %error, "chat avatar reference read failed");
+                        return unavailable();
+                    }
+                },
                 Err(error) => {
                     tracing::error!(host = %public_host, %error, "blog cover reference read failed");
                     return unavailable();
@@ -509,16 +518,17 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
         }
     }
 
-    // Whether the assistant widget rides on this response — live state, so
-    // it joins the ETag below: bytes stay a pure function of the validator.
-    let mut with_assistant = false;
+    // Whether (and how) the assistant widget rides on this response — live
+    // state, so it joins the ETag below: bytes stay a pure function of the
+    // validator.
+    let mut assistant_mark = None;
     let (content_type, body) = if path == "/assets/site.css" {
         ("text/css; charset=utf-8", site.css.clone())
     } else if let Some(page) = site.page(path) {
         let locale = site.page_locale(path).unwrap_or(&resolved.default_locale);
         let body = match chat::widget_if_on(&state, &resolved, locale).await {
             Some(assistant) => {
-                with_assistant = true;
+                assistant_mark = Some(fragment_mark(&assistant));
                 widget::inject(page.to_owned(), &assistant)
             }
             None => page.to_owned(),
@@ -529,13 +539,13 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
         return not_found(site.not_found.clone());
     };
 
-    // Strong ETag: bytes are a pure function of (publish, path) — plus the
-    // widget marker, so switching the assistant on or off revalidates
-    // cleanly instead of 304-ing a browser onto the wrong variant.
-    let etag = if with_assistant {
-        format!("\"{}:{path}:c\"", site.publish.as_str())
-    } else {
-        format!("\"{}:{path}\"", site.publish.as_str())
+    // Strong ETag: bytes are a pure function of (publish, path) — plus a
+    // digest of the widget fragment when one rides along, so switching the
+    // assistant on or off, or changing its appearance, revalidates cleanly
+    // instead of 304-ing a browser onto the wrong variant.
+    let etag = match assistant_mark {
+        Some(mark) => format!("\"{}:{path}:c{mark:x}\"", site.publish.as_str()),
+        None => format!("\"{}:{path}\"", site.publish.as_str()),
     };
     if if_none_match_hits(req.headers().get(header::IF_NONE_MATCH), &etag) {
         let response = cacheable(StatusCode::NOT_MODIFIED, content_type, &etag, String::new());
@@ -696,6 +706,18 @@ fn image_response(
         HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'"),
     );
     response
+}
+
+/// A short digest of the injected widget fragment for the page ETag — the
+/// widget's bytes depend on live state (enablement, locale words, the
+/// tenant's appearance), so the validator must change whenever they do.
+/// `DefaultHasher::new()` is deterministic (fixed keys), and a collision or
+/// cross-build drift merely costs one clean revalidation.
+fn fragment_mark(fragment: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::hash::DefaultHasher::new();
+    fragment.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Whether an `If-None-Match` value matches `etag` (list form and `*`).

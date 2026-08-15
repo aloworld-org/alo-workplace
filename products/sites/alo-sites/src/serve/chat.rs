@@ -47,8 +47,8 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use serde_json::json;
 
-use alo_ai::{SiteChatError, SiteChatRefusal, SiteChatReply};
-use alo_store::{ChatGate, PublishedSite, chat_month_key};
+use alo_ai::{SiteChatError, SiteChatRefusal, SiteChatReply, SiteChatVoice};
+use alo_store::{ChatGate, PublishedSite, SiteChatAppearance, chat_month_key};
 use time::OffsetDateTime;
 
 use super::forms::client_key;
@@ -201,7 +201,15 @@ async fn answer(
             return unavailable_state(state, site).await;
         }
     };
-    match alo_ai::answer_site_question(&config, question, &corpus).await {
+    // The tenant's voice (ADR 0040 §5): tone and note shape the prompt's
+    // style guidance — the answering rules stay absolute in `alo-ai`. A
+    // failed read answers in the default voice rather than not at all.
+    let appearance = chat_appearance(state, site).await;
+    let voice = SiteChatVoice {
+        tone: appearance.tone,
+        note: appearance.tone_note.as_deref(),
+    };
+    match alo_ai::answer_site_question(&config, question, &corpus, &voice).await {
         Ok(SiteChatReply::Answer { text, citations }) => {
             record_spend(state, site, month).await;
             let citations: Vec<serde_json::Value> = citations
@@ -272,12 +280,25 @@ async fn record_spend(state: &Arc<AppState>, site: &PublishedSite, month: &str) 
     }
 }
 
+/// The site's assistant appearance, defaults on a failed read — the page
+/// (and the answer) always come first.
+async fn chat_appearance(state: &Arc<AppState>, site: &PublishedSite) -> SiteChatAppearance {
+    match state.store.chat_appearance(site).await {
+        Ok(appearance) => appearance,
+        Err(error) => {
+            tracing::error!(site = %site.site, %error, "chat appearance read failed");
+            SiteChatAppearance::default()
+        }
+    }
+}
+
 /// Whether `site`'s published pages should carry the assistant widget right
 /// now: yes for an assistant that is on — including one whose ceiling is
 /// currently spent, which must say it is unavailable rather than vanish —
-/// and no bytes at all otherwise. Enablement is live state read per request
-/// (like page protection), never frozen with the publish. A read failure
-/// serves the page without the widget: the page always comes first.
+/// and no bytes at all otherwise. Enablement and appearance are live state
+/// read per request (like page protection), never frozen with the publish. A
+/// read failure serves the page without the widget: the page always comes
+/// first.
 pub(super) async fn widget_if_on(
     state: &Arc<AppState>,
     site: &PublishedSite,
@@ -287,7 +308,11 @@ pub(super) async fn widget_if_on(
     match state.store.chat_gate(site, &month).await {
         Ok(ChatGate::Disabled) => None,
         Ok(ChatGate::Ready { .. } | ChatGate::Exhausted) => {
-            Some(super::widget::fragment(crate::render::strings_for(locale)))
+            let appearance = chat_appearance(state, site).await;
+            Some(super::widget::fragment(
+                crate::render::strings_for(locale),
+                &appearance,
+            ))
         }
         Err(error) => {
             tracing::error!(site = %site.site, %error, "chat widget gate read failed");
