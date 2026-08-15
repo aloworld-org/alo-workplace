@@ -96,6 +96,27 @@ product besides.
   has already decided, instead of a second permission system that can disagree
   with the first. `mail` and `workspace` have no module — mail cannot be denied,
   and `workspace` is not a module.
+- `chat_channels.kind` gains **`agent_dm`** and `chat_channels.agent_id`
+  (migration 0402, ADR 0048) — a one-to-one between one person and one agent.
+  A DM could not hold one: `dm_key` is "both member ids sorted and joined", two
+  **user** ids, and 0141 deliberately refuses to make an agent a user. So it is
+  a third kind rather than a second meaning for `dm`, and old code that switches
+  on `kind` refuses it instead of misreading it as two humans.
+
+  One `chat_members` row (the human) and one `chat_agent_members` row (the
+  agent). `dm_key` stays `NULL`; a partial unique index over
+  `(tenant_id, agent_id, created_by)` gives one room per person per agent, so
+  opening it twice is the same conversation and two colleagues asking the same
+  agent get two separate ones. It is created on first open — a tenant with a
+  dozen agents does not get a dozen empty rooms — and it is private to its own
+  human, which the existing `kind = 'channel'` filter on discovery already
+  enforces.
+
+  **In an `agent_dm` every message from the human is the trigger**: there is
+  nobody else it could be addressed to, so no handle is typed. The room is asked
+  which agent it is with; the words are not parsed. An agent's own message is
+  posted through `post_as_agent`, which is not the path that triggers a turn, so
+  an agent cannot answer itself and two agents cannot be arranged into a loop.
 - `chat_messages.author_kind` — `user` (default) | `agent`. `author_id` already
   has no foreign key to `users`, so an agent id lives there without schema
   violence. A reader tells them apart by `author_kind` and never by parsing an
@@ -119,15 +140,17 @@ product besides.
 |---|---|
 | `GET /chat/agents` | The tenant's agents — for the composer's `@` list and the member sheet. Each carries its `product` and its **record**: answers given and actions approved, counted **only over rooms the caller can see**, so two people can legitimately be shown different numbers for the same agent. An aggregate leaks too, just more slowly — a tally that included private rooms would answer "is that agent busy somewhere I cannot see?" |
 | `POST /chat/agents` `{handle, name, description?, product}` | Define an agent. `product` is **required** and has no default: the only sensible default would be `workspace`, which is every tool in the workspace, and the widest agent must not be the one you get by forgetting. An unknown word is a 422 naming the accepted set |
+| `POST /chat/agents/{id}/dm` | Open the caller's one-to-one with an agent (ADR 0048), creating it once and returning the same room every time after. A route of its own rather than a third shape of `POST /chat/channels`, whose DM branch takes `{with}` — a **user** id; naming an agent there is the same confusion the schema refused. 404 for an agent this tenant does not have, 422 for a retired one |
 | `POST /chat/channels/{id}/agents` · `DELETE …/agents/{agent}` | Add or remove an agent from a room (owner only, like any member) |
 | `GET /chat/channels/{id}/turns` | Agent turns running in this room right now, so a room does not look idle while a model thinks |
 | `POST /chat/channels/{id}/turns/{turn}/stop` | Stop a running turn — **only the person who asked**, for the same reason only they may approve what it proposes. Answers 204 even when nothing was found: the turn may have just finished, and what the caller wanted is true either way |
 | `POST /chat/proposals/{id}` `{approve}` | Decide a pending proposal. **403 for anyone but the asker**, with the reason said plainly. Approving **runs the action in the same request**, through the one executor the command palette already uses — recording a decision the client must then follow up on would let the record and the effect drift, which is what this table exists to prevent |
 
-An agent turn is not a route. Mentioning an agent in an ordinary
+An agent turn is not a route. Saying something to an agent in an ordinary
 `POST …/messages` triggers it, because the trigger *is* the message — a
 separate "ask the agent" endpoint would let the two disagree about what was
-said.
+said. In a channel that means naming it; in a one-to-one with it, every message
+already is.
 
 ## Errors
 

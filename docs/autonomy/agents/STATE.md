@@ -571,3 +571,144 @@ decided (nullable `agent_id`, partial unique index over `(tenant_id, agent_id,
 created_by)`, `dm_key` left NULL), store and API only. Check the migrations
 directory again immediately before committing: this track's block is `04xx` and
 `0401` is the highest of ours so far; the sites loop is climbing through `03xx`.
+
+## A1.4 — a one-to-one with an agent (2026-08-15)
+
+**What shipped.** ADR 0048's `agent_dm`, store and API, exactly the scope the
+ADR bounds itself to: opening the room, being answered in it, and being the only
+person who can see it. The room-list rendering stays `[web]` and waits for the
+chat rebuild.
+
+- **Migration `0402_chat_agent_dm.sql`** — a nullable `chat_channels.agent_id`
+  with a composite FK to `chat_agents (tenant_id, id)`, the `kind` CHECK widened
+  to a third word, the shape CHECK given a third arm (and `agent_id IS NULL`
+  added to the two existing arms, so the column cannot be set on a channel or a
+  human DM), and a partial unique index on `(tenant_id, agent_id, created_by)
+  WHERE kind = 'agent_dm'`. Expand-only: both replaced CHECKs are strictly more
+  permissive than the ones they replace, so no existing row is touched. The
+  directory was re-checked immediately before committing — the sites loop is at
+  `0322` and `0401` was the highest of ours, so `0402` is free.
+- **`platform/alo-store/src/chat_agent_dm.rs`** (new) — `open_agent_dm`
+  (idempotent, `ON CONFLICT … DO NOTHING` + re-read, the shape `open_dm`
+  already uses for the two-simultaneous-opens race), `agent_dm` (the caller's
+  own, scoped by `created_by`, so it can never hand back a colleague's), and
+  `channel_agent_counterpart` — the trigger's question, asked of the **room**
+  rather than of the words.
+- **`ChannelKind::AgentDm`** and `ChatChannel.agent`, plus
+  `ChannelKind::is_direct()`. The four rules a DM has because it is a one-to-one
+  — `add_member`, `remove_member`, `rename_channel`, `archive_channel` — now ask
+  that one predicate instead of comparing to `Dm`, which is what stops the two
+  kinds drifting apart a rule at a time.
+- **`counterpart`** in `channel_summaries` gained an `agent_dm` arm: `@handle`,
+  because an agent has no address and the handle is what it is unique by. The
+  field's doc comment now says both.
+- **The trigger** (`chat_agent.rs`): `answer_if_named` became `answer_if_asked`,
+  which asks the room for its counterpart first and falls back to handles.
+  **No handle is typed in a one-to-one.**
+- **`POST /chat/agents/{id}/dm`** — a route of its own rather than a third shape
+  of `POST /chat/channels`, whose DM branch takes `{with}`, a *user* id. Putting
+  an agent id in that field on the wire would be the same confusion ADR 0048
+  refused in the schema. `channel_json` gained `"agent"` (additive; `null` for
+  every other kind).
+
+**How verified.**
+
+- `cargo fmt` clean. `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap
+  --all-targets` — zero errors, zero new warnings (the same two pre-existing
+  `type_complexity` warnings in `alo-store/src/meet.rs`, another track's file,
+  untouched).
+- **`cargo nextest run -p alo-store` — 1934/1934 green** (61 s), including the
+  new `platform/alo-store/tests/chat_agent_dm.rs`:
+  - `an_agent_dm_is_opened_once_and_holds_one_person_and_one_agent` — nothing
+    exists until it is asked for, opening twice is one room, one `chat_members`
+    row and one `chat_agent_members` row, `counterpart == "@mail"`, in
+    `channels()`/`channel_summaries()` and **not** in `joinable_channels()`.
+  - `an_agent_speaks_in_its_own_one_to_one_and_still_only_proposes` — the agent
+    posts under its own name with `on_behalf_of` set; **another** agent of the
+    same tenant is `NotFound` in that room; a proposal there is `pending` and
+    `asked_by` the room's one human.
+  - `a_one_to_one_with_an_agent_stays_one_to_one` — `add_member` and
+    `remove_member` are 422; rename and archive are refused one step earlier, by
+    ownership (`Forbidden`), because the one person in a one-to-one is a plain
+    member — which is exactly how a human DM already answers, so the test
+    asserts the refusal that actually happens rather than the one I assumed.
+  - the **mandatory wrong-tenant test**,
+    `an_agent_dm_is_never_a_colleagues_and_never_another_tenants`: a colleague
+    in the same tenant gets `NotFound` from the room, its members, its agents
+    and its feed, sees it in neither listing, and opening the same agent gives
+    them a *different* room; another tenant's user cannot see the agent, the
+    room, or open one, and an agent id from their own tenant is not a shortcut
+    into ours.
+- **`cargo nextest run -p alo-jmap --no-fail-fast` — 1066/1067**, the one
+  failure being the sites track's known
+  `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`. Re-run
+  alone and confirmed to be the same clock-resolution flake as the last two
+  entries, digits visible again: left `…30.118224`, right `…30.1182243` —
+  Windows' 100 ns clock against Postgres' microsecond `timestamptz`. Their file,
+  reported and not touched.
+- **On the wire**, against the local backend with the scripted local socket as
+  the model (no external call), in
+  `products/mail/alo-jmap/tests/agent_dm_http.rs`:
+  - `opening_a_one_to_one_with_an_agent_twice_is_one_room` — `POST
+    /chat/agents/{id}/dm` → `{"kind":"agent_dm","agent":"<id>","name":null,
+    "visibility":"private"}`; a second call returns the **same** `id`; the room
+    is in `GET /chat/channels` with `"counterpart":"@mail"` and absent from
+    `GET /chat/channels/joinable`; an unknown agent id is 404.
+  - `in_a_one_to_one_every_message_is_the_trigger_and_no_handle_is_typed` — the
+    item's own question, asked with **no `@` anywhere in it**: `POST
+    /chat/channels/{room}/messages {"body":"how many mails am I still owing a
+    reply?"}` → the agent answers in the room, `{"authorKind":"agent",
+    "author":"<agent id>","body":"Two are still unanswered."}`, and the model's
+    request body is asserted to carry the person's own words. The **same
+    sentence** in a named room the same agent is a member of is answered by
+    nobody within three seconds and costs **no** model call — which is what
+    proves the trigger came from the room and not from the agent answering
+    everything.
+  - `a_colleagues_one_to_one_is_not_visible_and_not_shared` — a second user of
+    the same tenant, with their own token: 404 on the room, its feed and its
+    agents, absent from their list, and their own `POST /chat/agents/{id}/dm`
+    returns a different room whose feed is **empty** — no history comes with the
+    agent.
+
+**Cuts / flags.**
+
+- **The retired-agent refusal is code without a test.** `open_agent_dm` refuses
+  a disabled agent with the same sentence `add_agent_to_channel` uses, and ADR
+  0048's "a retired agent keeps its room readable and takes no new turns" holds
+  by construction (`channel` is unaffected; `named_agents` and the new
+  counterpart lookup both filter `disabled`). It is untested because **the store
+  has no way to retire an agent** — there is no `disable_agent`, and
+  `disabled_at` is only ever set by hand. Not invented here: a retire verb is
+  A3.3's (the agent directory) or A1.5's to add, and it needs a route and an
+  authorisation rule of its own. Flagged so the next item does not assume the
+  refusal is covered.
+- **No new top-level route prefix** — `/chat` already exists, so nothing is owed
+  to the production Caddyfile.
+- **No i18n line**: nothing user-facing was added. The one string a person could
+  see is the 422 for a retired agent, which is the store's own message and goes
+  through the same `Problem` path as every other store refusal.
+- **Test-harness reuse rather than a third copy.** The scripted offline model
+  (`scripted_model`/`wants`/`says`/`use_model`) was duplicated in
+  `agent_reads_answer_http.rs` and `insights_ask_http.rs`. It now lives in
+  `products/mail/alo-jmap/tests/common/model.rs`; the agent suite was moved onto
+  it (113 lines deleted) and re-run green. `insights_ask_http.rs` is another
+  track's file and was left alone — it can move when they next touch it.
+- **Environment.** Docker is still unresponsive (`docker ps` returns nothing, no
+  `alo-pg`), so `scripts/prune-test-db.sh` still cannot run — its first
+  statement is a `docker exec` — and every command ran against `alo_agents_test`
+  on the native **5432** server; 5433 is still refused. The suites finished in
+  61 s and 121 s, so the database has not bloated.
+- **Disk.** C: was at **100%, 3.5 GB free** at the top of the iteration — the
+  exact state LOOP.md warns about. Deleting this checkout's own
+  `target/debug/**/*.pdb` (208 files, 23 GB directory) freed it to 9.0 GB, and
+  every command carried `CARGO_PROFILE_TEST_DEBUG=0` so none came back.
+- The test-binary build after the `alo-store` change used the LOOP-sanctioned
+  background+marker form and took **9 m 05 s**; every test run itself was
+  foreground.
+
+**Next:** A1.5 — the default agent set: a tenant gets its agents without an
+admin registering handles by hand, and a module the tenant cannot open has no
+agent. Reuse `tenant_user_module_denials` (migration 0208) rather than inventing
+a second gate; note that `mail` and `workspace` have no denial row. Check the
+migrations directory again immediately before committing: `0402` is this track's
+highest, and the sites loop is climbing through `03xx`.

@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **You can now have a one-to-one with an agent, the way you have one with a
+  colleague.** Open a conversation with the Mail agent and simply ask — no `@`,
+  no room to set up, nothing to invite it to. Everything you say there is for
+  it, and only you can see the conversation: each person's one-to-one with an
+  agent is their own, it never appears in anyone else's list or in the channels
+  you can browse, and asking the same agent again re-opens the conversation you
+  already have rather than starting a new one. Everywhere else nothing changes —
+  in a channel you still name an agent to ask it something, and anything it
+  wants to *change* still waits for your tap.
+
 - **An agent now looks in its own product, and not through everything you
   own.** Ask the Mail agent about a customer and it reads your correspondence
   and your address book; ask the Agenda agent and it reads your diary; ask the
