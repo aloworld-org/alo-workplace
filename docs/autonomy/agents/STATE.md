@@ -880,3 +880,146 @@ already landed (A1.5, `chat_agent_seed.rs`) and of the agent **DM** (A1.4,
 half — that a turn cannot read a room or a diary its asker cannot. Check the
 migrations directory again immediately before committing: `0403` is this track's
 highest, and the sites loop is climbing through `03xx`.
+
+## A1.6 — the isolation tests, one per surface (2026-08-15)
+
+**What shipped.** `products/mail/alo-jmap/tests/agent_isolation_http.rs`, five
+tests, no production code changed. The roster half was already landed (A1.4,
+A1.5); what this owed was the half that reads records — the **grounding** a turn
+is handed and the **reading tools** it runs inside itself — on each of the three
+surfaces a turn can happen on.
+
+The shape every test takes: **the same question, through the same agent, twice,
+changing only who asked.** A one-person isolation test cannot tell a rule that
+holds from a query that returns nothing at all, so every negative here is paired
+with the positive of somebody who may see the thing.
+
+- **Channel** — `a_room_turn_reads_only_what_the_person_who_asked_can_read`.
+  Ben's private room `boardroom` holds "the kestrel deal closes on friday"; Anna
+  is not in it. Both ask the same sentence, and the scripted model asks for
+  `catch_up_room {"room":"boardroom"}` for both. Her turn is grounded in her own
+  room only and the lookup answers `found:false`; his is grounded in the private
+  room and the same lookup reads it. Her `agent_tool_runs` holds exactly one row
+  — his run is not in her audit either.
+- **Agent DM** — `a_one_to_one_carries_the_askers_own_diary_and_no_colleagues`.
+  Two diaries, one entry each, one day. All four model calls are asserted: each
+  carries the asker's own entry and never the colleague's, in the grounding and
+  in the `whats_on` result alike.
+- **In-module** — `the_palette_looks_everywhere_and_still_only_where_the_asker_can`.
+  `POST /ai/agent` **is** Ask alo, the one agent ADR 0034 lets look across every
+  product, and looking everywhere still means everywhere *this person* can look:
+  her email is a source, a colleague's is not. Its tool half is the execution
+  boundary rather than a lookup — `POST /ai/agent/execute` handed a colleague's
+  message id is 422, and her own id is 200, so the refusal is about whose email
+  it is and not about the route.
+- **Wrong tenant** — `a_turn_is_never_another_tenants_on_any_surface`, the
+  mandatory one. The second tenant is a deliberate mirror: same room name, same
+  words, same question. `boardroom` resolves for Carla and does not exist for
+  Anna; another tenant's mail is never a source; `/ai/agent/execute` on their
+  message id is 422; and their agent's id is 404 at `POST /chat/agents/{id}/dm`,
+  which is the one-to-one surface's cross-tenant line (its room and feed are
+  `chat_agent_dm.rs`'s).
+- **The other end of a turn** —
+  `only_the_person_who_asked_can_approve_what_an_agent_proposed`. A change runs
+  with the asker's reach, so a colleague in the same room may read the proposal
+  and not decide it: 403, nothing created for either of them, no audit row; her
+  own tap then runs it once and the task lands in **her** list.
+
+**How verified.**
+
+- **The tests were made to fail before they were trusted.** Five deliberate
+  mutations to the production rules — `mail_term_hits` returning any user's mail,
+  `chat_term_hits` dropping its membership predicate, `event_term_hits` and
+  `events_in_range` dropping `calendar::visible_pred`, `channels()` dropping both
+  its tenant and its membership clause, and `decide_proposal`'s owner check
+  inverted — and **all five tests failed**. Reverted (`git checkout --`, tree
+  clean) and re-run green. A green isolation suite that has never been shown to
+  fail is a suite whose negatives may have no teeth; this is the only evidence
+  that they do.
+- `cargo fmt` clean. `SQLX_OFFLINE=true cargo clippy -p alo-jmap --all-targets` —
+  zero errors, zero new warnings (the same two pre-existing `type_complexity`
+  warnings in `alo-store/src/meet.rs`, another track's file).
+- **`cargo nextest run -p alo-jmap --no-fail-fast` — 1080/1081** (331 s),
+  including the five new tests. The one failure is the sites track's known
+  `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`; re-run alone
+  and confirmed to be the same clock-resolution flake as the last four entries,
+  digits visible: left `…372483`, right `…3724839` — Windows' 100 ns clock
+  against Postgres' microsecond `timestamptz`. Their file, reported and not
+  touched.
+- **On the wire**, against the local backend (real Postgres, the real router, the
+  scripted local socket as the model — no external call). The transcripts below
+  are copied out of an instrumented run of these same tests; the instrumentation
+  was then removed and the suite re-run green.
+
+  The room, Anna — her grounding, then the lookup's result in her turn's second
+  call:
+
+  ```
+  Request: @chat what did we say about the kestrel?
+  Sources:
+  [1] chat message "@chat what did we say about the kestrel?"
+  [2] chat message "the kestrel invoice is late"
+  …
+  [3] tool result "catch_up_room" — {"found":false,"kind":"chatCatchUp","messages":[],"room":"boardroom"}
+  ```
+
+  The same room name, the same tool, the same words, asked by Ben:
+
+  ```
+  [4] chat message "the kestrel deal closes on friday"
+  …
+  [5] tool result "catch_up_room" — {"found":true,"kind":"chatCatchUp","messages":[
+      {"author":"T9hxLdUYTzFN3p1aeBSQCQ","body":"the kestrel deal closes on friday","isAgent":false}, …]}
+  ```
+
+  The one-to-one, both people, grounding and `whats_on` alike:
+
+  ```
+  [1] calendar event "kestrel planning"
+  [2] tool result "whats_on" — {"events":[{"title":"kestrel planning","startsAt":"2027-03-11T09:00:00Z", …}], …}
+  ---
+  [1] calendar event "kestrel review with the board"
+  [2] tool result "whats_on" — {"events":[{"title":"kestrel review with the board", …}], …}
+  ```
+
+**Cuts / flags.**
+
+- **No production code changed, so no migration and no CHANGELOG line.** Nothing
+  a person can see behaves differently: this item is the proof that what already
+  shipped does what it says. `0403` remains this track's highest; the sites loop
+  is at `0323`.
+- **No `alo-store` suite run.** Nothing in that crate changed — the mutation
+  files were restored byte-for-byte and `git status` is clean — and the new tests
+  live in `alo-jmap`. Said plainly rather than left to be assumed.
+- **`lock_message` was not mutated** in the teeth check: it is a `sqlx::query!`
+  macro, and editing its SQL breaks the offline cache, so the check would have
+  measured the build rather than the rule. The `mark_read` pair (a colleague's id
+  422, her own 200) is what stands for it, and it is weaker proof than the other
+  four — named so the next reader does not over-read it.
+- **A refused lookup comes back as "not found", never as "forbidden".** That is
+  the existing behaviour and these tests pin it: an agent that answered 403 for a
+  private room would be a way to discover the room exists.
+- **Environment.** Docker is still unresponsive (`docker ps` hung past two
+  minutes, no `alo-pg`), so `scripts/prune-test-db.sh` still cannot run — its
+  first statement is a `docker exec` — and every command ran against
+  `alo_agents_test` on the native **5432** server. The full suite finished in
+  331 s, so the database has not bloated.
+- **Disk.** C: was at **99%, 7.1 GB free** at the top of the iteration and 6.5 GB
+  after clippy; every command carried `CARGO_PROFILE_TEST_DEBUG=0`, so no new
+  PDBs were written and no cleanup was needed this time.
+- **One foreground gate was cut off at the 600 s ceiling** — the full `alo-jmap`
+  suite, whose 74 test binaries all relink after an `alo-store` mtime change (the
+  mutation revert). It was already running in the background when the ceiling
+  hit, so the next command was the LOOP-sanctioned poll on its output file, which
+  exited on the condition rather than on a count.
+
+**Next:** A1.7 — the two questions end to end, on the wire, against the local
+backend: `@mail are we in contact with ABC?` answered from correspondence with
+the messages behind it, and `@inventory is the X100 in stock?` answered from the
+stock record with **no button in between**, both recorded verbatim in STATE.md.
+Note the standing rail: no paid/external AI API may be called, so "on the wire"
+means the real router and real Postgres with the scripted local socket as the
+model — the rig A1.1–A1.6 used. Docker has been unresponsive for four
+iterations, so plan for the native 5432 server rather than `alo-pg`. Check the
+migrations directory again immediately before committing: `0403` is this track's
+highest, and the sites loop is climbing through `03xx`.

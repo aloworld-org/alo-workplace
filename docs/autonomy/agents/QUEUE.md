@@ -55,7 +55,7 @@ start of the item — that is how the last collision happened.
 - [x] A1.3 Product-scoped retrieval: each agent grounds in its own product's records rather than one shared workspace search. `Ask alo` keeps the workspace-wide view; it is the only agent allowed to look everywhere. Prove a Mail agent's grounding contains no Drive rows.
 - [x] A1.4 One-to-one with an agent: a DM whose counterpart is an agent. New channel kind, listed beside human DMs, the agent answers there exactly as it does in a channel. API and store only — the room list rendering is `[web]` and comes after the chat rebuild.
 - [x] A1.5 The default agent set: a tenant gets its agents without an admin registering handles by hand, and a module the tenant cannot open has no agent. Reuse the existing per-user module access rather than inventing a second gate; a denied module must yield no agent in any surface.
-- [ ] A1.6 The isolation tests, one per surface — channel, agent DM, in-module. Wrong tenant and wrong user both prove an agent reaches nothing the asker could not, including a private channel the asker is not in and a colleague's diary.
+- [x] A1.6 The isolation tests, one per surface — channel, agent DM, in-module. Wrong tenant and wrong user both prove an agent reaches nothing the asker could not, including a private channel the asker is not in and a colleague's diary.
 - [ ] A1.7 The two questions end to end, on the wire, against the local backend: `@mail are we in contact with ABC?` answers from correspondence with the messages behind it, and `@inventory is the X100 in stock?` answers from the stock record — **no button in between**. Record the actual request and response in STATE.md, not a claim that it worked.
 
 ## Wave A2 — the agents with no tools yet
