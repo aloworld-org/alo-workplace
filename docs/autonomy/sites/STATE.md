@@ -7208,7 +7208,15 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
   refusal rather than an answer when it cannot cite; fixture-only tests) —
   after the HALT below is resolved.
 
-LOOP HALT: this Mac cannot execute freshly built test binaries in bounded
+RESOLVED 2026-08-15 08:20 — the halt below was real and is fixed. The Mac was
+rebooted (syspolicyd had 44 CPU-hours of wedged state; 18 seconds after boot)
+and Gatekeeper assessment was disabled for local binaries (Developer Tools
+exemption for Terminal and VS Code, then Allow-from-Anywhere). Proof, measured:
+the full alo-store suite with freshly linked binaries and the database up —
+**1 954 tests, all passing, 18.2 s**. The projected-8-hour gate is 18 seconds
+again. Diagnosis kept below because it earned its place.
+
+Formerly: the halt read: this Mac cannot execute freshly built test binaries in bounded
 time. Every first exec of a new binary blocks in `_dyld_start` while
 `syspolicyd`/`XprotectService` scan it (`spctl` assessments enabled; binaries
 carry `com.apple.provenance`). Measured tonight: 5 min for one binary alone,

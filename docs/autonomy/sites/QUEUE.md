@@ -136,7 +136,7 @@ reserved through their owner, never stored again (ADR 0041).
 
 ### The chatbot that answers (ADR 0040)
 
-- [!] S3.02a blocked: machine cannot run the full-suite gate (Gatekeeper hangs first-exec of all ~130 fresh test binaries — see STATE 2026-08-15 LOOP HALT). Code shipped + item-scope gates green (clippy all-targets, 4/4 new tenancy tests on the real DB); flip to [x] after `cargo nextest run -p alo-store` runs green on a fixed machine. Grounding model: the corpus is the **published** site plus a named Public knowledge collection; drafts and scheduled-but-unpublished versions are excluded by construction; tenant isolation tests, and a test that no unpublished string can ever be retrieved.
+- [x] S3.02a  (was blocked on the Gatekeeper scan wall; resolved 2026-08-15 — reboot + assessment exemption, and the full alo-store suite then ran green, 1 954 tests in 18.2 s. Code had shipped at 04:30 with item-scope gates green; the full-suite gate is what this flip records.)
 - [ ] S3.02b Answering with citations: retrieval over the corpus, every answer naming the page it came from, and a refusal rather than an answer when it cannot cite; fixture-only tests, no live model calls.
 - [ ] S3.02c Cost and abuse: a per-site monthly **spend** ceiling that is defaulted rather than blank, per-visitor and per-IP rate limits below it, a graceful unavailable message that offers the contact form, and the tenant told when it is hit.
 - [ ] S3.02d Source-adding UI: the screen that publishes a source to the bot says *anyone on the internet will be able to read this* above the button, every time; the ceiling is set in the same screen the bot is switched on.
