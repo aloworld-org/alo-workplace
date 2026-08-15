@@ -7126,3 +7126,100 @@ under the lock. Next: S1.16a (the freshly split, single-turn store slice).
     neither sites-owned.
 - **Next:** S3.02a (chatbot grounding model: the corpus is the published site
   plus a named Public knowledge collection; ADR 0040).
+
+## 2026-08-15 — S3.02a the assistant's reading list: published, or nothing
+
+- **Item:** S3.02a — the grounding model for the site chatbot (ADR 0040 §1).
+  The corpus a visitor's assistant may answer from is exactly what is already
+  on the internet: the **published** site, published blog posts, and a named
+  **Public knowledge** collection of documents the tenant deliberately
+  published to it. Drafts and scheduled-but-unrun publishes are excluded by
+  construction, not by filtering.
+- **Recovered start:** this iteration found the item's code sitting
+  uncommitted in the working tree — a prior invocation died after writing but
+  before gating (the same incident left d8371bb committed-but-unpushed, which
+  was pushed first). Per the one-agent-per-tree rule the code was treated as
+  untrusted input: reviewed line by line against ADR 0040 and the schema,
+  then taken through the full gate as if written fresh. It survived review
+  unchanged; every line below was verified, not assumed.
+- **What shipped** (`platform/alo-store`, no HTTP surface in this slice):
+  - Migration `0323_site_knowledge_sources`: the binding table (tenant, site,
+    Drive doc node), composite FKs keeping every reference inside one tenant,
+    doc-cascade so a deleted file silently leaves the collection
+    (fail-closed), unique per (site, doc).
+  - `site_knowledge.rs`: add/list/remove on the collection. Add requires a
+    readable document (alo Doc or an extractable file — folder, image,
+    trashed file refused with the reason), caps the collection at 50, and
+    maps the duplicate to a clean Conflict. Listing joins the live Drive name
+    and flags trashed bindings so the owner can see and undo them; a foreign
+    or unknown site is one clean NotFound everywhere.
+  - `site_grounding.rs`: `site_grounding_corpus` assembles the corpus —
+    pages read EXCLUSIVELY from the immutable snapshot set
+    `published_publish_id` points at (the same rows `alo-sites` serves, so
+    drafts/scheduled/rolled-back versions are unreachable by construction; a
+    site not live has an EMPTY corpus, knowledge included), posts through the
+    public blog's own gate (status `published`, non-trashed doc, current
+    bytes), knowledge docs by live text extraction (the blog's precedent:
+    publishing-to-the-assistant is the deliberate act on the document). Every
+    `GroundingDocument` carries a typed `GroundingCitation` (page slug+locale
+    / post slug / knowledge source id) — the citation every answer must name.
+    `section_text` extracts each typed section's visible prose only: no
+    hrefs, ids, layout values; `custom_code` contributes heading+title, never
+    its markup; catalog prices and booking availability stay OUT (they are
+    ADR 0040's toggled structured facts for a later slice, read by tool call,
+    never retrievable prose).
+- **Verified (what the machine allowed — see the HALT below):** `cargo fmt`
+  clean. `SQLX_OFFLINE=true cargo clippy -p alo-store --all-targets` exit 0 —
+  zero warnings from this item's files, and it type-checks EVERY test target
+  in the crate against the new code (the two surviving warnings are a
+  pre-existing `type_complexity` at `meet.rs:319`, another track's file —
+  flagged, not touched). `cargo nextest run -p alo-store --test
+  site_grounding_tenancy` **4/4 green in 0.4 s** against the real compose
+  postgres with migration 0323 applied by the run: the no-unpublished-string
+  property walked through draft-edit / new-draft-page / scheduled-unrun /
+  republish / rollback / unpublish; posts grounding only while published;
+  knowledge tenant walls in every direction (foreign corpus, foreign add in
+  both combinations, foreign remove — all NotFound); trash fail-closed with
+  the binding still listed; unreadable-source and cap refusals.
+- **NOT verified: the full-crate regression sweep.** `cargo nextest run -p
+  alo-store` could not be completed — not for a code reason (see HALT): the
+  machine currently blocks ~5–20+ minutes in a Gatekeeper/XProtect scan on
+  the FIRST exec of every freshly linked binary, and an alo-store source
+  change relinks all ~130 test binaries. 43 of 130 were warmed and the
+  scanner then degraded to a standstill (0 completions in 25 minutes at
+  4-way). Residual risk is bounded: the change is purely additive (new
+  modules, new id, additive lib.rs/`id.rs` lines; no existing line modified),
+  clippy proves every suite still compiles, and migration 0323 is append-only
+  and applied cleanly — but a sweep the machine refuses to run is a sweep
+  that did NOT run, so the item is marked `[!]` rather than `[x]`. The next
+  Rust-touching iteration's standard gate IS the missing sweep; whoever flips
+  this item to `[x]` runs `DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo
+  SQLX_OFFLINE=true cargo nextest run -p alo-store` green first.
+- **Cuts/flags:** none of the item's functional scope cut. `meet.rs:319`
+  clippy `type_complexity` is pre-existing and belongs to another track.
+  Structured facts (prices, availability) deliberately excluded per ADR 0040;
+  they arrive with their own toggles in later slices. Two harness notes: the
+  tests' fallback DATABASE_URL (port 5433) is dead on this box — export the
+  5432 compose URL above; and this iteration adopted a dead prior
+  invocation's uncommitted tree (reviewed line-by-line as untrusted input,
+  then gated) plus its orphaned LOOP.md commit 63444e9, which is pushed with
+  this iteration.
+- **Next:** S3.02b (answering with citations: retrieval over the corpus,
+  refusal rather than an answer when it cannot cite; fixture-only tests) —
+  after the HALT below is resolved.
+
+LOOP HALT: this Mac cannot execute freshly built test binaries in bounded
+time. Every first exec of a new binary blocks in `_dyld_start` while
+`syspolicyd`/`XprotectService` scan it (`spctl` assessments enabled; binaries
+carry `com.apple.provenance`). Measured tonight: 5 min for one binary alone,
+~6 min per wave of four in parallel, then monotonic degradation to ZERO
+completions in 25 minutes; `syspolicyd` shows **42 CPU-hours** accumulated.
+Any alo-store change relinks ~130 test binaries, so the mandatory full-suite
+gate cannot run — tonight it projected 8+ hours and rising. Scans that do
+complete are cached per binary, so already-warmed binaries run instantly (the
+4 new tests ran in 0.4 s). Human fixes, pick any: (1) System Settings →
+Privacy & Security → Developer Tools: add the terminal/agent host so its
+processes skip assessment for local dev binaries; (2) reboot (syspolicyd's
+state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
+`spctl --global-disable` knowingly. Then re-run the full alo-store suite
+(command in the entry above) and flip S3.02a to `[x]` if green.

@@ -32,6 +32,16 @@ contracts.
   across every product. Existing agents keep the reach they have today unless
   their handle already named a product.
 
+- **Groundwork for the website assistant: it can only ever know what your
+  visitors already see.** The upcoming site chatbot's reading list is now
+  fixed in the foundations: the published version of your website, blog posts
+  that are live, and documents you deliberately publish to it from Drive —
+  one at a time, each past a clear warning, never a whole folder. Drafts,
+  scheduled publishes that have not run yet, past versions and everything
+  else in your workspace are unreadable to it by construction, and a
+  document you trash stops counting immediately. The rule is one sentence:
+  whatever the assistant can read, the internet can read.
+
 - **Ask an agent a question and get the answer, not a button.** "Is the X100 in
   stock?", "what's on tomorrow?", "who's off next week?" — the agent now looks
   it up while it is answering you and replies with the figure, citing the record
