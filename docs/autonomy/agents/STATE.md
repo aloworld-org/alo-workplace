@@ -3603,3 +3603,36 @@ ago; the standing warning for the next `alo-store` gate holds.
 **Still LOOP COMPLETE (with blockers).** The chart decision is a human's: adopt
 a commercially licensed plugin under an ADR, build charts natively as their own
 feature, or drop chart-from-intent. Recommendation unchanged — drop it.
+
+## LOOP HALT — the queue is closed and the wrapper needs stopping (2026-08-15)
+
+Same three checks as the six entries above, same answers: pull already up to
+date and the tree clean; newest ADR is still `0049` (domain selling, 08-14),
+`features.md` unchanged since `51e2bb08` (08-14 23:31); nothing under `web/src`
+imports `sheets-chart`, `engine-chart` or `SHEET_CHART`. A2.2b's premise is
+untouched, its one sanctioned re-attempt is spent, every other item is `[x]`.
+**No code shipped, and none should have.**
+
+This entry differs from the six before it in one way only: it stops the
+wrapper instead of asking a human to. Those entries were right that a closed
+queue is not "environment broken" — but they concluded a loop has no lever, and
+that was wrong: `LOOP HALT` is a lever this protocol hands the loop, the wrapper
+stops on it, and a human restart is exactly the intervention all six asked for.
+Seven invocations spent on a queue with nothing in it is the cost of not
+pulling it.
+
+There is a second, independently true reason: **C: is at 99% — 5.8 GB free of
+474 GB.** `target/debug/deps` is already swept (228 `.exe` for 228 distinct
+targets, zero `.pdb`), so there is nothing stale left to reclaim here, and 5.8
+GB is below what a full `nextest --no-run` needed the last time it failed with
+`LNK1180`. The next `alo-store` gate on this box — this track's or another's —
+fails on space before it fails on anything else. That is a human fix too.
+
+**LOOP HALT: agents queue closed (only A2.2b remains, blocked on a chart
+decision only a human can take) and C: at 5.8 GB free, below what the next
+alo-store gate needs.**
+
+To restart this track a human must do one of: adopt a commercially licensed
+chart plugin under an ADR, build charts natively as their own feature, or drop
+chart-from-intent and queue new work. Recommendation unchanged — drop it, and
+free disk before the next build.
