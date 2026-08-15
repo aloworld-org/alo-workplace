@@ -2434,3 +2434,225 @@ thread" already has both readers it needs: `catch_up_room` for a conversation an
 this item's mail-joining for correspondence — do not build a third. Check the
 migrations directory again immediately before committing; `0405` is this track's
 highest and the sites loop was at `0324`.
+
+## A2.7 — the Tasks agent past `create_task`: the plate, who is late, and a conversation written down
+
+**Shipped 2026-08-15.** The Tasks agent had one tool and it was a write. It
+could put something on your list and could not read the list, so "what have I
+got on?" was answered from whatever the workspace search matched and "who is
+late?" had nothing to look at. Six tools, in the two halves the wave's shape
+asks for — three reads that answer inside the turn, three writes that wait for a
+tap — plus the executors, in a new `products/mail/alo-jmap/src/agent_tasks.rs`
+(`platform/alo-ai/src/agent_tasks.rs` grew from 20 lines to the tool set,
+descriptions, guidance and its own tests).
+
+- `my_plate` (read) — the caller's unfinished work in the buckets a day is read
+  in: `overdue`, `dueToday`, `comingUp` (a `days` horizon, 14 by default, 90 at
+  most), `later` and `noDate`.
+- `overdue_by_owner` (read) — late work grouped by the colleague it is assigned
+  to, optionally narrowed by `person` or `project`, with an unassigned group.
+- `thread_actions` (read) — a room's recent messages **plus** what has already
+  been captured out of it.
+- `set_task_priority` (write) — one task's priority and nothing else about it.
+- `chase_task` (write) — a comment on a late task, asking its owner where it
+  has got to.
+- `capture_actions` (write) — up to ten actions out of one room, written as
+  `state = 'proposed'` rows (ADR 0023).
+
+**No migration and no `alo-store` change.** Everything is on the account door
+that already exists: `task_projects` + `tasks_in_project` for the visible
+boards, `my_plate` for the dated half, `update_task`, `add_task_comment`,
+`create_task`, `tasks_for_source` + `task_proposals`, and `emails_of` for
+labels. `0405` is still this track's highest migration; the sites loop was at
+`0324` when this was committed.
+
+**The five rules the module is built on**, each of which is a way the obvious
+implementation is wrong:
+
+- **Overdue means due *before today*, everywhere.** Not "before now" — that
+  makes a task due today late at 00:01 and turns every morning into a chase.
+  One `days_late` decides the `overdue` bucket, the groups of
+  `overdue_by_owner`, and whether `chase_task` will chase at all.
+- **Mine is not the same as assigned to me.** `create_task` writes to the
+  personal board with **no assignee**, so a plate filtered on assignee would
+  have hidden exactly the tasks this agent creates. Ownership is *assigned to
+  me* **or** *unassigned on my own board*, unioned with `AccountStore::my_plate`
+  — which reaches a task somebody assigned to the caller on a board the caller
+  cannot open. That task comes back with `board: null`: it is theirs to do, and
+  where it lives is not theirs to see.
+- **You can chase somebody only about work you can already see.** The boards are
+  `task_projects`' (the caller's own personal one, plus the tenant's team ones),
+  a colleague is named out of the assignees already on them and never out of a
+  directory (`find_a_time`'s rule for diaries), and `add_task_comment` refuses an
+  invisible task on its own.
+- **A chase is the asker's own comment.** The store writes `self.user` as the
+  author, so the guidance tells the model to write it as that person would. A
+  task that is not late earns a refusal that says when it *is* due; one with no
+  due date earns "nobody is late with it".
+- **Extraction is proposed twice.** Approving `capture_actions` does not put work
+  on a board — it writes proposals the user still accepts one at a time, with
+  `source_kind = 'chat'` and the channel id on every row. `thread_actions` reads
+  **both** `tasks_for_source` (accepted) and `task_proposals` filtered to the
+  room (not yet accepted): `tasks_for_source` sees only `active` rows, so
+  without the second half a capture that had not been accepted would be
+  invisible and the same conversation would be captured twice in a row. Every
+  action is validated before any is written — half a conversation captured is
+  worse than none, because the half that failed is the half nobody notices.
+
+**Scope cut, deliberately: "prioritise" is an answer, not a write.** Putting
+somebody's work in order is something the agent *says* from `my_plate`'s
+signals; `set_task_priority` exists for when the user asks for the stored
+priority itself to change, and both the tool description and the guidance say
+so. An agent that reordered a board because it was asked what to do first would
+be editing a person's judgement.
+
+**Also deliberately absent: an agent cannot close a task, reassign one, or move
+one between columns.** Finishing somebody's work is not a thing to do on their
+behalf, and a "chase" that could also reassign is a different tool with a much
+worse failure mode.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-ai -p alo-jmap
+--all-targets` clean (the two pre-existing `clippy::type_complexity` warnings in
+`alo-store/src/meet.rs` are not this track's and were not touched); `cargo
+nextest run -p alo-ai` **219/219**; the whole `alo-jmap` suite **1 192 tests in
+142 s, 1 191 passed** — the single failure is the sites track's known one below.
+The new wire test is `products/mail/alo-jmap/tests/agent_tasks_http.rs` — 9
+tests: the plate answered in the room with no button in between (with the
+buckets, the horizon that moves the coming-up/later boundary, finished work and
+a colleague's work both absent), the plate holding a task the agent itself made
+*and* one assigned on a board the asker cannot open, the late work grouped by
+owner with the unassigned group and a colleague's private board unreachable plus
+the two name refusals, the chase proposed→approved→one comment authored by the
+asker with the task otherwise untouched, the four refusals a chase earns, the
+priority changed with title/notes/assignee/due all intact plus the bad-word and
+ambiguous-title refusals, the conversation captured as proposals that are not on
+the plate and are reported as already captured afterwards (before *and* after
+one is accepted), the six capture refusals plus the eleven-at-a-time one, and
+the isolation sweep across a tenant boundary and a colleague's private board for
+both writes and both reads.
+
+**On the wire, in a room, against the local backend** (the queue's "done means"
+— the exchanges verbatim, not a claim that they worked):
+
+```
+POST /chat/channels/ilQLsY826vCXx0NU3XO_NQ/messages
+     {"body":"@tasks what have I got on?"}
+--- what the model was shown on the second call ---
+[1] tool result "my_plate" — {"comingUp":[{"board":"My tasks","checklist":"0/0",
+"column":"todo","due":"2026-08-19T00:00:00Z","priority":"medium","title":"Draft
+the offsite plan"}],"dueToday":[{...,"title":"Call the printer"}],
+"horizonDays":14,"kind":"myPlate","later":[{...,"title":"Book the venue"}],
+"noDate":[{...,"due":null,"title":"Tidy the shared drive"}],"overdue":[{...,
+"daysLate":3,"due":"2026-08-12T00:00:00Z","title":"File the VAT return"}],
+"today":"2026-08-15","truncated":false}
+--- the agent's message ---
+"body":"The VAT return is three days late, the printer is due today, and nobody
+has dated tidying the shared drive [1].","proposal":null
+```
+
+```
+POST /chat/channels/eZBrY5VE5qD7CQ1lpy5ulg/messages
+     {"body":"@tasks who is late?"}
+[1] tool result "overdue_by_owner" — {"boardsRead":2,"kind":"overdueByOwner",
+"people":[{"tasks":[{"board":"Sales","daysLate":4,"title":"Website copy"}],
+"who":null},{"tasks":[{"board":"Sales","daysLate":2,"title":"Case study"}],
+"who":"marta@a27-late.test"},{"tasks":[{"board":"Sales","daysLate":5,
+"title":"Pricing sheet"},{"board":"Sales","daysLate":1,"title":"Renewal
+quote"}],"who":"ben@a27-late.test"}],"today":"2026-08-15"}
+--- the agent's message ---
+"body":"Ben has two late items and Marta one; the website copy has no owner
+[1].","proposal":null
+```
+
+```
+POST /chat/channels/U6Db0FNknVAm9zyhbJF3HA/messages
+     {"body":"@tasks chase Ben about the pricing sheet"}
+--- the agent's message, with its proposal ---
+"body":"I'll ask Ben where the pricing sheet has got to.","proposal":{"args":
+{"message":"Hi Ben — the pricing sheet was due five days ago. Where has it got
+to?","task":"Pricing sheet"},"state":"pending","tool":"chase_task"}
+POST /chat/proposals/Uflz7dtiuQeinr78ybtlsQ {"approve":true}
+{"result":{"ok":true,"result":{"board":"Sales","comment":"Hi Ben — …",
+"daysLate":5,"due":"2026-08-10T00:00:00Z","kind":"taskChased",
+"owner":"ben@a27-chase.test","title":"Pricing sheet"}},"state":"approved"}
+```
+
+```
+POST /chat/channels/wzzA9m7f3EkQowz9W_hCsQ/messages
+     {"body":"@tasks write down what we agreed in #launch"}
+--- the agent's message, with its proposal ---
+"body":"I'll write down the two things you agreed.","proposal":{"args":{"room":
+"launch","tasks":[{"due":"2026-08-17","notes":"Ben, agreed in #launch","title":
+"Write the press note"},{"title":"Book the venue"}]},"state":"pending","tool":
+"capture_actions"}
+POST /chat/proposals/yT1e6VLpIcJ_mKPWXsaOZw {"approve":true}
+{"result":{"ok":true,"result":{"captured":2,"kind":"actionsCaptured","room":
+"launch","state":"proposed","tasks":[{"due":"2026-08-17T00:00:00Z","title":
+"Write the press note"},{"due":null,"title":"Book the venue"}]}},
+"state":"approved"}
+```
+
+- **The one pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime` at
+  100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision. Identical to the failure the last seven iterations
+  recorded; the file is theirs and the fix on their side is comparing at
+  microsecond precision.
+- **`cargo fmt -p alo-ai` reformatted the sites track's `site_chat.rs` again,
+  and the change was reverted before committing** — exactly as the last entry
+  predicted it would. Check `git status` after every `cargo fmt -p alo-ai`.
+- **The `agent_ground.rs:31` documentation debt is still NOT paid**, for the
+  fourth item running and for the same reason: this item never opened
+  `alo-store` (every read it needed was already on the account door), and a
+  one-comment change there would have bought ~115 relinks. It moves on to the
+  next item that opens the crate for a real reason.
+- **`CARGO_PROFILE_TEST_DEBUG=0` does NOT stop the `.pdb` files on this box, and
+  the gate cost ninety minutes to that.** The link line still carries `/DEBUG`
+  because the dependency rlibs (profile `dev`, `debug = 2`) hand CodeView data
+  to `link.exe`, which writes a PDB for the test binary whatever the test
+  profile says: a full `alo-jmap --no-run` produced 70 of them, ~150 MB each,
+  and died three times with `LNK1318: Unexpected PDB error` on a disk that had
+  8 GB free when it started. **What worked** — and is the form to reuse until
+  someone changes the dev profile — is sweeping them *while the build runs*,
+  because a `.pdb` is only needed during its own link:
+
+  ```
+  ( cargo nextest run -p alo-jmap --no-run > /tmp/nextest-build.log 2>&1;
+    echo "BUILD_EXIT=$?" >> /tmp/nextest-build.log ) &
+  BUILD=$!
+  while kill -0 $BUILD 2>/dev/null; do
+    find target/debug/deps -name '*.pdb' -mmin +1 -delete 2>/dev/null
+    sleep 10
+  done
+  ```
+
+  `-mmin +1` is the number that converged; `+3` still filled the disk. Cargo is
+  incremental, so a run killed by a full disk is not wasted — the third
+  invocation finished the remaining 13 binaries in 28 seconds. Deleting the
+  ~83 `alo-jmap` test `.exe`s **before** the build (5 GB) is still the cheapest
+  headroom: they are stale the moment the crate changes.
+- **Environment.** C: opened at **6.2 GB free, 99 % full** and never got above
+  8 GB all iteration; 16 GB of `target/debug/deps` is 8.8 GB of `.rlib` and
+  6.3 GB of `.exe`, so the newest-per-name sweep now frees almost nothing — the
+  binaries are all current. Docker is still unresponsive, so
+  `scripts/prune-test-db.sh` still cannot run; everything ran against
+  `alo_agents_test` on the native **5432** server
+  (`DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_agents_test` —
+  the harness default is **5433**, the docker one, and without the variable
+  every test dies with `PoolTimedOut`, which reads exactly like a broken test
+  and is not). 1 192 tests in 142 s says the database has not bloated.
+
+**Next:** A2.8 — the Mail agent's answer half: correspondence questions answered
+from the record ("are we in contact with X", "who last replied", "what did we
+promise them"), cited to the messages and never to a snippet. Two things to read
+first. A1.7 already asked `@mail are we in contact with ABC?` on the wire and
+answered it, so **find out what that turn actually used before building a new
+tool** — if it answered from grounding rather than from a reading tool, the item
+is the tool that makes the citation a message id rather than a search hit; if it
+already has one, the item is the other two questions. And `meeting_prep`
+(A2.6, `agent_meeting.rs`) already joins a subject to the caller's own
+`workspace_search` hits of kind `message`, opens the nearest few and reads their
+bodies — that is the correspondence reader this item needs, so lift it rather
+than write a third one. Check the migrations directory again immediately before
+committing; `0405` is this track's highest and the sites loop was at `0324`.

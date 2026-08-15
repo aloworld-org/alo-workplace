@@ -17,6 +17,21 @@ contracts.
   What visitors typed is never stored, and no entry says who a visitor was:
   the transcript shows the act, the published fact it used, and the page
   that fact came from.
+
+- **`@tasks` can now read your list, not just add to it.** Ask what you have
+  on and it answers from your tasks — what is already late, what is due today,
+  what is coming up, and the things nobody has dated, which are the ones a
+  deadline-shaped answer usually loses. Ask who is late and it groups the
+  overdue work by the colleague it belongs to, over the boards you can already
+  open and no others, so the answer is never a claim about somebody's private
+  list. It can then act on what it found: chase a late task with a comment left
+  under your own name (never on work that is not actually late), change one
+  task's priority and nothing else about it, and write down what a conversation
+  agreed — as suggestions in your task list that you still accept or reject one
+  by one, with the room they came from recorded so the same commitment is never
+  captured twice. Every change is still proposed and waits for your tap; asking
+  a question changes nothing.
+
 - **A visitor who asks the site assistant to be contacted can now leave
   their details in the conversation — and the lead is on your sales board
   before you have read anything.** The assistant only ever offers the form;
