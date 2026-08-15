@@ -98,11 +98,21 @@ product besides.
   and `workspace` is not a module.
 
   **That gate is now applied** (A1.5). Every agent read joins the denial table
-  on `d.module = a.product`, so a person who cannot open Inventory has no
+  on the agent's product, so a person who cannot open Inventory has no
   `@inventory`: not in the list, not by id, not in a room they share with a
   colleague who does have it, and not as the counterpart of a one-to-one they
   opened before the switch was thrown (its history stays readable; nobody
-  answers in it). Defining one is refused with a 422 rather than made and
+  answers in it).
+
+  One product's word is **not** its module's, and the join translates it:
+  `sheets` (A2.2) is a real product with an agent in ADR 0034 and no rail app of
+  its own — a spreadsheet is a Drive node, opened from Drive — so
+  `AgentProduct::module` answers Drive and the SQL says `CASE a.product WHEN
+  'sheets' THEN 'drive'`. Left untranslated it would compare `sheets` against a
+  column that can never hold it, and somebody denied Drive would keep `@sheets`:
+  an agent that reads the very files they were denied. A unit test reads
+  `module()` and holds the CASE to it, so a later product that borrows a module
+  fails there rather than in production. Defining one is refused with a 422 rather than made and
   hidden, because an agent its author cannot then see would be a 200 followed by
   a 404. `NOT u.is_admin` is in the predicate: an administrator is never denied,
   which is `AccessFacts::may_open`'s own rule and exists so an admin who
@@ -123,7 +133,15 @@ product besides.
   gives: once has to survive what it wrote, so a tenant that retires an agent is
   not handed it back the next morning. Each insert is `ON CONFLICT DO NOTHING`
   besides, so a tenant that had already registered its own `@mail` keeps theirs,
-  name and all, and is given the fourteen it was missing.
+  name and all, and is given the rest.
+
+  That same "once" would leave a tenant seeded **before** a product existed
+  permanently without its agent, which is the other half of A1.5's promise. So a
+  product built later is offered once more, under **its own ledger key**
+  (`LATER_AGENT_PRODUCTS`, today `sheets` → `default-agents:sheets`): a tenant
+  that never saw it gets it, a tenant that threw it away keeps it thrown away,
+  and a tenant seeded from scratch today already has it, finds the handle taken,
+  and simply records the key.
 - `chat_channels.kind` gains **`agent_dm`** and `chat_channels.agent_id`
   (migration 0402, ADR 0048) — a one-to-one between one person and one agent.
   A DM could not hold one: `dm_key` is "both member ids sorted and joined", two

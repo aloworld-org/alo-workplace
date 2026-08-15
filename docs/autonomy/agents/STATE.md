@@ -1523,3 +1523,218 @@ was shown. Two registry counts move with every new tool (`all_tools().len()` and
 `agent_turn.rs`'s read count) — update them rather than loosening them. Check
 the migrations directory again immediately before committing; `0403` is this
 track's highest.
+
+## A2.2 — the Sheet agent: answers cited to cells, formulas proposed, columns tidied
+
+**Shipped.** alo Sheets has an agent of its own — `@sheets`, a product in the
+registry rather than a name on the Drive one — with three reads and two writes,
+all of them over the workbook snapshot a Drive `sheet` node actually stores.
+
+- **A new product, and the one gate that had to be taught about it.**
+  `AgentProduct::Sheets` (migration `0404`, the CHECK widened only), seeded into
+  the default set, named `Sheets` / `Tableurs` / `Rekenbladen` at the API edge.
+  It is the first product with **no rail app of its own**: a spreadsheet is a
+  Drive node, so `AgentProduct::module()` answers `AppModule::Drive`. That
+  mattered more than it looks — `AGENT_VISIBLE` joined `d.module = a.product`
+  literally, so `sheets` would have matched no denial row and a person denied
+  Drive would have kept `@sheets`, an agent reading the very files they were
+  denied. The join now translates through `AGENT_GATE` (`CASE a.product WHEN
+  'sheets' THEN 'drive'`), and two unit tests hold the SQL to `module()`: one
+  asserting Sheets is the *only* product whose word is not its module's, one
+  reading `module()` and requiring the matching CASE arm. A later product that
+  borrows a module fails there rather than in production.
+- **A tenant seeded before A2.2 still gets the agent.** The `chat_agent_seeds`
+  ledger runs once, which is what keeps a retired agent retired — and would have
+  left every existing tenant permanently without a Sheet agent. So
+  `LATER_AGENT_PRODUCTS` offers a product built later **once, under its own
+  key** (`default-agents:sheets`), in its own transaction, `ON CONFLICT DO
+  NOTHING`: never seen it → gets it; threw it away → keeps it thrown away;
+  seeded from scratch today → already has it and just records the key.
+- **`platform/alo-ai/src/sheet_grid.rs` is where the depth is** — pure, no store
+  handle, no model, 20 unit tests. It reads a Univer snapshot into tabs and
+  cells (tolerant of everything that is not structure: a missing `t`, a tab the
+  `sheetOrder` forgot, an order naming a tab that is gone, a cell holding only a
+  style), forms and parses A1 addresses, finds the header row only when it is
+  unmistakable, scans a formula for what it points at, and writes **into the
+  caller's own snapshot** rather than re-serialising one from the model above —
+  so styles, merges, filters and plugin data survive a write.
+- **`products/mail/alo-jmap/src/agent_sheets.rs`** resolves the workbook by name
+  out of the caller's own Drive (`drive_sheets`, new, personal-only on
+  `drive_find`'s reasoning), loads the blob, runs the pure function, and for a
+  write stores a blob and adds a Drive **version** — the same two steps
+  `SheetEditor.tsx` takes, so the agent's change is in the same history and
+  rolls back the same way.
+
+**The five tools.** `sheet_read` (a bounded window, every cell addressed),
+`sheet_answer` (the rows matching the question, each captioned with the label
+above its column), `sheet_formula_explain` (the formula, its ranges, and what
+those cells hold *now*) — all three reads, all three answering in the turn.
+`sheet_write_formula` and `sheet_clean_column` are writes and wait for a tap.
+
+**Three refusals that are the item, not decoration.**
+
+- **A formula is written; a fact never is.** `sheet_write_formula` refuses
+  anything not starting with `=`, so no path here types a figure into somebody's
+  data. Their numbers are theirs; a calculation over them is what an agent is
+  for.
+- **A cell already holding a value is refused by name**, all of them at once,
+  before a single cell is touched — unless the user said `replace`. A cell
+  holding a *formula* is replaced without ceremony: that is what "change the
+  formula" means, and the version history holds the old one.
+- **A tidy is about typing, never meaning.** Ends trimmed, inner runs of blanks
+  (including the non-breaking space a pasted column is full of) collapsed, and
+  text that is a number stored as one. Nothing else: not case, not spelling, not
+  dates, not currencies, never a formula cell, and never a cell the sheet
+  already holds as a number. **A number is converted only when it reads back
+  exactly as it was typed** — JSON numbers are `f64`, so `12.30` would become
+  `12.3`, `0041` would become `41`, and a 22-digit reference would come back a
+  different number; each of those is us silently altering a figure while
+  claiming to have tidied its typing, so such a cell is left as text.
+
+**Verified.**
+
+- `cargo fmt` on the three crates; `SQLX_OFFLINE=true cargo clippy -p alo-ai -p
+  alo-store -p alo-jmap --all-targets` — clean but for the two pre-existing
+  `alo-store/src/meet.rs` `type_complexity` warnings (another track's file).
+- `cargo nextest run -p alo-ai` — **162/162**.
+- `cargo nextest run -p alo-store` — **1958/1958** (66 s), including the two new
+  tests in `tests/chat_agent_seed.rs`.
+- `cargo nextest run -p alo-jmap` — **1109/1110** in 333 s, the one failure
+  pre-existing and the sites track's (below).
+- **The question, on the wire** (`agent_sheets_http.rs`, eight new tests).
+  Copied out of `cargo nextest run -p alo-jmap --test agent_sheets_http
+  --no-capture`:
+
+```
+===== A2.2 TRANSCRIPT: @sheets what did the North region bring in in January? =====
+POST /chat/channels/yllug2HxakCne-orsgqCuQ/messages
+     {"body":"@sheets what did the North region bring in in January?"}
+--- what the model was shown (call 1 of 2, user turn) ---
+Today's date is 2026-08-15. …
+Request: @sheets what did the North region bring in in January?
+
+Sources:
+
+--- what the model replied (call 1) ---
+{"action":{"args":{"question":"North region January"},"tool":"sheet_answer"},
+ "kind":"action","say":"Let me look in the sheet."}
+--- what the model was shown (call 2 of 2, user turn) ---
+Request: @sheets what did the North region bring in in January?
+
+Sources:
+[1] tool result "sheet_answer" — {"kind":"sheetAnswer","matched":1,"rows":[{"cells":[
+{"cell":"A2","formula":null,"header":"Region","matched":true,"text":"North","type":"text"},
+{"cell":"B2","formula":null,"header":"January","matched":false,"text":"1200","type":"number"},
+{"cell":"C2","formula":null,"header":"February","matched":false,"text":" 1300 ","type":"text"}],
+"row":2,"tab":"Revenue"}],"searchedRows":5,"searchedTabs":["Revenue","Notes"],
+"terms":["north","region","january"],"workbook":{"id":"1gh3Jvu7DCzi9BCs9SldDw",
+"name":"Q1 figures","tabs":["Revenue","Notes"],"workbookName":"Q1 figures"}}
+
+The last source above is the result of a tool you just ran. ANSWER the request from it now…
+--- what the model replied (call 2) ---
+{"answer":"North brought in 1 200 in January (B2 of Revenue), against 900 for South in B3 [1].",
+ "kind":"answer"}
+--- GET /chat/channels/{id}/messages, the agent's message ---
+{"authorKind":"agent","authorEmail":"Sheets","body":"North brought in 1 200 in January…",
+ "proposal":null,…}
+--- audited: sheet_answer / read / ok=true ---
+===== end =====
+```
+
+The properties pinned around that exchange:
+
+- **`proposal` is `null` on every message in the room**, and the workbook is
+  still on version 1 with its bytes byte-for-byte what they were. Asking what a
+  figure is produced no button and no version.
+- **The cited cell is in what the model was shown.** `"cell":"B2"` with
+  `"header":"January"` and `"text":"1200"` — the address, the caption and the
+  figure, which is the difference between an answer a person can check and one
+  they have to trust. The row that did not match ("South") and the other tab's
+  prose are not in it.
+- **The write, proposed then applied.** `@sheets total February under the
+  column` came back as a proposal carrying `sheet_write_formula`; nothing
+  changed until the tap; after it, `C4` holds `=SUM(C2:C3)`, the node is on
+  version 2, version 1 is still there, and B2's `1200`, C2's `style-3`, the
+  100-row count, the workbook id and the whole `Notes` tab are unchanged. The
+  result says `"recalculates":"onOpen"` — the cached value went with the old
+  formula, so nobody reports a number that was never computed.
+- **The tidy, measured.** Column C: `changed: 2`, `C2` `" 1300 "` →
+  `1300` with `["trimmed","storedAsNumber"]`, its `style-3` intact, the header
+  untouched (it started at `C2`, under it). Column B: `skippedFormulas: 1`,
+  `changed: 0`, `reason: "nothingToTidy"` and **`versionNo: null`** — an
+  approved tool that changed nothing writes no version saying it did.
+- **Isolation, over the real route.** A second tenant's workbook and a
+  colleague's private one are unreachable by name from all five tools, each
+  answering the same `no spreadsheet of yours is called …` an unknown name gets,
+  and neither gained a version. A refusal lists the asker's **own**
+  spreadsheets only.
+- **The module gate, over the store.** Denying Drive takes away `@drive` **and**
+  `@sheets` — list, id, shared room, and opening a one-to-one — while a
+  colleague who still has Drive keeps both.
+
+**Cuts / flags.**
+
+- **Chart from intent is cut, and queued as A2.2b** rather than half-built. A
+  chart in an alo Sheet is a Univer **drawing**: a plugin-owned structure
+  outside `cellData` that `sheet_grid` does not model, that the export path
+  (`web/src/drive/exportOffice.ts`) does not write either, and that nothing in
+  this repo can read back to check. Composing one from documentation and putting
+  it behind an approval button risks an unopenable workbook, which is worse than
+  no chart tool. A2.2b states the prerequisite: a **reader** first, against a
+  fixture the editor itself saved.
+- **The other four capabilities all landed** — formula from intent
+  (`sheet_write_formula`), explain a formula, clean a column, and answer from
+  the data with the cells cited.
+- **A new product word is a permission surface, and it needed SQL.** Recorded
+  above and in `docs/design/chat-agents.md`; the important part for the next
+  wave is that A2.3 (Docs) is the same shape — alo Docs is also a Drive node
+  with no rail app — so it adds a row to `AGENT_GATE` and a row to
+  `LATER_AGENT_PRODUCTS`, and both tests will tell it if it forgets.
+- **`drive_sheets` is new in `alo-store/src/drive.rs`.** `drive_find` needs
+  something to search for and cannot answer "which one did they mean when they
+  named none" or "which ones are there". Personal-only and folder/trash-excluded
+  on `drive_find`'s own documented reasoning.
+- **The stale sentence in `alo-store/src/agent_ground.rs` is still there** — it
+  still says Sites has neither grounding nor tools "yet". This item did rebuild
+  `alo-store`, so the excuse is gone; it was simply missed until the gate had
+  run. Fold it into A2.4 (Insights), which touches that file's table anyway.
+- **One pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime::now_utc()`
+  at 100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision — this run: `…452661` vs `…4526616`. Identical to the
+  failure the last two iterations recorded; the file is theirs and the fix on
+  their side is comparing at microsecond precision.
+- **"On the wire" is the in-process router over real Postgres**, as in A2.1: real
+  `Request`s through the real router with a real bearer token against real rows
+  and real blobs, and no live model call (the standing rail). The argument-level
+  tests go through `POST /ai/agent/execute`, the ordinary approval route the
+  command palette's button takes. The model's words are fixtures; what is proved
+  is what it was *shown* and what the product did with its reply.
+- **Environment.** Docker is still unresponsive, so `scripts/prune-test-db.sh`
+  still cannot run — its first statement is a `docker exec` — and everything ran
+  against `alo_agents_test` on the native **5432** server. 1 958 store tests in
+  66 s and 1 110 jmap tests in 333 s, so the database has not bloated. C: was at
+  **99%, 3.3 GB free** at the top of the iteration; deleting this checkout's own
+  `target/debug/deps/*.pdb` (80 files) took it to 7.8 GB and every command
+  carried `CARGO_PROFILE_TEST_DEBUG=0`, so none came back. **The feared
+  40-minute `alo-store` relink was 3 m 22 s** with that flag set — worth knowing:
+  the ~115 test binaries relink quickly when no PDB is written. It still did not
+  fit beside everything else in one call, so it used the sanctioned
+  background-plus-marker form and was waited on inside a single poll; the suites
+  themselves ran in the foreground (the full `alo-jmap` run passed the 600 s
+  ceiling and was waited on the same way).
+
+**Next:** A2.3 — the Docs agent reachable from a room: draft a section, rewrite
+a selection, translate a document. Read A2.2 first: alo Docs is the same shape as
+alo Sheets — a product with an agent in ADR 0034 and no rail app of its own, a
+`doc` node in Drive whose blocks are BlockNote JSON in the `documents` table
+(`alo-store/src/document.rs`, owner-scoped) — so it needs the same two rows
+(`AGENT_GATE`, `LATER_AGENT_PRODUCTS`) and a migration `04xx` widening the
+product CHECK. Note `documents` is **owner-scoped, not Space-scoped**, so the
+agent reaches only the asker's own documents and the isolation test is a
+colleague's document as much as another tenant's. Three registry counts move
+with every new tool now (`all_tools().len()`, `agent_product`'s `workspace.len()`
+and `agent_turn.rs`'s read count) — update them rather than loosening them.
+Check the migrations directory again immediately before committing; `0404` is
+this track's highest and the sites loop is at `0324`.

@@ -23,6 +23,23 @@ contracts.
   for the website's owner; invited editors keep editing pages and nothing
   more.
 
+- **Your spreadsheets have an agent now — `@sheets`.** Ask it what a figure is
+  and it answers from the cells, telling you which ones: "1 200 in B2", not
+  "1 200", so you can check it against your own grid. Ask what a formula does
+  and it explains it from what the formula actually reads and what those cells
+  hold right now, not from the text you can already see in the formula bar. Ask
+  for a total it does not have yet and it proposes a **formula** for the sheet
+  to work out — it never does the arithmetic itself and never types a figure
+  into your data, so the answer stays right when the numbers change. Ask it to
+  tidy a column and it takes the stray blanks off the ends, collapses the double
+  spaces, and stores text that is really a number as a number — and nothing
+  else: not the spelling, not the dates, not the currencies, and never a cell
+  holding a formula. Every change waits for your tap, arrives as an ordinary new
+  version you can roll back, and leaves the rest of the workbook — your other
+  tabs, your formatting, your notes — exactly as it was. It reaches only the
+  spreadsheets you can already open, and if you cannot open Drive you do not
+  have this agent at all.
+
 - **Ask the Websites agent how far your other languages have got.** "Is the
   website ready in French?" now gets a straight count back: how many pages your
   site has, how many are already written in each language you set it up in, and
