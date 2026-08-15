@@ -7754,3 +7754,79 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.03b — booking from the conversation (create the meeting,
   confirmation, visitor-calendar invite, cancellation link, reversible-only
   enforced in code).
+
+## 2026-08-15 — S3.03b the conversation books the meeting, and the visitor can undo it
+
+- **Item:** S3.03b — booking from the conversation: create the meeting, the
+  confirmation, the visitor's calendar, a cancellation link; reversible-only
+  enforced in code.
+- **What shipped:**
+  - **The action contract, closed in code** (`alo-ai/site_chat.rs`): the
+    reply contract gains exactly one verb — `{"book":N}` naming a service
+    from the numbered *published* list the prompt now carries (only when the
+    site has one). `deny_unknown_fields` makes any other verb (`pay`,
+    `invoice`, `discount`, …) a shape error — unrepresentable, not
+    disallowed — and a `book` of an unlisted number is a typed refusal
+    (`UnknownService`), the action twin of Uncited. The no-model shortcut
+    widens by one case: no sources **and no services** still refuses unheard;
+    with services, the model is consulted with zero sources (citation rule
+    already makes the only deliverable outcomes book-or-refuse).
+  - **The offer is deterministic** (`serve/chat.rs`): on `OfferBooking` the
+    reply is `{"state":"booking",…}` with the service and its next real free
+    times (≤3 days, ≤4 times/day, ≤14 days ahead under the service's own
+    horizon) read via `public_booking_slots` over the S3.03a spans-only seam.
+    A service with required questions gets `direct:false` — the widget sends
+    the visitor to the booking form instead of squeezing custom questions
+    into a bubble (journaled cut, not a stub: the form path fully works).
+  - **The reservation** (`serve/chat_book.rs`, `POST /_alo/chat/book`): same
+    caps/limiters as `/_alo/chat`; the service id resolves **among the
+    serving site's published services only** (a foreign site's id is the
+    uniform 404); then the same race-safe `reserve_public_booking` as the
+    page. 409 `taken`, 400 with the store's verbatim `detail`, 200 `booked`
+    with `icsPath` + `managePath`.
+  - **Reversibility as a capability** (migration `0326`, store
+    `site_booking_manage.rs`): every reservation now mints a `manage_token`
+    (unique, 22-char). `managed_appointment`/`cancel_managed_appointment`
+    resolve it only on the site it was minted for; cancel flips
+    status→cancelled (slot frees, availability only subtracts `booked`),
+    removes the owner's event through the same Agenda door that wrote it
+    (already-gone event/calendar tolerated), and answers typed
+    Cancelled/AlreadyCancelled/TooLate.
+  - **The visitor's pages** (`serve/booking_manage.rs`): `GET /b/manage/:t`
+    (appointment + cancel button while it stands), `POST …/cancel` (POST
+    behind a button, never a GET side effect), `GET …/calendar.ics` — a
+    hand-rolled RFC 5545 document (escaping §3.3.11, folding §3.1 at char
+    boundaries, UTC DATE-TIMEs, CRLF) whose DESCRIPTION/URL carry the cancel
+    link, so the undo travels inside the visitor's own calendar entry.
+  - **Widget + confirmation page:** the widget renders the offer (day rows,
+    time buttons/links, in-chat name+email form, confirmation card with
+    add-to-calendar + cancel links, taken/invalid/limited states — all words
+    via data-* from EN/FR/NL `UiStrings`); the plain booking-page
+    confirmation carries the same two links. Widget byte budget raised
+    10→17 KiB (measured 15 643) with the reason in the test comment.
+- **Verified:** clippy on alo-store/alo-ai/alo-sites — zero warnings from
+  this item (the two meet.rs type_complexity survivors remain; a third from
+  my first cut was fixed by typing the row). Test-binary build via the
+  sanctioned background+marker form (11m41s; one poll re-issued at the
+  600 s ceiling), then foreground `cargo nextest run -p alo-store -p alo-ai
+  -p alo-sites`: **2 347/2 347 green** (1 pre-existing skip, 31 s;
+  prune-test-db first — 892 pruned). New proof: store cancel arc (token
+  minted → view → cancel → slot re-offered → owner event gone → honest
+  double-cancel → TooLate past start), the mandatory wrong-tenant/wrong-site
+  token test (foreign site sees and cancels nothing, unknown/malformed the
+  same nothing), ICS unit goldens (escaping, folding, UTF-8 boundaries),
+  alo-ai contract tests incl. `no_other_action_verb_can_even_be_represented`,
+  and three wire arcs on the real router+postgres: book→ics→cancel→slot
+  freed, site-scoping of service ids and tokens, verbatim validation detail.
+- **Cuts/flags:** "send the confirmation" read as the in-conversation
+  confirmation card + the .ics for the visitor's calendar + the existing
+  owner-inbox notification sweep (S2.13b2 covers conversation bookings
+  automatically — same ledger). A confirmation **email to the visitor**
+  needs an outbound-mail-to-strangers seam no sites feature has yet; if
+  wanted, it is its own queue item (and its own abuse story). Services with
+  required custom questions book via their form page from the chat
+  (`direct:false`) rather than in-bubble. `cargo fmt` deliberately not run
+  (machine memory: rustfmt 1.9.0 divergence); no new route prefix —
+  `/b/*` and `/_alo/*` already reach alo-sites.
+- **Next:** S3.03c — CRM-owned public seam for contact+lead from a site
+  conversation.

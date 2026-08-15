@@ -24,9 +24,16 @@
 //! - `{"state":"answer","text":…,"citations":[{"title":…,"path":…}]}` — a
 //!   cited answer; `path` is site-relative, or `null` for a knowledge
 //!   document (which has no public URL and is named by title alone).
+//! - `{"state":"booking","service":…,"direct":…,"formPath":…,"days":[…]}` —
+//!   the visitor asked to book and the model offered one of the site's own
+//!   published services (S3.03b): the reply carries that service and its
+//!   next real free times, read live from the Agenda seam. The reservation
+//!   itself is `POST /_alo/chat/book` ([`super::chat_book`]) — the model can
+//!   offer, never act.
 //! - `{"state":"refusal","contactPath":…}` — the assistant will not answer
-//!   this question (nothing retrievable, an uncited reply, or the model's
-//!   own refusal — deliberately indistinguishable to a stranger).
+//!   this question (nothing retrievable, an uncited reply, a booking offer
+//!   for a service never listed, or the model's own refusal — deliberately
+//!   indistinguishable to a stranger).
 //! - `{"state":"unavailable","contactPath":…}` — the ceiling is spent, no
 //!   backend is configured, or the backend failed; the widget offers the
 //!   site's contact page instead.
@@ -48,7 +55,10 @@ use serde::Deserialize;
 use serde_json::json;
 
 use alo_ai::{SiteChatError, SiteChatRefusal, SiteChatReply, SiteChatVoice};
-use alo_store::{ChatGate, PublishedSite, SiteChatAppearance, chat_month_key};
+use alo_store::{
+    ChatGate, PublicBookingService, PublishedSite, SiteChatAppearance, chat_month_key, local_day,
+    local_wall_clock,
+};
 use time::OffsetDateTime;
 
 use super::forms::client_key;
@@ -116,12 +126,7 @@ pub(super) async fn ask(State(state): State<Arc<AppState>>, request: Request) ->
         Err(_) => return state_json(StatusCode::BAD_REQUEST, json!({"state": "invalid"})),
     };
 
-    if !VISITOR_TOKEN_CHARS.contains(&body.visitor.chars().count())
-        || !body
-            .visitor
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
+    if !valid_visitor(&body.visitor) {
         return state_json(StatusCode::BAD_REQUEST, json!({"state": "invalid"}));
     }
     if let Err(wait) = state.chat_visitor_rate.allow(&body.visitor, Instant::now()) {
@@ -201,6 +206,20 @@ async fn answer(
             return unavailable_state(state, site).await;
         }
     };
+    // What can be booked here (S3.03b): the site's published services, whose
+    // names — and nothing else — the model is shown so it can *offer* one.
+    // A failed read answers without booking rather than not at all.
+    let services = match state.store.published_availability(site).await {
+        Ok(services) => services,
+        Err(error) => {
+            tracing::error!(site = %site.site, %error, "chat bookable services read failed");
+            Vec::new()
+        }
+    };
+    let service_names: Vec<String> = services
+        .iter()
+        .map(|service| service.published.name.clone())
+        .collect();
     // The tenant's voice (ADR 0040 §5): tone and note shape the prompt's
     // style guidance — the answering rules stay absolute in `alo-ai`. A
     // failed read answers in the default voice rather than not at all.
@@ -209,7 +228,7 @@ async fn answer(
         tone: appearance.tone,
         note: appearance.tone_note.as_deref(),
     };
-    match alo_ai::answer_site_question(&config, question, &corpus, &voice).await {
+    match alo_ai::answer_site_question(&config, question, &corpus, &service_names, &voice).await {
         Ok(SiteChatReply::Answer { text, citations }) => {
             record_spend(state, site, month).await;
             let citations: Vec<serde_json::Value> = citations
@@ -225,6 +244,18 @@ async fn answer(
                 StatusCode::OK,
                 json!({"state": "answer", "text": text, "citations": citations}),
             )
+        }
+        // The model may only *offer* a booking (ADR 0040 §2, S3.03b): the
+        // service is one of the published list by construction of the parse,
+        // and everything the visitor sees next — the free times — is read
+        // from Agenda's seam here, never from the model.
+        Ok(SiteChatReply::OfferBooking { service }) => {
+            record_spend(state, site, month).await;
+            match services.get(service - 1) {
+                Some(service) => booking_state(state, service).await,
+                // The list changed between the read and the reply.
+                None => unavailable_state(state, site).await,
+            }
         }
         Ok(SiteChatReply::Refusal(refusal)) => {
             // An off-topic question refused at retrieval never reached the
@@ -254,6 +285,78 @@ async fn answer(
             unavailable_state(state, site).await
         }
     }
+}
+
+/// How many days ahead the conversation offers free times from, capped under
+/// the service's own horizon: enough to book this week, small enough that the
+/// reply stays a chat bubble. The full week-by-week view is one click away on
+/// the service's own booking page.
+const BOOKING_OFFER_DAYS: i64 = 14;
+/// At most this many days with free time are offered in the conversation.
+const BOOKING_OFFER_MAX_DAYS: usize = 3;
+/// At most this many times per offered day.
+const BOOKING_OFFER_MAX_TIMES: usize = 4;
+
+/// The `booking` state: one published service the visitor may book from the
+/// conversation, with its next real free times. `direct` is `false` when the
+/// service asks required questions of its own — those are answered on its
+/// booking page (linked as `formPath`), not squeezed into a chat bubble.
+pub(super) async fn booking_state(
+    state: &Arc<AppState>,
+    service: &PublicBookingService,
+) -> Response {
+    let now = OffsetDateTime::now_utc();
+    let zone = &service.published.time_zone;
+    let mut days: Vec<serde_json::Value> = Vec::new();
+    let horizon = i64::from(service.published.horizon_days.max(0)).min(BOOKING_OFFER_DAYS);
+    let today = local_day(now, zone).unwrap_or_else(|| now.date());
+    for offset in 0..=horizon {
+        if days.len() >= BOOKING_OFFER_MAX_DAYS {
+            break;
+        }
+        let day = today.saturating_add(time::Duration::days(offset));
+        let slots = match state.store.public_booking_slots(service, day, now).await {
+            Ok(slots) => slots,
+            Err(error) => {
+                tracing::error!(%error, "chat booking slots read failed");
+                break;
+            }
+        };
+        if slots.is_empty() {
+            continue;
+        }
+        let times: Vec<serde_json::Value> = slots
+            .iter()
+            .take(BOOKING_OFFER_MAX_TIMES)
+            .filter_map(|slot| {
+                let at = slot
+                    .starts_at
+                    .format(&time::format_description::well_known::Rfc3339)
+                    .ok()?;
+                let label = match local_wall_clock(slot.starts_at, zone) {
+                    Some((_, (hour, minute))) => format!("{hour:02}:{minute:02}"),
+                    None => at.clone(),
+                };
+                Some(json!({"at": at, "label": label}))
+            })
+            .collect();
+        days.push(json!({"date": day.to_string(), "times": times}));
+    }
+    let direct = !service.published.fields.iter().any(|field| field.required);
+    state_json(
+        StatusCode::OK,
+        json!({
+            "state": "booking",
+            "service": {
+                "id": service.published.booking_id.as_str(),
+                "name": service.published.name,
+                "minutes": service.published.duration_minutes,
+            },
+            "direct": direct,
+            "formPath": format!("/b/{}", service.published.booking_id.as_str()),
+            "days": days,
+        }),
+    )
 }
 
 /// The typed `unavailable`, always carrying the site's own contact page when
@@ -354,8 +457,17 @@ async fn contact_path(state: &AppState, site: &PublishedSite) -> Option<String> 
         })
 }
 
+/// Whether a widget-minted visitor token has the only shape the wire
+/// accepts: bounded, header-safe, and unable to carry anything but noise.
+pub(super) fn valid_visitor(token: &str) -> bool {
+    VISITOR_TOKEN_CHARS.contains(&token.chars().count())
+        && token
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 /// The 429, with the limiter's `Retry-After` hint in seconds.
-fn rate_limited(wait_seconds: u64) -> Response {
+pub(super) fn rate_limited(wait_seconds: u64) -> Response {
     let mut response = state_json(
         StatusCode::TOO_MANY_REQUESTS,
         json!({"state": "rate_limited"}),
@@ -368,7 +480,7 @@ fn rate_limited(wait_seconds: u64) -> Response {
 
 /// One JSON state object, uncacheable — the scripted widget is the only
 /// consumer of this path.
-fn state_json(status: StatusCode, body: serde_json::Value) -> Response {
+pub(super) fn state_json(status: StatusCode, body: serde_json::Value) -> Response {
     (
         status,
         [

@@ -182,6 +182,32 @@ pub struct UiStrings {
     pub chat_rate_limited: &'static str,
     /// Assistant widget: shown on a network or server failure.
     pub chat_error: &'static str,
+    /// Assistant widget, booking: heading above the offered free times.
+    pub chat_book_pick: &'static str,
+    /// Assistant widget, booking: link to the service's full booking page.
+    pub chat_book_more: &'static str,
+    /// Assistant widget, booking: the service currently offers no free time.
+    pub chat_book_none: &'static str,
+    /// Assistant widget, booking: the confirm button under name and email.
+    pub chat_book_confirm: &'static str,
+    /// Assistant widget, booking: prefix of the confirmation line.
+    pub chat_book_booked: &'static str,
+    /// Assistant widget, booking: the picked time was taken meanwhile.
+    pub chat_book_taken: &'static str,
+    /// Appointment pages and confirmation cards: the .ics download link.
+    pub booking_add_calendar: &'static str,
+    /// Appointment pages and confirmation cards: the cancel affordance.
+    pub booking_cancel: &'static str,
+    /// Manage page: heading (and `<title>`) while the appointment stands.
+    pub booking_manage_title: &'static str,
+    /// Manage page: heading once the appointment is cancelled.
+    pub booking_manage_cancelled_title: &'static str,
+    /// Manage page: text confirming a cancellation that just happened.
+    pub booking_manage_cancelled_text: &'static str,
+    /// Manage page: text when the appointment was already cancelled.
+    pub booking_manage_already_text: &'static str,
+    /// Manage page: text when the appointment already started.
+    pub booking_manage_too_late_text: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -267,6 +293,19 @@ pub const EN: UiStrings = UiStrings {
     chat_contact: "Use the contact page instead",
     chat_rate_limited: "Please wait a moment before asking again.",
     chat_error: "Something went wrong. Please try again.",
+    chat_book_pick: "Pick a time:",
+    chat_book_more: "More times",
+    chat_book_none: "No free times in the coming days.",
+    chat_book_confirm: "Book",
+    chat_book_booked: "Booked:",
+    chat_book_taken: "That time has just been taken — pick another.",
+    booking_add_calendar: "Add to your calendar",
+    booking_cancel: "Cancel this appointment",
+    booking_manage_title: "Your appointment",
+    booking_manage_cancelled_title: "Appointment cancelled",
+    booking_manage_cancelled_text: "Your appointment has been cancelled. The time is free again.",
+    booking_manage_already_text: "This appointment was already cancelled.",
+    booking_manage_too_late_text: "This appointment has already started and can no longer be cancelled here.",
 };
 
 /// French renderer chrome.
@@ -352,6 +391,19 @@ pub const FR: UiStrings = UiStrings {
     chat_contact: "Passez plutôt par la page de contact",
     chat_rate_limited: "Patientez un instant avant de poser une autre question.",
     chat_error: "Une erreur est survenue. Veuillez réessayer.",
+    chat_book_pick: "Choisissez une heure :",
+    chat_book_more: "Plus d'horaires",
+    chat_book_none: "Aucun créneau libre dans les prochains jours.",
+    chat_book_confirm: "Réserver",
+    chat_book_booked: "Réservé :",
+    chat_book_taken: "Ce créneau vient d'être pris — choisissez-en un autre.",
+    booking_add_calendar: "Ajouter à votre agenda",
+    booking_cancel: "Annuler ce rendez-vous",
+    booking_manage_title: "Votre rendez-vous",
+    booking_manage_cancelled_title: "Rendez-vous annulé",
+    booking_manage_cancelled_text: "Votre rendez-vous a été annulé. Le créneau est de nouveau libre.",
+    booking_manage_already_text: "Ce rendez-vous était déjà annulé.",
+    booking_manage_too_late_text: "Ce rendez-vous a déjà commencé et ne peut plus être annulé ici.",
 };
 
 /// Dutch renderer chrome.
@@ -437,6 +489,19 @@ pub const NL: UiStrings = UiStrings {
     chat_contact: "Gebruik liever de contactpagina",
     chat_rate_limited: "Wacht even voordat u een nieuwe vraag stelt.",
     chat_error: "Er ging iets mis. Probeer het opnieuw.",
+    chat_book_pick: "Kies een tijdstip:",
+    chat_book_more: "Meer tijden",
+    chat_book_none: "Geen vrije tijden in de komende dagen.",
+    chat_book_confirm: "Boeken",
+    chat_book_booked: "Geboekt:",
+    chat_book_taken: "Dit tijdstip is net bezet — kies een ander.",
+    booking_add_calendar: "Toevoegen aan uw agenda",
+    booking_cancel: "Deze afspraak annuleren",
+    booking_manage_title: "Uw afspraak",
+    booking_manage_cancelled_title: "Afspraak geannuleerd",
+    booking_manage_cancelled_text: "Uw afspraak is geannuleerd. Het tijdstip is weer vrij.",
+    booking_manage_already_text: "Deze afspraak was al geannuleerd.",
+    booking_manage_too_late_text: "Deze afspraak is al begonnen en kan hier niet meer worden geannuleerd.",
 };
 
 /// Renderer chrome for a normalized locale. Region variants inherit their

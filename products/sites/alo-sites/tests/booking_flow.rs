@@ -85,8 +85,9 @@ async fn live_site_with_booking(
     tag: &str,
     fields: &[SiteBookingField],
     active: bool,
-) -> (SiteId, SiteBookingId) {
-    let site = acc.create_site("Studio", &unique(tag)).await.unwrap();
+) -> (SiteId, SiteBookingId, String) {
+    let subdomain = unique(tag);
+    let site = acc.create_site("Studio", &subdomain).await.unwrap();
     let home = acc.create_site_page(&site, "Home", "", true).await.unwrap();
     let calendar = acc.ensure_personal_calendar().await.unwrap();
     let hours = [SiteBookingWindow {
@@ -129,7 +130,7 @@ async fn live_site_with_booking(
     .await
     .unwrap();
     acc.publish_site(&site).await.unwrap();
-    (site, booking)
+    (site, booking, subdomain)
 }
 
 async fn get_day(state: &Arc<AppState>, booking: &str, date: &str) -> Response {
@@ -180,7 +181,7 @@ async fn the_day_page_offers_the_free_times_and_a_booking_reaches_the_owners_cal
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "booking-arc").await;
     let outsider = fresh_account(&store, "booking-arc-outsider").await;
-    let (site, booking) = live_site_with_booking(&owner, "booking-arc", &[], true).await;
+    let (site, booking, _) = live_site_with_booking(&owner, "booking-arc", &[], true).await;
     let day = wednesday_ahead();
     let date = day
         .format(&time::macros::format_description!("[year]-[month]-[day]"))
@@ -260,7 +261,7 @@ async fn the_day_page_offers_the_free_times_and_a_booking_reaches_the_owners_cal
 async fn the_same_time_cannot_be_booked_twice() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "booking-twice").await;
-    let (_site, booking) = live_site_with_booking(&owner, "booking-twice", &[], true).await;
+    let (_site, booking, _) = live_site_with_booking(&owner, "booking-twice", &[], true).await;
     let day = wednesday_ahead();
     let date = day
         .format(&time::macros::format_description!("[year]-[month]-[day]"))
@@ -288,8 +289,8 @@ async fn the_same_time_cannot_be_booked_twice() {
 async fn a_service_nobody_may_book_is_one_uniform_absence() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "booking-absent").await;
-    let (site, offered) = live_site_with_booking(&owner, "booking-absent", &[], true).await;
-    let (_asleep_site, asleep) = live_site_with_booking(&owner, "booking-asleep", &[], false).await;
+    let (site, offered, _) = live_site_with_booking(&owner, "booking-absent", &[], true).await;
+    let (_asleep_site, asleep, _) = live_site_with_booking(&owner, "booking-asleep", &[], false).await;
     let day = wednesday_ahead()
         .format(&time::macros::format_description!("[year]-[month]-[day]"))
         .unwrap();
@@ -339,7 +340,7 @@ async fn the_honeypot_answers_like_success_and_a_refused_answer_says_what_is_wro
         required: true,
         options: Vec::new(),
     }];
-    let (site, booking) = live_site_with_booking(&owner, "booking-guards", &fields, true).await;
+    let (site, booking, _) = live_site_with_booking(&owner, "booking-guards", &fields, true).await;
     let day = wednesday_ahead();
     let date = day
         .format(&time::macros::format_description!("[year]-[month]-[day]"))
@@ -407,7 +408,7 @@ async fn the_honeypot_answers_like_success_and_a_refused_answer_says_what_is_wro
 async fn a_closed_day_says_so_rather_than_offering_a_form() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "booking-closed").await;
-    let (_site, booking) = live_site_with_booking(&owner, "booking-closed", &[], true).await;
+    let (_site, booking, _) = live_site_with_booking(&owner, "booking-closed", &[], true).await;
     // The Thursday after the open Wednesday.
     let closed = wednesday_ahead() + Duration::days(1);
     let date = closed
@@ -422,4 +423,292 @@ async fn a_closed_day_says_so_rather_than_offering_a_form() {
 /// body must not.
 fn urlencode(value: &str) -> String {
     value.replace(':', "%3A").replace('+', "%2B")
+}
+
+// ---- Booking from the conversation (S3.03b) ----------------------------
+
+/// One JSON POST to the conversation's booking endpoint, on a given site's
+/// own host.
+async fn post_chat_book(
+    state: &Arc<AppState>,
+    subdomain: &str,
+    client: &str,
+    body: serde_json::Value,
+) -> Response {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/_alo/chat/book")
+        .header(header::HOST, format!("{subdomain}.{APEX}"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-forwarded-for", client)
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    app(Arc::clone(state)).oneshot(request).await.unwrap()
+}
+
+async fn get_on(state: &Arc<AppState>, subdomain: &str, path: &str) -> Response {
+    let request = Request::builder()
+        .method("GET")
+        .uri(path)
+        .header(header::HOST, format!("{subdomain}.{APEX}"))
+        .body(Body::empty())
+        .unwrap();
+    app(Arc::clone(state)).oneshot(request).await.unwrap()
+}
+
+async fn post_on(state: &Arc<AppState>, subdomain: &str, path: &str, client: &str) -> Response {
+    let request = Request::builder()
+        .method("POST")
+        .uri(path)
+        .header(header::HOST, format!("{subdomain}.{APEX}"))
+        .header("x-forwarded-for", client)
+        .body(Body::empty())
+        .unwrap();
+    app(Arc::clone(state)).oneshot(request).await.unwrap()
+}
+
+async fn json_body(response: Response) -> serde_json::Value {
+    serde_json::from_str(&body_string(response).await).unwrap()
+}
+
+#[tokio::test]
+async fn booking_from_the_conversation_reserves_and_is_reversible_by_its_links() {
+    let (store, state) = harness().await;
+    let owner = fresh_account(&store, "chat-book").await;
+    let (_site, booking, subdomain) =
+        live_site_with_booking(&owner, "chat-book", &[], true).await;
+    let day = wednesday_ahead();
+    let date = day
+        .format(&time::macros::format_description!("[year]-[month]-[day]"))
+        .unwrap();
+    let page = body_string(get_day(&state, booking.as_str(), &date).await).await;
+    let slot = slot_value(day, &page, "09:00");
+
+    // The conversation books the slot: real reservation, and the two
+    // reversibility handles in the same reply.
+    let response = post_chat_book(
+        &state,
+        &subdomain,
+        "9.1.0.1",
+        json!({
+            "visitor": "visitor-token-0001",
+            "service": booking.as_str(),
+            "slot": slot,
+            "name": "Ada Lovelace",
+            "email": "ada@example.test",
+        }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let booked = json_body(response).await;
+    assert_eq!(booked["state"], "booked");
+    assert_eq!(booked["service"], "Consultation");
+    let manage = booked["managePath"].as_str().unwrap().to_owned();
+    let ics = booked["icsPath"].as_str().unwrap().to_owned();
+    assert!(manage.starts_with("/b/manage/"));
+    assert!(ics.ends_with("/calendar.ics"));
+
+    // The slot is gone for the next visitor…
+    let after = body_string(get_day(&state, booking.as_str(), &date).await).await;
+    assert!(!after.contains(">09:00<"), "the slot must be taken: {after}");
+    // …and booking it through the conversation again says taken.
+    let clash = post_chat_book(
+        &state,
+        &subdomain,
+        "9.1.0.2",
+        json!({
+            "visitor": "visitor-token-0002",
+            "service": booking.as_str(),
+            "slot": slot,
+            "name": "Grace Hopper",
+            "email": "grace@example.test",
+        }),
+    )
+    .await;
+    assert_eq!(clash.status(), StatusCode::CONFLICT);
+    assert_eq!(json_body(clash).await["state"], "taken");
+
+    // The manage page shows the appointment with its cancel button.
+    let page = get_on(&state, &subdomain, &manage).await;
+    assert_eq!(page.status(), StatusCode::OK);
+    let page = body_string(page).await;
+    assert!(page.contains("Consultation"), "{page}");
+    assert!(page.contains("/cancel"), "{page}");
+
+    // The .ics puts the meeting in the visitor's calendar and carries the
+    // cancellation link inside the entry itself.
+    let calendar = get_on(&state, &subdomain, &ics).await;
+    assert_eq!(calendar.status(), StatusCode::OK);
+    assert_eq!(
+        calendar
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "text/calendar; charset=utf-8"
+    );
+    let document = body_string(calendar).await;
+    assert!(document.starts_with("BEGIN:VCALENDAR\r\n"), "{document}");
+    assert!(document.contains("SUMMARY:Consultation"), "{document}");
+    assert!(document.contains("DTSTART:"), "{document}");
+    // Unfold (RFC 5545 §3.1) before matching: a long host splits the URL
+    // across folded lines.
+    let unfolded = document.replace("\r\n ", "");
+    assert!(
+        unfolded.contains(&format!("https://{subdomain}.{APEX}{manage}")),
+        "the undo travels with the meeting: {document}"
+    );
+
+    // Cancelling by the link frees the slot again.
+    let cancelled = post_on(&state, &subdomain, &format!("{manage}/cancel"), "9.1.0.3").await;
+    assert_eq!(cancelled.status(), StatusCode::OK);
+    let text = body_string(cancelled).await;
+    assert!(text.contains("cancelled"), "{text}");
+    let freed = body_string(get_day(&state, booking.as_str(), &date).await).await;
+    assert!(freed.contains(">09:00<"), "cancelling frees the time: {freed}");
+    // A cancelled appointment has nothing left to import.
+    assert_eq!(
+        get_on(&state, &subdomain, &ics).await.status(),
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn a_conversation_booking_is_scoped_to_the_serving_site() {
+    let (store, state) = harness().await;
+    let owner = fresh_account(&store, "chat-book-scope-a").await;
+    let stranger = fresh_account(&store, "chat-book-scope-b").await;
+    let (_site_a, booking_a, sub_a) =
+        live_site_with_booking(&owner, "cb-scope-a", &[], true).await;
+    let (_site_b, _booking_b, sub_b) =
+        live_site_with_booking(&stranger, "cb-scope-b", &[], true).await;
+    let day = wednesday_ahead();
+    let date = day
+        .format(&time::macros::format_description!("[year]-[month]-[day]"))
+        .unwrap();
+    let page = body_string(get_day(&state, booking_a.as_str(), &date).await).await;
+    let slot = slot_value(day, &page, "09:00");
+
+    // Site B's widget cannot book site A's service: the id resolves among
+    // the serving site's own services only.
+    let crossed = post_chat_book(
+        &state,
+        &sub_b,
+        "9.2.0.1",
+        json!({
+            "visitor": "visitor-token-0003",
+            "service": booking_a.as_str(),
+            "slot": slot,
+            "name": "Mallory",
+            "email": "mallory@example.test",
+        }),
+    )
+    .await;
+    assert_eq!(crossed.status(), StatusCode::NOT_FOUND);
+
+    // Book it at home, then probe the token from the foreign host: the
+    // manage page, the calendar and the cancel are all the same 404 there,
+    // and the appointment survives the probing untouched.
+    let booked = json_body(
+        post_chat_book(
+            &state,
+            &sub_a,
+            "9.2.0.2",
+            json!({
+                "visitor": "visitor-token-0004",
+                "service": booking_a.as_str(),
+                "slot": slot,
+                "name": "Ada Lovelace",
+                "email": "ada@example.test",
+            }),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(booked["state"], "booked");
+    let manage = booked["managePath"].as_str().unwrap().to_owned();
+    let ics = booked["icsPath"].as_str().unwrap().to_owned();
+    for response in [
+        get_on(&state, &sub_b, &manage).await,
+        get_on(&state, &sub_b, &ics).await,
+        post_on(&state, &sub_b, &format!("{manage}/cancel"), "9.2.0.3").await,
+    ] {
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+    let still = get_on(&state, &sub_a, &manage).await;
+    assert_eq!(still.status(), StatusCode::OK);
+    assert!(body_string(still).await.contains("/cancel"));
+}
+
+#[tokio::test]
+async fn a_conversation_booking_refuses_bad_input_with_the_stores_own_words() {
+    let (store, state) = harness().await;
+    let owner = fresh_account(&store, "chat-book-guards").await;
+    let (_site, booking, subdomain) =
+        live_site_with_booking(&owner, "cb-guards", &[], true).await;
+    let day = wednesday_ahead();
+    let date = day
+        .format(&time::macros::format_description!("[year]-[month]-[day]"))
+        .unwrap();
+    let page = body_string(get_day(&state, booking.as_str(), &date).await).await;
+    let slot = slot_value(day, &page, "09:00");
+
+    // A blank name: the store's sentence rides to the widget verbatim.
+    let refused = post_chat_book(
+        &state,
+        &subdomain,
+        "9.3.0.1",
+        json!({
+            "visitor": "visitor-token-0005",
+            "service": booking.as_str(),
+            "slot": slot,
+            "name": "  ",
+            "email": "ada@example.test",
+        }),
+    )
+    .await;
+    assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
+    let refused = json_body(refused).await;
+    assert_eq!(refused["state"], "invalid");
+    assert!(
+        refused["detail"].as_str().unwrap().contains("name"),
+        "{refused}"
+    );
+
+    // A malformed visitor token never reaches the store.
+    let bad_token = post_chat_book(
+        &state,
+        &subdomain,
+        "9.3.0.2",
+        json!({
+            "visitor": "x",
+            "service": booking.as_str(),
+            "slot": slot,
+            "name": "Ada",
+            "email": "ada@example.test",
+        }),
+    )
+    .await;
+    assert_eq!(bad_token.status(), StatusCode::BAD_REQUEST);
+
+    // An unknown service on the right host is the uniform absence.
+    let unknown = post_chat_book(
+        &state,
+        &subdomain,
+        "9.3.0.3",
+        json!({
+            "visitor": "visitor-token-0006",
+            "service": "no-such-service-id",
+            "slot": slot,
+            "name": "Ada",
+            "email": "ada@example.test",
+        }),
+    )
+    .await;
+    assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+
+    // Nothing was reserved by any of it.
+    let untouched = body_string(get_day(&state, booking.as_str(), &date).await).await;
+    assert!(untouched.contains(">09:00<"), "{untouched}");
 }

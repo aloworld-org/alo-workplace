@@ -73,6 +73,12 @@ const STYLE: &str = "<style>#alo-chat{position:fixed;right:1rem;bottom:1rem;z-in
 #alo-chat-q{flex:1;resize:none;border:1px solid var(--border,#ddd);border-radius:8px;padding:.5rem;font:inherit;background:var(--bg,#fff);color:var(--text,#1a1a1a)}\
 .alo-chat-send{background:var(--alo-chat-accent,var(--primary,#1a1a1a));color:var(--alo-chat-on-accent,var(--on-primary,#fff));border:0;border-radius:8px;padding:.5rem .9rem;font:inherit;cursor:pointer}\
 .alo-chat-hide{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}\
+.alo-chat-slot{display:inline-block;background:var(--bg,#fff);color:var(--text,#1a1a1a);border:1px solid var(--border,#ddd);border-radius:8px;padding:.25rem .6rem;margin:.1rem;font:inherit;font-size:.875rem;cursor:pointer;text-decoration:none}\
+.alo-chat-slot:focus-visible{outline:2px solid var(--primary,#1a1a1a);outline-offset:2px}\
+.alo-chat-day{margin:.35rem 0 0}\
+.alo-chat-book p{margin:.35rem 0}\
+.alo-chat-book label{display:block;font-size:.8125rem}\
+.alo-chat-book input{width:100%;box-sizing:border-box;border:1px solid var(--border,#ddd);border-radius:8px;padding:.4rem;font:inherit;background:var(--bg,#fff);color:var(--text,#1a1a1a)}\
 @media (max-width:480px){#alo-chat-panel{right:.5rem;left:.5rem;width:auto}#alo-chat[data-side=left] #alo-chat-panel{right:.5rem;left:.5rem}}</style>\n";
 
 /// The widget's behavior. Static — every word it shows is read back off the
@@ -113,6 +119,130 @@ const SCRIPT: &str = r#"<script>(function () {
     link.href = path;
     link.textContent = word("contact");
     msg.appendChild(link);
+  }
+  function anchor(parent, path, text) {
+    if (typeof path !== "string" || path.charAt(0) !== "/") { return; }
+    var line = document.createElement("p");
+    line.className = "alo-chat-cites";
+    var a = document.createElement("a");
+    a.href = path;
+    a.textContent = text;
+    line.appendChild(a);
+    parent.appendChild(line);
+  }
+  function bookedCard(msg, body) {
+    var name = typeof body.service === "string" ? body.service : "";
+    var when = typeof body.when === "string" ? body.when : "";
+    msg.textContent = word("booked") + " " + name + " — " + when;
+    anchor(msg, body.icsPath, word("bookcal"));
+    anchor(msg, body.managePath, word("bookcancel"));
+  }
+  var fieldSeq = 0;
+  function fieldRow(form, text, type, cap) {
+    var id = "alo-chat-bf-" + (++fieldSeq);
+    var row = document.createElement("p");
+    var label = document.createElement("label");
+    label.setAttribute("for", id);
+    label.textContent = text;
+    var input = document.createElement("input");
+    input.id = id;
+    input.type = type;
+    input.required = true;
+    input.maxLength = cap;
+    if (type === "text") { input.autocomplete = "name"; }
+    if (type === "email") { input.autocomplete = "email"; }
+    row.appendChild(label);
+    row.appendChild(input);
+    form.appendChild(row);
+    return input;
+  }
+  function bookForm(serviceId, at) {
+    var wrap = bubble("bot");
+    var form = document.createElement("form");
+    form.className = "alo-chat-book";
+    var nameField = fieldRow(form, word("bookname"), "text", 200);
+    var mailField = fieldRow(form, word("bookemail"), "email", 254);
+    var go = document.createElement("button");
+    go.type = "submit";
+    go.className = "alo-chat-send";
+    go.textContent = word("bookconfirm");
+    form.appendChild(go);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (busy) { return; }
+      busy = true;
+      go.disabled = true;
+      fetch("/_alo/chat/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitor: token, service: serviceId, slot: at,
+          name: nameField.value, email: mailField.value })
+      }).then(function (response) {
+        if (response.status === 429) { return { state: "rate_limited" }; }
+        return response.json();
+      }).then(function (body) {
+        busy = false;
+        var reply = bubble("bot");
+        if (body && body.state === "booked") {
+          bookedCard(reply, body);
+        } else if (body && body.state === "taken") {
+          reply.textContent = word("booktaken");
+          go.disabled = false;
+        } else if (body && body.state === "invalid" && typeof body.detail === "string") {
+          reply.textContent = body.detail;
+          go.disabled = false;
+        } else if (body && body.state === "rate_limited") {
+          reply.textContent = word("limited");
+          go.disabled = false;
+        } else {
+          reply.textContent = word("error");
+          go.disabled = false;
+        }
+        log.scrollTop = log.scrollHeight;
+      }).catch(function () {
+        busy = false;
+        go.disabled = false;
+        bubble("bot").textContent = word("error");
+      });
+    });
+    wrap.appendChild(form);
+    nameField.focus();
+    log.scrollTop = log.scrollHeight;
+  }
+  function bookingOffer(reply, body) {
+    var service = body.service && typeof body.service === "object" ? body.service : {};
+    var name = typeof service.name === "string" ? service.name : "";
+    var sid = typeof service.id === "string" ? service.id : "";
+    var days = Array.isArray(body.days) ? body.days : [];
+    var direct = body.direct === true && sid !== "";
+    var formPath = typeof body.formPath === "string" && body.formPath.charAt(0) === "/"
+      ? body.formPath : null;
+    reply.textContent = name + " — " + (days.length ? word("bookpick") : word("booknone"));
+    days.forEach(function (day) {
+      var when = typeof day.date === "string" ? day.date : "";
+      var row = document.createElement("p");
+      row.className = "alo-chat-day";
+      row.appendChild(document.createTextNode(when + " "));
+      (Array.isArray(day.times) ? day.times : []).forEach(function (time) {
+        if (typeof time.at !== "string" || typeof time.label !== "string") { return; }
+        if (direct) {
+          var slot = document.createElement("button");
+          slot.type = "button";
+          slot.className = "alo-chat-slot";
+          slot.textContent = time.label;
+          slot.addEventListener("click", function () { bookForm(sid, time.at); });
+          row.appendChild(slot);
+        } else if (formPath) {
+          var open = document.createElement("a");
+          open.className = "alo-chat-slot";
+          open.href = formPath + "?date=" + encodeURIComponent(when);
+          open.textContent = time.label;
+          row.appendChild(open);
+        }
+      });
+      reply.appendChild(row);
+    });
+    if (formPath) { anchor(reply, formPath, word("bookmore")); }
   }
   function cite(msg, list) {
     if (!list || !list.length) { return; }
@@ -181,6 +311,8 @@ const SCRIPT: &str = r#"<script>(function () {
       if (body && body.state === "answer" && typeof body.text === "string") {
         reply.textContent = body.text;
         cite(reply, body.citations);
+      } else if (body && body.state === "booking") {
+        bookingOffer(reply, body);
       } else if (body && body.state === "refusal") {
         reply.textContent = word("refusal");
         offer(reply, body.contactPath);
@@ -307,7 +439,11 @@ fn markup(
         "<div id=\"alo-chat\" data-side=\"{side}\"{auto} style=\"{accent}\" \
          data-thinking=\"{thinking}\" data-sources=\"{sources}\" \
          data-refusal=\"{refusal}\" data-unavailable=\"{unavailable}\" data-contact=\"{contact}\" \
-         data-limited=\"{limited}\" data-error=\"{error}\">\n\
+         data-limited=\"{limited}\" data-error=\"{error}\" \
+         data-bookpick=\"{bookpick}\" data-bookmore=\"{bookmore}\" data-booknone=\"{booknone}\" \
+         data-bookconfirm=\"{bookconfirm}\" data-booked=\"{booked}\" data-bookcal=\"{bookcal}\" \
+         data-bookcancel=\"{bookcancel}\" data-booktaken=\"{booktaken}\" \
+         data-bookname=\"{bookname}\" data-bookemail=\"{bookemail}\">\n\
          <button type=\"button\" id=\"alo-chat-open\" aria-expanded=\"{expanded}\" \
          aria-controls=\"alo-chat-panel\">{icon}{open}</button>\n\
          <section id=\"alo-chat-panel\" role=\"dialog\" aria-label=\"{title}\"{hidden}>\n\
@@ -338,6 +474,16 @@ fn markup(
         contact = esc(strings.chat_contact),
         limited = esc(strings.chat_rate_limited),
         error = esc(strings.chat_error),
+        bookpick = esc(strings.chat_book_pick),
+        bookmore = esc(strings.chat_book_more),
+        booknone = esc(strings.chat_book_none),
+        bookconfirm = esc(strings.chat_book_confirm),
+        booked = esc(strings.chat_book_booked),
+        bookcal = esc(strings.booking_add_calendar),
+        bookcancel = esc(strings.booking_cancel),
+        booktaken = esc(strings.chat_book_taken),
+        bookname = esc(strings.form_name),
+        bookemail = esc(strings.form_email),
         open = esc(strings.chat_open),
         title = esc(name),
         close = esc(strings.chat_close),
@@ -445,21 +591,25 @@ mod tests {
 
     /// The widget is inlined into every published page of an assistant-on
     /// site, so it gets a byte ceiling like the page's other scripts — held
-    /// even with every appearance field at its cap.
+    /// even with every appearance field at its cap. Raised once (10 KiB →
+    /// 17 KiB) when the booking flow landed in the script (S3.03b): offering
+    /// real free times, the in-chat name/email form, and the confirmation
+    /// card are ~5.4 KiB the assistant-on page pays for the visitor being
+    /// able to book without leaving the conversation.
     #[test]
     fn the_widget_stays_within_its_byte_budget() {
         let default = SiteChatAppearance::default();
         for strings in [&EN, &FR, &NL] {
             let bare = fragment(strings, &default);
             assert!(
-                bare.len() < 10240,
+                bare.len() < 17408,
                 "default widget fragment is {} bytes for {}",
                 bare.len(),
                 strings.lang
             );
             let maxed = fragment(strings, &maximal());
             assert!(
-                maxed.len() < 14336,
+                maxed.len() < 21504,
                 "maximal widget fragment is {} bytes for {}",
                 maxed.len(),
                 strings.lang

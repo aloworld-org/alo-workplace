@@ -10,6 +10,19 @@ contracts.
 
 ## Unreleased
 
+- **Visitors can now book an appointment inside the site assistant's
+  conversation — and undo it themselves.** When someone asks the assistant
+  to book, it offers your published services and their *real* free times
+  (read from your calendar's spans-only seam, never guessed), takes the
+  reservation with the same double-booking protection as the booking page,
+  and answers with a confirmation card: an "Add to your calendar" file for
+  the visitor's own calendar, and a cancellation link that frees the slot
+  and removes the event from yours. The assistant can only ever offer this
+  one act — that it cannot pay, invoice, discount, or promise anything is
+  enforced in the code that parses its replies, not in the prompt — and the
+  booking-page confirmation now carries the same calendar file and
+  cancellation link.
+
 - **Your calendar now tells your website even less.** When a visitor looks
   at free appointment times — on a booking page today, in the site
   assistant's conversation next — the calendar behind the service answers

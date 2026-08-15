@@ -189,7 +189,19 @@ pub(super) async fn book(
                 "{} {} — {when}. {}",
                 EN.booking_booked_text, reserved.booking_name, EN.form_back_hint
             );
-            message_page(StatusCode::OK, &EN, EN.booking_booked_title, &text)
+            // The visitor's own handles on what they just booked (S3.03b):
+            // the .ics that puts it in their calendar, and the manage page
+            // that can cancel it — both behind the reservation's own token.
+            let body = format!(
+                "<p>{}</p>\n\
+                 <p><a href=\"/b/manage/{token}/calendar.ics\">{}</a></p>\n\
+                 <p><a href=\"/b/manage/{token}\">{}</a></p>\n",
+                esc(&text),
+                esc(EN.booking_add_calendar),
+                esc(EN.booking_cancel),
+                token = esc(&reserved.manage_token),
+            );
+            page(StatusCode::OK, &EN, EN.booking_booked_title, &body)
         }
         Ok(None) => super::not_found(state.unknown_host.clone()),
         Err(StoreError::Validation(reason)) => refused(StatusCode::BAD_REQUEST, &reason),

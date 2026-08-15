@@ -37,9 +37,11 @@
 mod analytics;
 mod beacon;
 mod blog;
+mod booking_manage;
 mod bookings;
 mod cache;
 pub mod chat;
+mod chat_book;
 pub mod config;
 mod conversion;
 pub mod derivative;
@@ -167,6 +169,12 @@ pub fn app(state: Arc<AppState>) -> Router {
                 .post(bookings::book)
                 .layer(DefaultBodyLimit::max(bookings::BOOKING_BODY_MAX_BYTES)),
         )
+        .route("/b/manage/{token}", get(booking_manage::show))
+        .route("/b/manage/{token}/cancel", post(booking_manage::cancel))
+        .route(
+            "/b/manage/{token}/calendar.ics",
+            get(booking_manage::calendar),
+        )
         .route(
             "/_alo/collect",
             post(beacon::collect).layer(DefaultBodyLimit::max(beacon::BEACON_BODY_MAX_BYTES)),
@@ -174,6 +182,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route(
             "/_alo/chat",
             post(chat::ask).layer(DefaultBodyLimit::max(chat::CHAT_BODY_MAX_BYTES)),
+        )
+        .route(
+            "/_alo/chat/book",
+            post(chat_book::book).layer(DefaultBodyLimit::max(chat::CHAT_BODY_MAX_BYTES)),
         )
         .fallback(serve_site)
         .with_state(state)
