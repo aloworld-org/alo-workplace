@@ -10,6 +10,18 @@ contracts.
 
 ## Unreleased
 
+- **An agent now looks in its own product, and not through everything you
+  own.** Ask the Mail agent about a customer and it reads your correspondence
+  and your address book; ask the Agenda agent and it reads your diary; ask the
+  Chat agent and it reads the rooms you are already in. None of them is handed
+  your files, and no agent is handed anything from a product that is not its
+  own — where before every agent was given the same eight results from one
+  search across your whole workspace, whatever it was the agent of. The
+  business agents — Billing, CRM, Projects, Finance, Inventory, People — look
+  their records up as they answer instead, so a stock question is answered from
+  stock rather than from something in your inbox that happened to mention it.
+  "Ask alo" is unchanged: it is still the one assistant that looks everywhere.
+
 - **An agent now belongs to a product, and only does that product's work.** Each
   agent is created as the agent *of* something — Mail, Agenda, Inventory, People
   and so on — and is given that product's tools and no others. Ask the Inventory

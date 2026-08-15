@@ -429,3 +429,145 @@ product's records rather than one shared `workspace_search_terms`, with Ask alo
 keeping the workspace-wide view. The seam it needs is already in place: `Turn`
 and `AgentAsk` both carry the product, and `agent_product.rs` is the one table a
 per-product retrieval belongs in.
+
+---
+
+## A1.3 — an agent looks in its own product, and Ask alo alone looks everywhere (2026-08-15)
+
+**Shipped and gated.** Grounding is now a property of the product, read from one
+table, and the Inventory agent is no longer handed eight of the asker's emails.
+
+**What shipped.**
+
+- **The table.** `platform/alo-store/src/agent_ground.rs` — `GroundSource` and
+  `sources_for(product)`, one row per product, plus
+  `AccountStore::agent_ground(product, question, limit)`. Mail grounds in the
+  asker's mailbox **and** their address book (which is why it has
+  `find_contact`), Agenda in their diary, Tasks in their tasks, Chat in the rooms
+  they are in, Drive in their files. `AgentProduct::Workspace` — and only it —
+  delegates straight back to `workspace_search_terms`, so "Ask alo" keeps the
+  workspace-wide view ADR 0034 gave it.
+- **The three shared queries stopped being one blob.** `search.rs` kept
+  `workspace_search_terms`' behaviour exactly, but its Drive, Tasks and Mail
+  halves are now `drive_term_hits` / `task_term_hits` / `mail_term_hits`, so
+  per-product grounding draws on the same access predicate rather than a second
+  copy of it. `keywords` is `pub(crate)` for the same reason: one reduction of a
+  question to its content words, not two that can disagree.
+- **The three new queries each carry their module's own predicate**, never a
+  widened one. Contacts is `user_id`-scoped as every contacts read is. Events use
+  `calendar::visible_pred()` — the calendar module's own "owner or a grant", so a
+  colleague's diary is reachable here exactly when it is reachable in the app —
+  and are ordered by **proximity to now** rather than by when they were written,
+  because "the meeting" means the next one. Chat reuses `search_messages`'
+  predicate verbatim (a member of the room, or a public unarchived room), so a
+  private channel the asker is not in can never ground a turn.
+- **Both callers moved.** `chat_agent.rs` grounds on `agent.product`;
+  `agent.rs`'s `POST /ai/agent` states `Workspace` explicitly, so the palette's
+  workspace-wide view is a decision in the code rather than the absence of one.
+- **The prompt was told.** `render_sources` says "chat message" and "calendar
+  event" instead of the bare stored word, and a product with tools but no
+  retrieval now carries `GROUND_BY_TOOL`: *"Nothing in your product is searched
+  for you… reach those with one of your reading tools."* Without it an empty
+  source list reads to the model as "there is nothing", which is the wrong
+  answer to a stock question. It is rendered off `agent_ground`'s own table, so
+  the prompt and the retrieval cannot drift.
+
+**The scope cut, and why it is the safe reading rather than the small one.**
+
+Nine products ground in **nothing**: Billing, CRM, Projects, Finance, Inventory,
+People, and (having no tools yet either) Insights, Meet, Sites. That is
+deliberate and it is narrower than what they had, never wider.
+`user_modules.rs` says in its own header that it *narrows and never widens* —
+"Finance still wants an admin or an accountant, People still wants the HR role"
+— and those gates live on the routes, not in a search predicate. Adding a
+keyword query over `fin_expenses` or `hr_employees` here would be a **second
+door into role-gated records**, reachable by anybody who can name an agent in a
+room. So those products reach their records the way ADR 0047 decided they
+should: through a reading tool, executed inside the turn, carrying the module's
+own gate with it. `stock_answer` is how the Inventory agent learns about stock.
+
+What is genuinely owed later, and is not this item: retrieval for the business
+products, once each has a read whose access predicate can be stated as exactly
+as the five above. It belongs beside A1.5 (module access) and A2.x (each
+agent's own reads), not in a retrieval file that would have to re-derive six
+role gates. Flagged here rather than left implied.
+
+**How verified.**
+
+- `cargo fmt` clean. `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-ai -p
+  alo-jmap --all-targets` — zero errors, zero new warnings (the same two
+  pre-existing `type_complexity` warnings at `alo-store/src/meet.rs:185` and
+  `:319`, another track's file, untouched).
+- **`cargo nextest run -p alo-store` — 1930/1930 green** (55 s), including the
+  new `platform/alo-store/tests/agent_ground.rs`:
+  - `each_product_grounds_in_its_own_records_and_no_others` files the word
+    "pangolin" into a file, a task, an email, a contact, a diary entry and a
+    room in **one** workspace, then asserts each product's agent is shown exactly
+    its own: Mail `[message, contact]`, Drive `[file]`, Tasks `[task]`, Agenda
+    `[event]`, Chat `[chat]`, Ask alo `[file, task, message]` and identical to
+    `workspace_search_terms`. The nine by-tool products are shown **none of the
+    six**.
+  - the **mandatory wrong-tenant test**,
+    `grounding_is_never_another_tenants_and_never_a_colleagues`: over five
+    products at once, Anna finds her own records, her colleague Bob in the same
+    tenant finds nothing, and Dana in another tenant finds nothing.
+  - `a_chat_agent_never_grounds_in_a_room_the_asker_is_not_in`: a private room
+    grounds Anna's turn and not Bob's.
+  - `an_empty_question_grounds_in_nothing` — including a pure stop-word question,
+    which grounds on the phrase itself and so matches nothing rather than
+    everything.
+- `cargo nextest run -p alo-ai` — **119/119 green**, including
+  `only_a_product_with_tools_but_no_retrieval_is_told_to_look_it_up`, which
+  checks the prompt sentence against `sources_for` over all fifteen products, and
+  `the_product_scoped_kinds_are_rendered_as_words`.
+- **On the wire**, in a real room, against the local backend, with a scripted
+  local socket as the model (no external call), in
+  `products/mail/alo-jmap/tests/agent_reads_answer_http.rs`. One workspace holds
+  a Drive file `pangolin report.docx` **and** an email `the pangolin account`;
+  the question is the same both times.
+  - `a_mail_agents_grounding_is_its_own_records_and_holds_no_drive_rows` — asked
+    `@mail what about the pangolin?`, the agent answers "They wrote about it last
+    week [1]." and the model's request body is asserted to **contain** `the
+    pangolin account` and to **not contain** `pangolin report.docx`. That is the
+    sentence the queue item asks for, checked on the actual request.
+  - `an_inventory_agent_is_grounded_in_nothing_and_told_to_look_it_up` — asked
+    the same question, the Inventory agent's request body contains **neither**
+    record, and does contain `Nothing in your product is searched for you`. The
+    same test then calls `POST /ai/agent` in the same workspace and asserts Ask
+    alo's `sources` still carry **both** titles: the one agent that looks
+    everywhere still does.
+- **`cargo nextest run -p alo-jmap -p alo-ai --no-fail-fast` — 1182/1183** (143 s
+  after a 3 m 45 s cold build), the one failure being the sites track's known
+  `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`. Re-run alone
+  and confirmed to be the same clock-resolution flake reported in the A1.1 entry,
+  with the digits visible this time: left `…17.53595`, right `…17.5359505` —
+  Windows' 100 ns clock against Postgres' microsecond `timestamptz`. Their file,
+  reported and not touched.
+
+**Cuts / flags.**
+
+- **No migration and no new route**, so nothing is owed to the production
+  Caddyfile and the sites loop's `03xx` block is untouched. The only
+  contract-shaped change is that `SearchHit.kind` can now be `contact`, `event`
+  or `chat` — and only for a product agent in chat, which has no UI yet.
+  `POST /ai/agent` (the palette, the only surface a browser reads `sources`
+  from) is `Workspace`-scoped and so returns exactly the three kinds it always
+  did. No `web/src/**` file was opened.
+- No i18n line: nothing user-facing was added. `GROUND_BY_TOOL` is prompt text
+  read by the model, which is where every other prompt string in `alo-ai` lives.
+- **Environment, unchanged from the last entry and still worth stating.** Docker
+  is still unresponsive and the test Postgres on **5433** is still refused, so
+  every command ran against `alo_agents_test` on the live **5432** server. C: is
+  at **100%, 4.1 GB free** all through; every command carried
+  `CARGO_PROFILE_TEST_DEBUG=0`, without which `alo-jmap` cannot link on this box.
+  `scripts/prune-test-db.sh` still cannot run (its first statement is a `docker
+  exec`) — the suites finished in 55 s and 143 s, so the database has not bloated.
+- The two test-binary builds (`alo-store`, then `alo-jmap`+`alo-ai`) used the
+  LOOP-sanctioned background+marker form and took 3 m 09 s and 3 m 45 s; every
+  test run itself was **foreground**.
+
+**Next:** A1.4 — a one-to-one with an agent: the `agent_dm` channel kind ADR 0048
+decided (nullable `agent_id`, partial unique index over `(tenant_id, agent_id,
+created_by)`, `dm_key` left NULL), store and API only. Check the migrations
+directory again immediately before committing: this track's block is `04xx` and
+`0401` is the highest of ours so far; the sites loop is climbing through `03xx`.
