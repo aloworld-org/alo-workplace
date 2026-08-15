@@ -30,6 +30,7 @@ pub(super) async fn serve(
     path: &str,
     query: Option<&str>,
     themed_not_found: String,
+    widget: Option<&str>,
 ) -> Response {
     let theme = SiteTheme::from_stored(resolved.theme.clone());
     let base_url = format!("https://{public_host}");
@@ -84,13 +85,16 @@ pub(super) async fn serve(
         if requested_page > total_pages {
             return not_found(themed_not_found);
         }
-        return dynamic_html(render_index(
-            &context,
-            &page.posts,
-            BlogPagination {
-                current_page: requested_page,
-                total_pages,
-            },
+        return dynamic_html(super::widget::maybe_inject(
+            render_index(
+                &context,
+                &page.posts,
+                BlogPagination {
+                    current_page: requested_page,
+                    total_pages,
+                },
+            ),
+            widget,
         ));
     }
 
@@ -117,12 +121,15 @@ pub(super) async fn serve(
     };
     let date = stored.post.published_at.date().to_string();
     let card = to_card(&stored.post, &date);
-    dynamic_html(render_blog_post(
-        &context,
-        &BlogArticle {
-            card,
-            body_html: &body,
-        },
+    dynamic_html(super::widget::maybe_inject(
+        render_blog_post(
+            &context,
+            &BlogArticle {
+                card,
+                body_html: &body,
+            },
+        ),
+        widget,
     ))
 }
 

@@ -8,6 +8,9 @@ publish.workspace = true
 
 [dependencies]
 alo-store = { path = "../../../platform/alo-store" }
+# The visitor assistant's answering pipeline (S3.02e): deterministic
+# retrieval + the tenant-configured model call, held to the citation rule.
+alo-ai = { path = "../../../platform/alo-ai" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }

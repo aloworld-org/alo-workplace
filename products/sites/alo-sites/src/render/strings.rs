@@ -153,6 +153,31 @@ pub struct UiStrings {
     pub protected_wrong: &'static str,
     /// Protected page: shown when too many attempts came from one visitor.
     pub protected_rate_limited: &'static str,
+    /// Assistant widget: launcher button text (also its accessible name).
+    pub chat_open: &'static str,
+    /// Assistant widget: dialog heading.
+    pub chat_title: &'static str,
+    /// Assistant widget: accessible label of the close button.
+    pub chat_close: &'static str,
+    /// Assistant widget: label and placeholder of the question field.
+    pub chat_question: &'static str,
+    /// Assistant widget: send button text.
+    pub chat_send: &'static str,
+    /// Assistant widget: shown while an answer is on its way.
+    pub chat_thinking: &'static str,
+    /// Assistant widget: prefix before an answer's source links.
+    pub chat_sources: &'static str,
+    /// Assistant widget: shown when the assistant will not answer — it only
+    /// answers what the published site itself supports (ADR 0040 §1).
+    pub chat_refusal: &'static str,
+    /// Assistant widget: shown when the assistant cannot answer right now.
+    pub chat_unavailable: &'static str,
+    /// Assistant widget: link text to the site's contact page.
+    pub chat_contact: &'static str,
+    /// Assistant widget: shown when the visitor asked too quickly.
+    pub chat_rate_limited: &'static str,
+    /// Assistant widget: shown on a network or server failure.
+    pub chat_error: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -225,6 +250,18 @@ pub const EN: UiStrings = UiStrings {
     protected_open: "Open page",
     protected_wrong: "That password does not open this page.",
     protected_rate_limited: "Too many attempts. Please wait a few minutes and try again.",
+    chat_open: "Ask us",
+    chat_title: "Ask us anything",
+    chat_close: "Close",
+    chat_question: "Your question",
+    chat_send: "Send",
+    chat_thinking: "Looking that up…",
+    chat_sources: "From:",
+    chat_refusal: "I can only answer from what is published on this site, and I could not find that.",
+    chat_unavailable: "The assistant is not available right now.",
+    chat_contact: "Use the contact page instead",
+    chat_rate_limited: "Please wait a moment before asking again.",
+    chat_error: "Something went wrong. Please try again.",
 };
 
 /// French renderer chrome.
@@ -297,6 +334,18 @@ pub const FR: UiStrings = UiStrings {
     protected_open: "Ouvrir la page",
     protected_wrong: "Ce mot de passe n’ouvre pas cette page.",
     protected_rate_limited: "Trop de tentatives. Patientez quelques minutes et réessayez.",
+    chat_open: "Posez votre question",
+    chat_title: "Posez-nous vos questions",
+    chat_close: "Fermer",
+    chat_question: "Votre question",
+    chat_send: "Envoyer",
+    chat_thinking: "Je cherche…",
+    chat_sources: "Source :",
+    chat_refusal: "Je ne peux répondre qu’à partir de ce qui est publié sur ce site, et je n’ai rien trouvé à ce sujet.",
+    chat_unavailable: "L’assistant n’est pas disponible pour le moment.",
+    chat_contact: "Passez plutôt par la page de contact",
+    chat_rate_limited: "Patientez un instant avant de poser une autre question.",
+    chat_error: "Une erreur est survenue. Veuillez réessayer.",
 };
 
 /// Dutch renderer chrome.
@@ -369,6 +418,18 @@ pub const NL: UiStrings = UiStrings {
     protected_open: "Pagina openen",
     protected_wrong: "Dit wachtwoord opent deze pagina niet.",
     protected_rate_limited: "Te veel pogingen. Wacht een paar minuten en probeer opnieuw.",
+    chat_open: "Stel uw vraag",
+    chat_title: "Stel ons uw vraag",
+    chat_close: "Sluiten",
+    chat_question: "Uw vraag",
+    chat_send: "Versturen",
+    chat_thinking: "Even opzoeken…",
+    chat_sources: "Bron:",
+    chat_refusal: "Ik kan alleen antwoorden op basis van wat op deze site gepubliceerd is, en daarover heb ik niets gevonden.",
+    chat_unavailable: "De assistent is momenteel niet beschikbaar.",
+    chat_contact: "Gebruik liever de contactpagina",
+    chat_rate_limited: "Wacht even voordat u een nieuwe vraag stelt.",
+    chat_error: "Er ging iets mis. Probeer het opnieuw.",
 };
 
 /// Renderer chrome for a normalized locale. Region variants inherit their

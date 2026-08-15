@@ -6,20 +6,35 @@
 //! the response is a typed `unavailable` carrying the path of the site's own
 //! published contact page, so the widget can offer a human instead.
 //!
-//! The answering pipeline itself (retrieval + the model call built in
-//! `alo-ai::site_chat`) is wired in the widget slice (S3.02e): until then a
-//! question that passes every gate receives the same honest `unavailable`,
-//! because with no configured model the assistant *is* unavailable. That
-//! branch — and only that branch — is where the pipeline call lands.
+//! Past the gates sits the answering pipeline (S3.02e): deterministic
+//! retrieval over the site's published grounding corpus plus the tenant's
+//! own configured model backend (`alo-ai::site_chat`), held to ADR 0040 §1's
+//! rule — an answer that cannot cite is a refusal, and every delivered
+//! answer names the published pages it came from. Spend is recorded against
+//! the site's monthly ceiling only when the model was actually contacted: an
+//! off-topic question refuses at retrieval and costs the tenant nothing.
 //!
 //! Wire contract: an unknown host and a site whose assistant is off are the
 //! same generic 404 as any other miss (no existence leak). A malformed body,
 //! an invalid visitor token, and an empty or oversized question are 400 (413
 //! when the body itself exceeds the route's cap); a rate-limited client is
 //! 429 with `Retry-After`. Everything else is 200 with a JSON state object,
-//! `no-store`. Privacy: the visitor token and client address key the
-//! in-memory limiters transiently ([`super::rate`]) and are never stored or
-//! logged.
+//! `no-store`:
+//!
+//! - `{"state":"answer","text":…,"citations":[{"title":…,"path":…}]}` — a
+//!   cited answer; `path` is site-relative, or `null` for a knowledge
+//!   document (which has no public URL and is named by title alone).
+//! - `{"state":"refusal","contactPath":…}` — the assistant will not answer
+//!   this question (nothing retrievable, an uncited reply, or the model's
+//!   own refusal — deliberately indistinguishable to a stranger).
+//! - `{"state":"unavailable","contactPath":…}` — the ceiling is spent, no
+//!   backend is configured, or the backend failed; the widget offers the
+//!   site's contact page instead.
+//!
+//! Privacy: the visitor token and client address key the in-memory limiters
+//! transiently ([`super::rate`]) and are never stored or logged; the
+//! question itself is sent to the tenant's configured backend and nowhere
+//! else, and is never logged either.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -32,6 +47,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use serde_json::json;
 
+use alo_ai::{SiteChatError, SiteChatRefusal, SiteChatReply};
 use alo_store::{ChatGate, PublishedSite, chat_month_key};
 use time::OffsetDateTime;
 
@@ -141,15 +157,141 @@ pub(super) async fn ask(State(state): State<Arc<AppState>>, request: Request) ->
         // Off is indistinguishable from nonexistent — the widget only ships
         // on sites whose assistant is on, so a 404 here is only ever a probe.
         ChatGate::Disabled => super::not_found(state.unknown_host.clone()),
-        // The ceiling is spent, and — until S3.02e wires the answering
-        // pipeline into the Ready arm below — an unconfigured model is the
-        // same honest state: unavailable, with a human offered instead.
-        ChatGate::Exhausted | ChatGate::Ready { .. } => {
-            let contact_path = contact_path(&state, &resolved).await;
+        // The ceiling is spent: unavailable, with a human offered instead
+        // (never a quiet degradation — ADR 0040 §3).
+        ChatGate::Exhausted => unavailable_state(&state, &resolved).await,
+        ChatGate::Ready { .. } => answer(&state, &resolved, question, &month).await,
+    }
+}
+
+/// What one answered question costs the tenant's monthly ceiling, as an
+/// estimate in euro cents: the ceiling is spend, not tokens (ADR 0040 §3),
+/// and the OpenAI-compatible wire reports no price — so the estimate errs
+/// simple and predictable. The €10.00 default ceiling buys ~1000 answers a
+/// month; an operator with real per-token prices can revisit the constant.
+pub const CHAT_SPEND_PER_QUESTION_CENTS: i64 = 1;
+
+/// The Ready arm: retrieval over the published corpus, the tenant's own
+/// model backend, and the citation rule — with spend recorded exactly when
+/// the backend was actually contacted.
+async fn answer(
+    state: &Arc<AppState>,
+    site: &PublishedSite,
+    question: &str,
+    month: &str,
+) -> Response {
+    let config = match state.store.tenant_ai_config(site).await {
+        Ok(Some(row)) => alo_ai::AiConfig {
+            base_url: row.base_url,
+            model: row.model,
+            api_key: row.api_key,
+            enabled: row.enabled,
+        },
+        // No configured backend: the assistant is honestly unavailable.
+        Ok(None) => return unavailable_state(state, site).await,
+        Err(error) => {
+            tracing::error!(site = %site.site, %error, "chat backend config read failed");
+            return unavailable_state(state, site).await;
+        }
+    };
+    let corpus = match state.store.site_grounding_corpus(site).await {
+        Ok(corpus) => corpus,
+        Err(error) => {
+            tracing::error!(site = %site.site, %error, "chat corpus read failed");
+            return unavailable_state(state, site).await;
+        }
+    };
+    match alo_ai::answer_site_question(&config, question, &corpus).await {
+        Ok(SiteChatReply::Answer { text, citations }) => {
+            record_spend(state, site, month).await;
+            let citations: Vec<serde_json::Value> = citations
+                .iter()
+                .map(|citation| {
+                    json!({
+                        "title": citation.title,
+                        "path": alo_ai::citation_path(&citation.citation, &site.default_locale),
+                    })
+                })
+                .collect();
             state_json(
                 StatusCode::OK,
-                json!({"state": "unavailable", "contactPath": contact_path}),
+                json!({"state": "answer", "text": text, "citations": citations}),
             )
+        }
+        Ok(SiteChatReply::Refusal(refusal)) => {
+            // An off-topic question refused at retrieval never reached the
+            // backend and costs nothing; the model's own refusals did.
+            if !matches!(refusal, SiteChatRefusal::NoSources) {
+                record_spend(state, site, month).await;
+            }
+            let contact_path = contact_path(state, site).await;
+            state_json(
+                StatusCode::OK,
+                json!({"state": "refusal", "contactPath": contact_path}),
+            )
+        }
+        // Belt over the route's own validation.
+        Err(SiteChatError::EmptyQuestion | SiteChatError::QuestionTooLong) => {
+            state_json(StatusCode::BAD_REQUEST, json!({"state": "invalid"}))
+        }
+        // Disabled, unconfigured, or unreachable: nothing was billed.
+        Err(SiteChatError::Inference(error)) => {
+            tracing::warn!(site = %site.site, %error, "chat backend call failed");
+            unavailable_state(state, site).await
+        }
+        // The backend answered (and billed) but out of contract.
+        Err(error) => {
+            tracing::warn!(site = %site.site, %error, "chat reply was out of contract");
+            record_spend(state, site, month).await;
+            unavailable_state(state, site).await
+        }
+    }
+}
+
+/// The typed `unavailable`, always carrying the site's own contact page when
+/// it has one — the graceful refusal ADR 0040 §3 requires.
+async fn unavailable_state(state: &Arc<AppState>, site: &PublishedSite) -> Response {
+    let contact_path = contact_path(state, site).await;
+    state_json(
+        StatusCode::OK,
+        json!({"state": "unavailable", "contactPath": contact_path}),
+    )
+}
+
+/// Adds one question's estimated cost to the site's monthly ledger. A failed
+/// write is logged and never fails the visitor's answer: the ceiling is an
+/// abuse bound, not an accounting system, and the gate re-reads live truth
+/// on the next question.
+async fn record_spend(state: &Arc<AppState>, site: &PublishedSite, month: &str) {
+    if let Err(error) = state
+        .store
+        .record_chat_spend(site, month, CHAT_SPEND_PER_QUESTION_CENTS)
+        .await
+    {
+        tracing::error!(site = %site.site, %error, "chat spend record failed");
+    }
+}
+
+/// Whether `site`'s published pages should carry the assistant widget right
+/// now: yes for an assistant that is on — including one whose ceiling is
+/// currently spent, which must say it is unavailable rather than vanish —
+/// and no bytes at all otherwise. Enablement is live state read per request
+/// (like page protection), never frozen with the publish. A read failure
+/// serves the page without the widget: the page always comes first.
+pub(super) async fn widget_if_on(
+    state: &Arc<AppState>,
+    site: &PublishedSite,
+    locale: &str,
+) -> Option<String> {
+    let month = chat_month_key(OffsetDateTime::now_utc());
+    match state.store.chat_gate(site, &month).await {
+        Ok(ChatGate::Disabled) => None,
+        Ok(ChatGate::Ready { .. } | ChatGate::Exhausted) => {
+            Some(super::widget::fragment(crate::render::strings_for(locale)))
+        }
+        Err(error) => {
+            tracing::error!(site = %site.site, %error, "chat widget gate read failed");
+            None
         }
     }
 }

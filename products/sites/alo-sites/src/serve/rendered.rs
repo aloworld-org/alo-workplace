@@ -247,6 +247,14 @@ impl RenderedSite {
         self.page_ids.get(path).map(String::as_str)
     }
 
+    /// The exact language of the page at `path`, if the publish has one
+    /// there — what per-request chrome (the assistant widget) localizes by,
+    /// so it speaks the language of the page it stands on.
+    #[must_use]
+    pub fn page_locale(&self, path: &str) -> Option<&str> {
+        self.page_locales.get(path).map(String::as_str)
+    }
+
     /// The unlock screen for the page at `path`, in that page's own language.
     /// Rendered per request rather than frozen with the publish because
     /// protection is live state: a password can be set, changed, or lifted

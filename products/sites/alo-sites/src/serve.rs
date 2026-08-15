@@ -53,6 +53,7 @@ mod orders;
 pub mod rate;
 mod rendered;
 mod unlock;
+mod widget;
 
 use std::sync::Arc;
 
@@ -456,6 +457,8 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
     }
 
     if path == "/blog" || path.starts_with("/blog/") {
+        // Blog chrome is in the site's default language, and so is its widget.
+        let assistant = chat::widget_if_on(&state, &resolved, &resolved.default_locale).await;
         let response = blog::serve(
             &state,
             &resolved,
@@ -463,6 +466,7 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
             path,
             req.uri().query(),
             site.not_found.clone(),
+            assistant.as_deref(),
         )
         .await;
         return analytics::record_html_view(&state, &resolved, path, analytics_visit, response)
@@ -505,17 +509,34 @@ async fn serve_site(State(state): State<Arc<AppState>>, req: Request) -> Respons
         }
     }
 
+    // Whether the assistant widget rides on this response — live state, so
+    // it joins the ETag below: bytes stay a pure function of the validator.
+    let mut with_assistant = false;
     let (content_type, body) = if path == "/assets/site.css" {
         ("text/css; charset=utf-8", site.css.clone())
     } else if let Some(page) = site.page(path) {
-        ("text/html; charset=utf-8", page.to_owned())
+        let locale = site.page_locale(path).unwrap_or(&resolved.default_locale);
+        let body = match chat::widget_if_on(&state, &resolved, locale).await {
+            Some(assistant) => {
+                with_assistant = true;
+                widget::inject(page.to_owned(), &assistant)
+            }
+            None => page.to_owned(),
+        };
+        ("text/html; charset=utf-8", body)
     } else {
         tracing::debug!(host = %public_host, "no page at requested path");
         return not_found(site.not_found.clone());
     };
 
-    // Strong ETag: bytes are a pure function of (publish, path).
-    let etag = format!("\"{}:{path}\"", site.publish.as_str());
+    // Strong ETag: bytes are a pure function of (publish, path) — plus the
+    // widget marker, so switching the assistant on or off revalidates
+    // cleanly instead of 304-ing a browser onto the wrong variant.
+    let etag = if with_assistant {
+        format!("\"{}:{path}:c\"", site.publish.as_str())
+    } else {
+        format!("\"{}:{path}\"", site.publish.as_str())
+    };
     if if_none_match_hits(req.headers().get(header::IF_NONE_MATCH), &etag) {
         let response = cacheable(StatusCode::NOT_MODIFIED, content_type, &etag, String::new());
         return analytics::record_html_view(&state, &resolved, path, analytics_visit, response)

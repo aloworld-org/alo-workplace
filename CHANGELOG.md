@@ -10,6 +10,18 @@ contracts.
 
 ## Unreleased
 
+- **Your website's assistant now answers visitors, on the page.** Switch the
+  assistant on and every published page of your site carries a small "Ask us"
+  button in your site's own colours; visitors ask in their language, and the
+  assistant answers only from what you have published — every answer names
+  the page it came from, as a link, and when it cannot back an answer with
+  your own pages it says so and points at your contact page instead. Each
+  answered question counts a fixed amount against the monthly budget you set
+  (off-topic questions cost nothing), and at the budget the assistant says it
+  is unavailable rather than degrading quietly. The widget works by keyboard,
+  fits a phone screen, stores nothing about the visitor, and vanishes from
+  your pages the moment you switch it off.
+
 - **Your website's assistant now has one screen — the switch, the budget, and
   its reading list together.** Open Assistant on a website you own and switch
   it on, set the monthly budget it may spend answering visitors (pre-filled

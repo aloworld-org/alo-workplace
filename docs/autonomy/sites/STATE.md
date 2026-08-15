@@ -7428,3 +7428,80 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   seams carry those facts.
 - **Next:** S3.02e — visitor chat UI: on-site widget, keyboard-accessible,
   mobile, citations as links, and an honest empty/unavailable state.
+
+## 2026-08-15 — S3.02e the visitor asks on the page, and every answer names its page
+
+- **Item:** S3.02e — visitor chat UI (ADR 0040): on-site widget,
+  keyboard-accessible, mobile, citations as links, and an honest
+  empty/unavailable state. This is also the item the S3.02c journal assigned
+  the Ready arm to, so the answering pipeline went live with the widget that
+  needs it.
+- **What shipped:**
+  - Store, the public door (`platform/alo-store/src/site_grounding.rs` +
+    `site_chat_limits.rs`): the grounding assembly refactored into shared
+    free functions and exposed as `SitePublicStore::site_grounding_corpus`
+    — one set of corpus rules, two doors, proven byte-identical by a test —
+    plus `SitePublicStore::tenant_ai_config` (the resolved site's tenant's
+    enabled default provider, first listed model, same mapping as the
+    authenticated door's `default_ai_config`).
+  - The Ready arm (`products/sites/alo-sites/src/serve/chat.rs`): past the
+    S3.02c gates, retrieval over the published corpus → the tenant's own
+    backend via `alo-ai::answer_site_question` → the citation rule. New wire
+    states beside `unavailable`: `answer` (text + citations as
+    `{title, path}`, path site-relative via `citation_path`, null for
+    knowledge docs) and `refusal` (no sources / uncited / model declined —
+    deliberately indistinguishable to a stranger, contact page offered).
+    Spend recorded ONLY when the backend was actually contacted
+    (`CHAT_SPEND_PER_QUESTION_CENTS = 1`): an off-topic question refuses at
+    retrieval and bills nothing; an uncited reply and an out-of-contract
+    reply bill (the call happened); an unreachable backend bills nothing.
+  - The widget (`serve/widget.rs`): launcher + labelled `role="dialog"`
+    panel + `role="log"` live region + visually-labelled question field,
+    injected just inside `</body>` of every published HTML document —
+    section pages (in the page's own language) and blog index/articles (site
+    default language) — exactly while the assistant is on, Exhausted
+    included (it must be present to say it is unavailable). Style is theme
+    tokens only (`--primary`, `--surface`, …) so it wears the site's preset
+    palette (ADR 0040 §5); the script is a static constant reading its words
+    off `data-*` attributes (localized markup, en/fr/nl in the renderer's
+    `UiStrings`); answers enter the DOM via `textContent`, citations render
+    as links only for `/`-leading paths; the visitor token is random,
+    in-memory per page load, never stored. Escape closes and returns focus;
+    Enter sends; phone widths get a full-width sheet. Byte-budget test
+    (< 8 KB per locale) and one-`</script>` test pinned.
+  - Cache honesty: the widget joins the page ETag (`…:c`) so switching the
+    assistant on/off revalidates cleanly instead of 304-ing a browser onto
+    the wrong variant; enablement is read per request (like page
+    protection), never frozen with the publish.
+- **Verified:** `cargo fmt` clean; `SQLX_OFFLINE=true cargo clippy -p
+  alo-store -p alo-sites --all-targets` — zero warnings from this item (the
+  two survivors are the pre-existing `meet.rs:319` type_complexity pair).
+  `cargo nextest run -p alo-store -p alo-sites` green twice: **2 126/2 126
+  (28.3 s)** incl. the new `the_public_door_reads_the_same_corpus_and_only_
+  its_own` (public corpus == account corpus verbatim, host A never reads
+  B's strings, tenant AI config behind the same wall) and the new chat_gate
+  arcs against a **localhost fixture backend speaking the OpenAI-compatible
+  wire** (never a live model): cited answer → `{state:answer}` naming
+  "Home" at "/" + exactly one backend hit + 1 cent in the ledger; off-topic
+  → refusal with the contact path, zero hits, zero cents; uncited answer →
+  refusal, billed; dead backend → unavailable, unbilled; widget present
+  with its accessible bones exactly while the assistant is on (off → zero
+  chat bytes; exhausted → still present; ETag differs by variant; blog
+  index and article carry it; stylesheet never does).
+- **Cuts/flags:** none of the item's scope cut. Deliberate boundaries
+  journaled: the widget rides published pages and blog documents, not the
+  unlock screen, unlocked protected pages, or the themed 404. The per-answer
+  cost is a flat 1-cent estimate (the wire reports no price) — revisit when
+  an operator has real per-token prices. Test lesson re-learned: provider
+  ids are global PKs in the shared test database — a fixed id in a test
+  belongs to the first run's tenant forever; generate them. **Deploy notes
+  for the human inbox:** no new Caddy prefix (`/_alo/chat` exists since
+  S3.02c; the widget rides the pages) — but production `alo-sites` now
+  makes outbound calls to tenant-configured model backends, so its
+  container should set `ALO_AI_EGRESS=restricted` like the workspace
+  services, and the assistant stays honestly unavailable until a tenant
+  configures an AI provider.
+- **Next:** S3.02f — appearance and voice model (ADR 0040 §5): welcome
+  message, bot name/avatar, suggested questions, tone note, launcher
+  position, offline message; palette-role colour choices only, with
+  contrast-safety validation tests.

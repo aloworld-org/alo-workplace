@@ -1,11 +1,16 @@
-//! In-process integration tests of `POST /_alo/chat` (ADR 0040 §3, item
-//! S3.02c) — the assistant's cost-and-abuse gate on the public surface. The
-//! load-bearing properties: an unknown host and a site whose assistant is
-//! off (the default) are one uniform 404; a question that passes every gate
-//! is answered with the typed `unavailable` state carrying the site's own
-//! published contact page (the answering pipeline is the S3.02e seam); the
-//! per-visitor and per-IP budgets refuse with 429 + `Retry-After`; and
-//! malformed input never reaches the database gate.
+//! In-process integration tests of `POST /_alo/chat` and the on-page widget
+//! (ADR 0040, items S3.02c + S3.02e) — the assistant's cost-and-abuse gate
+//! and its answering pipeline on the public surface. The load-bearing
+//! properties: an unknown host and a site whose assistant is off (the
+//! default) are one uniform 404; with no configured backend the wire is the
+//! honest `unavailable` carrying the site's own published contact page; with
+//! a backend (a localhost fixture speaking the OpenAI-compatible wire —
+//! never a live model) a cited answer arrives naming the published page it
+//! came from and is billed against the monthly ceiling, an off-topic
+//! question refuses without ever contacting the backend, and an uncited
+//! reply becomes a refusal; the widget rides published HTML exactly when the
+//! assistant is on; the per-visitor and per-IP budgets refuse with 429 +
+//! `Retry-After`; and malformed input never reaches the database gate.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -81,7 +86,8 @@ async fn live_site(acc: &AccountStore, tag: &str) -> (SiteId, String) {
         json!({
             "schema_version": 1,
             "sections": [{"type": "hero", "heading": "Chat Co",
-                          "subheading": null, "image": null,
+                          "subheading": "We sell handmade rye bread in Ghent",
+                          "image": null,
                           "primary_cta": null, "secondary_cta": null}]
         }),
     )
@@ -165,8 +171,8 @@ async fn enabled_and_exhausted_answer_unavailable_with_the_contact_page() {
         .await
         .unwrap();
 
-    // Within budget: the gate opens, and — until S3.02e wires the answering
-    // pipeline — the honest wire state is unavailable, with a human offered.
+    // Within budget but with no configured backend: the assistant is
+    // honestly unavailable, with a human offered instead.
     let body = chat_body("What do you sell?", "visitor-bbbb0001");
     let response = post_chat(&state, &sub, "203.0.113.20", &body).await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -343,4 +349,332 @@ async fn malformed_input_never_reaches_the_gate() {
     let oversized = chat_body(&"q".repeat(CHAT_BODY_MAX_BYTES), "visitor-ffff0002");
     let response = post_chat(&state, &sub, "203.0.113.43", &oversized).await;
     assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+// ---------------------------------------------------------------------------
+// S3.02e: the answering pipeline and the on-page widget.
+// ---------------------------------------------------------------------------
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use alo_sites::serve::chat::CHAT_SPEND_PER_QUESTION_CENTS;
+use alo_store::{DriveLocation, NewDriveFile, NewSitePost};
+
+/// A localhost fixture speaking the OpenAI-compatible chat-completions wire —
+/// the model call verified structurally, never a live model (hard rail).
+/// Returns the base URL to configure and a counter of how often the backend
+/// was actually contacted.
+async fn model_backend(content: &str) -> (String, Arc<AtomicUsize>) {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let router = axum::Router::new()
+        .route(
+            "/v1/chat/completions",
+            axum::routing::post(
+                |axum::extract::State((content, hits)): axum::extract::State<(
+                    String,
+                    Arc<AtomicUsize>,
+                )>| async move {
+                    hits.fetch_add(1, Ordering::SeqCst);
+                    axum::Json(json!({
+                        "choices": [{"message": {"role": "assistant", "content": content}}]
+                    }))
+                },
+            ),
+        )
+        .with_state((content.to_owned(), Arc::clone(&hits)));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base_url = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    });
+    (base_url, hits)
+}
+
+/// Points the tenant's default AI provider at `base_url`.
+async fn configure_backend(acc: &AccountStore, base_url: &str) {
+    acc.upsert_ai_provider(
+        &format!("prov-{}", SiteId::generate().as_str()),
+        "openai_compatible",
+        "Fixture backend",
+        base_url,
+        "test-model",
+        None,
+        true,
+    )
+    .await
+    .unwrap();
+    let id = acc.list_ai_providers().await.unwrap()[0].id.clone();
+    acc.set_default_ai_provider(&id).await.unwrap();
+}
+
+/// One public GET through the real router.
+async fn get_path(state: &Arc<AppState>, sub: &str, path: &str) -> Response {
+    let request = Request::builder()
+        .method("GET")
+        .uri(path)
+        .header(header::HOST, format!("{sub}.{APEX}"))
+        .body(Body::empty())
+        .unwrap();
+    app(Arc::clone(state)).oneshot(request).await.unwrap()
+}
+
+async fn body_string(response: Response) -> String {
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    String::from_utf8(bytes.to_vec()).unwrap()
+}
+
+#[tokio::test]
+async fn a_cited_answer_names_its_page_and_is_billed() {
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "chat-answer").await;
+    let (site, sub) = live_site(&acc, "chatanswer").await;
+    let month = alo_store::chat_month_key(time::OffsetDateTime::now_utc());
+    acc.set_site_chat_settings(&site, true, 500, &month)
+        .await
+        .unwrap();
+    let (base_url, hits) =
+        model_backend(r#"{"answer":"We sell handmade rye bread.","citations":[1]}"#).await;
+    configure_backend(&acc, &base_url).await;
+
+    let response = post_chat(
+        &state,
+        &sub,
+        "203.0.113.60",
+        &chat_body("What do you sell?", "visitor-gggg0001"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let value = json_body(response).await;
+    assert_eq!(value["state"], "answer", "wire: {value}");
+    assert_eq!(value["text"], "We sell handmade rye bread.");
+    // The citation names the published page the fact lives on, as a
+    // site-relative link the widget can render.
+    assert_eq!(value["citations"][0]["title"], "Home");
+    assert_eq!(value["citations"][0]["path"], "/");
+    assert_eq!(hits.load(Ordering::SeqCst), 1, "one model round-trip");
+
+    // The question was billed against the monthly ceiling.
+    let settings = acc.site_chat_settings(&site, &month).await.unwrap();
+    assert_eq!(settings.spent_cents, CHAT_SPEND_PER_QUESTION_CENTS);
+}
+
+#[tokio::test]
+async fn off_topic_refuses_unbilled_and_uncited_refuses_billed() {
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "chat-refuse").await;
+    let (site, sub) = live_site(&acc, "chatrefuse").await;
+    let month = alo_store::chat_month_key(time::OffsetDateTime::now_utc());
+    acc.set_site_chat_settings(&site, true, 500, &month)
+        .await
+        .unwrap();
+    // This backend cannot cite: an answer with no citations.
+    let (base_url, hits) = model_backend(r#"{"answer":"Trust me on this.","citations":[]}"#).await;
+    configure_backend(&acc, &base_url).await;
+
+    // No shared vocabulary with the corpus: refused at retrieval, the
+    // backend never contacted, the tenant billed nothing — a stranger's
+    // off-topic question is free by construction.
+    let response = post_chat(
+        &state,
+        &sub,
+        "203.0.113.61",
+        &chat_body("quantum flux capacitor maintenance", "visitor-hhhh0001"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let value = json_body(response).await;
+    assert_eq!(value["state"], "refusal", "wire: {value}");
+    assert_eq!(value["contactPath"], "/contact", "a human is offered");
+    assert_eq!(hits.load(Ordering::SeqCst), 0, "no model call");
+    assert_eq!(
+        acc.site_chat_settings(&site, &month)
+            .await
+            .unwrap()
+            .spent_cents,
+        0
+    );
+
+    // On-topic, but the reply cannot cite: the ADR's rule turns it into a
+    // refusal — and the call that was made is billed.
+    let response = post_chat(
+        &state,
+        &sub,
+        "203.0.113.62",
+        &chat_body("What do you sell?", "visitor-hhhh0002"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let value = json_body(response).await;
+    assert_eq!(
+        value["state"], "refusal",
+        "an uncited answer is not delivered"
+    );
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        acc.site_chat_settings(&site, &month)
+            .await
+            .unwrap()
+            .spent_cents,
+        CHAT_SPEND_PER_QUESTION_CENTS
+    );
+}
+
+#[tokio::test]
+async fn an_unreachable_backend_is_unavailable_and_unbilled() {
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "chat-dead").await;
+    let (site, sub) = live_site(&acc, "chatdead").await;
+    let month = alo_store::chat_month_key(time::OffsetDateTime::now_utc());
+    acc.set_site_chat_settings(&site, true, 500, &month)
+        .await
+        .unwrap();
+    configure_backend(&acc, "http://127.0.0.1:1").await;
+
+    let response = post_chat(
+        &state,
+        &sub,
+        "203.0.113.63",
+        &chat_body("What do you sell?", "visitor-iiii0001"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let value = json_body(response).await;
+    assert_eq!(value["state"], "unavailable", "wire: {value}");
+    assert_eq!(value["contactPath"], "/contact");
+    assert_eq!(
+        acc.site_chat_settings(&site, &month)
+            .await
+            .unwrap()
+            .spent_cents,
+        0,
+        "an unreachable backend billed nothing"
+    );
+}
+
+#[tokio::test]
+async fn the_widget_rides_published_pages_exactly_while_the_assistant_is_on() {
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "chat-widget").await;
+    let (site, sub) = live_site(&acc, "chatwidget").await;
+    let month = alo_store::chat_month_key(time::OffsetDateTime::now_utc());
+
+    // Off (the default): zero chat bytes on the page.
+    let response = get_path(&state, &sub, "/").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let plain_etag = response.headers()[header::ETAG]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let body = body_string(response).await;
+    assert!(
+        !body.contains("alo-chat"),
+        "an off assistant ships no bytes"
+    );
+
+    // On: the widget, with its accessible bones, in the page's language.
+    acc.set_site_chat_settings(&site, true, 500, &month)
+        .await
+        .unwrap();
+    let response = get_path(&state, &sub, "/").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let widget_etag = response.headers()[header::ETAG]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert_ne!(
+        plain_etag, widget_etag,
+        "the widget joins the validator, so caches revalidate cleanly"
+    );
+    let body = body_string(response).await;
+    for needle in [
+        "id=\"alo-chat\"",
+        "aria-controls=\"alo-chat-panel\"",
+        "role=\"dialog\"",
+        "role=\"log\"",
+        "Ask us",
+    ] {
+        assert!(body.contains(needle), "missing {needle}");
+    }
+
+    // A spent ceiling does not make the widget vanish — it must be there to
+    // say it is unavailable and offer the contact page (ADR 0040 §3).
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(2)
+        .connect(&database_url())
+        .await
+        .unwrap();
+    let public = SitePublicStore::new(pool, BlobStore::in_memory(1024 * 1024));
+    let resolved = public.resolve_published(&sub).await.unwrap().unwrap();
+    public
+        .record_chat_spend(&resolved, &month, 500)
+        .await
+        .unwrap();
+    let body = body_string(get_path(&state, &sub, "/").await).await;
+    assert!(body.contains("id=\"alo-chat\""), "exhausted still shows it");
+
+    // Off again: gone again — enablement is live state, not publish state.
+    acc.set_site_chat_settings(&site, false, 500, &month)
+        .await
+        .unwrap();
+    let body = body_string(get_path(&state, &sub, "/").await).await;
+    assert!(!body.contains("alo-chat"));
+
+    // The stylesheet never carries it.
+    let css = body_string(get_path(&state, &sub, "/assets/site.css").await).await;
+    assert!(!css.contains("alo-chat-panel{position"));
+}
+
+#[tokio::test]
+async fn the_blog_carries_the_widget_too() {
+    let (store, state) = harness().await;
+    let acc = fresh_account(&store, "chat-blog").await;
+    let (site, sub) = live_site(&acc, "chatblog").await;
+    let month = alo_store::chat_month_key(time::OffsetDateTime::now_utc());
+    acc.set_site_chat_settings(&site, true, 500, &month)
+        .await
+        .unwrap();
+
+    let bytes = bytes::Bytes::from(
+        json!([
+            {"type": "paragraph", "content": [{"type": "text", "text": "Rye week.", "styles": {}}]}
+        ])
+        .to_string(),
+    );
+    let size = i64::try_from(bytes.len()).unwrap();
+    let blob = acc.put_blob(bytes, Some("application/json")).await.unwrap();
+    let doc = acc
+        .drive_create_file(
+            &DriveLocation::Personal,
+            None,
+            &NewDriveFile {
+                name: "Rye week".to_owned(),
+                blob_id: blob.as_str().to_owned(),
+                size,
+                kind: Some("doc".to_owned()),
+                ..NewDriveFile::default()
+            },
+        )
+        .await
+        .unwrap();
+    let post = acc
+        .create_site_post(
+            &site,
+            &NewSitePost {
+                doc_node_id: &doc,
+                slug: "rye-week",
+                title: "Rye week",
+                excerpt: "All about rye.",
+                cover_blob_id: None,
+            },
+        )
+        .await
+        .unwrap();
+    acc.publish_site_post(&site, &post).await.unwrap();
+
+    let index = body_string(get_path(&state, &sub, "/blog").await).await;
+    assert!(index.contains("id=\"alo-chat\""), "blog index carries it");
+    let article = body_string(get_path(&state, &sub, "/blog/rye-week").await).await;
+    assert!(article.contains("id=\"alo-chat\""), "article carries it");
 }
