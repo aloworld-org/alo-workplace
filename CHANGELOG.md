@@ -10,6 +10,22 @@ contracts.
 
 ## Unreleased
 
+- **The Websites agent can now read your site, write for it, and never puts
+  anything online by itself.** Ask it what your site says about your opening
+  hours and it answers from the version that is actually published — the pages
+  a visitor can load, your live posts, and whatever you added to the site's
+  public knowledge — and tells you plainly when the site is not live yet rather
+  than reading you something out of the draft. Ask it to draft a page and you
+  get one, in the draft, with the words in front of you before you approve it.
+  Ask it to reword a page and it rewrites the wording you point it at and
+  nothing else: where a button sends people, your pictures, your forms and any
+  code on the page are left exactly as they were. It can also go through your
+  pages and tell you what search engines will find missing — a page with no
+  description, one description that is far too long, two pages sharing a title,
+  a picture with no alt text. **Putting any of it online is one separate thing
+  you approve**, and until you do, nothing you asked it to do is visible to
+  anybody.
+
 - **Your agents are simply there now.** Open the agent list and every part of
   alo already has one — Mail, Agenda, Tasks, Chat, Drive, Billing, Sales,
   Projects, Finance, Inventory, People, Insights, Meet, Websites, and alo itself

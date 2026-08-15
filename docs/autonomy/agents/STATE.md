@@ -1187,3 +1187,182 @@ currently grounds in nothing (`agent_ground.rs`, `BY_TOOL_ONLY`), so its answers
 come through its own reading tools — the same shape Inventory has above. Check
 the migrations directory again immediately before committing: `0403` is this
 track's highest and the sites loop is climbing through `03xx`.
+
+## A2.1 — the Website agent: it reads the live site, writes into the draft, and publishes only when asked (2026-08-15)
+
+**What shipped.** The Sites agent stops being a name on an assistant with no
+tools. Six of them, in two new files and nothing else:
+
+- `platform/alo-ai/src/agent_sites.rs` — the tool set, its descriptions and its
+  guidance, on the seam every product before it uses. `SITES_TOOLS` is three
+  reads (`site_answer`, `site_page_read`, `site_seo_review`) and three writes
+  (`site_page_draft`, `site_page_edit`, `site_publish`); `agent_product.rs` now
+  answers `SITES` where it answered `NONE_YET`, so the prompt, the allowlist and
+  the execution boundary all follow from the one table.
+- `products/mail/alo-jmap/src/agent_sites.rs` — the executors, dispatched from
+  `agent.rs` beside Inventory's, every one of them through `account.acc`.
+
+Four properties are what the item is actually for, and each is a test rather
+than a sentence:
+
+- **`site_answer` reads the internet, not the draft.** It grounds in
+  `site_grounding_corpus` — the pages of the *current publish*, the live posts,
+  the deliberate public knowledge — ranked by the question's own content words,
+  five passages, each with the citation a visitor could follow. A site with no
+  publish comes back `live:false` with nothing, which the prompt tells the model
+  to say plainly.
+- **Nothing but `site_publish` publishes.** A drafted page and a rewritten
+  heading land in the draft and stop; publishing is one tool, declared a write,
+  so ADR 0047's boundary refuses it inside a turn and it runs only from the
+  owner's own tap.
+- **An agent edits the words, never the wiring.** `copy_leaves` is the
+  permission, not a listing: `site_page_edit` refuses any pointer that function
+  did not produce, so a link's `href`, an image's `blob_id`, a form's id and
+  every field of a `custom_code` block are unreachable whatever the model puts
+  in its arguments. The rewrites themselves go through `alo_ai::apply_site_edit`,
+  so a stale target is a refusal rather than an edit to whatever moved into that
+  slot.
+- **`site_page_draft` cannot carry an invented fact.** Its vocabulary is a
+  headline, a line under it, and heading/body blocks — a hero and a features
+  grid. There is no argument for a price, a person, a quote or an asset, so none
+  can arrive; the slug is derived from the title when unstated, and a title with
+  no address in it (Greek, Japanese) asks for one rather than inventing it.
+
+`site_seo_review` reports reason codes only — `noSeoDescription`,
+`seoDescriptionTooShort/TooLong`, `seoTitleTooLong`, `duplicateTitle`,
+`noHeading`, `emptyPage`, `imageWithoutAltText`, and the site's own `noPages`,
+`noHomePage`, `notPublished`. No sentence is composed in the server, and the
+description says in the model's own prompt that it may never claim a ranking, a
+position or traffic.
+
+**How verified.**
+
+- `cargo fmt -p alo-ai -p alo-jmap` clean. `SQLX_OFFLINE=true cargo clippy -p
+  alo-ai -p alo-jmap --all-targets` — zero errors, zero warnings from either
+  crate (the two pre-existing `type_complexity` warnings are in
+  `alo-store/src/meet.rs`, another track's file, untouched).
+- **`cargo nextest run -p alo-ai -p alo-jmap --no-fail-fast` — 1224/1225 green
+  in 126 s.** The one failure is the sites track's known Windows-clock issue,
+  `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`
+  (`…167685` vs `…1676857` — Windows' 100 ns clock against Postgres'
+  microsecond `timestamptz`), flagged in every entry since A1.3 and not this
+  track's file. alo-ai is 126/126; alo-jmap's lib tests are 699/699.
+- **The question, on the wire** (`agent_sites_http.rs`, five tests). The
+  transcript below is copied out of
+  `cargo nextest run -p alo-jmap --test agent_sites_http --no-capture`.
+
+```
+===== A2.1 TRANSCRIPT: @sites what are our opening hours on the website? =====
+POST /chat/channels/G6HsQYQMeybg838LLjXE_w/messages
+     {"body":"@sites what are our opening hours on the website?"}
+--- what the model was shown (call 1 of 2, user turn) ---
+Today's date is 2026-08-15. The person's timezone is unknown, so any datetime you produce is
+read as UTC — say which hour you assumed in your `say` line..
+Request: @sites what are our opening hours on the website?
+
+Sources:
+
+--- what the model replied (call 1) ---
+{"action":{"args":{"question":"opening hours"},"tool":"site_answer"},"kind":"action",
+ "say":"Let me look at what the site says."}
+--- what the model was shown (call 2 of 2, user turn) ---
+Request: @sites what are our opening hours on the website?
+
+Sources:
+[1] tool result "site_answer" — {"kind":"siteAnswer","live":true,"matched":1,"passages":[
+{"citation":{"kind":"page","locale":"en","slug":""},"text":"A bakery on Sint-Jansplein baking
+sourdough every single morning.\nJuniper Bakery\nSourdough, every morning\nVisit us\nThe bakery\n
+Opening hours\nWe open at seven and close at four, Tuesday to Sunday.\nWhere we are\nOn the corner
+of Sint-Jansplein.","title":"Home","truncated":false}],"published":1,"site":{"id":"9-8R04jTWKZ…",
+"name":"Juniper Bakery","status":"live","subdomain":"juniper-qdwqt5kom31a",…}}
+
+The last source above is the result of a tool you just ran. ANSWER the request from it now…
+--- what the model replied (call 2) ---
+{"answer":"Your site says you open at seven and close at four, Tuesday to Sunday [1].","kind":"answer"}
+--- GET /chat/channels/{id}/messages, the agent's message ---
+{"authorKind":"agent","authorEmail":"Websites","body":"Your site says you open at seven and close
+at four, Tuesday to Sunday [1].","proposal":null,…}
+--- audited: site_answer / read / ok=true ---
+===== end =====
+```
+
+The properties pinned around that exchange:
+
+- **`proposal` is `null` on every message in the room.** Asking what the site
+  says produced no button.
+- **The answer is the publish's, and the draft says something else on purpose.**
+  The fixture publishes "close at four", then edits the draft to "close at noon"
+  and adds a never-published Careers page mentioning opening hours. Neither
+  string appears anywhere in what the model was shown; "close at four" does.
+- **A drafted page waits, lands in the draft, and is not on the internet.** The
+  proposal is `pending`, the site still has two pages and no audit row while it
+  waits; the tap creates `Workshops` (slug derived, `is_home` false, hero +
+  features), and `site_grounding_corpus` still returns exactly one document,
+  none of it the new page. The result carries `"public": false`.
+- **Publishing waits for the owner.** With the proposal pending the site is
+  still `Draft` and its corpus is empty; the tap makes it `Live` with one page
+  published, audited `site_publish / write / ok=true`.
+- **An edit rewrites the words and leaves the wiring.** Two rewrites land
+  (`/heading`, `/primary_cta/label`) and `primary_cta.href` is still `/visit`;
+  an unstated `seo_title` is not cleared by setting the description; and the
+  published corpus still reads the old heading, because an edit is not a
+  publish.
+- **Wrong tenant, both ways.** The second tenant's store answers `None` for the
+  first's site, an empty page list, and `NotFound` for its corpus; its Website
+  agent, asked by name for "Juniper Bakery", is refused (`no website of yours is
+  called Juniper Bakery`), the refusal is what the model is shown, not one word
+  of the other tenant's site appears in the turn, and the attempt is audited
+  `ok=false`.
+
+**Cuts / flags.**
+
+- **Translating the site was cut, and is queued as A2.1b.** The write needs the
+  translation source the sites track assembles in `alo-jmap`'s `sites.rs`
+  (`translation_source`, private, and that file is theirs). The two ways to have
+  it were editing their file — which this queue forbids — or copying sixty lines
+  of their assembly that would then drift from it silently. A narrower slice
+  that fully works beats the listed slice half-done: the other four capabilities
+  are complete and proved. A2.1b records the honest shape — a readiness *read*
+  the agent owns, with the translating itself staying on the existing route —
+  and the prerequisite (the sites track exporting the assembly) if a write is
+  ever wanted.
+- **No migration and no store change.** `0403` remains this track's highest;
+  the sites loop is at `0323`. Deliberate: everything here is reachable through
+  store functions that already exist, and not touching `alo-store` also avoided
+  relinking its ~115 test binaries.
+- **One stale sentence left in another crate on purpose.**
+  `alo-store/src/agent_ground.rs` still says Sites has neither grounding nor
+  tools "yet (A2.1, A2.4, A3.2)". Sites now has tools and still grounds by tool
+  only, which is correct behaviour; correcting the comment costs a full
+  `alo-store` rebuild and ~40 minutes of test relinking for one line. Fold it
+  into the next item that touches `alo-store` — A2.4 (Insights) is the natural
+  one.
+- **`content_words` in the executor is a near-copy of `alo-store`'s own search
+  vocabulary**, which is `pub(crate)` there. Copied rather than exported for the
+  same rebuild reason, and because this one matches an in-memory corpus while
+  that one is composed into SQL. It has its own test.
+- **"On the wire" is the in-process router over real Postgres**, not a socket to
+  a spawned `alo-jmap` binary — this item adds no HTTP route, and the standing
+  rail forbids a live model call. Every route driven is an existing one, as a
+  real `Request` through the real router with a real bearer token, against real
+  rows. The model's words are fixtures; what is proved is what it was *shown*
+  and what the product did with its reply.
+- **Environment.** Docker is still unresponsive (`docker ps` hung past two
+  minutes, nothing listening on 5433), so `scripts/prune-test-db.sh` still
+  cannot run — its first statement is a `docker exec` — and everything ran
+  against `alo_agents_test` on the native **5432** server. The 1 225-test run
+  took 126 s, so the database has not bloated. C: was at **99%, 7.8 GB free** at
+  the top of the iteration; every command carried `CARGO_PROFILE_TEST_DEBUG=0`,
+  so no new PDBs were written. The test-binary build after the `alo-ai` change
+  did not fit one 600 s call and was finished with the sanctioned
+  condition-poll, then the suite itself ran in the foreground.
+
+**Next:** A2.2 — the Sheet agent: a formula from intent, explaining a formula,
+cleaning a column, answering from the data **with the cells cited**, and a chart
+from intent. The shape A2.1 settled is the one to copy: a tool set in
+`platform/alo-ai/src/agent_sheets.rs` (reads and writes declared in the same
+list), executors in `products/mail/alo-jmap/src/agent_sheets.rs` dispatched from
+`agent.rs`, results carrying figures and reason codes rather than sentences, and
+one integration test that asks the question in a room and reads what the model
+was shown. Check the migrations directory again immediately before committing;
+`0403` is this track's highest.
