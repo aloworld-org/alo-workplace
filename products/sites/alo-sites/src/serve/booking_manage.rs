@@ -28,8 +28,6 @@ use axum::extract::{Path, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use time::OffsetDateTime;
-use time::format_description::BorrowedFormatItem;
-use time::macros::format_description;
 
 use alo_store::{CancelOutcome, ManagedAppointment, PublishedSite, local_wall_clock};
 
@@ -37,12 +35,8 @@ use crate::render::html::esc;
 use crate::render::{UiStrings, strings_for};
 
 use super::AppState;
+use super::ics::{ics_escape, ics_fold, ics_time};
 use super::rendered::minimal_page;
-
-/// How an instant is written into an iCalendar document: UTC, second
-/// precision, the RFC 5545 `DATE-TIME` form with the `Z` designator.
-const ICS_TIME: &[BorrowedFormatItem<'static>] =
-    format_description!("[year][month][day]T[hour][minute][second]Z");
 
 /// The appointment page.
 pub(super) async fn show(
@@ -301,50 +295,6 @@ fn ics_document(
     out
 }
 
-/// An instant as an RFC 5545 UTC `DATE-TIME`.
-fn ics_time(instant: OffsetDateTime) -> String {
-    instant
-        .to_offset(time::UtcOffset::UTC)
-        .format(ICS_TIME)
-        .unwrap_or_default()
-}
-
-/// RFC 5545 §3.3.11 TEXT escaping: backslash first, then the reserved
-/// separators; a newline becomes the literal `\n`.
-fn ics_escape(text: &str) -> String {
-    text.replace('\\', "\\\\")
-        .replace(';', "\\;")
-        .replace(',', "\\,")
-        .replace('\r', "")
-        .replace('\n', "\\n")
-}
-
-/// RFC 5545 §3.1 line folding: content lines longer than 75 octets are split
-/// with CRLF + one space, always on a character boundary so no UTF-8
-/// sequence is ever cut.
-fn ics_fold(line: &str) -> String {
-    const LIMIT: usize = 74;
-    if line.len() <= LIMIT {
-        return line.to_owned();
-    }
-    let mut out = String::with_capacity(line.len() + line.len() / LIMIT * 3);
-    let mut budget = LIMIT;
-    let mut used = 0;
-    for c in line.chars() {
-        let width = c.len_utf8();
-        if used + width > budget {
-            out.push_str("\r\n ");
-            // A continuation line starts with the fold space, which counts
-            // against its 75 octets.
-            budget = LIMIT - 1;
-            used = 0;
-        }
-        out.push(c);
-        used += width;
-    }
-    out
-}
-
 /// A manage document: never cacheable, never indexed.
 fn page(status: StatusCode, strings: &UiStrings, title: &str, body: &str) -> Response {
     (
@@ -403,10 +353,6 @@ mod tests {
 
     #[test]
     fn text_values_are_escaped_per_rfc_5545() {
-        assert_eq!(
-            ics_escape("a;b,c\\d\ne\r\nf"),
-            "a\\;b\\,c\\\\d\\ne\\nf".to_owned()
-        );
         let doc = ics_document(
             &appointment(),
             "s.sites.test",
@@ -414,18 +360,6 @@ mod tests {
             time::macros::datetime!(2026-09-01 08:00 UTC),
         );
         assert!(doc.contains("SUMMARY:Consultation\\; morning\\, with Ada\\\\Bob"));
-    }
-
-    #[test]
-    fn folding_never_splits_a_multibyte_character() {
-        let line = format!("SUMMARY:{}", "é".repeat(200));
-        let folded = ics_fold(&line);
-        for part in folded.split("\r\n") {
-            assert!(part.len() <= 75);
-            assert!(std::str::from_utf8(part.as_bytes()).is_ok());
-        }
-        // Unfolding gives the original back.
-        assert_eq!(folded.replace("\r\n ", ""), line);
     }
 
     #[test]

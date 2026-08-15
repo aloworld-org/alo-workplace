@@ -49,12 +49,14 @@ pub mod derivative;
 mod forms;
 mod heatmap;
 mod host;
+mod ics;
 mod orders;
 /// The public surface's anti-abuse budgets. Public because they are an
 /// operational contract — an operator sizing a proxy, and the tests that pin
 /// each budget, both need the numbers.
 pub mod rate;
 mod rendered;
+mod ticket_page;
 mod unlock;
 pub mod widget;
 
@@ -176,6 +178,8 @@ pub fn app(state: Arc<AppState>) -> Router {
             "/b/manage/{token}/calendar.ics",
             get(booking_manage::calendar),
         )
+        .route("/t/{token}", get(ticket_page::show))
+        .route("/t/{token}/calendar.ics", get(ticket_page::calendar))
         .route(
             "/_alo/collect",
             post(beacon::collect).layer(DefaultBodyLimit::max(beacon::BEACON_BODY_MAX_BYTES)),

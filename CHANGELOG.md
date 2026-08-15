@@ -21,6 +21,18 @@ contracts.
   theirs: the tally you see is your own. Nothing you asked it *about* is
   repeated here.
 
+- **A paid ticket sale now takes care of its own paperwork.** The moment a
+  buyer's payment is confirmed, alo mints their ticket — a private page on
+  your website they can open from the checkout and an "add to your calendar"
+  file that puts the event in their own calendar — raises the invoice in
+  Billing (VAT carved out of the price they actually paid, the hosted payment
+  already recorded against it) and files the buyer in CRM, where someone you
+  already know is recognised rather than filed twice. If your Billing seller
+  profile is missing its country the sale still completes — ticket and CRM —
+  and the skipped invoice is written down with the reason. The ticket email
+  is not sent yet: alo never emails strangers automatically today, and that
+  decision gets its own review.
+
 - **`@meet` can now write up a meeting after it has finished.** Ask what
   happened in one and it answers from the meeting itself — who was there, what
   was said out loud, and what people typed during it — with no button in

@@ -221,6 +221,12 @@ pub struct UiStrings {
     pub booking_manage_already_text: &'static str,
     /// Manage page: text when the appointment already started.
     pub booking_manage_too_late_text: &'static str,
+    /// Ticket page: heading (and `<title>`) of the buyer's ticket.
+    pub ticket_page_title: &'static str,
+    /// Ticket page: label before the number of seats this ticket admits.
+    pub ticket_seats_label: &'static str,
+    /// Ticket page: label before the holder's name.
+    pub ticket_holder_label: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -324,6 +330,9 @@ pub const EN: UiStrings = UiStrings {
     booking_manage_cancelled_text: "Your appointment has been cancelled. The time is free again.",
     booking_manage_already_text: "This appointment was already cancelled.",
     booking_manage_too_late_text: "This appointment has already started and can no longer be cancelled here.",
+    ticket_page_title: "Your ticket",
+    ticket_seats_label: "Seats",
+    ticket_holder_label: "Issued to",
 };
 
 /// French renderer chrome.
@@ -427,6 +436,9 @@ pub const FR: UiStrings = UiStrings {
     booking_manage_cancelled_text: "Votre rendez-vous a été annulé. Le créneau est de nouveau libre.",
     booking_manage_already_text: "Ce rendez-vous était déjà annulé.",
     booking_manage_too_late_text: "Ce rendez-vous a déjà commencé et ne peut plus être annulé ici.",
+    ticket_page_title: "Votre billet",
+    ticket_seats_label: "Places",
+    ticket_holder_label: "Établi au nom de",
 };
 
 /// Dutch renderer chrome.
@@ -530,6 +542,9 @@ pub const NL: UiStrings = UiStrings {
     booking_manage_cancelled_text: "Uw afspraak is geannuleerd. Het tijdstip is weer vrij.",
     booking_manage_already_text: "Deze afspraak was al geannuleerd.",
     booking_manage_too_late_text: "Deze afspraak is al begonnen en kan hier niet meer worden geannuleerd.",
+    ticket_page_title: "Uw ticket",
+    ticket_seats_label: "Plaatsen",
+    ticket_holder_label: "Op naam van",
 };
 
 /// Renderer chrome for a normalized locale. Region variants inherit their

@@ -8223,3 +8223,81 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.04d — fulfilment: the ticket by email and in the buyer's
   calendar, the contact in CRM and the invoice in Billing, each through
   its owned seam.
+
+## 2026-08-15 — S3.04d The sale takes care of its own paperwork
+
+- **Item:** S3.04d — fulfilment: the ticket by email and in the buyer's
+  calendar, the contact in CRM and the invoice in Billing, each through its
+  owned seam.
+- **What shipped:**
+  - **The claim is the ticket** (migration `0331`, store
+    `site_ticket_fulfil.rs`): a paid order with no fulfilment row is one
+    nobody has made good; `claim_ticket_fulfilments` claims by INSERTING the
+    row (FOR UPDATE SKIP LOCKED + the one-per-order unique index), minting
+    the ticket token in the same act — at-most-once exactly like the notify
+    sweeps, so a crash leaves a visibly empty row, never a duplicate invoice.
+    The fulfilment table has NO buyer column of any kind (columns-of-the-table
+    proof); who bought stays on the order.
+  - **The invoice through Billing's own writers** (`fulfil_claimed_ticket`):
+    find-or-create the customer by address, create, line, issue, and record
+    the hosted payment — the document is born settled. **The money decision,
+    flagged for S3.04e and the human:** a price shown to a consumer is
+    VAT-inclusive, so the line carves VAT OUT of what the buyer actually paid
+    (`net_within`: the largest net whose Billing-computed gross — half away
+    from zero at the subtotal — does not exceed the charge; property-tested)
+    rather than adding VAT on top of it, which would invoice money nobody was
+    charged. One line carries the exact total as its net with the seat count
+    in its words, because a per-seat net cannot survive subtotal rounding for
+    every quantity. Customer country = the seller's own (admission is
+    supplied where the seller runs the event); a seller profile with no
+    country skips the invoice with the reason on the row (`invoice_note`) —
+    the sale still completes. S3.04e's tax-professional review MUST revisit
+    both choices.
+  - **The contact through CRM's own seam** (`CrmLeadCapture`), and **CRM
+    deliberately runs BEFORE Billing**: the invoice makes the buyer a
+    customer, and a capture that ran second would answer "already a customer"
+    for the very sale that made them one — no first-time buyer would ever
+    reach the board. (Found by the arc test, fixed by ordering; the comment
+    in the code carries the reason.)
+  - **The buyer's calendar** (`/t/{token}` + `/t/{token}/calendar.ics` on
+    alo-sites, `serve/ticket_page.rs`): the ticket page (holder, seats,
+    what, when, EN/FR/NL strings) and a hand-rolled RFC 5545 document whose
+    DESCRIPTION/URL carry the ticket link; no DTEND (an admission names when
+    doors open). RFC 5545 primitives extracted to `serve/ics.rs`, shared
+    with the booking manage page. Token walls mirror the manage token:
+    site-scoped resolution, uniform 404 for foreign/unknown/malformed.
+  - **The sweep** (`alo-jmap/site_ticket_worker.rs`, 30 s interval in
+    main.rs): claims, resolves the site's language into the invoice unit /
+    payment-method words and the CRM seed (EN/FR/NL), fulfils, logs ids only.
+- **Verified:** clippy `-p alo-store -p alo-jmap -p alo-sites --all-targets`
+  exit 0 (only the two pre-existing `meet.rs` survivors, business track's;
+  ~25 min with the harness-background dance). Test-binary build via the
+  sanctioned background+marker form (31m12s), `nextest list` Gatekeeper
+  warm-up, then foreground `cargo nextest run` on all three crates:
+  **3 477/3 477 green** (1 pre-existing skip, 104 s; prune first — 2 189
+  pruned). New proof: the arc (paid order → claim → invoice issued at ≤ the
+  charge with VAT carved and paid_cents settling it → one CRM card titled by
+  the caller → claim never re-offered → public ticket on its own host);
+  same-buyer-again reusing the customer, raising no twin card, and still
+  invoicing; the no-seller-country sale completing ticket+CRM with the
+  skipped invoice written down; the fulfilment table's no-buyer-column
+  proof; wire tests on the real router+postgres (ticket page + .ics content
+  types and cache headers, foreign-site/unknown/malformed tokens one 404) —
+  the wire tests steal-tolerant because the claim sweep is global and two
+  suites claim concurrently. `net_within` property tests; ics primitives'
+  escaping/folding/UTC goldens kept where they moved.
+- **Cuts/flags:** **the ticket email is cut → queued as S3.04h with its
+  prerequisite inside it** (an ADR first: alo has never emailed a stranger
+  automatically — ADR 0034 sends even POs from a human's Drafts — and the
+  abuse story must be decided before code). The ticket link today travels on
+  the checkout return page (S3.04f/g wires it) and inside the .ics. Ticket
+  page shows the UTC wall clock until S3.04f brings the venue's zone. Owner
+  isn't separately notified of a sale (the invoice already lands in
+  Billing); journal if the wave review wants an inbox line. No Caddy change:
+  `/t/*` rides the sites vhost. `cargo fmt` deliberately not run (machine
+  memory: rustfmt divergence); new code written in-style. Gate lesson
+  re-learned: a `-p` filter still relinks every binary of the package — a
+  one-line store fix costs the full relink; batch fixes before re-running.
+- **Next:** S3.04e — place-of-supply VAT rules table; it is gated on a tax
+  professional's review by its own text, so expect it to block unless the
+  human has arranged that review.
