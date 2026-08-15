@@ -3472,3 +3472,45 @@ their own sake.** The agent should not be the reason charts get bought.
 **LOOP COMPLETE (with blockers)** — the agents queue is done but for A2.2b, which
 is blocked on a product/licensing decision rather than on any code. A human
 unblocks it; the loop has nothing further to attempt.
+
+## The queue is closed; the disk is the only thing left to say (2026-08-15)
+
+The loop was re-entered after `LOOP COMPLETE (with blockers)`. Nothing had
+changed underneath it: `git pull --rebase` was already up to date, the tree was
+clean, and no ADR, feature entry or human commit had landed that touches charts.
+The blocker's central fact was re-checked rather than trusted — nothing under
+`web/src` imports `sheets-chart`, `engine-chart` or `SHEET_CHART` — so A2.2b
+stands blocked for the reason the previous entry sets out at length. Per LOOP
+step 3 the oldest `[!]` item gets **one** re-attempt with fresh eyes; it had it,
+and it failed again. A third pass would be thrashing, which the protocol
+forbids. **No code shipped, and none should have.**
+
+**The finding that is not about this track.** `df -h` at the top of the
+iteration read **C: 100%, 4.4 GB free** — the condition LOOP.md names as the
+single symptom behind a wedged docker, a dead daemon and a failed link. The
+agents queue has nothing left to build, so it costs this track nothing; the
+next iteration of **any other track** that touches `alo-store` links ~115 test
+binaries and would meet `LNK1180: insufficient disk space` before it met a
+gate.
+
+Cleared what LOOP.md sanctions clearing, in this checkout only and with no
+build in flight (`ps -W` clean first): **148 stale test binaries** — 376 `.exe`
+for 228 distinct target names, i.e. cargo never removing the previous build's
+hash — and 13 `.pdb`, together **~1.4 GB**. Free space 4.4 → **5.8 GB**. This
+invalidates nothing cargo will not relink anyway, and no other checkout's
+`target/` was touched.
+
+**5.8 GB is still not comfortable, and a human should know that.** The last
+full `nextest --no-run` on this box died on a disk that a `.pdb` sweep had just
+cleared 7 GB on. The 14 GB remaining under `target/debug/deps` is mostly
+`.rlib`/`.rmeta` incremental state, which is not mine to delete — removing it
+buys space at the price of a cold rebuild for whoever runs next. The durable
+fixes are already written down: `CARGO_PROFILE_TEST_DEBUG=0` in every gate's
+environment, and the queued test-binary consolidation. The space itself has to
+come from somewhere other than this checkout.
+
+**Still LOOP COMPLETE (with blockers).** A2.2b waits on a product decision —
+adopt a commercially licensed plugin under an ADR, build charts natively as
+their own feature, or drop chart-from-intent. The recommendation in the
+previous entry stands: drop it, and build charts for their own sake if they are
+wanted. The loop has nothing further to attempt on this track.
