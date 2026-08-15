@@ -7231,3 +7231,55 @@ processes skip assessment for local dev binaries; (2) reboot (syspolicyd's
 state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 `spctl --global-disable` knowingly. Then re-run the full alo-store suite
 (command in the entry above) and flip S3.02a to `[x]` if green.
+
+## 2026-08-15 — S3.02b an answer that names its page, or no answer at all
+
+- **Item:** S3.02b — answering with citations: retrieval over the S3.02a
+  corpus, every answer naming the page it came from, refusal rather than an
+  answer when it cannot cite; fixture-only tests, no live model calls.
+- **What shipped** (`platform/alo-ai/src/site_chat.rs`, no HTTP surface —
+  the route and the widget are later slices):
+  - Deterministic local retrieval: corpus documents chunked on their own line
+    boundaries (≤700 chars, one section string per line as `site_grounding`
+    emits them), scored by rarity-weighted lexical overlap
+    (`ln((chunks+1)/df)` per distinct question token, half again for a title
+    match), ties keeping the corpus's stable order; top 6 chunks become
+    numbered sources. A question sharing no vocabulary with the corpus
+    retrieves nothing and is refused BEFORE any model call — an off-topic
+    stranger costs the tenant nothing (the spend ceiling itself is S3.02c).
+  - The reply contract, held: the model must return one JSON object —
+    `{"answer","citations":[n]}` or `{"refuse":true}` (strict serde,
+    unknown fields rejected, prose/code-fence wrapping tolerated). An answer
+    with empty citations, or citing any source it was never shown, becomes a
+    typed `Refusal(Uncited)` — ADR 0040's "an answer that cannot cite is an
+    answer the bot does not give" enforced in the parser, not the prompt. A
+    reply that both answers and refuses refuses (the safe direction).
+    Citations come back typed (`GroundingCitation` + title), deduplicated by
+    provenance; `citation_path` maps them to the exact public URLs the
+    serving stack uses (default locale at root, `/{locale}/{slug}`
+    otherwise, `/blog/{slug}`, knowledge docs deliberately unlinked).
+  - Question hygiene: trimmed, empty refused as an error, 2 000-char cap on
+    anonymous input. Prompt forbids invented facts, prices, dates, discounts,
+    availability, and promises on the business's behalf; answers in the
+    visitor's language.
+- **Verified:** `cargo fmt` clean; `SQLX_OFFLINE=true cargo clippy -p alo-ai
+  --all-targets` — zero warnings from this item (the two surviving warnings
+  are the pre-existing `meet.rs:319` type_complexity in alo-store, another
+  track's file); `cargo nextest run -p alo-ai` **136/136 green in 0.16 s**
+  (17 new: ranking picks the page that answers, determinism, no-vocabulary →
+  `NoSources` with a provably untouched wire, backend gate order, chunking
+  on line boundaries incl. oversized single lines, prompt shape, and the
+  five reply fixtures — cited, uncited, out-of-range, refusal,
+  prose-wrapped — plus citation dedup, out-of-contract errors, and
+  `citation_path` locale rules). No store change → no test-binary relink
+  wave; the full-suite sweep S3.02a owed was run green at 08:20 (1 954
+  tests, 18.2 s) before this item started.
+- **Cuts/flags:** none of the item's scope cut. Retrieval refuses only on
+  zero vocabulary overlap; a stopword-only match still reaches the model,
+  which then refuses — safety identical, cost slightly higher, and the
+  ceiling item (S3.02c) is the budget's real gate. Embeddings deliberately
+  not used: lexical retrieval is deterministic, testable, and needs no
+  external service.
+- **Next:** S3.02c — cost and abuse: the defaulted per-site monthly spend
+  ceiling, per-visitor/per-IP rate limits, the graceful unavailable message,
+  and telling the tenant when it is hit.

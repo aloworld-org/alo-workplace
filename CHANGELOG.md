@@ -26,6 +26,15 @@ contracts.
   you approve**, and until you do, nothing you asked it to do is visible to
   anybody.
 
+- **The website chatbot now answers only from what you published — and always
+  says where.** Its answering engine finds the passages of your published
+  pages, blog posts, and Public knowledge documents that match a visitor's
+  question, and every answer names the page it came from. When your published
+  site doesn't contain the answer, the bot declines instead of guessing — no
+  invented prices, dates, or promises — and an off-topic question is turned
+  away before it costs you anything. (The on-site chat window itself is on its
+  way.)
+>>>>>>> 9b26c41 (feat(sites): the chatbot answers with the page it came from, or not at all)
 - **Your agents are simply there now.** Open the agent list and every part of
   alo already has one — Mail, Agenda, Tasks, Chat, Drive, Billing, Sales,
   Projects, Finance, Inventory, People, Insights, Meet, Websites, and alo itself
