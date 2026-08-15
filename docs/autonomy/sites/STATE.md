@@ -8141,3 +8141,85 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.04c — hosted payment handoff (provider adapter + fixture,
   order → payment-reference → paid state machine, idempotent webhooks;
   Mollie/Adyen ahead of Stripe).
+
+## 2026-08-15 — S3.04c hosted payment handoff (store + provider boundary)
+
+- **Item:** S3.04c — hosted payment handoff: provider adapter + fixture,
+  order → payment-reference → paid state machine, idempotent webhooks, and
+  the proof that no card data can reach alo.
+- **What shipped:**
+  - **The boundary** (`site_payments.rs`): `SitePaymentProvider`, the
+    crate's second money-moving trait, mirroring `DomainRegistrar` —
+    `create_payment` (idempotent under the caller's key, which is the order
+    id) and `payment_status` (the truth a webhook makes us *fetch*; a
+    webhook is a doorbell, not a message — an unauthenticated POST can make
+    alo look, never make it believe). The outbound vocabulary is six fields
+    (key, integer-cents amount, currency, description, two https-only
+    URLs); the inbound is an opaque id, a checkout URL and a five-word
+    status. **No field exists that a card number, expiry, CVC or cardholder
+    could travel in, in either direction** — proven by exhaustive
+    destructure in `the_vocabulary_has_no_room_for_a_card`, so a field
+    added later fails to compile until named there. Identity is EEA-only by
+    construction (the registrar's sovereignty rule, mechanical: Mollie/
+    Adyen are the intended shapes, a non-EEA processor refuses at
+    `SitePaymentIdentity::new`). `UnconfiguredSitePayments` answers typed
+    `Unconfigured` for the surfaces to branch on.
+  - **The fixture** (`site_payments_fixture.rs`): deterministic — no clock,
+    no random, no socket, no money; ids are `fixpay-<idempotency key>`, a
+    pure function of the request; the replay contract (same key + same
+    fingerprint → the payment already made; different fingerprint →
+    Conflict, never a second charge); tests move buyers with `mark`.
+  - **The order** (`site_ticket_orders.rs`, migration `0330`): where the
+    buyer lives (the hold deliberately holds nobody). pending →
+    awaiting_payment → paid; failed/cancelled/expired end the road.
+    Creation is idempotent under the **hold id** (one hold is one order, by
+    unique index — the same buyer's double-click replays, a different
+    buyer is refused); the price is the S3.04a seam's answer at placement,
+    computed server-side (qty × unit price, VAT bp, accounting currency)
+    and stored as the record of the sale — the same way a domain purchase
+    records the quote its buyer approved, never a live copy of the list.
+    `open_ticket_payment` records the provider's reference (one payment
+    settles one order: a **global** unique index, because it is the
+    webhook's lookup key). `apply_ticket_payment` settles with a
+    provider-fetched status: Paid completes the hold and the order in ONE
+    transaction under the same per-event advisory lock the buyers take;
+    money that arrives after the hold lapsed fails **visibly**, `failure`
+    naming the refund (never a sale of possibly-resold seats, never money
+    that vanishes); dead statuses free the seats immediately rather than
+    waiting out the hold; a paid order is never unsold by any late status;
+    every path is idempotent for retried webhooks.
+    `Store::ticket_payment_target` is the webhook's door: payment id →
+    (tenant, site, order), the tenant read from the row itself; unknown or
+    garbage ids answer `None` — a probe learns nothing.
+- **Verified:** fmt; `clippy -p alo-store --all-targets` exit 0 twice (only
+  the two pre-existing `meet.rs` type_complexity survivors, business
+  track's); `cargo nextest run -p alo-store` **2 049/2 049 green** (1
+  pre-existing skip, 20.7 s; prune first — 1 330 pruned). New proof: the
+  full arc through the fixture (hold → order → create_payment → open →
+  mark paid → webhook target → status fetch → paid, seats sold); the
+  webhook replayed five times is one sale, `paid_at` unmoved; late money
+  → failed + the refund sentence + seats back on sale; cancel frees seats
+  at once, replays clean, and a paid-after-cancel names the refund; a paid
+  order survives every late status; creation replays for the same buyer
+  and refuses another; expired/released holds and archived products
+  refused at the door; the wrong-tenant AND same-tenant-wrong-site walls
+  on every verb; the exact-column-list card proof; the webhook door's
+  None-for-strangers.
+- **Cuts/flags:** store-only by design — the public checkout + webhook
+  routes on alo-sites land with the shop (S3.04f/g), fulfilment is S3.04d,
+  and a live Mollie/Adyen adapter is production wiring behind this trait
+  (credentials + a human). No CHANGELOG line (nothing user-visible yet —
+  S3.04a/b precedent). Two gate lessons, both paid for this iteration:
+  (1) **export DATABASE_URL for the nextest gate on this Mac** — this
+  shell had it unset, the 5433 fallback has no listener, and the failure
+  reads as `PoolTimedOut` in whichever DB-test binaries the schedule
+  reaches first (it happened to be the agents track's suites, which sent
+  me hunting a saturated pool; it was the environment, exactly as the
+  memory note warned); (2) **anything a test writes into a globally-unique
+  column must be minted per run** — the shared test database remembers
+  every earlier run, so hardcoded provider payment ids collide on the
+  second run; the fixture now derives ids from the order id and the DB
+  tests mint theirs.
+- **Next:** S3.04d — fulfilment: the ticket by email and in the buyer's
+  calendar, the contact in CRM and the invoice in Billing, each through
+  its owned seam.

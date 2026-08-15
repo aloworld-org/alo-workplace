@@ -156,7 +156,7 @@ reserved through their owner, never stored again (ADR 0041).
 
 - [x] S3.04a **Billing-owned**: a read seam exposing published catalog items and their prices to a site, with no write path and no second copy.
 - [x] S3.04b Hold-with-expiry: capacity is reserved *before* payment and released if the buyer does not finish; concurrency tests proving two simultaneous buyers cannot oversell the last seat. This is the first commit of the wave, not hardening.
-- [ ] S3.04c Hosted payment handoff: a provider adapter with a fixture provider and no external calls in tests, an order → payment-reference → paid state machine, idempotent webhook handling, and a test that no card data can reach alo. Mollie or Adyen ahead of Stripe.
+- [x] S3.04c Hosted payment handoff: a provider adapter with a fixture provider and no external calls in tests, an order → payment-reference → paid state machine, idempotent webhook handling, and a test that no card data can reach alo. Mollie or Adyen ahead of Stripe.
 - [ ] S3.04d Fulfilment: the ticket by email and in the buyer's calendar, the contact in CRM and the invoice in Billing, each through its owned seam.
 - [ ] S3.04e Place-of-supply VAT for event tickets as a rules table with tests — reviewed by a tax professional before this item is taken, because wrong here is wrong in Finance years later.
 - [ ] S3.04f Shop sections and checkout on the published site: typed sections like every other, public render goldens, mobile.
