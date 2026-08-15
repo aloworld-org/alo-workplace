@@ -3388,3 +3388,87 @@ iteration re-attempts the oldest blocked item once with fresh eyes; the blocker
 is not a coding failure but a licensing/product decision (adopt the Univer Pro
 chart plugin under an ADR, implement charts natively, or drop the item), so the
 honest outcome is `LOOP COMPLETE (with blockers)` and a human unblocking it.
+
+---
+
+## A2.2b, re-attempted with fresh eyes — the last route to a fixture is closed too (2026-08-15)
+
+**No code shipped, and that is the finding.** The queue's twenty other items are
+`[x]`; A2.2b was the only one left, so per LOOP step 3 this iteration re-attempts
+the oldest `[!]` item once. It fails again, for the reason it was blocked on and
+for one more the first pass had not checked.
+
+**What the first pass established, re-verified rather than taken on trust.**
+
+- `web/src/drive/SheetEditor.tsx` registers **eleven** Univer presets — core,
+  sort, filter, find-replace, conditional-formatting, data-validation, drawing,
+  hyper-link, note, table, thread-comment. None is a chart. So the editor cannot
+  create one, and a user cannot save one.
+- The only chart implementation in the ecosystem is **`@univerjs-pro/sheets-chart`**
+  (with `@univerjs-pro/sheets-chart-ui` and `@univerjs-pro/engine-chart`). It is
+  present in `web/node_modules` only as a transitive dependency of
+  `@univerjs/presets`, its `package.json` carries **no `license` field**, it ships
+  beside a `@univerjs-pro/license` package — Univer's commercial gate — and
+  nothing under `web/src` imports it.
+
+**The fact the first pass did not have: import cannot supply the fixture either.**
+
+The first pass checked the editor and the *export* path. It did not check
+*import* — which was the last honest way a chart-bearing workbook could enter
+alo without licensing anything. It cannot.
+`web/src/drive/importOffice.ts` reads a real `.xlsx` client-side (fflate +
+`DOMParser`, no engine, no server) and says so in its own header: *"cell values,
+types, and sheet structure carry over; styles, formulas' definitions, **charts**,
+and exact layout do not."* It resolves `<c>` cells into `cellData` and never
+touches `resources`. So a workbook imported from Excel arrives chartless by
+construction.
+
+That closes it: **no path in this product — create, import, or export — can
+produce a workbook holding a `SHEET_CHART_PLUGIN` resource.** The item makes a
+reader the prerequisite for the write, and makes a saved fixture the prerequisite
+for the reader ("Do not write a drawing structure inferred from the Univer docs
+without a saved fixture to check it against"). The fixture cannot be obtained, so
+the prerequisite chain has no first link.
+
+**Why building it anyway would be the wrong call, not merely a risky one.**
+
+The tempting move is to model the drawing structure from Univer's documentation
+and ship the reader — it would be a green test and a checked box. It would also
+be a structure nothing in this repo has ever seen, verified against a fixture
+this repo wrote from the same guess, which proves the guess self-consistent and
+nothing else. The item forbids exactly that, and the reason it gives is right: an
+approved proposal that writes an unopenable workbook into somebody's Drive is
+worse than the absence of a chart tool. Cut scope, never depth — but there is no
+narrower slice here, because every slice of chart-from-intent bottoms out in the
+same unverifiable structure.
+
+**Verified.** Nothing to gate — no Rust, no TypeScript, no migration, no route
+was touched this iteration. `docs/autonomy/agents/QUEUE.md` gains the import
+finding on the A2.2b blocker line; this entry is the rest.
+
+**The decision that is waiting, stated so a human can take it in one sitting.**
+
+Three ways out, none of which a loop may choose:
+
+1. **Adopt `@univerjs-pro/sheets-chart` under an ADR.** Charts arrive
+   immediately and the item becomes ordinary work. It also puts a commercially
+   licensed, source-unavailable component into the editor of a **sovereignty**
+   product, which is a promise-level decision and squarely an ADR's business —
+   see the standing rule that engines are configured, never patched, and that
+   settled decisions live in `docs/decisions/`.
+2. **Implement charts natively.** Keeps the promise, and is a feature in its own
+   right — a rendering surface, a model, a persistence format, an export path —
+   not a tail of an agent item. It needs a `docs/features.md` entry and a phase
+   before it needs a queue item.
+3. **Drop chart-from-intent.** The Sheet agent already ships formula-from-intent,
+   explain-a-formula, clean-a-column, and answer-from-the-data-with-cells-cited
+   (A2.2). Chart-from-intent is the one tool of the five that depends on a
+   capability the product does not have; dropping it costs the agent nothing it
+   can currently do.
+
+Recommendation, for whoever picks this up: **3, then 2 if charts are wanted for
+their own sake.** The agent should not be the reason charts get bought.
+
+**LOOP COMPLETE (with blockers)** — the agents queue is done but for A2.2b, which
+is blocked on a product/licensing decision rather than on any code. A human
+unblocks it; the loop has nothing further to attempt.
