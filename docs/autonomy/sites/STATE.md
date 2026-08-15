@@ -8301,3 +8301,33 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.04e — place-of-supply VAT rules table; it is gated on a tax
   professional's review by its own text, so expect it to block unless the
   human has arranged that review.
+
+## 2026-08-16 — S3.04e The rules table waits for the professional it was promised
+
+- **Item:** S3.04e — place-of-supply VAT for event tickets as a rules table
+  with tests.
+- **What shipped:** Nothing — marked `[!]` blocked without an attempt. The
+  item's own text makes a tax professional's review a prerequisite to
+  *taking* the item ("reviewed … before this item is taken"), and LOOP.md's
+  own lesson (ADR 0049) is that a prerequisite written into the item is a
+  gate the loop must honour. No review is on record anywhere in the repo,
+  the loop runs unattended and cannot arrange one, and the compliance rail
+  says never guess loosely on VAT. Building the table first and asking
+  forgiveness would invert the item's explicit ordering.
+- **For the human — what the review must cover** (so the arranged afternoon
+  is sufficient, per ADR 0041 "worth a tax professional's afternoon"):
+  1. The place-of-supply rules table itself for admission to events
+     (VAT Directive Art. 53/54 territory: B2C vs B2B admission, where the
+     event physically happens, virtual-event attendance rules from 2025,
+     OSS/IOSS thresholds for cross-border sales).
+  2. The two decisions S3.04d shipped provisionally and flagged for exactly
+     this review (STATE entry 2026-08-15): (a) consumer prices are treated
+     as VAT-INCLUSIVE and the invoice carves VAT out of what was actually
+     charged (`net_within` in `site_ticket_fulfil.rs`) rather than adding
+     it on top; (b) customer country on the invoice is currently the
+     SELLER's own country on the theory that admission is supplied where
+     the event runs — the rules table replaces this assumption.
+- **Verified:** n/a — no code changed; docs-only commit.
+- **Cuts/flags:** none. S3.04f (shop sections + checkout) does not depend
+  on the rules table and is the next buildable item.
+- **Next:** S3.04f — shop sections and checkout on the published site.
