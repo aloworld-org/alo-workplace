@@ -3514,3 +3514,21 @@ adopt a commercially licensed plugin under an ADR, build charts natively as
 their own feature, or drop chart-from-intent. The recommendation in the
 previous entry stands: drop it, and build charts for their own sake if they are
 wanted. The loop has nothing further to attempt on this track.
+
+## Re-entered a third time; the terminal state holds (2026-08-15)
+
+Kept to four lines deliberately — an unchanged blocker restated at length is
+noise in a journal a human has to read. What was re-checked, cheaply, before
+concluding it: `git pull --rebase` already up to date and the tree clean; no
+commit under `docs/decisions/` or in `docs/features.md` since 08-14, so no ADR
+and no feature entry has taken the chart decision; and nothing under `web/src`
+imports `sheets-chart`, `engine-chart` or `SHEET_CHART`. A2.2b's premise is
+therefore unchanged, it has had its one sanctioned re-attempt, and a further
+pass would be the thrashing the protocol forbids. **No code shipped.**
+
+Disk unchanged at **C: 5.8 GB free** — where the previous iteration's sweep left
+it, so nothing has run here since. The warning in that entry stands untouched
+for whoever runs the next `alo-store` gate.
+
+**Still LOOP COMPLETE (with blockers).** Nothing further to attempt on this
+track until a human takes the chart decision.
