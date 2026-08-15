@@ -86,6 +86,16 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      environment: it applies to test targets only, so no dependency rebuilds, and
      no PDB is written at all. Never clean another checkout's `target/` to make
      room — a loop mid-build there breaks.
+     **Once `CARGO_PROFILE_TEST_DEBUG=0` is in force, the next thing to fill the
+     disk is stale test binaries, and it is bigger.** Cargo never removes a
+     previous build's `<name>-<hash>.exe`, so every iteration that changes a
+     crate leaves a full set behind: on 2026-08-15 that was **538 binaries
+     totalling 12 GB for 215 distinct targets**, and a full `nextest --no-run`
+     died with `LNK1180: insufficient disk space` on a disk the `.pdb` sweep had
+     just cleared 7 GB on. Keeping only the newest `.exe` per target name frees
+     it and invalidates nothing cargo will not relink anyway. Do it **before**
+     the gate, never during one: deleting a binary out from under `nextest
+     --list` costs a relink and reads like a build failure.
    - **The `Bash` ceiling on this harness is 10 minutes, whatever timeout you
      pass.** A cold build plus a suite can exceed it. When a foreground gate is
      cut off mid-build, **re-run the same foreground command** — cargo's cache

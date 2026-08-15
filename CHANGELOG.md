@@ -27,6 +27,21 @@ contracts.
   the avatar uploads from Drive, and an accessibility box states the facts
   up front — including the measured contrast of the colour you chose.
 
+- **Your figures have an agent now — `@insights`.** Ask it what the numbers
+  say and it answers from your own books, telling you which measure, which
+  dataset and which period the figure came from — no button in between, and
+  every amount repeated in whole cents in its own currency rather than worked
+  out in a sentence. Ask what changed between two periods and it names what
+  moved and by how much, biggest movement first, counting something that was
+  not there before from zero instead of leaving it out; it says what moved and
+  never invents a reason the figures do not carry. Ask for a report and it
+  proposes one — a named board with its charts — which stays a proposal until
+  you tap approve, and then opens in Insights as an ordinary board you can
+  rename, rearrange and add to. Every chart is checked and answered before the
+  board is written, so an approved report never lands as broken tiles, and a
+  question the catalog cannot answer is refused in plain words rather than
+  guessed at.
+
 - **Your website's assistant can now look and sound like you.** The widget
   already wears your site's colours, and everything else about it is now
   yours to shape: give it a name and a face (a photo from Drive), write its

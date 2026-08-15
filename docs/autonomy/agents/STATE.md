@@ -1980,3 +1980,200 @@ the file and A2.4 owns it. Three registry counts move with every new tool
 `agent_turn.rs`'s read count = 20) — update them rather than loosening them.
 Check the migrations directory again immediately before committing; `0405` is
 this track's highest and the sites loop is at `0324`.
+
+## A2.4 — the Insights agent: the figure, what moved, and a board that waits for a tap
+
+**Shipped.** `AgentProduct::Insights` was the empty row in the registry
+(`NONE_YET`, beside Meet); it now carries four tools, three of which answer in
+the room and one of which waits for the asker's tap.
+
+- `insight_catalog` (read) — **the vocabulary, looked up rather than
+  remembered.** A question about the figures is a `ChartSpec` over the closed
+  catalog ADR 0037 settled, and every word in one is an enum variant the server
+  validates, so a model has to be told the words before it can use them. The
+  menu is generated from `insight_catalog::DATASETS` and the catalog entries
+  themselves — never a list typed out — so a measure the product gains is a
+  measure the agent is offered on the next build, and a test walks the whole
+  catalog to hold that.
+- `insight_answer` (read) — one specification evaluated through
+  `AccountStore::insight_evaluate`, the same store function `POST
+  /insights/eval` reads, so a figure the agent says and a figure the board draws
+  cannot disagree. The answer carries the buckets, the unit and — always — the
+  question it answers (`asked`: dataset, measure, agg, breakdown, grain,
+  period).
+- `insight_change` (read) — the same specification over two periods, aligned
+  bucket by bucket, biggest movement first, each row carrying `before`, `now`
+  and `change`, with the two periods' totals beside them and both periods' notes
+  kept apart.
+- `insight_report` (write) — a named board of charts, every one validated **and
+  evaluated** before the board is created, then pinned as ordinary tiles at the
+  ordinary widths.
+
+**No migration** (the product word already existed), **no new route** (the tools
+run through `/ai/agent/execute` and the ordinary chat turn), and therefore
+**nothing for the production Caddyfile**.
+
+**Verified on the wire** — `products/mail/alo-jmap/tests/agent_insights_http.rs`,
+five tests, in-process router over real Postgres, real invoices and real
+payments made over the ordinary billing routes, and the scripted local model
+socket (no live model call, the standing rail). Copied from the run:
+
+```
+===== A2.4 TRANSCRIPT: @insights how much have we billed? =====
+POST /chat/channels/oql1inzlGZoSkb-m6x77Mg/messages
+     {"body":"@insights how much have we billed?"}
+--- what the model was shown (call 3 of 3, user turn) ---
+Sources:
+[1] tool result "insight_catalog" — {"datasets":[{"breakdowns":[…],"filters":[…],
+ "id":"billing.documents","measures":[{"aggs":["sum"],"by":"all","id":"net",
+ "unit":"money"},…],"period_on":"issue_date"},…],"filterOps":["in","not_in"],
+ "kind":"insightCatalog","spec":{…}}
+[2] tool result "insight_answer" — {"asked":{"agg":"sum","breakdown":null,
+ "dataset":"billing.documents","filters":0,"grain":null,"measure":"net",
+ "period":{"kind":"all"}},"kind":"insightAnswer","notes":[],
+ "series":[{"key":"EUR","label":{"kind":"raw","text":"EUR"},"omitted":0,
+ "points":[{"bucket":"total","label":null,"value":100000}]}],
+ "truncated":false,"unit":{"currency":"EUR","kind":"money"}}
+--- what the model replied (call 3) ---
+{"answer":"You have billed 100000 cents net in total (EUR), across every period [2].",
+ "kind":"answer"}
+--- GET /chat/channels/{id}/messages, the agent's message ---
+{"authorKind":"agent","body":"You have billed 100000 cents net in total (EUR),
+ across every period [2].","proposal":null}
+--- audited: insight_catalog / read / ok=true ---
+===== end =====
+
+===== A2.4 TRANSCRIPT: @insights what changed in the money coming in between May and July? =====
+[2] tool result "insight_change" — {"against":{"from":"2026-05-01","kind":"range",
+ "to":"2026-05-31"},"asked":{"agg":"sum","breakdown":"method",
+ "dataset":"billing.payments","filters":0,"grain":null,"measure":"amount",
+ "period":{"from":"2026-07-01","kind":"range","to":"2026-07-31"}},
+ "kind":"insightChange",
+ "movers":[{"before":0,"bucket":"card","change":60000,"key":"EUR",
+            "label":{"kind":"raw","text":"card"},"now":60000},
+           {"before":40000,"bucket":"transfer","change":-30000,"key":"EUR",
+            "label":{"kind":"raw","text":"transfer"},"now":10000}],
+ "notes":{"before":[],"now":[]},"omitted":0,
+ "totals":[{"before":40000,"change":30000,"key":"EUR","now":70000}],
+ "unit":{"kind":"money"}}
+--- what the model replied (call 3) ---
+{"answer":"Between May and July, card went from 0 to 60000 cents and transfer
+ fell from 40000 to 10000 — 70000 in July against 40000 in May [2].","kind":"answer"}
+--- audited: insight_change / read / ok=true ---
+===== end =====
+```
+
+The properties pinned around those exchanges:
+
+- **`proposal` is `null` on every message in both answering rooms**, and the
+  tenant still has no board afterwards. Asking what the figures say produced no
+  button.
+- **The figure in the answer is the figure in the books.** The invoice
+  underneath is `netCents: 100000`; the value the model was shown is
+  `"value":100000`, in cents, captioned `"currency":"EUR"` — and beside it the
+  measure, the dataset and the period it is the total of.
+- **The catalog reached the model whole.** 3 465 characters against the turn's
+  4 000-character result bound, held by a test that reads
+  `agent_turn::MAX_RESULT_CHARS` rather than a copy of it — a menu cut in half is
+  a menu with invented spellings at the end, and the model has no way to know it
+  was cut. Getting there took two rounds of compaction (4 922 → 4 234 → 3 465)
+  and the test is what found it: a measure whose breakdowns are its dataset's
+  whole list says `"by":"all"`, a category breakdown is the one with no grains,
+  and the usual `in`/`not_in` pair is stated once instead of on each of the dozen
+  filters.
+- **A change is aligned, ordered and never silently dropped.** `card` was not a
+  payment method in May and is counted from `0` rather than left out; `transfer`
+  fell and is reported with its sign; the two are ordered by the size of the
+  movement rather than by the figure. The totals say the month rose overall even
+  though one method fell — which is the sentence a person would otherwise get
+  wrong.
+- **The report waits, and lands as an ordinary board.** `@insights build me a
+  revenue report` came back as a proposal carrying `insight_report`; no board of
+  that name existed until the tap; after it, `GET /insights/dashboards/{id}`
+  shows the two tiles in the order proposed, `span` 1 for the single figure and 2
+  for the chart, each carrying the spec that was proposed, and `GET
+  /insights/tiles/{id}/data` draws `100000` — the same figure through the
+  builder's own route.
+- **A refused chart pins nothing.** A report whose second chart names a measure
+  the catalog has not got is a 422 saying `chart 2 (Profit): …profit…`, and no
+  board is created — every spec is validated *and* evaluated before the first row
+  is written. A report with no charts, and one with nine, are refused the same
+  way.
+- **A comparison with nothing to compare is refused by name.** A spec broken down
+  by `issue_date` is a 422 saying the breakdown must be a category or none at
+  all: two periods bucketed by month share no bucket keys, and diffing them would
+  be arithmetic dressed as an explanation. The earlier period is also put **into
+  the spec** and revalidated rather than written into the struct behind the
+  validator's back, so a comparison cannot reach further back than a chart may.
+- **Isolation, over the real route.** Two tenants, two sets of books, one
+  specification: each gets its own total (100 000 and 77 700 cents), never the
+  sum. A board one tenant's agent builds is not listed in the other's Insights
+  and is a 404 to it.
+
+**Cuts / flags.**
+
+- **`alo-store` was deliberately not touched**, which shaped one decision worth
+  recording. The compact machine catalog is rendered in
+  `alo-jmap/src/agent_insights.rs` rather than beside the prose one in
+  `alo-store/src/insight_prompt.rs`. It is a second *shape* of the menu, not a
+  second *source* — both iterate `DATASETS` and the catalog entries, and the
+  totality test here walks the whole catalog — and the shapes differ because the
+  consumers do (a system prompt of several thousand characters versus a tool
+  result cut at 4 000). The reason it is not in the store is the gate: any change
+  to `alo-store` relinks its ~115 test binaries, and on a disk with under 2 GB
+  free that is not a cost a rendering could justify. If a wave review wants both
+  renderings in one file, that is the move — with the store gate budgeted for.
+- **One documentation debt, handed on.**
+  `platform/alo-store/src/agent_ground.rs:31` still says "Insights and Meet have
+  neither yet (A2.4, A3.2)". The *behaviour* is already right — Insights is
+  `BY_TOOL_ONLY`, which is exactly where an agent with tools and no grounding
+  belongs, and `system_prompt_for` now tells it so, which the wire test sees —
+  but the sentence should read like Sites' and Docs'. Left because it is one
+  comment in a crate this item otherwise never opened. **A2.5 (the Drive agent)
+  will almost certainly open `alo-store` anyway: pay it there.**
+- **`insights_ask::span_for` is now `pub(crate)`** rather than copied. A chart
+  proposed from a room and one proposed from the ask box lay out identically
+  because they ask the same function. That is the only line this item changed
+  outside its own area.
+- **Three registry counts moved**, as every A2 item's journal has warned:
+  `all_tools().len()` 49 → 53, `agent_product`'s workspace length the same, and
+  `agent_turn.rs`'s read count 20 → 23.
+- **The one pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime` at
+  100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision. Identical to the failure the last four iterations
+  recorded; the file is theirs and the fix on their side is comparing at
+  microsecond precision. Full run: **1 333 tests, 1 332 passed, that one
+  failed.** Two pre-existing `clippy::type_complexity` warnings in
+  `alo-store/src/meet.rs` are likewise not this track's and were not touched.
+- **Environment: the disk is the story of this iteration.** C: opened at
+  **758 MB free, 100 % full**. Deleting this checkout's `target/debug/deps/*.pdb`
+  (219 files, 6.3 GB) got it to 7 GB, and the first full `nextest --no-run` still
+  died with `LNK1180: insufficient disk space`. The cause is no longer `.pdb`s —
+  `[profile.test] debug = 0` is doing its job — it is **stale test binaries**:
+  cargo leaves every previous build's `<name>-<hash>.exe` behind, and there were
+  **538 of them totalling 12 GB for 215 distinct targets**. Keeping only the
+  newest per name freed 6.7 GB and the build completed. **The durable fix is a
+  prune step in the loop's own preamble**, and it belongs in LOOP.md's gate
+  section beside the `.pdb` paragraph, which now describes a symptom that has
+  been fixed. One caveat learned the hard way: **do not prune while a build is
+  running** — the newest-per-name rule deleted `alo_jmap-<hash>.exe` out from
+  under `nextest --list` and cost a 2½-minute relink. Docker is still
+  unresponsive, so `scripts/prune-test-db.sh` still cannot run; everything ran
+  against `alo_agents_test` on the native **5432** server, 1 333 tests in 155 s,
+  so the database has not bloated.
+
+**Next:** A2.5 — the Drive agent beyond `find_file`: summarise a document,
+extract from an attachment, propose a move or a rename. Read A2.3 first: the
+Docs agent already reads a `doc` node's blocks (`alo-ai/src/doc_blocks.rs`,
+`alo-jmap/src/agent_docs.rs`) and `alo-store/src/drive.rs` gained
+`drive_docs`/`drive_sheets` over a shared `drive_nodes_of_kind`, so "summarise a
+document" is a question of *whose* tool it is rather than of new plumbing —
+decide that before writing anything, because a tool in two products is the one
+thing `workspace_is_every_product_once` refuses. A move or a rename is Drive's
+first **write**, so it wants the treatment the report got here: validated before
+it is proposed, and the refusal naming the node. If the item opens `alo-store` at
+all, pay the `agent_ground.rs:31` debt above in the same commit. Check the
+migrations directory again immediately before committing; `0405` is this track's
+highest and the sites loop is at `0324`.
