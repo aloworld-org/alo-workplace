@@ -8331,3 +8331,63 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Cuts/flags:** none. S3.04f (shop sections + checkout) does not depend
   on the rules table and is the next buildable item.
 - **Next:** S3.04f — shop sections and checkout on the published site.
+
+## 2026-08-16 — S3.04f1 The visitor's door to the box office
+
+- **Item:** S3.04f1 — public checkout doors on the store (split from S3.04f
+  this iteration: the item as written held the store doors, the public
+  pages, the typed section + goldens AND the editor mirror — three
+  iterations of work by the S2.12c/S2.15c precedent, so it became
+  f1/f2/f3 in the queue before the first line of code).
+- **What shipped:** `site_public_shop.rs` — the anonymous visitor's whole
+  vocabulary for the ticket shop, every verb anchored on a `PublishedSite`
+  from the Host resolvers, in the `site_public_orders`/`site_public_bookings`
+  mould:
+  - **The offer** (`public_ticket_events`, `public_ticket_event`): upcoming
+    events priced by `BillingCatalogRead` at EVERY read — the name and the
+    price are the list's answer *now*, never a copy (ADR 0041); an event
+    whose product was archived, or that has started, is simply not offered;
+    `remaining` from the same time-predicate arithmetic the holds use.
+    Unknown, malformed, foreign-tenant and same-tenant-wrong-site ids are
+    one uniform `None`.
+  - **Begin checkout** (`public_begin_ticket_checkout`): typo gate FIRST
+    (name/email/quantity — a bad address never takes a hold real buyers are
+    racing for), then `take_ticket_hold` (30-min `TICKET_CHECKOUT_HOLD_TTL`),
+    then `create_ticket_order`; an order failure releases the hold rather
+    than squatting out the TTL. Returns exactly what the hosted-payment call
+    needs (order id = idempotency key, server-computed amount, currency,
+    "2 × Letterpress workshop — 2026-09-16" description, the hold deadline).
+  - **Settle** (`public_open_ticket_payment`, `public_ticket_payment_target`,
+    `public_settle_ticket_payment`): the S3.04c fetch-not-believe contract
+    re-exposed for the public service — the webhook target is
+    host-independent (a webhook has no Host worth trusting), the status is
+    whatever the caller fetched from the provider, and every path is
+    idempotent by the order machinery's own rules.
+  - **The return page** (`public_ticket_order`): state, amount, the
+    checkout link only while the order is still open, the provider payment
+    id for fetch-on-return, and the ticket token once fulfilment mints it —
+    deliberately NO buyer name/email back out (holding a return URL proves
+    less than being the buyer).
+  - Doors open as `(tenant, owner)` read from the site's own row
+    (`sites.created_by`) — the same handshake as every seam door; the
+    internal `AccountStore` handle is never exposed, so the public service
+    still cannot open a tenant door. `normalize_buyer_name/email` became
+    `pub(crate)` for the pre-hold gate; `lib.rs` gains the additive
+    mod/pub-use lines. No migration (no new tables), no CHANGELOG line
+    (nothing user-visible until f2 serves the pages).
+- **Verified:** `cargo check` clean; new DB suite
+  `tests/site_public_shop.rs` — 5 tests, all green first run: the offer
+  priced from the seam (archived product drops out, started event excluded,
+  a reprice shows at the next read — nothing copied), the full arc (offer →
+  begin → fixture payment → open → webhook target → settle → paid →
+  fulfilment claim → ticket token on the return door, replayed settle one
+  sale, sold seats counting forever), the typo gate costing no seat +
+  the "sold out" sentence verbatim, a dead payment freeing the seats, and
+  the walls (foreign tenant AND same-tenant-second-site on offer/checkout/
+  order/open, probe ids answering the webhook door nothing). Full-crate
+  clippy + nextest below.
+- **Cuts/flags:** the description's date is the event's UTC day (S3.04d's
+  venue-zone cut carries through; f2 inherits it). `public_ticket_events`
+  reads `sale_items()` once rather than per-event; fine to 200 events.
+- **Next:** S3.04f2 — the `/tix` pages, the `tickets` section + goldens and
+  the webhook route on alo-sites.
