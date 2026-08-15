@@ -3040,3 +3040,174 @@ and Agenda agents rather than a second mechanism inside Meet; A3.1's
 one-approval-surface rule then applies to them unchanged. Check the migrations
 directory again immediately before committing; `0405` is still this track's
 highest and the sites loop was at `0328`.
+
+## A3.2 — Meet, after the fact: the record, the minutes, and no second mechanism (2026-08-15)
+
+**What shipped.** alo Meet was the last product whose agent had no tools at all
+— `AgentProduct::Meet => NONE_YET` in `agent_product.rs`, an agent that could
+only answer from a grounding that is deliberately empty for it. It now has a
+tool set of three, and `NONE_YET` is gone: every product has one.
+
+- **`meetings_recent`** (read) — the ended meetings this person was allowed to
+  see, each with its title, when it ran, its day, and whether it came out of a
+  conversation. It exists because a meeting has no id anybody could know: this
+  is what lets the next turn say which one it means.
+- **`meeting_record`** (read) — one ended meeting in full: who attended, the
+  transcript segments, the messages typed during it, and **what has been posted
+  in its room since it finished**. That last field is the `alreadyCaptured` of
+  this item — an agent asked twice can see its own first set of minutes and say
+  so rather than posting a second.
+- **`meeting_minutes`** (write) — a summary, the decisions and the actions,
+  composed into one message and posted into the meeting's own conversation
+  through `post_message`, which posts **as the caller**. The room sees a
+  person's minutes, and the room's membership check is that person's own.
+
+**Nothing here joins a call.** The live in-call participant is a media path
+(roadmap A3.3), explicitly not in this queue and not decided. Everything works
+from what a meeting leaves behind in our own database, which is exactly the seam
+`alo_store::meet` was built to keep: LiveKit knows an opaque room name, and
+every fact that makes a meeting somebody's is ours.
+
+**"Through the ordinary agent path" is enforced, not merely intended.** There is
+no `create_task` and no `create_event` in Meet's set, and the registry test says
+so; the execution boundary refuses them whatever the model returned, which a
+wire test proves by having a Meet agent propose `create_task` and approving it —
+403, and nothing on the board. The actions in minutes become work by asking the
+Tasks agent to capture them out of that room, where each one is still a
+*proposal* the user accepts one at a time (ADR 0023). A3.1's one-approval-surface
+rule applies to them unchanged, and the Meet agent is now routable by its planner
+with something to route *to* — it was always on the roster, it simply had nothing
+to do.
+
+**No store change, and that was the design constraint that paid.**
+`my_recent_meetings`, `my_live_meetings`, `meeting`, `meeting_participants`,
+`meeting_transcript`, `meeting_messages` and `post_message` already exist and
+are already account-scoped, so this item is `alo-ai` + `alo-jmap` only — no
+migration (`0405` is still this track's highest; the sites loop is at `0328`)
+and, more to the point, **no ~115 alo-store relinks**. Two relinks of alo-jmap's
+87 test binaries were needed anyway (4 m 04 s and 5 m 13 s); a third, for a
+one-line comment in alo-store, would have bought nothing.
+
+**The exchange, on the wire** (`agent_meet_http`, real HTTP through the router,
+scripted local model — no live provider, per the safety rails):
+
+```
+POST /chat/channels/{id}/messages  {"body":"@meet what happened in the Q3 budget review?"}
+--- what came back in the room ---
+agent @meet  "You were eleven thousand over on marketing; you agreed to hold
+              marketing flat and move the rest to hosting, and Ben is sending
+              the revised sheet before Thursday [1]."     proposal: null
+
+POST /chat/channels/{id}/messages  {"body":"@meet write up the Q3 budget review"}
+agent @meet  "I'll post the minutes of the Q3 budget review."
+             proposal: {"tool":"meeting_minutes","state":"pending", …}
+POST /chat/proposals/{id} {"approve":true} → 200, state "approved"
+--- and the room now holds, authored by the asker, authorKind "user" ---
+Minutes — Q3 budget review (2026-08-15)
+
+We are eleven thousand over on the marketing line, so marketing holds flat and
+the difference moves to hosting.
+
+Decisions
+- Hold the marketing budget flat
+- Move the difference to hosting
+
+Actions
+- Send the revised sheet — Ben, by 2026-08-20
+
+--- then, through the ordinary agent path, in another room ---
+POST /chat/channels/{other}/messages {"body":"@tasks write down what we agreed in #q3-budget"}
+agent @tasks proposal: {"tool":"capture_actions", …} → approved → state "proposed"
+                       → one task PROPOSAL, source chat/#q3-budget, still to be accepted
+```
+
+**What the five tests assert beyond "it ran".** The first call's system prompt
+starts "You are the alo Meet agent" and contains `- meeting_minutes:` but
+neither `- create_task:` nor `- create_event:`. The second call's user turn
+contains `meetingRecord` with the words actually spoken in the meeting and the
+message typed during it — so the answer came from the record and not from a
+search snippet. Nothing matching `Minutes — Q3 budget review` is in the room
+before the tap. The posted row has `author_is_agent == false` and the asker's
+own user id. `task_proposals()` is empty after the minutes are posted, and holds
+exactly one row after the Tasks agent's own capture. The refusals: a meeting
+still running is "has not ended yet, so it has no minutes" rather than "no such
+meeting" — saying the latter about a meeting somebody is sitting in would be a
+lie; a title that ran twice lists the days; a day that is not a date and a day
+nothing ran on are two different refusals. Isolation: another tenant's meeting
+and a colleague's private-room meeting are both absent from `meetings_recent`
+and both earn the *same words* an invented title earns, so asking is not a way
+to learn that somebody else's meeting exists.
+
+**Cuts and flags.**
+
+- **The minutes' three headings are hardcoded English** ("Minutes",
+  "Decisions", "Actions"), as `UNCONFIGURED`, `OUT_OF_LOOKUPS` and A3.1's plan
+  heading already are. Everything around them — the summary, every decision,
+  every action — is the model's, written in the language of the meeting.
+  Externalising all server-side agent speech is one job, not six, and it is
+  still not this item's. This is the sixth entry to say so; it is worth a queue
+  item of its own.
+- **A transcript is capped at 200 segments and the in-meeting chat at 50**, with
+  `transcriptTruncated` reported rather than silently dropped. A three-hour
+  sitting would otherwise be a denial-of-service on the model's context.
+- **The fixture cannot backdate a meeting's ending** (`end_meeting` writes
+  `now()`), so the "say which day" refusal is proven with two sittings that both
+  ran today, and the day filter is proven by a day neither ran on. A test that
+  wanted a real two-day spread would have to write timestamps behind the store's
+  back, which is worse.
+- **A meeting started outside a conversation has no thread.** Its record reads
+  (with `room: null`) and its minutes are refused, naming which of the two it
+  is. Picking a room for it would put somebody's meeting in front of people who
+  were never in it.
+- `NO_TOOLS_YET` in `agent.rs` is now taken by no product. It was kept — a
+  product is routinely added a wave before its agent — but the branch moved into
+  a small pure `tools_block`, so it stays tested rather than rotting as dead
+  code nothing exercises.
+- **The sites track's pre-existing failure is still there and still theirs**:
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  compares a Windows `OffsetDateTime` at 100 ns against the same instant
+  round-tripped through Postgres at microsecond precision.
+- `cargo fmt -p alo-ai` reformatted the sites track's `site_chat.rs` again, and
+  it was reverted before committing — the sixth entry running to say so.
+
+**How verified.**
+
+- `cargo fmt -p alo-ai -p alo-jmap` clean (with the revert above).
+- `cargo clippy -p alo-ai --all-targets` and `cargo clippy -p alo-jmap
+  --all-targets` — zero warnings from either crate; the two `type_complexity`
+  warnings are pre-existing in `alo-store/src/meet.rs`.
+- `cargo nextest run -p alo-ai` — **237 passed** (229 before; the eight new ones
+  are the Meet tool set's seven plus the empty-tool-set one).
+- `cargo nextest run -p alo-jmap --no-fail-fast` — **1 220 of 1 221 passed** in
+  154 s. The one failure is the sites-track one above. Two registry counts moved
+  with the new tools and were updated where they are written out rather than
+  derived: `all_tools().len()` 68 → 71, and the read list 32 → 34.
+
+**Environment.**
+
+- **Docker still answers nothing** — `docker ps` returns an empty list, and so
+  does `docker ps -a` — so `scripts/prune-test-db.sh` still cannot run. The
+  Postgres it forwards is still up on 5432, and every command here carried
+  `DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_agents_test`, as
+  the last several iterations did. The suite finished in 154 s, so the database
+  has not bloated.
+- **Disk opened at 3.4 GB free, 100 %** and stayed there. The newest-per-name
+  sweep freed only 0.02 GB (90 names, 93 binaries — earlier iterations' sweeps
+  had already done the work), and both builds ran with
+  `CARGO_PROFILE_TEST_DEBUG=0` plus the `.pdb` sweep beside them. Neither hit
+  `LNK1180`.
+
+**Next:** A3.3 — the agent directory, API side: what each agent is for, what it
+may touch, and what it has done, per tenant. Everything it needs to *report*
+already exists and is worth reading before starting: `chat_agents.rs` holds the
+row (handle, name, description, product, disabled), `alo_ai::tools_for(product)`
+plus `agent_product::headline` say what an agent may touch, and
+`agent_tool_runs.rs` already records every run with its effect and whether it
+succeeded — so this item is a read surface over three things that exist, not a
+new mechanism. Two things to decide inside it: whether the directory is gated by
+the module switch the way `agents()` already is (it should be — an agent for a
+module you cannot open should not be describable), and whether "what it has
+done" is the tenant's runs or the asker's own (the store's own scoping makes the
+latter the honest default, and anything wider needs the admin gate stated in the
+item). The directory *screen* is `[web]` and stays blocked behind the chat
+rebuild.

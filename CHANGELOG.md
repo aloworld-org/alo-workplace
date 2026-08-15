@@ -10,6 +10,24 @@ contracts.
 
 ## Unreleased
 
+- **`@meet` can now write up a meeting after it has finished.** Ask what
+  happened in one and it answers from the meeting itself — who was there, what
+  was said out loud, and what people typed during it — with no button in
+  between, because reading a meeting you were in changes nothing. Ask it to
+  write the meeting up and it proposes the minutes: a short summary, the
+  decisions, and the actions with whoever took each one and by when. Approving
+  it posts them in the conversation the meeting came out of, **under your own
+  name**, so the room sees your minutes rather than a robot's. It writes down
+  only what the meeting actually contains: no decision nobody made, no owner
+  nobody volunteered, no deadline nobody gave. Name a meeting the way you would
+  say it; if the same title ran twice, it asks which day rather than guessing.
+  A meeting still running has no minutes yet and it says so, and one you did
+  not start from a conversation has nowhere to post them. The actions in the
+  minutes become to-dos the ordinary way — ask `@tasks` to write down what was
+  agreed in that room, and each one still waits for you to accept it in your
+  task list. `@meet` cannot put a task on a board or an entry in a diary
+  itself, by design.
+
 - **`@alo` now asks the right agent instead of trying to be all of them.** Ask
   it something in a room and it first says what it is going to do — a numbered
   plan, one line per step, naming the agent each part goes to — and then works
