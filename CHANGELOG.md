@@ -10,6 +10,19 @@ contracts.
 
 ## Unreleased
 
+- **Your website's assistant now has one screen — the switch, the budget, and
+  its reading list together.** Open Assistant on a website you own and switch
+  it on, set the monthly budget it may spend answering visitors (pre-filled
+  with the default, never blank, with this month's spend beside it), and see
+  exactly what it reads: your published pages and posts, always, plus any
+  document you deliberately publish to it from Drive. Above the publish
+  button, every time, the screen says the whole rule in one sentence — anyone
+  on the internet will be able to read this — and a published document can be
+  withdrawn with one click while staying untouched in Drive. Switching the
+  assistant on, spending the budget, and publishing sources are all reserved
+  for the website's owner; invited editors keep editing pages and nothing
+  more.
+
 - **Ask the Websites agent how far your other languages have got.** "Is the
   website ready in French?" now gets a straight count back: how many pages your
   site has, how many are already written in each language you set it up in, and

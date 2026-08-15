@@ -7357,3 +7357,74 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.02d — source-adding UI: the screen that publishes a source to
   the bot says *anyone on the internet will be able to read this* above the
   button; the ceiling is set in the same screen the bot is switched on.
+
+## 2026-08-15 — S3.02d the sentence above the button, and one screen for the whole assistant
+
+- **Item:** S3.02d — source-adding UI (ADR 0040 §1): the screen that
+  publishes a source to the bot says *anyone on the internet will be able to
+  read this* above the button, every time; the ceiling is set in the same
+  screen the bot is switched on.
+- **What shipped:**
+  - HTTP door for the S3.02a store (`products/mail/alo-jmap/src/
+    sites_knowledge.rs`, routes under the existing `/sites/*` prefix — no new
+    Caddy prefix): `GET/POST /sites/{id}/chat-knowledge` and `DELETE
+    /sites/{id}/chat-knowledge/{source}`. POST answers the stored binding
+    (title included) so the screen shows the new source without a second
+    read; the store's own sentences (unreadable kind, duplicate, the 50-doc
+    cap) surface verbatim as 422s.
+  - **The whole assistant-admin surface is the owner's** — `require_site` +
+    `require_site_manager` on all three knowledge routes AND (added in this
+    item) on `GET/PUT /sites/{id}/chat-settings` from S3.02c, the
+    domain-purchase posture: a restricted site editor cannot read Drive, so
+    letting them publish a Drive document to the internet-facing bot — or
+    switch the bot on and set the tenant's spend — would hand them exactly
+    the doors their role closes. S2.16a's matrix predates these routes; the
+    wave review should re-walk them.
+  - The screen (`web/src/sites/AssistantView.tsx`, route
+    `:siteId/assistant`, entry button on the site surface rendered only for
+    `canManageCollaborators`): ONE screen holding the switch, the euro budget
+    (pre-filled from the server's defaults, never blank; saved as integer
+    cents; spend-this-month and the ceiling-hit pause explained beside it,
+    server 422s shown verbatim) and the reading list — published site and
+    posts as fixed always-read rows, then the Public knowledge collection
+    with per-source withdraw (trashed docs flagged "no longer read", not
+    hidden). `KnowledgePickerDialog.tsx` browses Drive one folder at a time,
+    selects exactly one document, and never offers a folder as a source (the
+    ADR's rejected standing grant). The sentence "Anyone on the internet will
+    be able to read this." stands above the publish button on the panel AND
+    above the confirm in the dialog — warning-toned, not dismissible.
+  - i18n: full en/fr/nl for every new string (the sites parity ratchet
+    enforces it).
+- **Verified:** `cargo fmt` clean; `SQLX_OFFLINE=true cargo clippy -p
+  alo-jmap --all-targets` — zero warnings from this item (the two survivors
+  are the pre-existing alo-store `meet.rs:319` pair, another track's file).
+  `cargo nextest run -p alo-jmap` **1 107/1 107 green (64.8 s)** incl. the
+  new `sites_knowledge_http` (publish/list/withdraw arc, duplicate 422 naming
+  the rule, folder refusal, foreign-tenant 404 on every door incl. both
+  settings routes, no-token 401, and the owner wall: a granted site editor
+  AND an uninvolved colleague both 403 on list/add/settings — with proof the
+  refusals changed nothing). Web: `npx tsc --noEmit`, `npx eslint` (changed
+  files), `npm run build` clean; `vitest src/sites` **267/267** incl. the new
+  `Assistant.test.tsx` (switch+budget saved as cents from one screen,
+  ceiling-hit said out loud, the internet sentence above the button on the
+  panel and again in the dialog with the confirm disabled until a document is
+  chosen, withdraw touching only its source). **On the wire** (debug alo-jmap
+  on 127.0.0.1:8080, docker `alo-pg` db `alo` — confirmed via
+  pg_stat_activity; two fresh identityctl tenants): no token → 401; empty
+  list; real blob upload → `/drive/files` doc → publish → stored binding
+  with title; duplicate → 422 "already in the site's public knowledge";
+  foreign tenant → 404 on knowledge and settings; owner settings GET
+  defaults → PUT 2500 → persisted; withdraw → `{"status":"removed"}`, row
+  count 0 in psql, the Drive doc untouched (`trashed = f`). Server killed
+  after.
+- **Cuts/flags:** none of the item's scope cut. The one-binary nextest run
+  first failed with PoolTimedOut across DB-backed suites — the fallback URL
+  in tests points at 5433 where nothing listens; export
+  `DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo` for the gate
+  (already in the Mac memory note, now re-learned on this machine). The
+  structured facts of ADR 0040 §1 (opening hours, catalog prices,
+  availability as one-by-one switches) are not yet in the store and so not
+  on this screen; they belong to the acting-bot items (S3.03x/S3.04x) whose
+  seams carry those facts.
+- **Next:** S3.02e — visitor chat UI: on-site widget, keyboard-accessible,
+  mobile, citations as links, and an honest empty/unavailable state.
