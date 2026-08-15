@@ -175,3 +175,119 @@ implementation — but it is committed **ungated**, which is why the box is
 unticked.
 
 **Next:** A1.1's gate, then A1.2 — a product on the agent record.
+
+---
+
+## A1.1 (continued) — the gate, and why the last one could not run (2026-08-15)
+
+**A1.1 is now `[x]`.** The code was already committed (`7d935c1c`); this entry is
+the gate it was missing, the two tests it owed, and the environment fault that
+stopped it.
+
+**The halt above was wrong about its own cause. The disk was full.** `docker
+version`, `docker ps` and `docker exec` do not hang because the daemon is
+"wedged" for its own reasons — C: was at **100%, 3.2 MB free**, and Docker
+Desktop stops answering when it cannot write. The first thing this iteration ran
+after `git pull` was a build, and it failed with `rustc-LLVM ERROR: IO failure on
+output stream: no space on device` and `LNK1318 Unexpected PDB error`, which is
+what sent the search to `df` instead of to docker. **Check `df -h` before
+concluding anything about docker.**
+
+Where the space went, and what freed it:
+
+- 17 GB of it was `.pdb` debug-symbol files in **this checkout's own**
+  `target/debug/deps` — one per test binary, ~150 MB each, and this workspace has
+  ~185 of them. Deleting them frees the space without invalidating a single
+  compiled artifact (cargo does not fingerprint them; only symbolised backtraces
+  are lost). That got the gate moving.
+- They come straight back on the next build, and did: `alo-store`'s suite refilled
+  the disk to 380 MB free, and `alo-jmap` then could not link at all. The fix that
+  holds is **`CARGO_PROFILE_TEST_DEBUG=0`** — an env var, so no shared file is
+  edited and no other track's build is disturbed. It applies to test targets only
+  (dependencies keep `profile.dev`), so it does not force a dependency rebuild,
+  and test binaries then carry no PDB at all. Every gate below ran with it.
+- Two other checkouts hold build caches on the same disk (`/c/dev/Ficina/target`
+  is 24 GB). **Not touched** — a loop mid-build there would break, and it is not
+  this track's to clean.
+
+**The test database.** The test Postgres on **5433** is a container and could not
+be started (see above), so the gate ran against a **fresh database on the live
+5432 server**: `sqlx database create` + `sqlx migrate run --source
+platform/alo-store/migrations` created `alo_agents_test` and applied all 310
+migrations, `0400` included, from empty. Every command below carries
+`DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_agents_test`. It is
+its own database on its own lineage — the backend's `alo` database was not
+touched. `scripts/prune-test-db.sh` cannot prune it (its first statement is a
+`docker exec`); while docker is down, drop and recreate it with `sqlx` instead.
+
+**The gate, all in the foreground.**
+
+- `cargo fmt` clean. `SQLX_OFFLINE=true cargo clippy -p alo-jmap -p alo-store -p
+  alo-ai --all-targets` — zero errors, zero new warnings (the same two
+  pre-existing `type_complexity` warnings in `alo-store/src/meet.rs`, another
+  track's file).
+- **`cargo nextest run -p alo-store` — 1918/1918 green** (119 s), including
+  `platform/alo-store/tests/agent_tool_runs.rs`, the **mandatory wrong-tenant
+  test**, run on its own as well to be sure it was not filtered:
+  `a_run_is_never_another_tenants_and_never_a_colleagues` and
+  `a_read_leaves_a_record_even_though_nobody_approved_it`, both PASS.
+- **`cargo nextest run -p alo-jmap -p alo-ai --no-fail-fast` — 1166/1167**, the
+  one failure being another track's, below.
+
+**The two tests A1.1 owed, now written and green.**
+
+- `products/mail/alo-jmap/tests/agent_reads_answer_http.rs` — the properties on
+  the wire, in a real room, with **no live model**: the tenant's AI backend is a
+  scripted local socket (the shape `tests/insights_ask_http.rs` established), so
+  the two-turn read loop is exercised without a single external call.
+  - `a_read_answers_in_the_room_and_leaves_no_proposal`: the model asks for
+    `catch_up_room`, it runs inside the turn, and the **second** call to the model
+    is asserted to carry the tool's own result (`chatCatchUp`, containing the
+    asker's own question) among its sources — so the answer is grounded in the
+    record rather than in search hits. The agent's message arrives with
+    `proposal: null`, and **every** message in the room is asserted to have none:
+    a read files no `chat_proposals` row. One audit row, `catch_up_room`/`read`/ok,
+    against that agent and that channel, and `agent_records().reads == 1`.
+  - `a_write_executes_nothing_until_the_asker_approves_it`: the model asks for
+    `create_task`; the room gets the sentence with a **pending** proposal hanging
+    off it, `askedBy` the asker. At that moment the personal project holds **no
+    task** and `agent_tool_runs` is **empty** — nothing ran, so nothing is logged
+    as having run. `POST /chat/proposals/{id} {approve:true}` then creates exactly
+    one task with the proposed title and leaves one `create_task`/`write`/ok row.
+- The execution boundary itself: `execute_tool`'s condition is now the named
+  `must_wait_for_approval(entry, approval)` in `agent.rs`, and
+  `a_write_is_refused_from_inside_a_turn_and_a_read_never_is` checks it over
+  **every tool in the registry** — refused under `Approval::InTurn` iff it is a
+  write, never refused under `Approval::Asker`. This replaces the integration test
+  named in the previous entry, and is a better test than that one could have been:
+  `execute_tool` is `pub(crate)`, and no wire path can hand it a write under
+  `InTurn` because the turn consults the registry first, so an integration test
+  would have had to fake the very thing under test. The rule is now checked
+  directly, over the whole list, with no database and no model.
+
+**Flag for the sites track — a pre-existing failing test, not touched.**
+`products/mail/alo-jmap/tests/site_schedule_http.rs:193`
+(`a_publish_is_scheduled_moved_and_called_off`, from `78781768`) asserts
+`instant(&scheduled["publishAt"]) == chosen`, where `chosen =
+OffsetDateTime::now_utc() + 2 days`. Windows' clock has 100 ns resolution (7
+fractional digits); Postgres `timestamptz` stores microseconds (6). The value
+round-trips truncated, so the assertion fails whenever the seventh digit is
+non-zero — i.e. about nine runs in ten, on this platform, regardless of database.
+Observed three times with three different timestamps. It is the sites track's
+file and their area, so it is reported rather than fixed.
+
+**Cuts / flags.**
+
+- No CHANGELOG line added: the user-visible line for this behaviour went in with
+  `7d935c1c` and still describes what ships. No new routes, so nothing is owed to
+  the production Caddyfile.
+- The `Bash` tool's ceiling on this harness is **10 minutes**, not the 600 s the
+  LOOP text assumes is generous: a cold `cargo nextest run -p alo-jmap` build
+  (4 m 18 s) plus its run does not fit one call. It was not backgrounded — the
+  same foreground command was re-run, and cargo's cache carried the build
+  forward. That is the right move when a build is cut off at the ceiling.
+
+**Next:** A1.2 — a product on the agent record (migration `04xx`), and the tool
+registry scoped by it, refused at the execution boundary rather than in the
+prompt. Check the migrations directory again immediately before committing: the
+sites loop is climbing through `03xx`.

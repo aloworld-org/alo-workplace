@@ -72,6 +72,26 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      gate past the one-command ceiling and sent earlier iterations into the
      polling workarounds below. If a gate is mysteriously slow, this is the
      first thing to check, not the last: `select count(*) from tenants;`.
+   - **A wedged docker, a failed link and a mysteriously dead daemon are all one
+     symptom: `df -h` first.** On 2026-08-15 an iteration halted with "docker
+     daemon unresponsive" after thirty minutes of `docker ps` hanging; the actual
+     fault was C: at **100%, 3.2 MB free**, and Docker Desktop stops answering
+     when it cannot write. The tell in a build is `rustc-LLVM ERROR: IO failure on
+     output stream: no space on device` or `LNK1318 Unexpected PDB error`. On
+     Windows the space is usually **`.pdb` debug symbols in your own checkout's
+     `target/debug/deps`** — one per test binary, ~150 MB × ~185 binaries ≈ 17 GB.
+     Deleting them frees it and invalidates nothing (cargo does not fingerprint
+     them; you lose symbolised backtraces only), but they return on the next
+     build. The fix that holds is **`CARGO_PROFILE_TEST_DEBUG=0`** in the gate's
+     environment: it applies to test targets only, so no dependency rebuilds, and
+     no PDB is written at all. Never clean another checkout's `target/` to make
+     room — a loop mid-build there breaks.
+   - **The `Bash` ceiling on this harness is 10 minutes, whatever timeout you
+     pass.** A cold build plus a suite can exceed it. When a foreground gate is
+     cut off mid-build, **re-run the same foreground command** — cargo's cache
+     carries the build forward and the second call gets to the tests. Do not
+     background it, and do not conclude the gate is too big before you have let
+     the build finish across two calls.
    - Rust touched: `cargo fmt` on changed crates; `SQLX_OFFLINE=true cargo
      clippy -p <crates> --all-targets` clean; then **`cargo nextest run -p
      <crates>`** green — *not* `cargo test`. `cargo test` runs each test
