@@ -23,6 +23,17 @@ contracts.
   booking-page confirmation now carries the same calendar file and
   cancellation link.
 
+- **Your files have an agent now — `@drive`.** Ask it what a document says
+  and it reads the file before answering, so a summary is written from the
+  words that are in it rather than from its name; a file it cannot read —
+  a PDF, a picture, an office document — is named and refused instead of
+  described. Ask what came with an email and it lists the attachments and
+  pulls the text out of the one you name. It can also propose a new name
+  or a new folder for a file, and both wait for your tap: a rename keeps
+  the file's extension so it still opens, a move stays inside your own
+  Drive so it never changes who can see the file, and nothing the agent
+  can do deletes anything or edits a word inside a file.
+
 - **Your calendar now tells your website even less.** When a visitor looks
   at free appointment times — on a booking page today, in the site
   assistant's conversation next — the calendar behind the service answers

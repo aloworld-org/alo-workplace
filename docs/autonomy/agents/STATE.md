@@ -2177,3 +2177,137 @@ it is proposed, and the refusal naming the node. If the item opens `alo-store` a
 all, pay the `agent_ground.rs:31` debt above in the same commit. Check the
 migrations directory again immediately before committing; `0405` is this track's
 highest and the sites loop is at `0324`.
+
+## A2.5 — the Drive agent: what a file says, what came with an email, and where a file lives
+
+**Shipped.** `AgentProduct::Drive` had one tool since A1 (`find_file`) and was
+the last one-sided read-only set in the registry; it now carries five, three of
+which answer in the room and two of which wait for the asker's tap.
+
+- `file_read` (read) — **what the file actually says.** A `doc` node is
+  flattened out of the same block array the editor stores (headings keep their
+  level as a marker, list items keep their bullet); a text-ish blob is decoded
+  from its bytes. What comes back is running text and **no address a write could
+  use**, which is the whole difference between Drive reading a file and Docs
+  reading a document.
+- `attachment_read` (read) — the attachments of an email the user named **by its
+  subject**, and the text of the one they named by its filename. No message id
+  is ever asked of the model: the subject goes through
+  `AccountStore::workspace_search`, which is the search box's own door.
+- `file_rename` (write) — a new name, with the file's own extension carried
+  across whatever the model proposed.
+- `file_move` (write) — a file into another folder of the caller's **own** Drive
+  and nowhere else.
+
+- **The decision the last journal asked for: whose tool "summarise a document"
+  is.** It is Drive's, and it is a *different* tool rather than a second copy of
+  `doc_read`. The two products read the same `doc` node for opposite reasons:
+  Docs reads it **by block id** so a rewrite can land on a paragraph, Drive reads
+  it as prose so a person can be told what is in it. `file_read` therefore hands
+  back no block ids at all — asserted twice, once in the unit test over the
+  wording (`reading_a_file_hands_back_no_address_a_write_could_use`) and once on
+  the wire, where the model's second turn is checked for the file's sentences and
+  against the block id `b2`. That is what keeps `workspace_is_every_product_once`
+  true without making the Drive agent answer "ask another agent" to the most
+  ordinary question it will ever get. `file_read` refuses a `sheet` node **naming
+  the alo Sheets agent**, because a spreadsheet flattened to prose is an answer
+  shaped like a summary and wrong in every figure.
+- **An attachment is a file that has not been filed yet**, so `attachment_read`
+  is Drive's rather than Mail's (A2.8 owns correspondence: who wrote, what we
+  promised, who has not replied). It lives in its own module,
+  `alo-jmap/src/agent_attachments.rs`, because it parses MIME rather than reading
+  a row and a blob — one file, one reason to change.
+- **The one rule the whole item is shaped by: a summary is written from the file
+  or it is not written.** Everything the agent cannot decode is refused **by name
+  and by what it is** — "scan.png is a .png file, and its text cannot be read
+  here — say so rather than describing what it might contain" — and the model is
+  told in its own guidance that a summary written from a filename is a guess
+  presented as a fact. There is no PDF or office extractor in this repo, and a
+  lossy decode of one reads like text and summarises like nonsense, which is the
+  one failure that would turn an agent into a liar. A `.txt` whose bytes are not
+  valid UTF-8 is refused the same way, for the same reason.
+- **A rename cannot make a file stop opening.** `q3.xlsx` renamed to
+  "Q3 report" becomes `Q3 report.xlsx`: the extension is not the model's to
+  change, and no wording of a tool description stops a model proposing a bare
+  title. Also refused, all before the store is touched: a name that is a path
+  (`../secrets`, `a/b`), a blank, a control character, one past 200 characters,
+  and one a sibling already has. A rename to the name the file already has is
+  **not a failure and not a change** — `changed: false`, reason `nameUnchanged`,
+  nothing written.
+- **A move never changes who can read the file.** `drive_move` re-scopes a node's
+  access (ADR 0027), so a destination in a Space would hand the file to everybody
+  in that Space. The destination is therefore always `DriveLocation::Personal`
+  and cannot express anything else. The folder is found by walking the caller's
+  own tree with `drive_list` (bounded at depth 6 / 300 folders, because
+  `drive_find` deliberately excludes folders), and a folder that is not there is
+  refused with **the folders that are** listed — `pick`'s own "no folder of yours
+  is called Invoices" is true and useless on its own.
+- **Two files of one name make the name unusable, and that is the right
+  answer.** The wire test asserts it for all three file tools: "more than one
+  file matches deal.txt" rather than one of them picking a file to act on. It
+  also means `file_move`'s destination-collision guard is normally reached only
+  through a *folder* sharing the file's name; it is kept and tested there,
+  because "the destination decides what may land in it" should not depend on how
+  the source happened to be resolved.
+- **Nothing here opens `alo-store`.** Every read and write already existed
+  (`drive_find`, `drive_list`, `drive_node`, `drive_writable`, `drive_rename`,
+  `drive_move`, `blob_bytes_for_send`, `message_bytes`, `workspace_search`), so
+  the item cost two crates' gates instead of `alo-store`'s ~115 relinks. **The
+  `agent_ground.rs:31` documentation debt the last journal handed to this item is
+  therefore NOT paid** — a one-comment change to `alo-store` would have bought a
+  40-minute relink, which is not a trade a comment justifies. It moves on to the
+  next item that opens the crate for a real reason.
+- **Registry counts moved**, as every A2 item's journal has warned:
+  `all_tools().len()` 53 → 57 (in two places — `agent.rs` and
+  `agent_product.rs`), and `agent_turn.rs`'s read count 23 → 25. One more this
+  time: `a_one_sided_product_is_told_about_the_half_it_has` had Drive down as
+  read-only, and Drive is now two-sided.
+
+**Verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-ai -p alo-jmap
+--all-targets` clean (the two pre-existing `clippy::type_complexity` warnings in
+`alo-store/src/meet.rs` are not this track's and were not touched);
+`cargo nextest run -p alo-ai` **197/197**; `cargo nextest run -p alo-jmap
+--no-fail-fast` **1 157 tests, 1 156 passed** in 345 s. The new wire test is
+`products/mail/alo-jmap/tests/agent_drive_http.rs` — 10 tests: the summary asked
+in a room with no button in between (asserting the model was shown the file's own
+sentences and no block id), reads and refusals over five kinds of file, the
+attachment listed and read with the PDF beside it refused by name and type, an
+email with nothing attached answering `noAttachments`, the rename and the move
+each proposed then approved then checked in the store, both write refusal sets,
+and the isolation sweep across a tenant boundary and a colleague's private Drive
+for every tool including the email one.
+
+- **The one pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime` at
+  100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision. Identical to the failure the last five iterations
+  recorded; the file is theirs and the fix on their side is comparing at
+  microsecond precision.
+- **Environment.** C: opened at **2.0 GB free, 100 % full**. Deleting this
+  checkout's `target/debug/deps/*.pdb` (86 files) took it to 6.9 GB; the
+  newest-per-name binary sweep found only **2** stale binaries this time, which
+  is what the sweep looks like when the previous iteration ran it — 20 GB of
+  `target/debug/deps` is now overwhelmingly `.rlib`/`.rmeta` rather than
+  leftovers. The full `nextest --no-run` for alo-jmap took **4 m 02 s** (81 test
+  binaries, not alo-store's ~115) and left the disk at 1.4 GB, which the
+  post-build sweep took back to 6.4 GB. Docker is still unresponsive — `docker
+  ps` hung past 120 s again — so `scripts/prune-test-db.sh` still cannot run;
+  everything ran against `alo_agents_test` on the native **5432** server
+  (`DATABASE_URL` set per run; the harness's own default is 5433, which is the
+  dead docker one), and 1 157 tests in 345 s says the database has not bloated.
+
+**Next:** A2.6 — the Agenda agent beyond reads: find a time across several
+diaries, prep a meeting from its thread and attachments, reschedule. Two things
+to read first. `agent_reads.rs` already owns `whats_on` and `am_i_free` for the
+caller's **own** diary, and "across several diaries" is a different access
+question — check what `alo-store`'s calendar module already exposes for a
+colleague's free/busy before assuming a new store method, because that method is
+the difference between a two-crate gate and an `alo-store` one (this item's whole
+budget turned on exactly that). And "prep a meeting from its thread and
+attachments" now has a reader: `attachment_read` above pulls text out of an email
+by subject, so the prep is a question of *joining an event to its thread* rather
+than of new parsing — do not build a second attachment path. If the item opens
+`alo-store` for the free/busy read anyway, pay the `agent_ground.rs:31` comment
+debt in the same commit. Check the migrations directory again immediately before
+committing; `0405` is this track's highest and the sites loop was at `0324`.
