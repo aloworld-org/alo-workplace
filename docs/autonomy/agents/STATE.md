@@ -3532,3 +3532,22 @@ for whoever runs the next `alo-store` gate.
 
 **Still LOOP COMPLETE (with blockers).** Nothing further to attempt on this
 track until a human takes the chart decision.
+
+## Fourth re-entry, same answer — stop the wrapper (2026-08-15)
+
+Same three cheap checks, same result: pull already up to date and the tree
+clean, nothing new under `docs/decisions/` or in `docs/features.md` since 08-14,
+and nothing under `web/src` importing `sheets-chart`, `engine-chart` or
+`SHEET_CHART`. A2.2b's premise is untouched, it has had its one sanctioned
+re-attempt, and every item above it is `[x]`. **No code shipped.**
+
+The new fact is the only reason this entry exists: **this is the fourth
+consecutive iteration to end without work**, so the wrapper is now spending
+whole invocations on a closed queue. Nothing in the protocol lets a loop stop
+its own wrapper — a human does that. Disk still **C: 5.8 GB free**, exactly
+where the sweep left it, which also says nothing else has built on this box
+since.
+
+**Still LOOP COMPLETE (with blockers).** The chart decision is a human's:
+adopt a licensed plugin under an ADR, build charts natively as their own
+feature, or drop chart-from-intent.
