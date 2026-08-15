@@ -2656,3 +2656,212 @@ already has one, the item is the other two questions. And `meeting_prep`
 bodies — that is the correspondence reader this item needs, so lift it rather
 than write a third one. Check the migrations directory again immediately before
 committing; `0405` is this track's highest and the sites loop was at `0324`.
+
+## A2.8 — the Mail agent's answer half: the exchange, who spoke last, and what was actually promised (2026-08-15)
+
+**Item.** A2.8, the last of wave A2: correspondence questions answered from the
+record — "are we in contact with X", "who last replied", "what did we promise
+them" — cited to the messages and never to a snippet.
+
+**What the last entry told this one to find out first, and what it found.** A1.7
+did ask `@mail are we in contact with ABC?` on the wire and did answer it — from
+**grounding**, in one model call, with no tool involved. So the Mail agent had no
+reading tool at all: all nine of its tools were writes, and `agent_mail.rs` said
+so in a comment that named this item. The answer A1.7 recorded is right for the
+wrong reason. Retrieval returns the messages whose *subject lines* rank for the
+words in the question; a subject line has no direction, so "who last replied" has
+nothing to answer from, and "what did we promise them" can only be paraphrased
+out of a subject. Both halves of the item's sentence were therefore missing, and
+the item is the tools, not a second proof of A1.7.
+
+**What shipped.** Two reading tools, declared once in the registry and executed
+in one new module.
+
+- `correspondence {who, about?, limit?}` — everything exchanged with one person
+  or company, **both directions**, newest first. Two `query_emails` per lookup
+  name (the mailbox stores the two directions in two columns), merged and
+  de-duplicated by id. It answers the first two questions as facts in the
+  payload rather than leaving them to be inferred: `inContact`, `lastReplyBy`
+  ("them"/"us"/null), `lastFromThem`, `lastFromUs`. The newest three messages
+  are opened and previewed; the rest carry `"opened": false`.
+- `message_read {message}` — one message of that exchange in full: its text
+  (3 000 chars, `truncated` said plainly), everyone it was addressed to, and
+  what is attached to it by name. The id comes from a `correspondence` result;
+  the store's own scoping is what refuses any other.
+- `products/mail/alo-jmap/src/agent_correspondence.rs` (new, 4 unit tests),
+  dispatched from `agent.rs`, registered in `alo-ai`'s `MAIL_TOOLS` with
+  `AgentTool::read`, described in `MAIL_TOOL_DOC`, and given a paragraph of
+  `MAIL_GUIDANCE` that forbids speaking for a message marked unopened.
+  `agent_meeting.rs`'s private copy of "how large a message may an agent open"
+  was deleted and now calls this module's reader, so there is one answer to it.
+- `products/mail/alo-jmap/tests/agent_correspondence_http.rs` (new, 5 tests).
+- **No migration and no `alo-store` change.** Every read it needs was already on
+  the account door (`query_emails`, `message`, `message_bytes`, `contacts`), so
+  the crate that costs ~115 relinks was never opened. `0405` is still this
+  track's highest.
+
+**The one thing that was nearly built wrong.** The first cut looked `who` up as a
+substring of the mail headers and nothing else. That fails the headline question
+outright: a mailbox stores `ilse@abc-supplies.test`, and nobody asking "are we in
+contact with ABC Supplies?" types the hyphen — the search matches nothing, and
+the agent would have answered "no" about a company it corresponds with weekly.
+So `lookup_names` resolves the name through **the asker's own address book**
+(Mail's own — it is why `find_contact` is a Mail tool, so this is the same door
+and not a wider one) into the addresses it reaches, and, only when the name is
+recognisably the domain itself, into that domain. The domain rule is guarded:
+`domain_is_the_name` compares letters and digits only, so "ABC Supplies" is
+`abc-supplies.test` and "Ilse Vermeer" is *not* `gmail.com` — widening
+unconditionally would have made every stranger at a webmail provider a colleague
+of the one person filed under it. That is what puts `orders@abc-supplies.test`
+in the same exchange as Ilse, which is what a person means by "the company".
+
+**On the wire**, against the local backend (real Postgres, the real axum router,
+the scripted local socket as the model — a paid or external AI call is forbidden
+by the standing rail). Printed by the tests themselves:
+`cargo nextest run -p alo-jmap --test agent_correspondence_http --no-capture`.
+
+The first two questions, one lookup, verbatim:
+
+```
+POST /chat/channels/3FqB8xSO-q6RXgSIPY_77Q/messages
+     {"body":"@mail are we in contact with ABC Supplies, and who replied last?"}
+--- what the model replied (call 1 of 2) ---
+{"action":{"args":{"who":"ABC Supplies"},"tool":"correspondence"},
+ "kind":"action","say":"Let me look at the exchange."}
+--- what the model was shown (call 2 of 2, user turn) ---
+Sources:
+[1] email "Re: our quote for ABC Supplies"
+[2] email "Re: our quote for ABC Supplies"
+[3] email "ABC Supplies - your March delivery"
+[4] contact "Ilse Vermeer"
+[5] tool result "correspondence" — {"about":null,"inContact":true,
+"kind":"correspondence","lastFromThem":{"at":"2026-08-06T14:40:00Z",
+"id":"HuyE-Ejp_hwQ6V76tJ5baA","subject":"Re: our quote for ABC Supplies"},
+"lastFromUs":{"at":"2026-08-05T08:30:00Z","id":"h660b90X47YnTc93FnKIVA",
+"subject":"Re: our quote for ABC Supplies"},"lastReplyBy":"them","limit":8,
+"lookedFor":["ABC Supplies","abc-supplies.test"],"messages":[
+{"at":"2026-08-06T14:40:00Z","attachments":[],"direction":"them",
+"from":"Ilse Vermeer <ilse@abc-supplies.test>","id":"HuyE-Ejp_hwQ6V76tJ5baA",
+"opened":true,"preview":"Thanks for the revised quote - we will confirm on
+Friday.","previewTruncated":false,"subject":"Re: our quote for ABC Supplies"},
+{"at":"2026-08-05T08:30:00Z","direction":"us","from":"agent-a28-contact-…
+@example.test","id":"h660b90X47YnTc93FnKIVA","opened":true,"preview":"We will
+hold the March price until the end of September, and we will deliver within
+five working days of your order.","subject":"Re: our quote for ABC Supplies"},
+{"at":"2026-08-03T09:12:00Z","direction":"them",
+"from":"orders@abc-supplies.test","id":"x2ooTp3W8IiX3EASO8lQUg","opened":true,
+"preview":"The pallets left our warehouse this morning.",
+"subject":"ABC Supplies - your March delivery"}],"openedAtMost":3,
+"who":"ABC Supplies"}
+--- the agent's message ---
+"body":"Yes — Ilse Vermeer at ABC Supplies. She replied last, on 6 August,
+about the revised quote; before that you wrote to her on the 5th.",
+"authorKind":"agent","proposal":null
+```
+
+The third, which needs the body and therefore a second read:
+
+```
+POST /chat/channels/YPY1mw-8WAPxEABK-W-CFg/messages
+     {"body":"@mail what did we promise ABC Supplies?"}
+--- call 1: correspondence {"who":"ABC Supplies","about":"quote"} ---
+    the exchange comes back narrowed to the two messages about the quote;
+    the March delivery, which says nothing about it, is absent.
+--- what the model was shown (call 3 of 3, user turn) ---
+[6] tool result "message_read" — {"at":"2026-08-05T08:30:00Z","attachments":[],
+"cc":"","from":"agent-a28-promise-…@example.test","id":"ym1wcuXt7xmsb0sSdVY13g",
+"kind":"messageRead","subject":"Re: our quote for ABC Supplies","text":"We will
+hold the March price until the end of September, and we will deliver within five
+working days of your order.","to":"ilse@abc-supplies.test","truncated":false}
+--- the agent's message ---
+"body":"You told them on 5 August that the March price holds until the end of
+September and that you would deliver within five working days of their order.",
+"proposal":null
+```
+
+**What the tests assert beyond "it answered".**
+
+- **No button, on any message in any room** — the reads run inside the turn
+  (ADR 0047), so a correspondence question produces an answer and never a
+  proposal. Both lookups are audited as `effect = read`, `ok = true`, against
+  that agent and that room; the agent's record shows `reads = 2` for the second
+  question.
+- **Cited to messages, not to snippets.** The exchange carries every message by
+  id, both directions, and the unrelated lunch invitation by neither. The
+  numbered sources *above* the tool result are the ordinary retrieval every Mail
+  turn still gets — deliberately **not** asserted, because it is a full-text
+  search and what it ranks moves between runs (the first draft of this test
+  pinned it and failed on the second run for exactly that reason). The point is
+  that the lookup is not a search: the unrelated message is absent from it by
+  construction.
+- **A listed message is not a read one.** Five messages from one correspondent:
+  the newest three come back with their bodies, the other two with their subject
+  lines and `"opened": false` — and the test asserts their bodies are *nowhere*
+  in what the model was shown.
+- **Isolation.** Two tenants writing to the same company: each exchange holds
+  only its own tenant's message, none of the other's words appear anywhere in
+  the payload, and naming the other tenant's message id outright earns the same
+  refusal an invented id does ("that is not one of your messages") — while the
+  tenant that owns it reads it perfectly well, so what failed was the scoping
+  and not the tool. Run through `/ai/agent/execute` as **Ask alo**, which is
+  offered every product's tools, so nothing there is narrowed by product scope
+  and the isolation proved is the store's alone.
+- **Refusals in words the model can act on**, since the turn hands a `Problem`
+  detail straight back to it: "say who, by name or address", "say which message,
+  by the id a correspondence result gave". Nobody to be in contact with is
+  `inContact: false` and an empty list — an answer, not an error.
+
+**How verified.**
+
+- `cargo fmt -p alo-ai -p alo-jmap` clean (see the standing note below).
+- `SQLX_OFFLINE=true cargo clippy -p alo-ai --all-targets` and `-p alo-jmap
+  --all-targets` — zero errors, zero warnings from either crate; the two
+  `type_complexity` warnings are pre-existing in `alo-store/src/meet.rs`.
+- `cargo nextest run -p alo-ai` — 219 passed.
+- `cargo nextest run -p alo-jmap --no-fail-fast` — **1 202 of 1 203 passed** in
+  150 s, against `alo_agents_test`. The one failure is the same pre-existing one
+  the last eight iterations recorded, in the sites track's file.
+
+**Flags and standing notes.**
+
+- **The one pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime` at
+  100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision (`…880928` vs `…8809281`). The file is theirs; the fix
+  on their side is comparing at microsecond precision.
+- **`cargo fmt -p alo-ai` reformatted the sites track's `site_chat.rs` again**,
+  and the change was reverted before committing — the fourth entry running to
+  say so. `git status` after every `cargo fmt -p alo-ai`, without exception.
+- **The `agent_ground.rs:31` documentation debt is still NOT paid**, for the
+  fifth item running and for the same reason: this item never opened
+  `alo-store`, and a one-comment change there would have bought ~115 relinks.
+  It moves to the next item that opens the crate for a real reason.
+- **Disk, and the number that actually worked this time.** C: opened at **3.1 GB
+  free, 100 % full**. There were *no* stale test binaries to sweep — 217 `.exe`
+  for 216 distinct target names, so the newest-per-name rule freed nothing. What
+  did work is deleting **`alo-jmap`'s own test binaries by name** before the
+  build (85 of them, ~4 GB), which is safe precisely because changing the crate
+  invalidates them all anyway: 3.1 GB → 7.1 GB, and the whole `--no-run` build
+  then took **5 m 31 s** with the `.pdb` sweep running beside it. Note the shape
+  that failed: the sanctioned `while kill -0 $BUILD` form was killed at the
+  600 s `Bash` ceiling *before* it could write its `BUILD_EXIT` marker, even
+  though cargo had finished — so on the next call, check the log for cargo's own
+  "Finished" line rather than trusting the marker's absence to mean "still
+  building".
+
+**Wave A2 is complete** (A2.2b excepted, blocked on a product decision no loop
+may take). **Next:** A3.1 — Ask alo orchestrates rather than owns: routing to the
+product agents, multi-step work across them, one approval surface, a visible
+plan, and a **Stop** that actually stops mid-run. Two things to read first. The
+turn loop (`agent_turn.rs`) already bounds a turn at `MAX_READS = 3` and already
+runs reads in-turn and proposes writes, so orchestration is a layer *over* that
+loop and not a second copy of it — the plan is what has to become visible, and
+`TurnResult` has no shape for one today. And the boundary (`execute_tool`) reads
+the product from **the agent's own row**, so an "Ask alo" turn that delegates to
+the Inventory agent must carry that agent's id into the run rather than widening
+its own scope; anything else re-opens A1.2. The **Stop** is the part with no
+precedent in this codebase at all — the turn runs off the request, so stopping it
+means a cancellation the chat route can signal and the loop can observe between
+calls. Check the migrations directory again immediately before committing; `0405`
+is this track's highest and the sites loop was at `0324`.

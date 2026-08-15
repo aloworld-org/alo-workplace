@@ -10,6 +10,18 @@ contracts.
 
 ## Unreleased
 
+- **`@mail` can now answer questions about a correspondent, not just act on an
+  email.** Ask whether you are in contact with a company and it looks at the
+  exchange itself — everything to and from them, newest first, both directions —
+  and tells you who wrote last and when. It finds the company's mail from the
+  name you use rather than the address they send from: a person in your address
+  book turns "ABC Supplies" into the address their people actually write from.
+  Ask what you promised somebody and it opens the message that says it and
+  quotes what you wrote, instead of paraphrasing a subject line. A message it
+  listed but did not open is marked as one it did not open, so it can never
+  speak for what a message says without having read it — and none of this asks
+  you to approve anything, because reading your own mail changes nothing.
+
 - **You can now see what your site's assistant did.** The assistant screen
   shows a transcript of its actions — each answered question with the pages
   the answer was drawn from, each declined question, the free times it
