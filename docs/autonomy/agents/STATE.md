@@ -3551,3 +3551,30 @@ since.
 **Still LOOP COMPLETE (with blockers).** The chart decision is a human's:
 adopt a licensed plugin under an ADR, build charts natively as their own
 feature, or drop chart-from-intent.
+
+## Fifth empty re-entry; the wrapper is now spinning in minutes (2026-08-15)
+
+Same three checks, same answers: pull already up to date and the tree clean,
+nothing under `docs/decisions/` or in `docs/features.md` since 08-14, nothing
+under `web/src` importing `sheets-chart`, `engine-chart` or `SHEET_CHART`.
+A2.2b's premise is untouched, it has had its one sanctioned re-attempt, every
+item above it is `[x]`. **No code shipped.**
+
+The one new fact, and the reason a human should read this entry rather than the
+four above it: **three of the four previous empty iterations landed at 22:33,
+22:34 and 22:35** — roughly a minute each. A closed queue does not slow the
+wrapper down, it speeds it up, so this will not self-limit; it will keep
+producing journal commits at that rate until someone stops it. The last commit
+on `main` from any other track is `9738589e` (sites, 21:24); everything after
+`96e0d639` is this track reporting that it has nothing to do.
+
+Disk unchanged at **C: 5.8 GB free**, and `target/debug/deps` holds 228 `.exe`
+for 228 distinct target names with zero `.pdb` — one binary per target, i.e.
+precisely where the earlier sweep left it. There is nothing stale left to clear
+here, which also confirms nothing has built on this box since. The standing
+warning holds for the next `alo-store` gate: 5.8 GB is below what a full
+`nextest --no-run` needed last time it failed.
+
+**Still LOOP COMPLETE (with blockers).** The chart decision is a human's: adopt
+a licensed plugin under an ADR, build charts natively as their own feature, or
+drop chart-from-intent. Recommendation unchanged — drop it.
