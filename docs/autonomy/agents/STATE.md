@@ -3211,3 +3211,180 @@ done" is the tenant's runs or the asker's own (the store's own scoping makes the
 latter the honest default, and anything wider needs the admin gate stated in the
 item). The directory *screen* is `[web]` and stays blocked behind the chat
 rebuild.
+
+---
+
+## A3.3 — the agent directory: what each is for, what it may touch, what it has done (2026-08-15)
+
+**What shipped.** Two read routes and one store query. Nothing new was invented
+to answer the item's three questions — each already had an owner, and the
+directory reads it:
+
+- `GET /chat/agents/directory[?lang=]` — the tenant's roster. Every agent as the
+  rest of chat spells it (id, handle, name, description, product, disabled,
+  answers/actions/reads/lastAt), plus **`gatedOn`** — the rail switch that
+  decides whether this person has it at all — and **`tools`**, every tool of its
+  product with the read/write bit beside it.
+- `GET /chat/agents/{id}/directory` — one entry, plus `recent`: the last twenty
+  runs behind its tallies, each `{id, tool, effect, ok, channel, at}`.
+- `AccountStore::agent_tool_runs_for(agent, limit)` — the caller's own runs by
+  one agent, newest first, clamped 1..200.
+
+`products/mail/alo-jmap/src/agent_directory.rs` is the whole of it (one file,
+one reason to change); `ListQuery` grew a `lang()` accessor so the directory
+seeds through the *same* call the agent list does rather than a second reading
+of "no language given".
+
+**The three decisions inside it, and why each went the way it did.**
+
+- **What it is for is the tenant's own words, not the prompt's.**
+  `alo_ai::agent_product::headline` was the tempting source — it is one line and
+  it is already written — but it is addressed to a model in the second person
+  ("You are the alo Mail agent…") and it is hardcoded English. The agent's
+  `description` is tenant data, seeded in the language of whoever opened the
+  list first (`chat_agent_names`) and editable afterwards, so that is what the
+  directory says. A test asserts no description starts with "You are", which is
+  the cheapest way to keep the tempting source out later.
+- **What it may touch is `tools_for(product)` — the registry the boundary
+  itself asks.** Not a list written here that could drift: the unit test walks
+  every product and asserts each named tool would be `offers()`ed and no other
+  product's would. A directory that overstates a reach is how somebody learns to
+  ask the wrong agent; one that understates it is how a real tool goes unused.
+  Tool *names* rather than sentences, because a client renders them through its
+  own catalogue — this route carries no English at all.
+- **What it has done is the asker's own**, as the previous entry predicted it
+  should be. The tallies keep the scopes `agent_records` already has (answers
+  and approved actions over rooms the caller can see; reads over the caller's
+  own runs), and `recent` is the caller's own runs only. Two people therefore
+  see different histories for the same agent, which is the rule the rest of chat
+  follows rather than an inconsistency. A tenant-wide "who asked what" is an
+  audit surface with an admin gate and is deliberately not this door.
+- **`recent` carries no `args`.** The row has them, and they are exactly the
+  things law #1 keeps off new surfaces: the body of a drafted email, a person's
+  name, the text of a document. What tool ran, whether it worked and when is the
+  record; what it was asked *about* is not.
+
+**The module gate, on this surface too.** The roster goes through
+`agents_or_seed`, so `AGENT_VISIBLE` hides a denied agent exactly as it does in
+the composer's list; the single-entry route asks `AccountStore::agent` first, so
+a denied agent is a plain 404 — the same answer an id that was never issued
+gets, which is what stops the directory being an oracle for which apps a
+colleague has.
+
+**On the wire, against the local backend** — this item adds new HTTP routes, so
+the loop's binary-server recipe applies rather than the in-process router the
+last several items used. Debug `alo-jmap` on `127.0.0.1:8080` against docker
+Postgres `alo_loop`, real OAuth (PKCE S256 through `POST /oauth/authorize` then
+`POST /oauth/token`), real curl:
+
+```
+GET /chat/agents/directory                     -> 200, 17 agents
+  @mail       product mail       gatedOn null        12 tools
+              "Ask about your correspondence: who wrote, what was agreed, ..."
+              correspondence:read  message_read:read  mark_read:write
+              flag_email:write  ...  send_email:write  find_contact:read
+  @inventory  product inventory  gatedOn "inventory"  2 tools
+              reorder_proposals:write  stock_answer:read
+  @sheets     product sheets     gatedOn "drive"      5 tools
+              sheet_read:read  sheet_answer:read  sheet_formula_explain:read
+              sheet_write_formula:write  sheet_clean_column:write
+  @alo        product workspace  gatedOn null        71 tools
+
+GET /chat/agents/G078JsVQ1QCpsw3UIj7lkg/directory  -> 200
+  {"handle":"mail","name":"Mail","product":"mail","gatedOn":null,
+   "disabled":false,"answers":0,"actions":0,"reads":0,"lastAt":null}
+  recent: []
+
+GET /chat/agents/never-issued/directory  -> 404 {"detail":"not found"}
+GET /chat/agents/directory               -> 401 {"detail":"missing or invalid bearer token"}
+GET /chat/agents/{id}/directory          -> 401 (same)
+```
+
+`recent` is empty there because that database has no agent turns in it, and
+**filling it would have taken a model call, which the standing rail forbids.**
+The populated case is proved instead by `agent_directory_http.rs`'s
+`what_an_agent_has_done_is_in_its_entry_and_is_the_askers_own`: a real turn
+through the real router over real Postgres, with the scripted local socket as
+the model, runs `catch_up_room` inside the turn, and the route afterwards reads
+`answers 1, reads 1, actions 0`, `recent[0] = {tool: catch_up_room, effect:
+read, ok: true, channel: <the room>}` with **no `args` key**. Ben, a colleague
+in the same tenant, gets `reads 0` and `recent []` from the same URL — and
+`answers 1`, because the room is public and what the agent *said* there is
+legitimately his to count. That split is the two halves of the record having
+different scopes on purpose, and it is asserted rather than left implied.
+
+**Cuts and flags.**
+
+- **No `[web]` work**, as the queue requires: the directory screen waits for the
+  chat rebuild. No new user-facing English exists on the server side, so
+  `i18n/en.ts` is untouched — the client renders tool names and product words
+  through its own catalogue, which is why this route carries none.
+- **No new route *prefix***, so the production Caddyfile needs nothing: both
+  routes are under `/chat`, which is already proxied.
+- **`recent` is capped at twenty and has no paging.** "Has it been doing
+  anything, and what kind of thing" is the question; a whole history is a
+  different surface with a different gate, and inventing paging for a screen
+  that does not exist yet would be guessing at it.
+- `cargo fmt -p alo-store` reformatted the sites track's `site_tickets.rs`,
+  `site_chat_actions.rs`, `site_ticket_holds.rs`, `site_agenda.rs` and five of
+  their tests again; all were reverted before committing — the seventh entry
+  running to say so.
+- **The sites track's pre-existing failure is still there and still theirs**:
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`.
+
+**How verified.**
+
+- `cargo fmt -p alo-store -p alo-jmap` clean (with the revert above).
+- `cargo clippy -p alo-store --all-targets` and `cargo clippy -p alo-jmap
+  --all-targets` — zero warnings from either crate; the two `type_complexity`
+  warnings are the pre-existing ones in `alo-store/src/meet.rs`.
+- `cargo nextest run -p alo-store` — **2 026 passed** in 88 s (2 024 before; the
+  two new ones are the per-agent window and its isolation half).
+- `cargo nextest run -p alo-jmap --no-fail-fast` — **1 225 of 1 226 passed** in
+  186 s. The one failure is the sites-track one above.
+- The wrong-tenant test is mandatory and is there twice over: another tenant
+  reading `agent_tool_runs_for` with the agent id guessed exactly right gets
+  nothing, and a colleague in the *same* tenant — who legitimately knows the id,
+  because he can see the agent — gets nothing either.
+
+**Environment — the disk, and a sweep that cost forty minutes.**
+
+- **Docker still answers nothing** (`docker ps` returns an empty list), so
+  `scripts/prune-test-db.sh` still cannot run; Postgres on 5432 is up and every
+  test command carried
+  `DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_agents_test`.
+  The store suite finished in 88 s, so the database has not bloated.
+- **The disk opened at 3.4 GB free and the stale-artifact sweep had to go
+  further than `.exe` this time.** There were no `.pdb` files and only one stale
+  binary; the 16 GB in `target/debug/deps` was **stale `.rlib`/`.rmeta`** —
+  five `libalo_jmap-*.rlib` at ~1 GB each. Keeping the newest three per name
+  freed 6.2 GB.
+- **That sweep is what made this iteration long, and the lesson is precise:
+  keeping "the newest three" of a crate's rlibs is not the same as keeping the
+  ones cargo's fingerprints point at.** One of the deleted `alo-sieve` /
+  `alo-store` rlibs was live, so cargo recompiled `alo-store`, which changed its
+  hash, which invalidated `alo-jmap` and forced a relink of all ~120 of its test
+  binaries — 7 minutes of linking plus a 9-minute build that had already run,
+  for artifacts that were fresh before the sweep. **Sweep `.exe` and `.pdb`
+  freely; leave `.rlib` and `.rmeta` alone unless the disk genuinely has no
+  other slack, and expect a full relink when you do.**
+- **`[profile.test] debug = 0` in the workspace `Cargo.toml` does not stop the
+  `.pdb` flood, and neither does `CARGO_PROFILE_TEST_DEBUG=0`.** The build
+  produced 355 `.pdb` files totalling **8.7 GB** and filled the disk to 19 MB
+  free mid-link (`LNK1318`, then `LNK1106: invalid file or disk full`). The
+  debug info is the **dependencies'**, compiled under the `dev` profile and
+  copied into each test binary's PDB at link time; only
+  `CARGO_PROFILE_DEV_DEBUG=0` would prevent it, and that invalidates every
+  dependency in the workspace. What worked instead, and is safe: poll the build
+  with `find target/debug/deps -name '*.pdb' -mmin +2 -delete` inside the wait
+  loop — a PDB untouched for two minutes belongs to a link that has finished,
+  and deleting it invalidates nothing.
+- Finished with 7.3 GB free.
+
+**Next:** the queue's last unchecked item is done. What remains is **A2.2b,
+`[!]` blocked** — chart-from-intent, blocked because alo Sheets has no charts at
+all and the fixture the item requires cannot exist. Per LOOP step 3 the next
+iteration re-attempts the oldest blocked item once with fresh eyes; the blocker
+is not a coding failure but a licensing/product decision (adopt the Univer Pro
+chart plugin under an ADR, implement charts natively, or drop the item), so the
+honest outcome is `LOOP COMPLETE (with blockers)` and a human unblocking it.

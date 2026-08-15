@@ -10,6 +10,17 @@ contracts.
 
 ## Unreleased
 
+- **There is now a directory of your agents.** It says what each one is for in
+  your own words, exactly which tools it can use and whether each of those
+  answers you straight away or asks you to approve it first, which app switch
+  decides whether you have the agent at all, and what it has actually been
+  doing — how often it has answered, how many actions of its you have approved,
+  and what it has looked up for you, down to the individual lookups with the
+  time and whether they worked. An agent for an app you cannot open is not
+  described to you at all, and what an agent has done for a colleague stays
+  theirs: the tally you see is your own. Nothing you asked it *about* is
+  repeated here.
+
 - **`@meet` can now write up a meeting after it has finished.** Ask what
   happened in one and it answers from the meeting itself — who was there, what
   was said out loud, and what people typed during it — with no button in
