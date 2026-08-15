@@ -104,13 +104,14 @@ product besides.
   opened before the switch was thrown (its history stays readable; nobody
   answers in it).
 
-  One product's word is **not** its module's, and the join translates it:
-  `sheets` (A2.2) is a real product with an agent in ADR 0034 and no rail app of
-  its own — a spreadsheet is a Drive node, opened from Drive — so
-  `AgentProduct::module` answers Drive and the SQL says `CASE a.product WHEN
-  'sheets' THEN 'drive'`. Left untranslated it would compare `sheets` against a
-  column that can never hold it, and somebody denied Drive would keep `@sheets`:
-  an agent that reads the very files they were denied. A unit test reads
+  Two products' words are **not** their module's, and the join translates both:
+  `sheets` (A2.2) and `docs` (A2.3) are real products with agents in ADR 0034
+  and no rail app of their own — a spreadsheet and a document are both Drive
+  nodes, opened from Drive — so `AgentProduct::module` answers Drive for each
+  and the SQL says `CASE a.product WHEN 'sheets' THEN 'drive' WHEN 'docs' THEN
+  'drive'`. Left untranslated either would compare a word against a column that
+  can never hold it, and somebody denied Drive would keep `@sheets` and
+  `@docs`: agents that read the very files they were denied. A unit test reads
   `module()` and holds the CASE to it, so a later product that borrows a module
   fails there rather than in production. Defining one is refused with a 422 rather than made and
   hidden, because an agent its author cannot then see would be a 200 followed by
@@ -138,7 +139,8 @@ product besides.
   That same "once" would leave a tenant seeded **before** a product existed
   permanently without its agent, which is the other half of A1.5's promise. So a
   product built later is offered once more, under **its own ledger key**
-  (`LATER_AGENT_PRODUCTS`, today `sheets` → `default-agents:sheets`): a tenant
+  (`LATER_AGENT_PRODUCTS`, today `sheets` → `default-agents:sheets` and `docs`
+  → `default-agents:docs`): a tenant
   that never saw it gets it, a tenant that threw it away keeps it thrown away,
   and a tenant seeded from scratch today already has it, finds the handle taken,
   and simply records the key.

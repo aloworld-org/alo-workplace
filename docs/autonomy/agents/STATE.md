@@ -1738,3 +1738,245 @@ with every new tool now (`all_tools().len()`, `agent_product`'s `workspace.len()
 and `agent_turn.rs`'s read count) — update them rather than loosening them.
 Check the migrations directory again immediately before committing; `0404` is
 this track's highest and the sites loop is at `0324`.
+
+---
+
+## A2.2b — blocked before it was started: alo Sheets has no charts to read
+
+**What was found, and why it stops the item.** A2.2b makes a **reader** its own
+prerequisite: teach `sheet_grid` to report the charts a workbook already has,
+*the fixture being a sheet the editor saved with one*, and only then a write.
+There can be no such fixture. `web/src/drive/SheetEditor.tsx` registers eleven
+Univer presets — core, sort, filter, find-replace, conditional formatting, data
+validation, drawing, hyperlink, note, table, thread-comment — and **none of them
+is a chart**. The only chart implementation in the ecosystem is
+`@univerjs-pro/sheets-chart` (with `@univerjs-pro/engine-chart` and
+`sheets-chart-ui`), a Univer **Pro** package whose `package.json` carries no
+`license` field at all; it is in `node_modules` solely as a transitive
+dependency of `@univerjs/presets` and is imported nowhere in `web/src`. The OSS
+`@univerjs/sheets-graphics` is in-cell graphics and contains the word "chart"
+zero times. Nothing in the repo — not the editor, not `exportOffice.ts`, not any
+fixture — writes or reads a `SHEET_CHART_PLUGIN` resource.
+
+So: no alo user can create a chart, therefore no alo workbook holds one,
+therefore the fixture the item requires cannot be produced, therefore the reader
+would be modelling a structure this product cannot make — which is exactly the
+speculative write the item's own last sentence forbids ("do not write a drawing
+structure inferred from the Univer docs without a saved fixture to check it
+against"). Building it anyway would be a reader with no reality to check it
+against and a writer that puts an object in somebody's workbook their editor
+cannot open.
+
+**What a human has to decide**, because a loop does not get to: adopt a
+commercially licensed proprietary plugin inside a sovereignty product (an ADR at
+least, and a licence purchase), implement charts natively in the editor, or drop
+chart-from-intent from the queue. Marked `[!]` in QUEUE.md with the evidence
+inline so the next iteration does not re-derive it.
+
+---
+
+## A2.3 — the Docs agent: what a document says, what a section should say, and the same document in another language
+
+**Shipped.** alo Docs is now a product with an agent (ADR 0034), addressable as
+`@docs` from any room, with two reads that answer in the turn and two writes
+that wait for a tap (ADR 0047 §1). It is the same shape A2.2 gave alo Sheets,
+for the same reason: a document is a Drive node (`kind = 'doc'`) whose blob is
+the BlockNote block array `web/src/drive/DocEditor.tsx` writes (ADR 0031), so
+the product has no rail app of its own and Drive's switch is its gate.
+
+- **`doc_read`** (read) — the document's blocks in the order they read on the
+  page, each with the editor's **own block id**, its kind, its level, its depth,
+  the section it sits under, its text, and whether it can be rewritten at all.
+  Bounded (60 blocks, 30 by default) and says when it was cut.
+- **`doc_answer`** (read) — the passages that mention what was asked, each cited
+  to its block and its heading.
+- **`doc_draft_section`** (write) — new blocks after a named one, at that
+  block's own level. It only adds: there is no path here that deletes, moves or
+  replaces anything already written.
+- **`doc_rewrite`** (write) — new text into blocks that already exist, one text
+  per block. This is both "rewrite this selection" and "translate this
+  document"; there is deliberately no second translate tool to drift from the
+  one that actually edits the document.
+
+**Addresses are block ids, not positions.** A position moves the moment somebody
+adds a paragraph above it, and a proposal can be approved minutes after it was
+made. The read hands back the editor's own ids and the guidance says never to
+invent one; a position (`#3`) resolves only as a fallback for a block that has
+no id, which a document that has been through an import can contain.
+
+**Two defects the end-to-end tests found, both fixed in the code rather than
+papered over in the test.**
+
+1. **A sentence came back with a double space in it.** A paragraph with a bold
+   phrase in the middle is three runs — `"Invoices are due within "`,
+   `"30 days"`, `" of issue."` — and the first flattener put a separator between
+   runs, yielding `"…30 days  of issue."` That is a sentence the user cannot
+   find by searching their own document, and it would have been quoted back at
+   them in an answer. Runs of one block are now joined exactly as written; only
+   a table **cell** is separated from the next, where the boundary is real.
+2. **A matched heading did not bring its section, so the agent could not answer
+   the wave's own question.** Asked "what do we say about payment terms?", the
+   search matched the *heading* "Payment terms" and the two blocks holding those
+   words — and not the sentence that answers it, "Invoices are due within 30
+   days of issue.", which contains neither. `doc_answer` now expands a matched
+   heading with the blocks under it (down to the next heading of the same level
+   or higher, six at most), returns everything in reading order, and marks each
+   block `"matched": true/false` so the model can tell what the search found
+   from what came with it. This is the document's version of a spreadsheet
+   answer carrying its whole row.
+
+**How it was verified — the question, on the wire.** `cargo nextest run -p
+alo-jmap --test agent_docs_http`, eight tests, all green; the exchange below is
+copied from the `--no-capture` run, not described:
+
+```
+===== A2.3 TRANSCRIPT: @docs what do we say about payment terms? =====
+POST /chat/channels/qEHA1_kYhWnrpK_fRra26g/messages
+     {"body":"@docs what do we say about payment terms?"}
+--- what the model was shown (call 1 of 2, user turn) ---
+Request: @docs what do we say about payment terms?
+
+Sources:
+
+--- what the model replied (call 1) ---
+{"action":{"args":{"question":"payment terms"},"tool":"doc_answer"},"kind":"action",
+ "say":"Let me look in the document."}
+--- what the model was shown (call 2 of 2, user turn) ---
+Sources:
+[1] tool result "doc_answer" — {"blocks":[
+{"block":"b1","depth":0,"kind":"heading","level":1,"matched":true,"position":1,
+ "rewritable":true,"section":null,"text":"Terms of engagement","truncated":false},
+{"block":"b2","depth":0,"kind":"heading","level":2,"matched":true,"position":2,
+ "rewritable":true,"section":"Terms of engagement","text":"Payment terms","truncated":false},
+{"block":"b3","depth":0,"kind":"paragraph","level":null,"matched":false,"position":3,
+ "rewritable":true,"section":"Payment terms",
+ "text":"Invoices are due within 30 days of issue.","truncated":false},
+{"block":"b4","depth":0,"kind":"bulletListItem","level":null,"matched":true,"position":4,
+ "rewritable":true,"section":"Payment terms","text":"Late payment is charged monthly.",
+ "truncated":false},
+{"block":"b5","depth":1,"kind":"paragraph","level":null,"matched":false,"position":5,
+ "rewritable":true,"section":"Payment terms","text":"See the annex for the rate.",
+ "truncated":false},
+{"block":"b6","depth":0,"kind":"table","level":null,"matched":false,"position":6,
+ "rewritable":false,"section":"Payment terms","text":"Region","truncated":false}],
+"document":{"blocks":6,"id":"s4lUqF1sT-15Ndq3OPA3BA","name":"Terms of engagement","words":25},
+"kind":"docAnswer","matched":3,"searchedBlocks":6,"terms":["payment","terms"]}
+--- what the model replied (call 2) ---
+{"answer":"Under Payment terms, invoices are due within 30 days of issue (block b3) [1].",
+ "kind":"answer"}
+--- GET /chat/channels/{id}/messages, the agent's message ---
+{"authorKind":"agent","authorEmail":"Docs",
+ "body":"Under Payment terms, invoices are due within 30 days of issue (block b3) [1].",
+ "proposal":null,…}
+--- audited: doc_answer / read / ok=true ---
+===== end =====
+```
+
+The properties pinned around that exchange:
+
+- **`proposal` is `null` on every message in the room**, and the document is
+  still on version 1 with its bytes byte-for-byte what they were. Asking what a
+  document says produced no button and no version.
+- **The answer's sentence is in what the model was shown**, cited to `b3` and
+  captioned `"section":"Payment terms"` — and `"matched":false` on it, so the
+  model was told plainly that this block came with the heading rather than
+  matching the question itself.
+- **The section drafted, proposed then applied.** `@docs add a section on late
+  payment` came back as a proposal carrying `doc_draft_section`; nothing changed
+  until the tap; after it the document reads `b1, b2, b3, <heading>, <paragraph>,
+  b4, b6` — the new blocks at the top level after `b3`, not swallowed into the
+  list item below them — the node is on version 2, version 1 is still there, and
+  the bold run inside `b3`, the nested paragraph `b5` and the table `b6` are
+  unchanged.
+- **The rewrite keeps everything but the words.** `b3` rewritten to "…within 14
+  days…" keeps `"type":"paragraph"` and `"textAlignment":"left"`; every other
+  block is equal to what it was. A second rewrite with the text already in place
+  reports `changed: 0`, `reason: "nothingToRewrite"` and **`versionNo: null`** —
+  an approved tool that changed nothing writes no version saying it did.
+- **A table is refused by name, before anything is applied.** A rewrite naming
+  `b2` and `b6` together is a 422 saying `b6 is a table and its text cannot be
+  replaced`, and `b2` — named beside it — is still `"Payment terms"` afterwards.
+  A block that is not there and a block named twice are refused the same way.
+- **A translation is one proposal over the blocks that were read.** The model
+  read the document (`doc_read`), then proposed a single `doc_rewrite` carrying
+  all five text blocks in French; after the tap the headings are still headings
+  at their levels, the list item is still a list item, `b5` is translated **where
+  it sits** inside its parent, the table is untouched, and the English is still
+  in the version history.
+- **Isolation, over the real route.** A second tenant's document and a
+  colleague's private one are unreachable by name from all four tools, each
+  answering the same `no document of yours is called …` an unknown name gets,
+  and neither gained a version. A refusal lists the asker's **own** documents
+  only.
+- **The module gate, over the store.** Denying Drive now takes away `@drive`,
+  `@sheets` **and** `@docs` — list, by id, in the shared room, and opening a
+  one-to-one — while a colleague who still has Drive keeps all three.
+
+**Cuts / flags.**
+
+- **Translation is `doc_rewrite`, not a tool of its own.** Stated in the tool
+  doc and the guidance, and held by a test. A second mechanism would be a second
+  path to keep honest, and this is the one that actually edits the document; the
+  guidance also says what to do when a document is longer than one proposal can
+  carry (say so, propose the part that was read) so a half-translated document
+  is never reported as a translated one. If a wave review wants a first-class
+  translate tool, it needs the same treatment A2.1b got: a read the agent owns,
+  and the existing write.
+- **`drive_docs` is new in `alo-store/src/drive.rs`**, and `drive_sheets` now
+  shares its statement (`drive_nodes_of_kind`) rather than being copied — one
+  place holds the `location_kind = 'personal'` predicate that makes both
+  personal-only.
+- **The stale sentence in `agent_ground.rs` is fixed** (it still claimed Sites
+  had no tools, which A2.1 gave it) — the debt A2.2's journal handed to A2.4 is
+  paid here instead, since this item edited that table anyway.
+- **Three registry counts moved**, as the previous entry warned they would:
+  `all_tools().len()` 45 → 49, `agent_product`'s workspace length the same, and
+  `agent_turn.rs`'s read count 18 → 20.
+- **One pre-existing failure, in the sites track's area, left alone.**
+  `alo-jmap::site_schedule_http a_publish_is_scheduled_moved_and_called_off`
+  (`tests/site_schedule_http.rs:193`) compares a Windows `OffsetDateTime` at
+  100 ns precision against the same instant round-tripped through Postgres at
+  microsecond precision — this run: `…122469` vs `…1224695`. Identical to the
+  failure the last three iterations recorded; the file is theirs and the fix on
+  their side is comparing at microsecond precision. Two pre-existing
+  `clippy::type_complexity` warnings in `alo-store/src/meet.rs` are likewise not
+  this track's and were not touched.
+- **"On the wire" is the in-process router over real Postgres**, as in A2.1 and
+  A2.2: real `Request`s through the real router with a real bearer token against
+  real rows and real blobs, and no live model call (the standing rail). The
+  argument-level tests go through `POST /ai/agent/execute`, the ordinary
+  approval route the command palette's button takes. The model's words are
+  fixtures; what is proved is what it was *shown* and what the product did with
+  its reply.
+- **Environment, and one thing worth knowing.** Docker is still unresponsive
+  (`docker ps` hung past a minute), so `scripts/prune-test-db.sh` still cannot
+  run — its first statement is a `docker exec` — and everything ran against
+  `alo_agents_test` on the native **5432** server. 1 962 store tests in 115 s
+  and 1 123 jmap tests in 159 s, so the database has not bloated. C: was at
+  **100%, 579 MB free** at the top of the iteration; deleting this checkout's
+  own `target/debug/deps/*.pdb` (216 files, 6.5 GB) took it to 7 GB, and 219 of
+  them **came back during the build even with `CARGO_PROFILE_TEST_DEBUG=0`** —
+  the flag stops the test targets writing them, not the dependency `.exe`s — so
+  the deletion had to be repeated before the suites could run. Budget ~7 GB of
+  headroom for a cold build here, not 3.
+  **A backgrounded `cargo … &` does not survive this harness's 600 s call
+  ceiling**: when the poll call was killed at 600 s, the whole process group went
+  with it and the run died silently after its build (12 minutes lost noticing).
+  What does survive is the harness's own `run_in_background`, whose output file
+  can then be polled from a later call with `until grep -q Summary`. LOOP.md's
+  marker-plus-`&` form is only safe when the poll returns before the ceiling.
+
+**Next:** A2.4 — the Insights agent: answer from the numbers, explain a change,
+build a report. Read A2.2 and A2.3 first; the shape is the same but the subject
+matter is not. Insights already has a model path of its own
+(`alo-ai/src/insights.rs`, `chart_turn`/`parse_chart_reply`) and an
+`AgentProduct::Insights` that is in `NONE_YET` — so this item fills the empty row
+in `alo-ai/src/agent_product.rs` rather than adding a product word, needs **no
+migration**, and must decide whether its reads go through the existing insights
+path or a new one. `agent_ground.rs` names Insights and Meet as the two products
+with neither grounding nor tools; that sentence is now the only stale thing in
+the file and A2.4 owns it. Three registry counts move with every new tool
+(`all_tools().len()` = 49 today, `agent_product`'s workspace length, and
+`agent_turn.rs`'s read count = 20) — update them rather than loosening them.
+Check the migrations directory again immediately before committing; `0405` is
+this track's highest and the sites loop is at `0324`.

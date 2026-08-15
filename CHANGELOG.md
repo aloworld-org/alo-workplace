@@ -34,6 +34,20 @@ contracts.
   fits a phone screen, stores nothing about the visitor, and vanishes from
   your pages the moment you switch it off.
 
+- **Your documents have an agent now — `@docs`.** Ask it what a document says
+  and it answers from the document itself, telling you which part: the section
+  a passage sits under and the block it came from, so you can find the sentence
+  it means. Ask for a section and it drafts one — a heading and the paragraphs
+  under it, put where you said, and only ever added to what is already there.
+  Ask it to reword a passage, or to translate the whole document into another
+  language, and it proposes the new wording block by block: each paragraph
+  keeps its kind, its level and its formatting, and only the words change.
+  Nothing is written until you tap approve, and what lands is a new version of
+  the same document in Drive, so the old one is still there to go back to. A
+  table is left alone and said so by name rather than flattened into a
+  sentence. The agent reaches only the documents you can already open — someone
+  else's, in your company or another, is not something it can be asked about.
+
 - **Your website's assistant now has one screen — the switch, the budget, and
   its reading list together.** Open Assistant on a website you own and switch
   it on, set the monthly budget it may spend answering visitors (pre-filled
