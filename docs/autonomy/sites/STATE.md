@@ -9568,3 +9568,31 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   stays `[!]` blocked on the human-arranged tax review. The queue then has
   nothing unblocked: the next iteration should re-attempt or close out per
   the LOOP rules.
+
+## 2026-08-16 — S3.04e re-attempted with fresh eyes; the professional is still not in the room
+
+- **Item:** S3.04e — the only non-`[x]` item left in the queue, so per
+  LOOP rule 3 this iteration re-attempts the oldest `[!]` once.
+- **What the fresh look checked:** whether a tax-professional review has
+  landed anywhere since the block was recorded earlier today — the ADR
+  shelf (nothing past 0050, which is ticket mail; no VAT ADR), STATE.md
+  itself, `docs/` at large (no place-of-supply doc outside the queue and
+  journal), and the commit log since the block (only the S3 wave-review
+  and walk items). Nothing on record.
+- **Why it stays blocked:** the prerequisite is written into the item
+  ("reviewed by a tax professional before this item is taken") — the ADR
+  0049 lesson is that a gate in the item text is the one gate the loop
+  must honour — and the compliance rail says never guess loosely on VAT.
+  The review is human-arranged by nature; an unattended loop cannot
+  supply it. The 2026-08-16 block entry already gives the human the full
+  scope the reviewer's afternoon must cover (Art. 53/54 territory,
+  virtual-event rules, OSS thresholds, and the two provisional S3.04d
+  decisions: VAT-inclusive consumer pricing and seller-country invoices).
+- **Verified:** n/a — docs-only commit; no code changed.
+- **Next:** nothing unblocked remains. Wave 3 is otherwise complete: the
+  editor-on-the-page strand, the chatbot that answers and acts, tickets
+  and stock commerce, and the four review items all `[x]`. The loop
+  closes; a human restarts the track after arranging the S3.04e review
+  (and may then also queue Wave 4).
+
+LOOP COMPLETE (with blockers)
