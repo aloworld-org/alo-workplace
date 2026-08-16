@@ -9479,3 +9479,92 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
      published — S3.06d2 may look with eyes.
 - **Next:** S3.06d2 — the real-browser 360px keyboard walk (then the wave
   closes; S3.04e stays `[!]` blocked on the human tax review).
+
+## 2026-08-16 — S3.06d2 the walk with eyes: eighteen screens, 360 pixels, one Tab key
+
+- **Item:** S3.06d2 — every sites screen in a real browser at 360px, keyboard
+  only, reduced-motion and contrast included, Wave-3 screens first; then the
+  wave closes. The S2.16b2 rig rebuilt in this session's scratchpad:
+  `playwright-core` driving the Mac's own Chrome headless against the real
+  local stack — docker `alo-pg` (database `alo`), the debug `alo-jmap` on
+  127.0.0.1:8080, `npm run dev` on 5173 (**gotcha rediscovered: the vite
+  proxy targets the LIVE server unless `VITE_DEV_API=http://127.0.0.1:8080`
+  is set** — the login form 401'd against production until the proxy was
+  pointed home; nothing was sent beyond one bad login attempt), a fresh
+  `walk3-eyes` tenant, and a site seeded over the wire with the Wave-3
+  surface: eight sections (hero → footer incl. tickets, shop, contact form),
+  two ticket events priced from a Billing product, a stocked shop item (12
+  jars through Inventory's own adjustment door), delivery at €3.50, chat
+  enabled at the €10 ceiling, published.
+- **The walk:** all EIGHTEEN screens (tickets, shop, shop-setup, assistant,
+  page editor first; then list, site, analytics, heatmap, funnel, catalogs,
+  orders, bookings, collections, domains, history, submissions, posts), each
+  measured in-page for horizontal overflow, zero-width text, and the WCAG
+  ratio of every visible text node against its composited background, then
+  Tab-walked recording accessible names; screenshots kept in the scratchpad.
+  Dialog contract exercised on the two Wave-3 dialogs (New event, Add
+  product): focus lands inside, `aria-modal` + labelled, zero overflow at
+  360px, Escape closes and returns focus to the opener. Reduced-motion
+  emulated: **0 elements with a transition or animation over 10 ms** — the
+  global flattener holds. The funnel's wide table scrolls by keyboard
+  (Chrome's focusable-scroller; ArrowRight moved it 40px).
+- **Found — three sites-owned defect classes; layout was clean:**
+  1. **The box office was four identical buttons.** Every tickets row
+     rendered "Seats..." and "Delete" with nothing to say which event
+     (S2.16b2's own defect, reborn on the Wave-3 screens); the shop shelf's
+     "Remove" likewise. Measured off the live tab walk.
+  2. **The tertiary metadata colour fails on the warm panels.** `.label`,
+     `.hint`, `.themeSlotState` and the small-print rules measure 3.82:1 on
+     the assistant appearance/language panels and 4.15:1 on history's
+     "1 page" — the S2.16b2 sweep had moved individual lines, not the
+     classes, and S3.02g's appearance panel reintroduced them wholesale.
+  3. **Links on warm grounds wear the ds terracotta at 3.84:1** — shop
+     setup's "Manage ticket events / Manage catalogs" and the domains
+     screen's `walk3eyes.alosites.com`.
+  Everything else the meter flagged is either **disabled** (Propose a setup,
+  Invite editor, Add language, Create catalog/service, Add domain, Export
+  CSV, Prepare changes — all verified `disabled`, WCAG-exempt) or the
+  already-flagged **ds-owned** set (white-on-accent primary at 3.09, the
+  avatar, the `--success` chips at 3.35–3.61, the shell rail's off-screen
+  Drive/Billing) — left for the ds track, per ADR 0045.
+- **Shipped:** per-event names on the tickets row controls
+  (`sitesTicketChangeCapacityFor`/`sitesTicketDeleteFor` as functions of
+  "product, date", falling back to the gone-product string; armed state
+  keeps its own name so the confirm step is what's announced) and the
+  per-product `sitesShopRemoveFor`, en/fr/nl; the six tertiary CSS rules
+  moved to `--text-secondary`; `.hint a`/`.domainAloAddress a` to
+  `--text-primary` + permanent underline (the `.liveLink` precedent). Tests:
+  a new distinct-names test on the two-event box office (names differ, the
+  orphaned row named by its gone-product fact) and the existing press-path
+  tests re-pointed at the new names via a prefix matcher (the date half of
+  the name belongs to the machine's locale, not the test).
+- **Verified:** re-walked after the fix — the sites-owned contrast failures
+  are **gone** on all eight affected screens; the tab walk reads "Change
+  seats for Evening concert ticket, Sep 12, 2026, 9:00 PM" and "Remove
+  Honey jar from the shop"; zero horizontal overflow, zero clipped labels
+  on all eighteen screens, before and after. Gates: `npx tsc --noEmit`
+  clean; `npx eslint` on the eight changed files clean; `npx vitest run
+  src/sites src/i18n` **370 tests, 33 files, green**; `npm run build`
+  clean. No Rust, no route, no migration. Servers killed at exit.
+- **Cuts and honest limits:** the visitor-facing published pages (shop/tix/
+  checkout, the chat widget) were not re-walked in this browser session —
+  S3.06d1 walked them on the wire with byte budgets a day ago, their
+  accessibility contract lives in the render goldens (landmarks, labels,
+  the widget's keyboard tests), and the assistant screen's live preview
+  (the real widget, in the walk) surfaces its own in-screen contrast check
+  (6.7:1 shown). The two seeded events share a product and instant, so
+  their names tie on this dataset — the regression test pins distinctness
+  on differing rows.
+- **Flags:**
+  1. d1's flag looked at with eyes: the assistant screen indeed says
+     nothing when chat is on but no booking section is published (the bot
+     then refuses to offer times). Making it say so needs a new
+     published-sections read on that screen — a product decision for the
+     human inbox, not smuggled into a walk item.
+  2. The ds-owned contrast set is unchanged and still the biggest a11y debt
+     on these screens: the primary button (3.09), `--success` as chip text
+     (3.35), the avatar initials (3.94), the 360px shell rail overflow.
+- **Next:** the wave closes — every S3 item is `[x]` except S3.04e, which
+  stays `[!]` blocked on the human-arranged tax review. The queue then has
+  nothing unblocked: the next iteration should re-attempt or close out per
+  the LOOP rules.

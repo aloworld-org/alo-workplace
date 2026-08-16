@@ -10,6 +10,12 @@ contracts.
 
 ## Unreleased
 
+- **Website screens read better on a phone and through a screen reader.**
+  Every button in the ticket box office and the shop shelf now says which
+  event or product it acts on, so two events are no longer four identical
+  buttons to assistive technology. Small helper text, field labels and the
+  links inside hints across the Websites screens are darker, meeting the
+  WCAG AA contrast bar on the panels they sit on.
 - **For operators: the switches behind the new site commerce and assistant,
   in one place.** Selling on a website is off until the `alo-sites`
   container sets `ALO_SITES_PAYMENTS` — the only value that exists today is
