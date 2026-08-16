@@ -9295,3 +9295,75 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   collapses at 40rem (found in the S2.16b2 block, not beside the rule —
   noted here so the next audit doesn't re-find it).
 - **Next:** S3.06c — as-built docs and reconciliation.
+
+## 2026-08-16 — S3.06c The wave written down: what the ADRs promised, and what Wave 3 shipped
+
+- **Item:** S3.06c — as-built docs and reconciliation: `docs/design/sites.md`
+  against what Wave 3 actually shipped, the features.md `[S3]` table, the
+  CHANGELOG sweep, and the human-inbox summary. Documentation only: no Rust,
+  no web, no migration, no route.
+- **What the reconciliation found.** The design note had per-item sections
+  for the three ADR 0042 gestures (S3.01a–c) and an authorization matrix
+  S3.06a had already brought current — but **everything else Wave 3 built
+  had never been written down as a model**: the palette (S3.01d), the whole
+  assistant (corpus, citations-or-refusal, the spend ceiling, appearance,
+  the three closed action verbs, the transcript), and the whole of commerce
+  (the four seam doors, holds-before-money, the payment boundary,
+  fulfilment, the ticket mail behind ADR 0050, the stock shelf, the
+  proposal engine). A second gap: **features.md carried no Wave-3 lines at
+  all** — the wave was settled in ADRs 0040/0041/0042, and the scope-gate
+  doc never learned what they ordered. A stranger reading features.md would
+  not have known alo sells tickets.
+- **Shipped:**
+  - `docs/design/sites.md`: status line S3-as-built naming the four wave
+    ADRs; the intro extended; the public-surface bullet now lists every
+    Wave-3 public door; five new as-built sections written from the source
+    (the seeded palette; the assistant §what-it-reads/answers/costs/looks-
+    like; the acting assistant with the seam doors and the manage token;
+    tickets — seam, hold, money, fulfilment, `/tix`, ADR 0050 mail; stock —
+    Inventory's seam, the shelf, `/shop`, the owners-only proposal); and a
+    closing **What Wave 3 promised, and what Wave 3 shipped (S3.06c)** —
+    ten rows, each shipped-or-naming-its-dependency, incl. the blocked VAT
+    table and the S3.06a narrowing as a row of its own.
+  - The **human production inbox, Wave-3 additions**: the new public paths
+    incl. the webhook URL for the provider, no new workspace Caddy prefix,
+    `ALO_SITES_PAYMENTS` (only `fixture` exists — live PSP is human+ADR),
+    `ALO_SITES_MAIL_FROM` + submission listener for ticket mail,
+    `ALO_AI_EGRESS=restricted` on alo-sites, the `tix`/`shop`
+    reserved-slug check at deploy, and the sweep roster (all 30 s; domains
+    60 s).
+  - **Six open decisions for a human**, the blocked S3.04e tax review first
+    (with the two provisional S3.04d choices it must revisit), then the
+    live PSP, venue time zone, the 1-cent spend estimate, the
+    collaborator-scope product decision (transcript/enquiries + the funnel
+    "leads" column), and the deliberately unlimited webhook.
+  - `docs/features.md`: seven `[S3]` lines (six shipped strands + the
+    blocked VAT table stated as blocked-by-design) and an S3 reconciliation
+    note naming the three stated dependencies (tenant AI provider, no live
+    PSP yet, mail sender unset) — pointing at the design-doc table.
+  - `CHANGELOG.md`: one operator-voice entry for the gap the sweep found.
+- **The CHANGELOG sweep, and what it proves.** Every sites commit in
+  `ce59c4c..HEAD` (34 commits) was checked for a CHANGELOG line in its own
+  diff. Four had none: S3.04b (holds), S3.04c (payment boundary) and
+  S3.04f1 (public checkout doors) are store-only halves whose user-visible
+  lines rode their screen-half commits (S3.04f2/f3 — the S2.16c
+  model-half rule again), and S3.04e is the blocked docs-only commit with
+  nothing to tell a user. The genuine gap was the **operator side**: a
+  deployment could not learn from the changelog which switch turns commerce
+  on, that only the fixture provider exists, or that `tix`/`shop` became
+  reserved slugs. That is now one entry.
+- **Verified:** every factual claim added was read out of the source, not
+  recalled — `serve.rs`'s public route table, `main.rs`'s sweep roster and
+  intervals (30 s each; domain sweep 60 s guarded by `sells_domains`),
+  `serve/config.rs`'s `ALO_SITES_PAYMENTS` handling, the
+  `ALO_SITES_MAIL_FROM`/`ALO_JMAP_SUBMISSION_ADDR` pair in `main.rs`,
+  `RESERVED_SLUGS` carrying `tix` and `shop`, migrations 0323–0335,
+  `require_commerce_site` in sites.rs, and the journal's own wire-verified
+  numbers (ceiling default 1000 cents, limits 60/15 per 10 min, 50-doc
+  knowledge cap, 200-entry transcript, 200/day mail cap). Anchor check: the
+  features.md link resolves to the new heading. No code gate applies:
+  `git diff --stat` is five markdown files.
+- **Cuts:** none. The item was documentation and is complete.
+- **Next:** S3.06d — the wave's final arcs and the real-browser 360px walk;
+  then the wave closes (S3.04e stays `[!]` blocked on the human tax
+  review).

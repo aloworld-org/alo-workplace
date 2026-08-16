@@ -598,8 +598,9 @@ EU models, suggest-only where the EU AI Act calls a use high-risk.
 ## alo Sites — the AI-native website builder (ADR 0036)
 
 Tags: **[S1]** = v1 (site + blog + forms + both domain modes) · **[S2]** =
-fast-follow · **[S+]** = later. Built by the Sites track loop
-(`docs/autonomy/sites/QUEUE.md`).
+fast-follow · **[S3]** = wave 3 (editing on the page, the assistant,
+commerce — settled in ADRs 0040/0041/0042/0050) · **[S+]** = later. Built
+by the Sites track loop (`docs/autonomy/sites/QUEUE.md`).
 
 - [S1] ★ **AI builds the first draft**: "tell me about your business" → a complete site — pages, sections, real copy — then you edit; every AI change is a preview-then-approve diff (ADR 0034 pattern)
 - [S1] Section-based editor: add/reorder/remove typed sections (hero, features, text+image, gallery, testimonials, pricing, team, FAQ, CTA, contact form, nav, footer), each edited by a simple form — no pixel canvas
@@ -640,6 +641,26 @@ fast-follow · **[S+]** = later. Built by the Sites track loop
 > EU reseller and a PSP — the model, routes and screen exist behind an
 > unconfigured registrar. Automatic CRM lead creation shipped as the
 > deliberate one-click handoff rather than an automatic one.
+
+- [S3] ★ **Editing on the page** (ADR 0042): type into the headline, drag a section and watch the page reflow, resize among each section's declared shapes only, and drag new sections in previewed with your own content — every gesture lands as the same reviewable typed change a form or an AI proposal makes; no pixel canvas, ever
+- [S3] ★ **The site assistant that answers** (ADR 0040): a visitor's chatbot grounded in the published site, published posts and a deliberately published knowledge collection — every answer cites its page or the assistant refuses; a defaulted monthly spend ceiling with rate limits below it; appearance inside the site's own palette with contrast proven, never free-form CSS
+- [S3] ★ **The assistant that acts** (ADR 0040): book a real free slot (with the visitor's own cancellation link), capture a lead into CRM through its owned seam (aggregate attribution only, no visitor journeys), and point at ticketed events — three verbs closed in code; it can never pay, invoice, discount or invent a price
+- [S3] ★ **Tickets on the site** (ADR 0041): dated events referencing the Billing price list (never a copied price), seats held before payment so the last seat cannot be sold twice, hosted payment (card data structurally cannot reach alo), and a paid sale that fulfils itself — ticket page + calendar file, settled invoice, CRM contact — plus the ticket by email under ADR 0050's abuse rules
+- [S3] ★ **Stock items on the site** (ADR 0041): sell what Inventory says is on the shelf — availability computed from the ledger at every read, the sale recorded as a real stock movement, one flat delivery rate per site, honest failure paths that name the refund instead of overselling
+- [S3] **Shop setup proposed from one sentence**: the catalog, per-item VAT treatment and delivery rate drafted for review with every guess flagged in the type system — a price the model was not told arrives as a blank, never a number it made up; approval applies through the normal owned routes
+- [S3] **Place-of-supply VAT rules table** — *blocked by design*: a tax professional reviews it before it is built; consumer-price VAT carving and invoice country stand as flagged provisional choices until then
+
+> **S3 reconciliation (2026-08-16):** all Wave-3 strands above are accounted
+> for in [`docs/design/sites.md`](design/sites.md#what-wave-3-promised-and-what-wave-3-shipped-s306c).
+> Three dependencies are stated rather than hidden: the assistant answers
+> only with a tenant-configured AI provider (until then it is honestly
+> unavailable); **no live payment provider adapter exists yet** — checkout
+> stays off until a human names Mollie/Adyen-class PSP credentials behind
+> the built boundary (ADR work); and the ticket email is off until the
+> deployment configures its own sender address (ADR 0050). The VAT rules
+> table waits for its human-arranged tax review. The wave review also
+> narrowed the commerce write-doors and price-list reads to owners — an
+> invited site editor can look at what is on sale but not change it.
 
 - [S+] Simple catalog storefront (order-by-form, no checkout) — **shipped in S2**; booking-page section (ties to Agenda) — **shipped in S2**; custom-code blocks (sandboxed) — **shipped in S2**; template gallery — **shipped in S2**
 - [S+] ★ **Sell domains in-product** (S2 shipped the model, the routes and the screen; production ships an unconfigured registrar, so nothing can be bought until the ADR below is written) — buy `acme.com` inside alo and mail + site + ERP are live on it in minutes, zero DNS steps, because alo hosts the zone from second one. Built as a **reseller** over an EU wholesale-registrar API (Openprovider / Realtime Register / INWX class — never own ICANN accreditation at this scale); honest flat pricing, no first-year-bait renewals. Thin margin by design: this is the onboarding/retention closer, not a profit line. **Decided in ADR 0049** (Openprovider, an EU wholesaler; the customer is always the registrant; DNS phase 1 hosts the zone at the wholesaler so alo-run DNS stops being a blocker). **Remaining prerequisite:** the EU PSP checkout (B2 billing extension) — nothing can be bought until money can be taken. The item that sets `SITE_REGISTRAR` comes after that, in that order.

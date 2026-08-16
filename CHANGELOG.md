@@ -10,6 +10,19 @@ contracts.
 
 ## Unreleased
 
+- **For operators: the switches behind the new site commerce and assistant,
+  in one place.** Selling on a website is off until the `alo-sites`
+  container sets `ALO_SITES_PAYMENTS` — the only value that exists today is
+  the test fixture, so production checkout stays honestly off until a real
+  EU payment provider is wired (its own decision and ADR); the provider's
+  webhook URL is `POST /_alo/pay` on the public site hosts. Ticket email is
+  off until `ALO_SITES_MAIL_FROM` names a deployment-owned, DKIM-signed
+  address. The assistant makes outbound calls to tenant-configured model
+  backends, so `alo-sites` should run with `ALO_AI_EGRESS=restricted` like
+  the workspace services. `tix` and `shop` are newly reserved page slugs —
+  check for existing pages using them before deploying. All the sale and
+  notification paperwork runs as 30-second background sweeps inside
+  `alo-jmap`; no separate process is needed.
 - **The commerce screens now speak their state to screen readers, and their
   tables fit a phone.** When an invited collaborator opens Shop, Tickets or
   Shop setup, the "you can look, not change" fact is announced by assistive

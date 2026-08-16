@@ -1,6 +1,6 @@
 # Design note — alo Sites (marketing site + blog + forms)
 
-Status: S2 as built · 2026-08-13 · ADR 0036 · Sites track waves S1–S2
+Status: S3 as built · 2026-08-16 · ADR 0036 (+ 0040/0041/0042/0050 for wave 3) · Sites track waves S1–S3
 
 alo Sites is the AI-native no-code website builder: "tell me about your
 business" produces a complete draft site, then editing is conversational
@@ -13,9 +13,15 @@ the blog, the forms and both domain modes; S2 added publishing in several
 languages, collections over alo Base, the restricted site collaborator,
 version history, scheduling, page passwords, image framing, the second
 generation of analytics, the catalog and its orders, bookings, sandboxed
-custom code and the domain buy-box. Each section names the item that built
-it, and the two reconciliation tables at the end account for every feature
-line the product doc promised.
+custom code and the domain buy-box. Wave 3 added editing on the page itself
+(inline text, drag reorder, constrained resize, the seeded palette —
+ADR 0042), the site assistant that answers from the published site with
+citations and can book a meeting, capture a lead and point at a ticket —
+and nothing else (ADR 0040) — and commerce: ticketed events and stock items
+sold through hosted payment, priced by Billing and counted by Inventory at
+every read, never copied (ADR 0041), with the ticket email behind its own
+ADR 0050. Each section names the item that built it, and the reconciliation
+tables at the end account for every feature line the product doc promised.
 
 ## Surface
 
@@ -29,6 +35,11 @@ line the product doc promised.
   published pages resolved by `Host` header, `POST /f/:form_id` for
   contact forms, `/blog` index + post pages + RSS, `sitemap.xml`,
   `robots.txt`, `/healthz`, and the Caddy on-demand-TLS "ask" endpoint.
+  S2 added `/o/{catalog}` (orders), `/b/{booking}` + `/b/manage/*`
+  (appointments) and `/_alo/collect` (the page beacon); wave 3 added the
+  assistant (`/_alo/chat`, `/_alo/chat/book`, `/_alo/chat/lead`), the
+  ticket shop (`/tix*`, `/t/{token}*`), the stock shop (`/shop*`) and the
+  payment webhook (`/_alo/pay`) — all on the public site hosts.
 - **Outputs:** complete static HTML documents (semantic landmarks,
   meta/OG/canonical) plus one theme-token-driven stylesheet and
   near-zero JS (menu toggle + form submit only); stored form
@@ -855,6 +866,30 @@ stylesheet is layout-neutral by construction (above), a handle would need
 the keyboard step cover both without a preview that lays the page out
 differently from the published one.
 
+### The section palette, seeded from the tenant's own website (S3.01d, ADR 0042)
+
+A new section is previewed with the tenant's own content, never lorem
+ipsum. `alo-store`'s `site_seed` module is a pure function from a
+`SeedContext` — the site's name, its pages, every section already written,
+the first catalog/collection/bookable service — to what a new block of a
+given type would say: pages become nav links and feature cards, the site's
+own images the gallery. What only the owner can write (quotes, prices,
+team, answers) is copied from their existing sections or answered as a
+typed `NeedsInput(Writing|Picture|Catalog|…)` — never invented, and a test
+proves every string in every seed is a member of the corpus the tenant
+wrote. A seeded contact form never borrows another section's `form_id`.
+
+The edit API serves it read-only: `GET …/pages/{pid}/palette` (one tile
+per section kind, the page being edited first) and
+`GET …/palette/{kind}/preview` — the seeded section rendered through the
+same renderer that publishes, in the site's own theme, `no-store`; `422`
+when there is nothing of the tenant's to show. Nothing writes: dropping a
+tile is the existing `POST …/sections` with an explicit `index`, and the
+web palette (`SectionPalette.tsx`) is a panel beside the stack — not a
+dialog, because you cannot drag out of a modal onto what it covers — with
+a keyboard path ("Where it goes" + pressing the tile) proven to produce
+the byte-same request as the drag.
+
 ### The template catalog (S2.11a)
 
 The manual sibling of generation, and the path a tenant without a
@@ -1300,6 +1335,202 @@ nothing in alo mints one yet (S2.15c2), so the screen states the arc — approva
 then payment, then automatic registration and attachment — rather than offering
 a button no route completes. Wiring a real PSP is ADR work (S3.04c's shape).
 
+### The site assistant (S3.02, ADR 0040)
+
+**What it may read (S3.02a).** The corpus a visitor's question is answered
+from is exactly what is already on the internet: the **published** site
+(pages read from the immutable snapshot set `published_publish_id` points
+at — the same rows `alo-sites` serves, so drafts, scheduled-but-unrun
+publishes and rolled-back versions are unreachable by construction, and a
+site that is not live has an empty corpus), published blog posts, and a
+named **Public knowledge** collection (`site_knowledge`, migration 0323) of
+up to 50 Drive documents the tenant deliberately published to it — one
+document at a time, never a folder, with the sentence *"Anyone on the
+internet will be able to read this."* above the button every time. A
+trashed document silently leaves the corpus (fail-closed) but stays listed
+so the owner can see and undo it. Section text contributes visible prose
+only: no hrefs, no layout values, `custom_code` never its markup — and
+catalog prices and availability stay out of the corpus entirely; they are
+structured facts read by tool call, never retrievable prose.
+
+**How it answers (S3.02b).** Retrieval is deterministic and local:
+corpus lines chunked and scored by rarity-weighted lexical overlap, top 6
+chunks numbered as sources. A question sharing no vocabulary with the
+corpus is refused *before* any model call — an off-topic stranger costs
+the tenant nothing. The model must return `{"answer","citations":[n]}` or
+`{"refuse":true}` (strict serde); an answer with no citations, or citing a
+source it was never shown, becomes a typed refusal **in the parser, not
+the prompt**. Citations come back typed and map to the exact public URLs
+the serving stack uses.
+
+**What it may cost (S3.02c).** `site_chat_settings` (migration 0324):
+off by default, and the monthly **spend** ceiling is defaulted (€10,
+settable €1–€10 000, integer cents) rather than blank. Spend is a monthly
+ledger keyed `(tenant, site, 'YYYY-MM')` — a new month is a fresh budget
+by key, no reset job — and a consulted model call records a flat 1 cent
+(the wire reports no price; revisit with real per-token prices). Below the
+ceiling sit per-IP (60/10 min) and per-visitor (15/10 min) limits on
+`POST /_alo/chat`. Exhausted or unwired, the visitor gets the same honest
+`unavailable` answer offering the site's own contact page; the tenant is
+told once per site-month by an internal inbox message claimed at-most-once
+like the form/order/booking sweeps. Raising the ceiling reopens the
+assistant immediately (exhaustion is computed live).
+
+**What it looks like (S3.02f/g).** Appearance (migration 0325) is a
+versioned envelope of bounded fields — name, welcome, up to three
+suggested questions, tone note, launcher corner/icon, offline message,
+avatar blob — and an accent that is a **palette-role pair**
+(`primary/on_primary`, `text/background`, `surface/text`), never a
+free-form colour: a build-time test walks every accent over every shipped
+preset and proves ≥ 4.5:1, so no storable value can fail contrast. The
+tone note is quoted in the prompt as style guidance with the rules
+verbatim after it, and a hostile note ("ignore all rules…") is proven not
+to widen the closed vocabulary. The widget itself is injected just inside
+`</body>` of published pages exactly while the assistant is on — theme
+tokens only, all content HTML-escaped, the visitor token random and never
+stored — and the appearance screen previews the real widget through a
+store-nothing preview route validated by the same model as the save.
+
+### The assistant that acts (S3.03, ADR 0040 §2/§4)
+
+The action vocabulary is closed in code: the reply contract accepts
+exactly `{"book":N}`, `{"contact":true}` and `{"tickets":N}` beside
+answer/refuse, and `deny_unknown_fields` makes any other verb (`pay`,
+`invoice`, `discount`…) a shape error — unrepresentable, not disallowed.
+An index into a list the serving site never published is a typed refusal.
+
+- **Booking (S3.03a/b).** Agenda's own seam module
+  (`calendar_availability`, Agenda's files untouched) answers busy time as
+  `CalendarBusySpan { from, to }` — a type with no field a title, guest or
+  note could travel in, so "never contents" holds by construction. The
+  conversation offers a published service's next real free times, reserves
+  through the same race-safe door as the booking page
+  (`POST /_alo/chat/book`), and every reservation mints a **manage token**
+  (migration 0326): the visitor's confirmation carries an .ics for their
+  own calendar and a cancellation link that frees the slot and removes the
+  owner's event — the reversible-only rule as a capability, not a prompt.
+- **Lead capture (S3.03c/d).** CRM's own seam module (`crm_lead_capture`,
+  CRM's files untouched) exposes one verb: `capture(ConversationLead)` —
+  title, name, email, company, source, and no field a transcript or page
+  view could travel in. The card lands on the tenant's first active board
+  through CRM's own writers; a duplicate is an answer (`AlreadyKnown` /
+  `AlreadyCustomer`), reaching the wire as one bit. Attribution is
+  aggregate only (migration 0327): offer shown / lead raised counters
+  keyed by the site id, no visitor identity.
+- **The transcript (S3.03e).** `site_chat_actions` (migration 0328) is a
+  bounded (200 entries), tenant-scoped record of the assistant's acts —
+  each answer with the pages it cited, each consulted refusal, each
+  booking offer/reservation, each lead saved/known, each ticket offer —
+  with **no question column, no answer text, no visitor identity**,
+  proven by a columns-of-the-table test. Owner-only on the edit surface.
+
+### Selling tickets (S3.04, ADR 0041)
+
+**The seam.** `billing_catalog_read` is Billing's own read door: the
+active price list as `CatalogSaleItem` — id, name, unit, sale price
+cents, VAT bp, photo — with no field for cost, supplier, SKU or any
+workspace identity, and an exhaustive destructure so a column Billing
+adds tomorrow fails to compile at the seam until someone decides whether
+it crosses. Archived, foreign and never-existed ids answer one `None`.
+
+**The event and the hold (S3.04b, migration 0329).** A ticketed event is
+`starts_at`, `capacity` (1–100 000) and a *reference* into the price
+list — never a copied name, price or VAT. Capacity is reserved **before**
+payment: `take_ticket_hold` counts committed seats and inserts as one
+decision under a per-event advisory lock, so the second buyer after the
+last seat hears "sold out", never gets it. Expiry is a time predicate,
+not a sweeper — an abandoned checkout frees its seats by time passing —
+and a hold stores no buyer identity at all.
+
+**The money (S3.04c, migration 0330).** `SitePaymentProvider` is the
+hosted-payment boundary (Mollie/Adyen shape, EEA-only by construction,
+plus a deterministic fixture): `create_payment` idempotent under the
+order id, and `payment_status` — the truth a webhook makes us **fetch**;
+a webhook is a doorbell, and an unauthenticated POST can make alo look,
+never make it believe. No field exists in either direction that a card
+number could travel in, proven by exhaustive destructure. The order
+records the price the seam answered at placement, computed server-side —
+the record of the sale, like a domain quote. Paid completes hold and
+order in one transaction; money that arrives after the hold lapsed fails
+**visibly** with the refund named, never a sale of possibly-resold seats.
+
+**Fulfilment (S3.04d, migration 0331).** A 30 s sweep in `alo-jmap`
+claims each paid order at-most-once (insert + `FOR UPDATE SKIP LOCKED`)
+and does the paperwork through the owned doors: CRM first (so the invoice
+cannot make the buyer "already a customer" for the sale that made them
+one), then Billing's invoice born settled — VAT carved **out** of what
+the buyer actually paid (`net_within`, property-tested) rather than added
+on top, customer country currently the seller's own; both provisional
+pending the S3.04e tax review. The ticket is a private page
+`/t/{token}` plus a hand-rolled RFC 5545 .ics.
+
+**The shop (S3.04f).** A `tickets` section renders one link to `/tix` —
+a published page is cached bytes, and a price or a seat count must never
+be — and the live pages (`/tix`, `/tix/{event}`, `/tix/order/{order}`,
+`no-store`) price through the seam at every request. Checkout POSTs
+through the typo gate first (a bad address never takes a hold real buyers
+are racing for), holds for 30 minutes, and 303s to the provider's hosted
+page; the return page settles by **fetching** the provider's status. The
+webhook `POST /_alo/pay` resolves only by provider payment id and answers
+probes exactly like success. Unconfigured deployments say so honestly:
+sentence on the page, 503 on POST, nothing held. The owner's Tickets
+screen manages events over `/sites/{id}/tickets` with live sold/held
+counts; the assistant's `{"tickets":N}` verb points at `/tix/{id}` with
+the price read from the seam at that instant — **no price ever enters
+the prompt** (S3.04g, proven on the recorded wire).
+
+**The ticket by email (S3.04h, ADR 0050, migration 0333).** alo's first
+automated mail to a stranger, allowed only as the transactional
+consequence of an action the stranger took and paid for. Sender identity
+is one deployment-owned From (`ALO_SITES_MAIL_FROM`) — never a tenant
+value; the site's name rides as display name, the owner's address as
+Reply-To resolved inside the sale's own tenant. At-most-once per sale
+(claimed in the statement that selects), a per-tenant daily cap (200)
+that defers rather than drops, DKIM inherited by leaving through the
+trusted submission listener. Default-off: unset the address and no mail
+is attempted.
+
+### Selling stock (S3.05, ADR 0041)
+
+**Inventory's seam (S3.05a1, migration 0334).** `inv_stock_sale` is
+Inventory's own door: available-to-sell is **computed at every read**
+from the ledger's on-hand minus live holds — no stored copy anywhere —
+reserve is race-safe under a per-product lock, and `claim` records the
+real outbound `sale` movement to the customer counterparty in the same
+transaction, which is why a completed stock hold counts for nothing
+where a completed ticket hold counts forever: the shelf itself dropped.
+The shop-vs-warehouse race is deliberately *not* settled: holds bind the
+shop, never Inventory's own doors, and a claim that finds the goods gone
+refuses cleanly.
+
+**The shelf and the checkout (S3.05a2/a3, migration 0335).** A site's
+shop is `site_shop_items` — pure references, validated against both
+owning seams at add — plus one flat delivery rate in integer cents, the
+site's own price, its VAT following the goods. The public pages
+(`/shop`, `/shop/{item}`, `/shop/order/{order}`) reuse the ticket shop's
+machinery: priced and counted at every read, typo gate → 30-minute
+reserve → order, hosted payment, fetch-on-return settle, the shared
+webhook. The two honest failures both close the order as failed **with
+the refund named on the return page** and move nothing: paid-after-lapse
+and goods-gone. The owner's Shop screen picks stocked products from the
+price list and edits the delivery rate in place.
+
+**The proposed configuration (S3.05b, owners only).** From one sentence
+about the business, `alo-ai::site_shop_config` proposes the catalog —
+each item classified stock/dated/service — with a VAT treatment per item
+and the delivery rate, and the flags are unforgeable because they live in
+the parser, not the prompt: a `price_cents` is accepted **only** if that
+exact amount is stated in the description itself (any other number
+refuses the whole proposal), VAT is structurally a guess (`VatGuess`,
+with no field that could mark it confirmed), and shipping is only legal
+when something ships. `POST /sites/shop-config/propose` is
+owner/workspace auth only — a static path the site-editor allowlist never
+matches, because the proposal names Billing prices and VAT. The screen
+renders it as an approval list — every guess wearing its badge — and
+approving applies **only** through the already-owned Billing product,
+ticket-event and shop-settings routes; no bulk-apply endpoint exists, and
+the proposal itself is never stored.
+
 ## Errors
 
 Edit side (`alo-jmap`, RFC 9457 `Problem` bodies like every module):
@@ -1587,3 +1818,93 @@ still applies. On top of it:
    design: today's catalog takes orders, never money. The tax rules table is
    listed in wave 3 with the standing instruction that a professional reviews
    it before it is built.
+
+## What Wave 3 promised, and what Wave 3 shipped (S3.06c)
+
+Wave 3 was settled in ADRs rather than feature lines — **0040** (the
+chatbot), **0041** (the shop), **0042** (direct manipulation), **0050**
+(the ticket mail) — and its `[S3]` lines were added to
+`docs/features.md` § alo Sites by this reconciliation, so the promise and
+the account of it now live where a stranger will look. The same rule as
+the S1/S2 tables: shipped, or naming its explicit dependency.
+
+| `[S3]` capability | State | Where / narrowing |
+|---|---|---|
+| ★ Editing on the page (ADR 0042) | **Shipped** | Inline text edits travel through the reviewed AI-edit door as byte-identical envelopes (one path, one diff); drag-reorder goes through the same `move` the stack's buttons call, with a keyboard twin and diff goldens over all (from, to) pairs; resize is a `set_prop` choosing among **words, never numbers** — a percentage is not expressible in the schema; the palette seeds new sections from the tenant's own content or asks, never invents. The whole arc was driven in a real browser, keyboard-only pass included. No touch drag (phones use the stack's buttons); localized pages keep the forms. |
+| ★ The assistant that answers (ADR 0040 §1/§3) | **Shipped**, one stated dependency | Corpus = the published site, published posts and a deliberate Public-knowledge collection — drafts unreachable by construction; every answer names its page or the parser turns it into a refusal; off-topic questions refuse before any model call. The spend ceiling is defaulted (€10/month), rate limits sit below it, and the visitor's unavailable state offers the contact form. **Answers require the tenant's configured AI provider**; until then the widget is honestly unavailable. |
+| Assistant appearance and voice (ADR 0040 §5) | **Shipped** | Bounded fields, palette-role accent pairs proven ≥ 4.5:1 at build time, tone note quoted below the absolute rules with a hostile-note test, live preview that stores nothing, suggested questions drafted locally from the site's own pages. |
+| ★ The assistant that acts (ADR 0040 §2/§4) | **Shipped** | Exactly three verbs, closed in the parser (`book`, `contact`, `tickets`); booking reads Agenda through a spans-only seam and every reservation carries its own cancellation link; leads cross CRM's seam with no journey fields representable; the owner reads a transcript of acts that stores no visitor words. |
+| ★ Tickets: hold, pay, fulfil (ADR 0041) | **Shipped**, provider unconfigured | Seats held before money under a per-event lock (the oversell race is a test), hosted payment through a boundary no card field can cross, webhook-is-a-doorbell, invoice/CRM/ticket-page fulfilment claimed at-most-once. **No live PSP adapter exists** — `ALO_SITES_PAYMENTS` knows only `fixture`, so production checkout stays honestly off until a human wires Mollie/Adyen behind the trait (ADR work). Event times render as UTC wall clock (venue zone open). |
+| The ticket by email (ADR 0050) | **Shipped**, off by default | Deployment-owned sender, Reply-To the owner, at-most-once per sale, daily cap that defers; switched on only by configuring `ALO_SITES_MAIL_FROM` + the submission listener. No live sending in the loop, ever — structural verification only. |
+| ★ Stock items over Inventory (ADR 0041) | **Shipped** | Availability computed from the ledger at every read (no second copy — the ADR's constraint as a schema fact), race-safe reserve, claim records the real `sale` movement, flat per-site delivery rate, and the two honest failure paths name the refund instead of overselling. Shares the ticket checkout end to end. |
+| Shop setup proposed from a sentence | **Shipped** | Prices only when stated in the description (else flagged blanks), VAT structurally a guess, shipping only when something ships — flags the model cannot forge. Owners only; approval applies through the owned routes row by row; unconfigured AI keeps the manual path. |
+| Place-of-supply VAT rules table | **Blocked, by its own text** | A tax professional's review is the item's prerequisite and none is on record. The two provisional S3.04d decisions stand flagged for it: VAT carved out of consumer prices, and the seller's country as the invoice's customer country. |
+| Commerce doors vs the site-editor grant | **Held after fixing (S3.06a)** | The assistant's routes were owner-only from birth; the ticket/shop pickers and sale verbs were not, and are now owner-only via `require_commerce_site` with the refusal spoken. Collaborators keep read-only what the published pages state anyway, and the screens say so. |
+
+**Languages.** Every Wave-3 screen — tickets, shop, shop setup, the
+assistant, palette and inline editing — ships in English, French and Dutch,
+under the same parity ratchet. The assistant widget speaks the site's
+language; store refusal sentences on the public doors remain English (the
+standing cross-door cut, unchanged from S2).
+
+**Human production inbox, Wave-3 additions.** Everything in the S1 and S2
+inboxes above still applies. On top of them:
+
+- **New public paths on `alo-sites`**, all riding the public site hosts (a
+  wildcard/custom-Host route that sends everything to `alo-sites` needs no
+  per-path rule): `/_alo/chat`, `/_alo/chat/book`, `/_alo/chat/lead`
+  (assistant), `/tix`, `/tix/{event}`, `/tix/order/{order}` and
+  `/t/{token}[/calendar.ics]` (tickets), `/shop`, `/shop/{item}`,
+  `/shop/order/{order}` (stock), and `POST /_alo/pay` — the webhook URL to
+  give the payment provider.
+- **No new workspace Caddy prefix**: every authenticated Wave-3 route lives
+  under `/sites/*`, reached in production as `/api/sites/…`, already proxied.
+- **`ALO_SITES_PAYMENTS`** on the `alo-sites` container: unset = commerce
+  honestly off (pages say so, POSTs 503); the only accepted value today is
+  `fixture`, which is for tests and warns loudly at boot. A live provider is
+  human + ADR work behind `SitePaymentProvider`.
+- **`ALO_SITES_MAIL_FROM`** (e.g. `tickets@alomails.com` — a domain this
+  deployment DKIM-signs) plus the submission listener switch ticket mail on;
+  unset, the sweep never starts.
+- **`ALO_AI_EGRESS=restricted`** on the `alo-sites` container: since S3.02e
+  it makes outbound calls to tenant-configured model backends.
+- **Reserved slugs:** `tix` and `shop` are newly reserved page slugs. At the
+  next deploy run `select tenant_id, site_id from site_pages where slug in
+  ('tix','shop')` and rename any hit before the routes shadow it (none can
+  be created from now on).
+- **Background sweeps inside `alo-jmap`**, all 30 s: form, order, booking
+  and assistant-ceiling notifications; ticket fulfilment; stock fulfilment;
+  ticket mail (only when configured); scheduled publishing — plus domain
+  registration (60 s, only when the deployment sells domains).
+- The **tenant AI provider** remains the one switch behind the assistant,
+  generation, conversational editing, translation and the shop-config
+  proposal; each degrades to a stated manual path (or an honest
+  unavailable) without it.
+
+**Open decisions this wave flagged, for a human.**
+
+1. **The S3.04e tax review, first among them.** Arrange the tax
+   professional's afternoon: the place-of-supply rules for event admission
+   (B2C/B2B, virtual attendance, OSS), and the two provisional S3.04d
+   choices (VAT-inclusive carve; seller-country customer). Stock sales
+   snapshot the goods' VAT rate with the buyer's country recorded —
+   destination-based rules wait for the same table.
+2. **Name the live PSP.** The `SitePaymentProvider` boundary is built and
+   Mollie/Adyen are the intended shapes; choosing one, holding credentials
+   and writing its adapter is an ADR and a human's deploy. Until then every
+   checkout is honestly off. (The S2 domain-selling PSP decision folds into
+   this one.)
+3. **Venue time zone.** Ticket pages, shop pages and the .ics show the UTC
+   wall clock; giving events a zone is its own small item.
+4. **The 1-cent flat estimate per consulted question** stands in for real
+   per-token prices; revisit when an operator has them.
+5. **What a collaborator may answer.** The assistant transcript and the
+   enquiry-answering question from S2 are one product decision now: if
+   answering visitors becomes an invited job, the invite screen must say so
+   first. Related: the funnel's "leads" column counts person-made links
+   only, so chat-captured leads show under submits — widening it to
+   machine-made captures is a decision, not a bug.
+6. **The payment webhook is deliberately not rate-limited** (body cap +
+   fetch-not-believe are the guards; a provider's retries must not be
+   throttled) — confirmed at the wave review, recorded here so nobody
+   re-adds a limiter without deciding it.
