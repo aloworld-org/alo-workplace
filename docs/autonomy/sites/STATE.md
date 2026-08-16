@@ -9095,3 +9095,90 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   shop-settings` reachable by the site-editor grant like the tickets
   routes — flagged for the S3.06 security re-walk to confirm or narrow.
 - **Next:** S3.05c — shop UI for stock items over the wave-one checkout.
+
+## 2026-08-16 — S3.05c The shop window: the owner picks the shelf, and every number on it is somebody else's answer
+
+- **Item:** S3.05c — shop UI for stock items, sharing the wave-one checkout:
+  the owner-side surface over the S3.05a2 shelf (`site_shop_items`), which
+  was store-only, plus the `shop` section's web mirror — the Rust model,
+  renderer and public pages shipped in S3.05a3, but the editor could not
+  add the section and the server's palette tile was silently dropped by the
+  web's kind list.
+- **Design (implement-skill blocks):**
+  - *Surface, store:* two read methods in `site_shop_items.rs` (its own
+    module, its own reason): `site_shop_shelf` — the listings resolved
+    through the catalog and stock-sale seams at the read, `None`s for a
+    product that left the list — and `site_shop_candidates` — the active
+    price list narrowed to stocked items with live shelf counts (zero units
+    still offered: sold out is a state, not a refusal). One availability
+    query serves both (`stocked_shelf_counts`), flooring with the stock-sale
+    seam's own `available_units` (made `pub(crate)` rather than copied).
+  - *Surface, wire:* new `products/mail/alo-jmap/src/sites_shop_items.rs`
+    (tickets-module precedent): GET `/sites/{id}/shop-products`, GET/POST
+    `/sites/{id}/shop-items`, DELETE `…/shop-items/{item}` — authenticate +
+    `require_site`, store sentences verbatim, conflicts spoken as 422 like
+    the rest of the `/sites/{id}` contract (a first draft said 409; the
+    matrix said otherwise and the surface's own convention won).
+  - *Surface, web:* `shop` joins the section vocabulary end to end
+    (sections/drafts/info/thumbnail/form — the form counts the live shelf
+    and links to the Shop screen, S1.30b's "say why" law); `ShopView` at
+    `/sites/:siteId/shop` (TicketsView precedent): shelf table priced by
+    the seams, add-dialog offering only unlisted stocked products,
+    arm-to-confirm remove with the "orders keep it" sentence, and the flat
+    delivery rate shown and edited in place over the existing
+    shop-settings route; a Shop button on the site tool row; the assistant
+    suggests "What do you sell?" when a page carries the section.
+  - *Tenancy:* every verb resolves the site inside the caller's account
+    store; a foreign tenant's knock is the invented-id 404, proven by test
+    and on the wire.
+  - *Rejected alternative:* resolving shelf rows per product through
+    `stock_for_sale` (one query each) — a 200-item shop window must not
+    cost 200 round trips; the one-statement count map mirrors the tickets
+    screen's seat-count read.
+- **Shipped:** store methods + structs (`SiteShopShelfRow`,
+  `SiteShopCandidate`) + lib exports; the jmap module + 4 routes +
+  registration; test suite `tests/sites_shop_items_http.rs` (4 tests); web:
+  ShopView.tsx, Shop.test.tsx (8 tests), section mirror across seven files,
+  api methods + types, ~40 strings × en/fr/nl; CHANGELOG entry.
+- **Verified:** DB pruned (2 056 gone); fmt; clippy `-p alo-store` and
+  `-p alo-jmap --all-targets` exit 0 (23 m + 15 m; only the two
+  pre-existing `meet.rs` type_complexity survivors); test-binary build via
+  the sanctioned marker form (39 m 36 s); **`cargo nextest run -p alo-store
+  -p alo-jmap` 3 340/3 340 green** (96 s) incl. the 4 new: the shelf and
+  picker as the seams' answers now (stocked-only picker, shelf count 7,
+  resolved add answer, delist 204 then 404), the store's three refusal
+  sentences verbatim (service / invented id / duplicate) with a 400 shape
+  gate, the archived product's honest nulls and its disappearance from the
+  picker, and 401/404 walls on every verb with the invented-site-equality
+  proof. Web: tsc clean, eslint clean, `vitest run src/sites` **301/301**
+  (8 new), `npm run build` clean. **Wire transcript on the local backend**
+  (docker `alo-pg`, pg_stat_activity names `alo`; two fresh tenants via
+  `identityctl bootstrap-admin`, `/auth/token` password-grant tokens, debug
+  binary on 127.0.0.1:8080, stale servers killed before and after): no
+  token → 401; picker offers exactly the stocked product (`availableUnits:
+  0` — honest empty shelf) and not the service; POST → the resolved row
+  and **a real `site_shop_items` row on the database**; duplicate → 422
+  "already on this site's shop"; service → 422 "not a stocked product; the
+  shop sells from the shelf"; tenant B → 404 "no such site" on GET, POST
+  and DELETE while the row stayed; the same door live at the `/api/*`
+  mount; owner DELETE → 204 and **count 0 on the real database**.
+- **Gate note for the next iteration:** the jmap test harness falls back to
+  port 5433 when `DATABASE_URL` is unset, and nothing listens there — the
+  whole `-p alo-jmap` suite fails with `PoolTimedOut` in ~30 s per test.
+  Export `DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo` on
+  the nextest command (the memory note existed; it cost one full-suite run
+  to rediscover — 8 `accountant_role_http` "failures" that were nothing of
+  the kind).
+- **Cuts/flags:** (1) Manual click-path is structural (vitest drives the
+  real views over the real client; the wire pass proves every URL) — the
+  loop has no browser; the eyes-on walk joins the S3.06 wave review.
+  (2) The shop section's palette tile was already served (S3.05a3 seeded
+  it); no server change was needed — the web kind list was the only gap.
+  (3) `/sites/{id}/shop-*` sits inside the site-editor grant like tickets
+  and shop-settings; flagged for the S3.06 security re-walk alongside the
+  S3.05b3 flag (the picker names Billing prices for stocked items —
+  the same facts the catalog picker already shows a site editor).
+  (4) Stock receiving stays in Inventory; the empty-picker hint points at
+  shop setup/Billing rather than duplicating a receive flow.
+- **Next:** S3.06 — the wave review (S3.04e stays `[!]` blocked on the
+  human-arranged tax review).

@@ -10,6 +10,17 @@ contracts.
 
 ## Unreleased
 
+- **Your site now has a Shop screen, and pages a Shop block to match.** Under
+  the new "Shop" button, pick which stocked products your site sells: each
+  row shows the name and price from your Billing price list and what is on
+  the shelf right now from Inventory — never a stored copy, so the shop can
+  never show yesterday's price. Set your flat delivery rate in the same
+  place. In the page editor, the new Shop block puts the door to your shop
+  on any page, with your own words above the link; visitors buy through the
+  same checkout the ticket shop uses, paid on the payment provider's page.
+  Removing a product only takes it out of the window — orders already placed
+  keep it. In English, Dutch, and French. (ADR 0041.)
+
 - **alo can now draft your whole shop setup from one sentence about your
   business.** Tell it "I run workshops in Antwerp and sell two books" and it
   proposes the catalog — each item classified as shipped goods, a dated
