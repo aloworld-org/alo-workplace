@@ -8886,3 +8886,67 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   batch only if a real shop feels it. (5) The store's refund/refusal
   sentences remain English on all doors — the standing cross-door cut.
 - **Next:** S3.05b — propose the configuration (fixtures only).
+
+## 2026-08-16 — S3.05b The setup screen's engine: a shop configuration proposed, never applied
+
+- **Item:** S3.05b — propose the shop configuration from a sentence about
+  the business (ADR 0041's "where Odoo loses the customers who cannot
+  afford a consultant"): the catalog, one VAT treatment per item, the
+  delivery rate, every guess flagged. Fixtures only.
+- **Design (implement-skill blocks):**
+  - *Surface:* `platform/alo-ai/src/site_shop_config.rs`, the S1.26a/b
+    shape in one module: `shop_config_messages` (prompt),
+    `parse_shop_config(description, text)` (strict closed v1 envelope),
+    the one-repair `propose_shop_config[_with]`. Parsing never writes;
+    applying an approved proposal is the screen's job (S3.05b3) through
+    the owned Billing/ticket/shop routes — this crate holds no store.
+  - *The point — flags the model cannot forge, enforced in the parser
+    rather than requested in the prompt:* (1) a `price_cents` is accepted
+    ONLY if that exact amount is stated in the business description
+    itself — `stated_amounts_cents` recognises the European forms (`60`,
+    `19.50`, `19,50`, `1.950`, `1.234,56`); any other number refuses the
+    whole proposal ("never a price the model invented", ADR 0040/0041),
+    and an honest `null` parses to `ProposedPrice::NeedsInput`, a flagged
+    blank. (2) VAT is *structurally* a guess: the parsed type is
+    `VatGuess {rate_bp, basis}` (serialized key `vat_guess`) with no field
+    that could mark it confirmed; rate bounded 0–3000 bp, basis sentence
+    required. (3) Shipping follows the goods: a rate is only legal when a
+    `stock` item exists (0 allowed = stated-free), stock with no stated
+    rate parses to `NeedsInput`, nothing-ships must be `null` →
+    `NotNeeded`. Kinds: `stock` (Billing product stocked=true), `dated`
+    (ticket event), `service` (undated line). Caps: 40 items, unique
+    names, text/amount bounds; deny_unknown_fields everywhere.
+  - *Errors:* `ShopConfigError` mirrors `SiteDraftError` — Inference
+    (never retried), MissingObject, UnsupportedVersion, Shape, Invalid
+    (names the first refused field, shown verbatim in the repair turn),
+    RepairFailed after the single correction attempt.
+  - *Tenancy:* nothing tenant-scoped is read or written here; amounts are
+    integer cents in the tenant's accounting currency, the proposal never
+    names its own currency.
+  - *Rejected alternative:* trusting a model-supplied `"guessed": bool`
+    per field — a flag the model writes is a flag the model can omit; the
+    description-derived stated-amount set and the VatGuess type make the
+    honest presentation the only representable one.
+- **Shipped:** the module + `pub mod site_shop_config;` in lib.rs;
+  fixtures `valid_shop_config.json` (ADR 0041's Antwerp example) and
+  `near_miss_invented_price.json`; CHANGELOG user-voice entry.
+- **Verified:** DB pruned (to 3 403 tenants); fmt; clippy `-p alo-ai
+  --all-targets` exit 0 (only the two pre-existing `meet.rs` survivors);
+  `DATABASE_URL=… cargo nextest run -p alo-ai` **257/257 green** (0.3 s)
+  incl. the 15 new tests: the strict fixture parse, prompt-documents-the-
+  rules, invented price refused with the honest sentence / null flagged,
+  the European number forms, VAT bounds+basis, serialized flags golden
+  (`{"state":"needs_input"}`, `vat_guess`), shipping-follows-the-goods
+  (refused / NotNeeded / NeedsInput / stated-free-0), duplicate names,
+  fences/version walls, repair-conversation shape, one-repair-never-two,
+  second-refusal typed, inference-not-retried. alo-ai only — no store, no
+  routes, no web touched, so no wrong-tenant/wire/tsc gates apply.
+- **Cuts/flags:** the item's route and screen are split out as S3.05b2
+  (POST `/sites/shop-config/propose`, owner-auth NOT the site-editor
+  grant) and S3.05b3 (the approval screen, applying only through owned
+  routes) — the S3.04f1 precedent, prerequisites copied into the items
+  per the LOOP rule. No i18n strings yet (no UI in this slice; the
+  envelope's basis/notes arrive in the description's language by prompt
+  contract). VAT here is a flagged guess pipeline, not a rules table —
+  the S3.04e human tax review stays the authority the moment it exists.
+- **Next:** S3.05b2 — the proposal route.

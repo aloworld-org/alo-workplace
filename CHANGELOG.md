@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **alo can now draft your whole shop setup from one sentence about your
+  business.** Tell it "I run workshops in Antwerp and sell two books" and it
+  proposes the catalog — each item classified as shipped goods, a dated
+  event, or a service — with a VAT treatment per item and your delivery
+  rate, ready for you to review. Everything it was not told is flagged: a
+  price you never stated arrives as a blank to fill in (never a number it
+  made up), and every VAT rate is presented as a guess for your accountant
+  to confirm. Nothing is applied until you approve it. (ADR 0041; the
+  review screen itself is on its way.)
+
 - **Your website now has a public shop for the goods on your shelf.** A new
   "shop" section links visitors to `/shop`, where your chosen stock items
   are listed and sold in English, French, or Dutch — priced by your Billing
