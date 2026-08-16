@@ -9367,3 +9367,115 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.06d — the wave's final arcs and the real-browser 360px walk;
   then the wave closes (S3.04e stays `[!]` blocked on the human tax
   review).
+
+## 2026-08-16 — S3.06d1 The whole distance on two real processes: the three strands, walked
+
+- **Item:** S3.06d1 — the wave's final arcs on the real local stack. S3.06d
+  bundled the arcs AND the 360px browser walk; split d1/d2 in QUEUE.md on the
+  S2.16b→b2 precedent (one turn cannot hold three real-stack strands and a
+  browser walk with its fixes at full depth). This iteration is the arcs; the
+  eyes-on walk is S3.06d2.
+- **The rig:** docker `alo-pg` (database `alo`), a fresh `wave3-arc` tenant +
+  a `wave3-out` outsider from `identityctl bootstrap-admin`, `/auth/token`
+  password-grant tokens, debug `alo-jmap` on 127.0.0.1:8080 (its real 30 s
+  sweeps running), debug `alo-sites` on 127.0.0.1:8090 with
+  `SITES_DOMAIN=sites.test` and `ALO_SITES_PAYMENTS=fixture`, and a scripted
+  localhost `/v1/chat/completions` model fixture (node, scratchpad — never in
+  the repo, never an external call; the S2.16d precedent) whose replies are a
+  pure function of the question. Stale servers killed before and after.
+- **Strand 1 — editing on the page (ADR 0042), on the wire:** site created,
+  Home added, the palette read (`hero` seeded from the tenant's own site name,
+  not lorem ipsum) and dropped via `POST sections` with the seed verbatim;
+  typed sections added (features, faq, booking, tickets, shop; `text_image`
+  without an image refused verbatim: "missing field `image`"); inline text as
+  `rewrite_copy` through `PUT ai-edits` (heading changed on the served page);
+  constrained resize as `set_prop /columns=two`, and `columns=seventeen`
+  refused with the closed vocabulary spoken ("expected one of `two`, `three`,
+  `four`") — no gesture reaches free positioning; reorder driven through BOTH
+  doors and the envelopes diffed: **the direct `sections/{i}/move` route and
+  an ai-edits `reorder_section` return byte-identical envelopes** (the
+  reviewable-diff property, proven with `diff` on the wire). Published: the
+  served Host page carries the rewritten heading and the new order.
+- **Strand 2 — the bot that answers and acts (ADR 0040):** provider registered
+  at the localhost fixture via `/admin/ai/providers` (+default), chat enabled
+  with the 1000-cent ceiling. `POST /_alo/chat` on the public Host: "When are
+  you open?" → answer with `citations:[{path:"/",title:"Home"}]` — the FAQ's
+  own words, the page named. "Capital of France?" → refusal. "Can I book a
+  consultation?" → first a refusal that taught the arc a design fact: the
+  availability a bot may offer is the PUBLISHED availability, and a publish
+  snapshots only services a `booking` section binds — service + section +
+  republish, then the same ask → a real offer (Mon 09:00 Europe/Brussels as
+  07:00Z). `POST /_alo/chat/book` → booked, manage page with Cancel, working
+  .ics, **a real calendar event row in the owner's tenant**; the same slot
+  again → `taken` (race-safe). "Please contact me…" → lead offer;
+  `/_alo/chat/lead` → `lead_saved`, and the CRM seam holds "Website enquiry —
+  Wave3 Arc Venue | Grace Hopper | grace@print.example" on the deal card — no
+  visitor journey stored. The owner's transcript lists every action with its
+  fact (`booked: Studio consultation`…); the outsider's token gets 404. The
+  fixture's own log proves the prompts: the event list rode as labels, **zero
+  price shapes in any prompt** (grep over the recorded prompts: 0).
+- **Strand 3 — tickets + stock (ADR 0041):** Billing products created through
+  Billing's own door; the event (capacity 2) reads `unitPriceCents` from the
+  seam — a PATCH repricing the product repriced the event read instantly,
+  **never a stored copy, shown on the wire**. The bot asked about tickets →
+  `state:tickets`, "€ 85.00", `offerPath:/tix/{event}` — and the recorded
+  prompt carried the event label only. `/tix` and the offer page priced live;
+  two checkouts → two 303s to `checkout.fixture.invalid/fixpay-<order>` and
+  `held:2 sold:0 remaining:0` **before any money**; the third buyer → 409
+  "sold out" (hold-with-expiry IS the oversell wall). A forged webhook ring
+  with the real payment id → 200 (the doorbell answers) and the order stayed
+  `awaiting_payment`, the return page saying "Your payment has not finished
+  yet." — **no webhook body can settle anything; only the provider's own
+  status answer can**, and with the fixture that answer is Open by design.
+  Stock: 5 jars received through Inventory's own move door (ADJUST→MAIN),
+  shelf listed (`availableUnits:5`), delivery 350c set; `/shop` + offer pages
+  live-priced with delivery stated; checkout of 2 jars (typo gate proved:
+  missing address fields → 400) → 303, and the shelf read dropped to
+  **availableUnits:3 while the buyer is still on the hosted page** — the hold
+  visible through the owner's own read. The stock order row prices itself
+  server-side: 2×750+350 = 1850 cents from a body that carried only a
+  quantity. Walls: all five owner doors 404 to the outsider's token, 401
+  bare; `/tix`+`/shop` 404 on a nobody Host; the webhook's Host-independent
+  200 on an unknown id is the documented anti-enumeration design, not a leak.
+- **The payment boundary, stated honestly:** with `ALO_SITES_PAYMENTS=fixture`
+  the hosted page is unreachable by design (`checkout.fixture.invalid`), so a
+  pure-curl arc ends where the buyer leaves alo — which is the point: alo
+  cannot move money by itself. The settle→fulfil half (paid → ledger drop /
+  ticket minted → invoice → CRM) is proven by the in-process arc suites
+  driving the same code against the same Postgres: `chat_ticket_arc`,
+  `stock_shop`, `ticket_shop` — all green in this iteration's gate run.
+- **Byte and latency budgets, measured on served bytes:** home (widget
+  riding, 3 chat references) 23 596 B; `/assets/site.css` 17 835 B (< 50 KB);
+  `/tix` 697 B; ticket offer 1 339 B; `/shop` 662 B; shop offer 2 005 B;
+  order-status 626 B — all < 100 KB; warm cached `/` in 6–10 ms.
+- **Fix what it finds — shipped:** the recon showed `/tix`, `/shop`, `/t/…`
+  and the order pages had **no asserted byte ceilings** (the S2.16d parity
+  gap): seven 100 KB assertions added at the pages `ticket_shop.rs` and
+  `stock_shop.rs` already read, so a future section cannot quietly blow the
+  commerce pages' budget.
+- **Verified:** DB pruned first (2 427 tenants after); `rustfmt` on the two
+  touched test files; `SQLX_OFFLINE=true cargo clippy -p alo-sites
+  --all-targets` clean (4 m 15 s; only the two pre-existing alo-store
+  survivors); **`cargo nextest run -p alo-sites` 215/215 green in 16.5 s**
+  (DATABASE_URL exported per the standing gate note). No production code
+  changed: the diff is two test files + QUEUE/STATE. CHANGELOG deliberately
+  untouched — nothing a user can see changed (the S2.16d rule).
+- **Flags:**
+  1. **For the business track (Billing-owned, not touched here):**
+     `POST /billing/products` silently ignores unknown body fields (no
+     `deny_unknown_fields`) — this arc's snake_case first attempt produced a
+     0-price product with a 200; the sites bodies all refuse unknown fields.
+     Worth the same treatment on Billing's bodies.
+  2. **Product observation for the wave close:** an `awaiting_payment` stock
+     order is visible on no owner surface (the invoice appears only at
+     fulfilment); the buyer has a status page, the owner has the shelf's
+     dropped count only. If an owner should see money-in-flight, that is a
+     product decision for the invite of a future item — stated here rather
+     than discovered.
+  3. The publish-freezes-booking-sections behaviour (a bookable service is
+     only offerable by the bot once a `booking` section binds it AND the site
+     republishes) is correct per S2.13a but easy to trip on; the assistant
+     screen could say so when chat is enabled and no booking section is
+     published — S3.06d2 may look with eyes.
+- **Next:** S3.06d2 — the real-browser 360px keyboard walk (then the wave
+  closes; S3.04e stays `[!]` blocked on the human tax review).

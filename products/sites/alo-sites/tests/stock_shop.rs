@@ -280,6 +280,12 @@ async fn the_shop_sells_a_book_from_listing_to_shipped_goods() {
         "a price and a shelf count are live state"
     );
     let page = body_string(listing).await;
+    // The design note's page budget holds for the shop's pages too (S3.06d1).
+    assert!(
+        page.len() < 100 * 1024,
+        "listing is {} bytes, budget is 100KB",
+        page.len()
+    );
     assert!(page.contains("Field guide"), "{page}");
     assert!(
         page.contains("€\u{a0}24.00") || page.contains("€\u{a0}24,00"),
@@ -298,6 +304,11 @@ async fn the_shop_sells_a_book_from_listing_to_shipped_goods() {
     let offer = get(&s, &s.host, &format!("/shop/{}", s.item.as_str())).await;
     assert_eq!(offer.status(), StatusCode::OK);
     let page = body_string(offer).await;
+    assert!(
+        page.len() < 100 * 1024,
+        "offer page is {} bytes, budget is 100KB",
+        page.len()
+    );
     assert!(page.contains("name=\"quantity\""), "{page}");
     assert!(page.contains("max=\"10\""), "{page}");
     assert!(page.contains("name=\"address\""), "{page}");
@@ -334,6 +345,11 @@ async fn the_shop_sells_a_book_from_listing_to_shipped_goods() {
     assert_eq!(waiting.status(), StatusCode::OK);
     assert_eq!(header_value(&waiting, header::CACHE_CONTROL), "no-store");
     let page = body_string(waiting).await;
+    assert!(
+        page.len() < 100 * 1024,
+        "return page is {} bytes, budget is 100KB",
+        page.len()
+    );
     assert!(
         page.contains("Your payment has not finished yet."),
         "{page}"

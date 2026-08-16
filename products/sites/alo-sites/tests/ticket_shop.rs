@@ -199,6 +199,12 @@ async fn the_shop_sells_a_seat_from_listing_to_ticket() {
         "a price is live state"
     );
     let page = body_string(listing).await;
+    // The design note's page budget holds for the shop's pages too (S3.06d1).
+    assert!(
+        page.len() < 100 * 1024,
+        "listing is {} bytes, budget is 100KB",
+        page.len()
+    );
     assert!(page.contains("Letterpress workshop"), "{page}");
     assert!(
         page.contains("€\u{a0}85.00") || page.contains("€\u{a0}85,00"),
@@ -213,6 +219,11 @@ async fn the_shop_sells_a_seat_from_listing_to_ticket() {
     let offer = get(&v, &v.host, &format!("/tix/{}", v.event.as_str())).await;
     assert_eq!(offer.status(), StatusCode::OK);
     let page = body_string(offer).await;
+    assert!(
+        page.len() < 100 * 1024,
+        "offer page is {} bytes, budget is 100KB",
+        page.len()
+    );
     assert!(page.contains("name=\"quantity\""), "{page}");
     assert!(page.contains("max=\"10\""), "{page}");
     assert!(
@@ -246,6 +257,11 @@ async fn the_shop_sells_a_seat_from_listing_to_ticket() {
     assert_eq!(waiting.status(), StatusCode::OK);
     assert_eq!(header_value(&waiting, header::CACHE_CONTROL), "no-store");
     let page = body_string(waiting).await;
+    assert!(
+        page.len() < 100 * 1024,
+        "return page is {} bytes, budget is 100KB",
+        page.len()
+    );
     assert!(
         page.contains("Your payment has not finished yet."),
         "{page}"
@@ -287,6 +303,11 @@ async fn the_shop_sells_a_seat_from_listing_to_ticket() {
     let ticket = get(&v, &v.host, &format!("/t/{ticket_path}")).await;
     assert_eq!(ticket.status(), StatusCode::OK);
     let page = body_string(ticket).await;
+    assert!(
+        page.len() < 100 * 1024,
+        "ticket page is {} bytes, budget is 100KB",
+        page.len()
+    );
     assert!(page.contains("Maud Adams"), "{page}");
 }
 
