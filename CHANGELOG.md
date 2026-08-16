@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **You can now run your box office from the website editor.** A Tickets
+  screen on each site lists your ticketed events with the price read live from
+  your own price list, how many seats are sold, on hold, and left; you create
+  an event by picking an item off the price list and a date, grow or shrink
+  its seats (never below what is already sold), and delete one only while
+  nobody has bought in. The new Tickets page block puts the door to the shop
+  on any page, previews how many events it will offer, and tells you when
+  nothing is on sale yet. In English, French, and Dutch.
+
 - **Your website can now sell your tickets.** A new "Tickets" block links your
   published pages to a live box office at `/tix`: visitors see every upcoming
   event with its price read from your own price list at that instant, pick

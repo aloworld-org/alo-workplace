@@ -8468,3 +8468,72 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Next:** S3.04f3 — the shop section in the web editor (mirror, picker
   thumbnail, event-management UI over the `/sites` ticket routes — wire them
   if S3.04b left them store-only).
+
+## 2026-08-16 — S3.04f3 The box office gets an owner
+
+- **Item:** S3.04f3 — the shop section in the web editor (the last third of
+  the S3.04f split): the `tickets` section mirror, its picker tile, the
+  event-management screen, and the routes it needed — S3.04b had indeed left
+  ticket events store-only, so the wiring landed here as the item foresaw.
+- **What shipped:**
+  - **Store (sites-owned files only):** `site_tickets.rs` gains
+    `site_ticket_sale_items()` — the tenant's price list through the same
+    `BillingCatalogRead` seam the shop prices with, plus the list currency —
+    and `site_ticket_seat_counts(site, now)` — sold and live-held per event
+    in ONE grouped query, so the owner's screen never costs a query per
+    event. The seam file itself is untouched (Billing-owned).
+  - **Routes (`sites_tickets.rs`, registered in `server.rs`):**
+    `GET /sites/{id}/ticket-products` (what an event may sell, priced now,
+    with `currencyExponent` like the catalog routes); `GET /sites/{id}/tickets`
+    (events in start order, product resolved at THIS read — an archived item
+    answers `productName: null` rather than a stale price — plus live
+    sold/held/remaining); `POST` create (RFC 3339 `startsAt`, its own 422
+    sentence for a bad date, the store's sentences for ghost products and
+    capacity bounds); `PUT …/{event}` capacity-only (the store's only edit);
+    `DELETE` while nothing is sold. All behind `require_site`, all misses 404.
+  - **Web mirror:** `TicketsSection {heading?, body?}` through the whole
+    vocabulary — `sections.ts` (17th kind, same order as Rust), drafts
+    (toDraft/toSection with blanks-to-absent), `sectionInfo`, a two-stub
+    ticket thumbnail, `TicketsFields` (words only + the live "N events on
+    sale" fact, and the no-events dependency state linking to the screen),
+    `suggestQuestions` offers "Can I buy tickets online?".
+  - **The Tickets screen (`TicketsView`):** table of events — when, what
+    (the price list's name or the honest "no longer on the price list"),
+    price now, seats as words ("2 sold · 9 of 12 left (1 in a checkout)") —
+    create dialog (product picker priced from the seam, datetime-local with
+    a real suggestion, capacity), capacity dialog whose subtitle states the
+    seats already spoken for, armed two-click delete. An empty price list is
+    told as the dependency and Create says no; rail entry beside Bookings;
+    route `:siteId/tickets`. EN/FR/NL for every new string.
+- **Verified:** web: `npx tsc --noEmit`, targeted eslint, full vitest
+  **927/927** (7 new in `Tickets.test.tsx`: dependency state, live pricing +
+  gone-item row, exact POST body, the capacity refusal sentence verbatim,
+  armed delete + sold-refusal verbatim, section form saving words alone,
+  no-events state), `npm run build` — all clean. Rust: DB pruned (2 201);
+  fmt; clippy `-p alo-store -p alo-jmap --all-targets` exit 0 (only the two
+  pre-existing `meet.rs` type-complexity survivors); test-binary build via
+  the sanctioned background+marker form (36 min); `cargo nextest run -p
+  alo-store -p alo-jmap` **3 294/3 294 green** (1 pre-existing skip, 98 s).
+  Two new DB tests in `site_ticket_holds.rs`: the seat tally per event with
+  expiry honoured and BOTH walls (foreign tenant, wrong site) answering
+  empty, and the seam wrapper reading the list live (archived item gone at
+  the next read, a second tenant seeing only its own). Wire transcript on
+  the local backend (fresh PKCE tenants, debug binary on 8080, killed
+  before and after): 401 bare; empty price list honest; product created →
+  offered; event created and priced live; bad date / ghost product /
+  capacity 0 → three 422 sentences verbatim; grow to 20; foreign tenant
+  404 on all four verbs; owner DELETE 204 → empty list.
+- **Found en route:** `alo-jmap` DB tests fall back to port 5433 but this
+  Mac's `alo-pg` is on 5432 (the memory was right) — every DB test
+  PoolTimedOuts without `DATABASE_URL` set. And `site_palette_http`
+  asserted 16 tiles: stale since f2 added the 17th kind with only `cargo
+  check` on alo-jmap in reach that iteration; count fixed and the tickets
+  tile now asserted always-ready.
+- **Cuts/flags:** "manual click-path journaled" is honoured structurally —
+  the React tests drive the real views (create → table → capacity → delete,
+  and both section-form states) with only fetch faked; the loop has no
+  browser (S2.16b2 precedent), so the eyes-on walk rides the S3.06 wave
+  review. Date/product of an existing event are immutable by store design;
+  the screen edits capacity only, as the routes do. No new route prefix
+  (`/sites/*` already proxied) — no Caddy note.
+- **Next:** S3.04g — the arc: bot → offer → pay → ticket/contact/invoice.
