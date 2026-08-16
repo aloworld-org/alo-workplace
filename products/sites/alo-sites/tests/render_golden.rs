@@ -15,8 +15,8 @@ use alo_store::site_model::{
     BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqItem,
     FaqSection, FeatureItem, FeaturesSection, FooterSection, GallerySection, HeroSection,
     ImageCrop, ImageFocalPoint, ImageSide, Link, NavSection, PricingSection, PricingTier,
-    SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, SiteImage, TeamMember, TeamSection,
-    Testimonial, TestimonialsSection, TextImageSection, TicketsSection,
+    SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, ShopSection, SiteImage, TeamMember,
+    TeamSection, Testimonial, TestimonialsSection, TextImageSection, TicketsSection,
 };
 use alo_store::site_theme::SiteTheme;
 use alo_store::{
@@ -137,6 +137,10 @@ fn full_sections() -> Vec<Section> {
         Section::Tickets(TicketsSection {
             heading: Some("Cupping evenings".to_owned()),
             body: Some("Six seats around the roaster, once a month.".to_owned()),
+        }),
+        Section::Shop(ShopSection {
+            heading: Some("The roastery shop".to_owned()),
+            body: Some("Beans and brew gear, shipped from the roastery.".to_owned()),
         }),
         Section::CustomCode(custom_code_block()),
         Section::Footer(FooterSection {
@@ -325,7 +329,7 @@ fn assert_golden(name: &str, actual: &str) {
 #[test]
 fn one_golden_per_section_type() {
     let sections = full_sections();
-    assert_eq!(sections.len(), 16, "corpus must cover every variant");
+    assert_eq!(sections.len(), 17, "corpus must cover every variant");
     for section in sections {
         let kind = section.kind();
         let html = render_default(vec![section]);

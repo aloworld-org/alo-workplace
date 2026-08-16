@@ -255,6 +255,38 @@ pub struct UiStrings {
     pub tix_order_dead: &'static str,
     /// Ticket shop: link back to the event listing.
     pub tix_back: &'static str,
+    /// Shop section: the link into the live stock shop (`/shop`).
+    pub shop_see_offer: &'static str,
+    /// Stock shop: heading (and `<title>`) of the `/shop` listing.
+    pub shop_title: &'static str,
+    /// Stock shop: the listing's empty state.
+    pub shop_empty: &'static str,
+    /// Stock shop: label of the how-many field on the buy form.
+    pub shop_quantity_label: &'static str,
+    /// Stock shop: label of the delivery-address street line.
+    pub shop_address_label: &'static str,
+    /// Stock shop: label of the delivery-address city field.
+    pub shop_city_label: &'static str,
+    /// Stock shop: label of the delivery-address postcode field.
+    pub shop_postcode_label: &'static str,
+    /// Stock shop: label of the two-letter delivery country field.
+    pub shop_country_label: &'static str,
+    /// Stock shop: written after the flat delivery price ("… delivery").
+    pub shop_delivery: &'static str,
+    /// Stock shop: shown when no payment provider is wired into this
+    /// installation — the shop tells the truth instead of offering a form
+    /// that could only fail.
+    pub shop_unconfigured: &'static str,
+    /// Stock order return page: heading (and `<title>`).
+    pub shop_order_title: &'static str,
+    /// Stock order return page: paid — the goods are claimed and coming.
+    pub shop_order_paid: &'static str,
+    /// Stock order return page: the payment came to nothing; nothing is
+    /// reserved. (When money did move and could not be honoured, the order's
+    /// own stored sentence is shown instead.)
+    pub shop_order_dead: &'static str,
+    /// Stock shop: link back to the shop listing.
+    pub shop_back: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -374,6 +406,20 @@ pub const EN: UiStrings = UiStrings {
     tix_order_paid_wait: "Payment received — your ticket is on its way. Reload this page in a moment.",
     tix_order_dead: "The payment did not complete. No seats are held for you.",
     tix_back: "Back to tickets",
+    shop_see_offer: "Visit the shop",
+    shop_title: "Shop",
+    shop_empty: "Nothing is for sale right now.",
+    shop_quantity_label: "Quantity",
+    shop_address_label: "Street and number",
+    shop_city_label: "City",
+    shop_postcode_label: "Postal code",
+    shop_country_label: "Country code (for example NL)",
+    shop_delivery: "delivery per order",
+    shop_unconfigured: "Online sales are not set up on this site yet.",
+    shop_order_title: "Your order",
+    shop_order_paid: "Payment received — your order is confirmed. The shop will send your goods to the address you gave.",
+    shop_order_dead: "The payment did not complete. Nothing is reserved for you.",
+    shop_back: "Back to the shop",
 };
 
 /// French renderer chrome.
@@ -493,6 +539,20 @@ pub const FR: UiStrings = UiStrings {
     tix_order_paid_wait: "Paiement reçu — votre billet arrive. Rechargez cette page dans un instant.",
     tix_order_dead: "Le paiement n'a pas abouti. Aucune place n'est retenue pour vous.",
     tix_back: "Retour aux billets",
+    shop_see_offer: "Visiter la boutique",
+    shop_title: "Boutique",
+    shop_empty: "Rien n'est en vente pour le moment.",
+    shop_quantity_label: "Quantité",
+    shop_address_label: "Rue et numéro",
+    shop_city_label: "Ville",
+    shop_postcode_label: "Code postal",
+    shop_country_label: "Code pays (par exemple FR)",
+    shop_delivery: "de livraison par commande",
+    shop_unconfigured: "La vente en ligne n'est pas encore configurée sur ce site.",
+    shop_order_title: "Votre commande",
+    shop_order_paid: "Paiement reçu — votre commande est confirmée. La boutique enverra vos articles à l'adresse indiquée.",
+    shop_order_dead: "Le paiement n'a pas abouti. Rien n'est réservé pour vous.",
+    shop_back: "Retour à la boutique",
 };
 
 /// Dutch renderer chrome.
@@ -612,6 +672,20 @@ pub const NL: UiStrings = UiStrings {
     tix_order_paid_wait: "Betaling ontvangen — uw ticket komt eraan. Herlaad deze pagina zo dadelijk.",
     tix_order_dead: "De betaling is niet gelukt. Er worden geen plaatsen voor u vastgehouden.",
     tix_back: "Terug naar tickets",
+    shop_see_offer: "Bezoek de winkel",
+    shop_title: "Winkel",
+    shop_empty: "Er is op dit moment niets te koop.",
+    shop_quantity_label: "Aantal",
+    shop_address_label: "Straat en huisnummer",
+    shop_city_label: "Plaats",
+    shop_postcode_label: "Postcode",
+    shop_country_label: "Landcode (bijvoorbeeld NL)",
+    shop_delivery: "bezorging per bestelling",
+    shop_unconfigured: "Online verkoop is op deze site nog niet ingesteld.",
+    shop_order_title: "Uw bestelling",
+    shop_order_paid: "Betaling ontvangen — uw bestelling is bevestigd. De winkel stuurt uw artikelen naar het opgegeven adres.",
+    shop_order_dead: "De betaling is niet gelukt. Er is niets voor u gereserveerd.",
+    shop_back: "Terug naar de winkel",
 };
 
 /// Renderer chrome for a normalized locale. Region variants inherit their

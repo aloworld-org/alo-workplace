@@ -219,6 +219,7 @@ pub(super) fn body_section(
         Section::Catalog(s) => catalog(out, site, s, page.catalogs, m),
         Section::Booking(s) => booking(out, site, s, page.bookings, m),
         Section::Tickets(s) => tickets(out, site, s, m),
+        Section::Shop(s) => shop(out, site, s, m),
         Section::CustomCode(s) => custom_code(out, site, s, m),
     }
 }
@@ -245,6 +246,30 @@ fn tickets(
     out.push_str(&format!(
         "<p class=\"actions\"><a class=\"button\" href=\"/tix\">{}</a></p>\n",
         esc(site.strings.tickets_see_offer)
+    ));
+    out.push_str("</section>\n");
+}
+
+/// A `shop` section: the door to the site's live stock shop.
+///
+/// Static bytes for the same reason the tickets section is (item S3.05a3):
+/// what is for sale, its price and what is on the shelf are the owning
+/// seams' live answers, served on `/shop` one navigation away and never
+/// cached — a published page stays immutable while prices and shelves move.
+fn shop(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    section: &alo_store::site_model::ShopSection,
+    m: Marks,
+) {
+    open_section(out, "section", "s-shop", m);
+    push_opt_heading(out, section.heading.as_deref(), m);
+    if let Some(body) = &section.body {
+        out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));
+    }
+    out.push_str(&format!(
+        "<p class=\"actions\"><a class=\"button\" href=\"/shop\">{}</a></p>\n",
+        esc(site.strings.shop_see_offer)
     ));
     out.push_str("</section>\n");
 }

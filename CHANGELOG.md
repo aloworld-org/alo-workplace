@@ -10,6 +10,17 @@ contracts.
 
 ## Unreleased
 
+- **Your website now has a public shop for the goods on your shelf.** A new
+  "shop" section links visitors to `/shop`, where your chosen stock items
+  are listed and sold in English, French, or Dutch — priced by your Billing
+  price list and counted by your Inventory ledger at the moment of every
+  look, with your flat delivery price stated up front. Buyers give a
+  delivery address, pay on the provider's hosted page, and get an honest
+  return page: confirmed when the goods really moved, or the plain reason
+  and the refund named when they could not. The same protections as every
+  public door apply — rate limits, a spam honeypot, and no card data ever
+  touching alo. (ADR 0041)
+
 - **Your site can now sell what is on your shelf.** A site's shop lists
   chosen stock items and sells them the honest way end to end: the price is
   read from your Billing price list and availability from your Inventory

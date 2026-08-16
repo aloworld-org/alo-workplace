@@ -8816,3 +8816,73 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   strings (worker words live in their own per-locale tables like the
   ticket worker's).
 - **Next:** S3.05a3 — stock shop pages on alo-sites.
+
+## 2026-08-16 — S3.05a3 The shop opens to the street: stock pages on alo-sites
+
+- **Item:** S3.05a3 — stock shop pages on alo-sites: the `shop` typed
+  section (the door), the public `/shop` listing, `/shop/{item}` offer +
+  checkout, `/shop/order/{order}` return page over the S3.05a2 store doors,
+  and the shared `/_alo/pay` webhook extended to stock payments.
+- **Design (implement-skill blocks):**
+  - *Surface:* a new `shop` section — heading/body only, mirroring
+    `tickets`, because a published page is cached bytes and a price or a
+    shelf count must never be (the rejected alternative: rendering the
+    items into the page). It links `/shop`, where everything a buyer sees
+    is the owning seams' answer at that instant through
+    `site_public_stock`. The serving module `serve/shop.rs` is the ticket
+    door's machinery reused deliberately: `tickets.rs` helpers (Host
+    resolution, page shell, refusal/redirect/rate-limit shapes) went
+    `pub(super)` — with `refused`/`refusal_page` gaining a title parameter
+    — rather than being copied. The buy form adds what a stock sale needs:
+    quantity (max = shelf ∧ 20), buyer, street/city/postcode/ISO-2 country
+    (the store uppercases; a 2-char input, journaled below). The one
+    webhook now resolves a payment id against ticket orders first, stock
+    orders second — disjoint id spaces, one owner per payment.
+  - *Errors:* unresolvable Host and unknown/foreign/malformed ids one
+    uniform 404 on every door; unreadable body 400; oversized 413;
+    rate-limited 429 + Retry-After; store refusals verbatim (400/409 — "the
+    country must be a two-letter code", "sold out"); unconfigured provider
+    the honest sentence on the offer page and 503 on a POST that ignores
+    it; a failed order's stored refund sentence (paid-after-lapse /
+    goods-gone) shown to the buyer verbatim on the return page — the page
+    owes them the honest words; otherwise the generic "payment did not
+    complete".
+  - *Tenancy:* every read anchored on the Host resolver's `PublishedSite`
+    (the a2 doors bind tenant+site in SQL); the return page never echoes
+    name or address (a return URL proves less than being the buyer).
+  - *Out of scope:* editor UI mirror + item management screen (S3.05c),
+    the configuration-proposal AI (S3.05b), offer photos, a country picker
+    beyond the ISO-2 input, batching the seam's per-item pricing.
+- **Shipped:** `ShopSection` in `site_model` (kind `shop`, palette-seeded
+  always-ready like `tickets`, grounding pushes only the owner's words,
+  templates treat it as bindingless); renderer + `.s-shop` card CSS;
+  EN/FR/NL strings (15 new fields ×3); routes `/shop`,
+  `/shop/{item}` GET+POST (8 KB cap), `/shop/order/{order}`; "shop" added
+  to RESERVED_SLUGS beside "tix".
+- **Verified:** DB pruned (3 336 gone); fmt; clippy `-p alo-store -p
+  alo-sites -p alo-jmap --all-targets` exit 0 (only the two pre-existing
+  `meet.rs` survivors; the build needed two foreground calls then finished
+  in 30 m 37 s); test-binary build via the sanctioned background+marker
+  form (37 m); `cargo nextest run` on all three crates **3 543/3 543
+  green** (1 pre-existing skip, 111 s) incl. the new `stock_shop` wire
+  suite — the full arc (published door → live listing with price and
+  delivery → offer form → 303 to the fixture provider → fetch-on-return
+  settle → confirmation page **with the ledger actually dropping 2 000
+  milli-units** → idempotent webhook replay), the Host walls (B's host
+  resolves A's item and order ids to one 404; unknown host likewise), the
+  honeypot/typo gates costing no hold with the store's sentence verbatim,
+  the rate limit with Retry-After, and the unconfigured deployment telling
+  the truth on GET and POST — plus re-blessed goldens (palette ×2 additive,
+  `section_shop.html`, `full_page.html`, `site.css`) and the alo-jmap
+  palette count 17→18 with the shop tile pinned ready.
+- **Cuts/flags:** (1) As-built sites.md section deferred to S3.06 with the
+  rest of wave 3 (no `/tix` section exists either); CHANGELOG carries the
+  user-voice entry now. (2) **Deploy note:** "shop" is newly reserved as a
+  page slug — at next deploy check `select tenant_id, site_id from
+  site_pages where slug = 'shop'` and rename any hit before the route
+  shadows it (none can be created from now on). (3) Country is a 2-letter
+  input with example text, not a picker — S3.05c may upgrade it. (4) The
+  listing still prices per item through the seam (bounded at 200/site);
+  batch only if a real shop feels it. (5) The store's refund/refusal
+  sentences remain English on all doors — the standing cross-door cut.
+- **Next:** S3.05b — propose the configuration (fixtures only).

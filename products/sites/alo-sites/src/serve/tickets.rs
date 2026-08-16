@@ -33,6 +33,12 @@
 //! Privacy: the rate-limit key is used transiently ([`super::rate`]); the
 //! return page never echoes the buyer's own name or address (holding a
 //! return URL proves less than being the buyer); logs carry ids only.
+//!
+//! The stock shop (`/shop`, [`super::shop`], item S3.05a3) is this door's
+//! sibling and reuses the machinery here — the Host resolution, the page
+//! shell, the refusal and redirect shapes, and the one `/_alo/pay` webhook,
+//! which resolves a payment id against ticket orders first and stock orders
+//! second (the id spaces are disjoint; a payment belongs to exactly one).
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -168,10 +174,22 @@ pub(super) async fn checkout(
     let posted = match Form::<Vec<(String, String)>>::from_request(request, &()).await {
         Ok(Form(pairs)) => pairs,
         Err(FormRejection::BytesRejection(_)) => {
-            return refusal_page(&state, host.as_deref(), StatusCode::PAYLOAD_TOO_LARGE).await;
+            return refusal_page(
+                &state,
+                host.as_deref(),
+                StatusCode::PAYLOAD_TOO_LARGE,
+                |strings| strings.tix_title,
+            )
+            .await;
         }
         Err(_) => {
-            return refusal_page(&state, host.as_deref(), StatusCode::BAD_REQUEST).await;
+            return refusal_page(
+                &state,
+                host.as_deref(),
+                StatusCode::BAD_REQUEST,
+                |strings| strings.tix_title,
+            )
+            .await;
         }
     };
     let Some(site) = resolve_host(&state, host.as_deref()).await else {
@@ -190,6 +208,7 @@ pub(super) async fn checkout(
         return refused(
             StatusCode::BAD_REQUEST,
             strings,
+            strings.tix_title,
             strings.form_malformed_text,
         );
     };
@@ -200,6 +219,7 @@ pub(super) async fn checkout(
         return refused(
             StatusCode::SERVICE_UNAVAILABLE,
             strings,
+            strings.tix_title,
             strings.tix_unconfigured,
         );
     };
@@ -213,10 +233,10 @@ pub(super) async fn checkout(
         Ok(Some(checkout)) => checkout,
         Ok(None) => return super::not_found(state.unknown_host.clone()),
         Err(StoreError::Validation(reason)) => {
-            return refused(StatusCode::BAD_REQUEST, strings, &reason);
+            return refused(StatusCode::BAD_REQUEST, strings, strings.tix_title, &reason);
         }
         Err(StoreError::Conflict(reason)) => {
-            return refused(StatusCode::CONFLICT, strings, &reason);
+            return refused(StatusCode::CONFLICT, strings, strings.tix_title, &reason);
         }
         Err(error) => {
             tracing::error!(site = %site.site, %error, "ticket checkout failed");
@@ -242,6 +262,7 @@ pub(super) async fn checkout(
             return refused(
                 StatusCode::SERVICE_UNAVAILABLE,
                 strings,
+                strings.tix_title,
                 strings.tix_unconfigured,
             );
         }
@@ -361,10 +382,22 @@ pub(super) async fn webhook(State(state): State<Arc<AppState>>, request: Request
         // caller to learn.
         return ok_quietly();
     };
+    // One payment id belongs to exactly one order — ticket or stock. Both
+    // doors are asked; an id nobody holds answers exactly like success.
+    enum Target {
+        Ticket(alo_store::TicketPaymentTarget),
+        Stock(alo_store::StockPaymentTarget),
+    }
     let target = match state.store.public_ticket_payment_target(&payment_id).await {
-        Ok(Some(target)) => target,
-        // An id nobody holds: answer exactly like success.
-        Ok(None) => return ok_quietly(),
+        Ok(Some(target)) => Target::Ticket(target),
+        Ok(None) => match state.store.public_stock_payment_target(&payment_id).await {
+            Ok(Some(target)) => Target::Stock(target),
+            Ok(None) => return ok_quietly(),
+            Err(error) => {
+                tracing::error!(%error, "webhook stock target lookup failed");
+                return super::unavailable();
+            }
+        },
         Err(error) => {
             tracing::error!(%error, "webhook target lookup failed");
             return super::unavailable();
@@ -378,14 +411,25 @@ pub(super) async fn webhook(State(state): State<Arc<AppState>>, request: Request
             return super::unavailable();
         }
     };
-    match state
-        .store
-        .public_settle_ticket_payment(&target, status, OffsetDateTime::now_utc())
-        .await
-    {
+    let now = OffsetDateTime::now_utc();
+    let settled = match &target {
+        Target::Ticket(target) => {
+            state
+                .store
+                .public_settle_ticket_payment(target, status, now)
+                .await
+        }
+        Target::Stock(target) => {
+            state
+                .store
+                .public_settle_stock_payment(target, status, now)
+                .await
+        }
+    };
+    match settled {
         Ok(()) | Err(StoreError::NotFound) => ok_quietly(),
         Err(error) => {
-            tracing::error!(order = %target.order, %error, "webhook settle failed");
+            tracing::error!(%error, "webhook settle failed");
             super::unavailable()
         }
     }
@@ -482,7 +526,7 @@ pub(super) fn when(event: &PublicTicketEvent) -> String {
 }
 
 /// The raw Host header, read before any await.
-fn host_header(request: &Request) -> Option<String> {
+pub(super) fn host_header(request: &Request) -> Option<String> {
     request
         .headers()
         .get(header::HOST)
@@ -491,7 +535,7 @@ fn host_header(request: &Request) -> Option<String> {
 }
 
 /// Host → the serving site, or `None` for every kind of miss.
-async fn resolve_host(state: &AppState, host: Option<&str>) -> Option<PublishedSite> {
+pub(super) async fn resolve_host(state: &AppState, host: Option<&str>) -> Option<PublishedSite> {
     let scope = super::host::scope(host?, &state.sites_domain)?;
     match super::resolve_scope(state, &scope).await {
         Ok(site) => site,
@@ -504,7 +548,7 @@ async fn resolve_host(state: &AppState, host: Option<&str>) -> Option<PublishedS
 
 /// The public host the redirect and webhook URLs are built on: the Host the
 /// buyer is on, or the site's own subdomain when the header was unreadable.
-fn site_host(site: &PublishedSite, host: &Option<String>) -> String {
+pub(super) fn site_host(site: &PublishedSite, host: &Option<String>) -> String {
     host.clone()
         .unwrap_or_else(|| format!("{}.invalid", site.site))
 }
@@ -543,27 +587,38 @@ async fn read_order(
 
 /// A refusal on a request whose site could not (or need not) be resolved:
 /// still themed by the site when the Host does resolve, English otherwise.
-async fn refusal_page(state: &AppState, host: Option<&str>, status: StatusCode) -> Response {
+/// `title_of` picks the refusing door's page title from the locale's strings.
+pub(super) async fn refusal_page(
+    state: &AppState,
+    host: Option<&str>,
+    status: StatusCode,
+    title_of: fn(&UiStrings) -> &'static str,
+) -> Response {
     let strings = match resolve_host(state, host).await {
         Some(site) => strings_for(&site.default_locale),
         None => &crate::render::EN,
     };
-    refused(status, strings, strings.form_malformed_text)
-}
-
-/// A refused purchase: the store's own sentence plus how to recover.
-fn refused(status: StatusCode, strings: &UiStrings, reason: &str) -> Response {
-    let text = format!("{reason}. {}", strings.form_back_hint);
-    page(
+    refused(
         status,
         strings,
-        strings.tix_title,
-        &format!("<p>{}</p>\n", esc(&text)),
+        title_of(strings),
+        strings.form_malformed_text,
     )
 }
 
+/// A refused purchase: the store's own sentence plus how to recover.
+pub(super) fn refused(
+    status: StatusCode,
+    strings: &UiStrings,
+    title: &str,
+    reason: &str,
+) -> Response {
+    let text = format!("{reason}. {}", strings.form_back_hint);
+    page(status, strings, title, &format!("<p>{}</p>\n", esc(&text)))
+}
+
 /// The 429, with the limiter's `Retry-After` hint in seconds.
-fn rate_limited(wait_seconds: u64, strings: &UiStrings) -> Response {
+pub(super) fn rate_limited(wait_seconds: u64, strings: &UiStrings) -> Response {
     let mut response = page(
         StatusCode::TOO_MANY_REQUESTS,
         strings,
@@ -579,7 +634,7 @@ fn rate_limited(wait_seconds: u64, strings: &UiStrings) -> Response {
 /// `303 See Other`: the POST is done; what comes next is a GET somewhere
 /// else — the provider's hosted page, or the offer the honeypot pretends to
 /// have bought from.
-fn see_other(location: &str) -> Response {
+pub(super) fn see_other(location: &str) -> Response {
     let mut response = StatusCode::SEE_OTHER.into_response();
     if let Ok(value) = HeaderValue::from_str(location) {
         response.headers_mut().insert(header::LOCATION, value);
@@ -603,7 +658,7 @@ fn ok_quietly() -> Response {
 /// An event id echoed into a redirect path: the id grammar is enforced by
 /// the store, but the redirect is built before that gate, so only path-safe
 /// bytes may pass.
-fn esc_path(id: &str) -> String {
+pub(super) fn esc_path(id: &str) -> String {
     id.chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .collect()
@@ -627,7 +682,7 @@ fn decode(posted: &[(String, String)]) -> CheckoutBody {
 
 /// A shop document: live state and personal handles — never cacheable, never
 /// indexed.
-fn page(status: StatusCode, strings: &UiStrings, title: &str, body: &str) -> Response {
+pub(super) fn page(status: StatusCode, strings: &UiStrings, title: &str, body: &str) -> Response {
     (
         status,
         [

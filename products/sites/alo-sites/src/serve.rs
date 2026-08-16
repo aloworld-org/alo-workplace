@@ -56,6 +56,7 @@ mod orders;
 /// each budget, both need the numbers.
 pub mod rate;
 mod rendered;
+mod shop;
 mod ticket_page;
 mod tickets;
 mod unlock;
@@ -105,8 +106,8 @@ pub struct AppState {
     unlock: unlock::UnlockSessions,
     /// Secret-keyed visitor hashing. Raw identifiers never cross storage.
     analytics: analytics::VisitorHasher,
-    /// The hosted-payment provider of the ticket shop ([`tickets`]), when the
-    /// deployment has wired one. `None` is the honest default: the shop then
+    /// The hosted-payment provider of the ticket and stock shops
+    /// ([`tickets`], [`shop`]), when the deployment has wired one. `None` is the honest default: the shop then
     /// says online sales are not set up instead of rendering a checkout that
     /// could only fail.
     payments: Option<Arc<dyn SitePaymentProvider>>,
@@ -128,8 +129,9 @@ impl AppState {
         Self::with_payments(store, sites_domain, secret, None)
     }
 
-    /// [`Self::new`] with the ticket shop's hosted-payment provider. `None`
-    /// keeps the shop visible but honestly unsellable ([`tickets`]).
+    /// [`Self::new`] with the ticket and stock shops' hosted-payment
+    /// provider. `None` keeps both shops visible but honestly unsellable
+    /// ([`tickets`], [`shop`]).
     #[must_use]
     pub fn with_payments(
         store: SitePublicStore,
@@ -207,6 +209,14 @@ pub fn app(state: Arc<AppState>) -> Router {
                 .layer(DefaultBodyLimit::max(tickets::CHECKOUT_BODY_MAX_BYTES)),
         )
         .route("/tix/order/{order}", get(tickets::order_status))
+        .route("/shop", get(shop::listing))
+        .route(
+            "/shop/{item}",
+            get(shop::offer)
+                .post(shop::checkout)
+                .layer(DefaultBodyLimit::max(tickets::CHECKOUT_BODY_MAX_BYTES)),
+        )
+        .route("/shop/order/{order}", get(shop::order_status))
         .route(
             "/_alo/pay",
             post(tickets::webhook).layer(DefaultBodyLimit::max(tickets::WEBHOOK_BODY_MAX_BYTES)),

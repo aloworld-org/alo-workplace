@@ -454,6 +454,19 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 .s-tickets p { color: var(--muted); }
 .s-tickets .actions { margin-top: 1rem; }
 
+/* The door to the stock shop: the same short-offer card as the tickets door,
+   for the same reason — goods, prices and shelf counts are live state on
+   /shop, never bytes of this page. */
+.s-shop {
+  max-width: 38rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+.s-shop p { color: var(--muted); }
+.s-shop .actions { margin-top: 1rem; }
+
 /* A custom-code block. The page styles the box around the frame and nothing
    inside it: the frame is another document, and the site's tokens deliberately
    do not reach in. Its height is authored (a sandboxed frame cannot be
