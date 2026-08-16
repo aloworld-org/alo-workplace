@@ -19,8 +19,19 @@ contracts.
   made up), and every VAT rate is presented as a guess for your accountant
   to confirm. Nothing is applied until you approve it. Proposals are served
   by the workspace API and are for owners only — invited site editors never
-  see your prices or VAT. (ADR 0041; the review screen itself is on its
-  way.)
+  see your prices or VAT. (ADR 0041.)
+
+- **The shop-setup proposal now has its review screen.** Under your site's
+  new "Shop setup" button, describe your business and read the proposal as
+  an approval list: stated prices arrive prefilled, missing ones are blanks
+  you must fill, and every VAT rate wears its "guess" badge with the
+  reasoning beside it. Edit any row, untick what you don't want, and
+  approve — each item is created on your Billing price list and your
+  delivery rate is saved, through the same doors the manual screens use. A
+  row the server refuses shows the server's own words and can be retried
+  alone. Workspaces without AI keep the by-hand path, and the flat delivery
+  rate can now also be read and set over the API
+  (`/sites/{id}/shop-settings`). In English, French, and Dutch.
 
 - **Your website now has a public shop for the goods on your shelf.** A new
   "shop" section links visitors to `/shop`, where your chosen stock items

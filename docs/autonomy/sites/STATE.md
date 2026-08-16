@@ -9009,3 +9009,89 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   No new top-level route prefix (`/sites/*` already proxied) — no Caddy
   note needed. No UI strings (no UI in this slice).
 - **Next:** S3.05b3 — the proposal screen.
+
+## 2026-08-16 — S3.05b3 The approval list: every guess wears its badge, and approving walks through the owned doors
+
+- **Item:** S3.05b3 — the proposal screen: describe-your-business →
+  the S3.05b envelope as an approval list, edit-then-approve, applying
+  ONLY through the already-owned routes; unconfigured deployments keep
+  the manual path; i18n en/fr/nl.
+- **Design (implement-skill blocks):**
+  - *Surface:* `web/src/sites/ShopSetupView.tsx` at
+    `/sites/:siteId/shop-setup`, a "Shop setup" button on the site's tool
+    row. Describe box → `proposeShopConfig` → rows the owner edits: stated
+    prices prefilled via the module's own `priceInput`, flagged blanks
+    empty with the why-hint, VAT always rate + "VAT is a guess" badge +
+    basis sentence verbatim, per-row include checkbox, kind chip
+    (goods/tickets/service). Approve = one `POST /billing/products` per
+    ticked row (`stocked` = kind stock; Billing's OWN door — the SitesApi
+    already calls CRM/Drive routes, same precedent) + one
+    `PUT /sites/{id}/shop-settings` for the delivery rate. No bulk-apply
+    endpoint anywhere.
+  - *The missing owned door, wired:* the item names "shop-settings routes"
+    but S3.05a2 left `set_site_shop_shipping_cents` store-only — so this
+    item wires it (the S3.04f3 "wire them if left store-only" precedent):
+    new `products/mail/alo-jmap/src/sites_shop_settings.rs`, GET/PUT
+    `/sites/{id}/shop-settings` ↔ `{"shippingCents": n}`, authenticate +
+    `require_site`, store sentences verbatim on 422. Under `/sites/{id}`
+    it sits inside the site-editor grant like tickets/catalogs do — the
+    rate is the site's own delivery price (`site_shop_settings`), not a
+    Billing-side fact; the PROPOSAL door (which names Billing prices and
+    VAT) stays owner-only per S3.05b2.
+  - *Errors:* 503 `unconfigured` → the honest no-AI sentence with the
+    by-hand links kept beside the describe box always; other propose
+    failures → server detail verbatim. A refused apply row keeps its own
+    server sentence, other rows land; the button becomes "Try again" and
+    re-sends ONLY pending rows (created rows and a saved rate are never
+    re-sent). Disabled Approve always says why (`submitRequirement`, the
+    S1.30b law): name/price/VAT/shipping missing each have a sentence.
+  - *Tenancy:* the new routes resolve the site inside the caller's
+    account store; a foreign tenant's knock is the same 404 an invented
+    id gets, proven by test AND on the wire. The screen writes only
+    through authenticated owned routes; the proposal itself is never
+    stored.
+  - *Rejected alternative:* a server-side apply-proposal endpoint — one
+    POST creating everything would be a new write path duplicating three
+    owned doors with its own auth story; row-by-row through existing
+    doors keeps every write behind a wall that already has tests, and
+    makes partial failure honest instead of transactional-looking.
+- **Shipped:** `sites_shop_settings.rs` + registration;
+  `tests/sites_shop_settings_http.rs` (3 tests); web: `ShopSetupView.tsx`,
+  route + SiteView button, `parsePriceInput` (text→minor units, strict,
+  no floats — the sites module must not import billing's parser, its own
+  parts.tsx says so) in `catalogPricing.ts`, proposal types in types.ts,
+  4 api methods, `ShopSetup.test.tsx` (4 tests), ~35 strings × en/fr/nl,
+  shop-setup CSS block; CHANGELOG entry.
+- **Verified:** DB pruned; fmt; clippy `-p alo-jmap --all-targets` exit 0
+  (13 m 57 s, only the two pre-existing alo-store survivors); test-binary
+  build via the sanctioned marker form (13 m 47 s); `cargo nextest run -p
+  alo-jmap` **1 244/1 244 green** (79 s) incl. the new suite: unset-rate-
+  is-zero → PUT answers the stored row → stated-free is real; the store's
+  sentence verbatim on 422 + missing-field 400 leaving the rate untouched;
+  foreign tenant indistinguishable from a missing site on both verbs. Web:
+  `tsc` clean, eslint clean, `vitest run src/sites` **293/293** (the 4 new:
+  flags render — stated prefilled/blank required/2 VAT badges/shipping
+  prefilled/Approve disabled saying why; exact bodies through the owned
+  routes incl. stocked-by-kind and no float anywhere; refused row shows
+  the server's sentence and retry re-sends exactly one create and zero
+  shipping PUTs; unconfigured keeps the manual links), `npm run build`
+  clean. **Wire transcript on the local backend** (docker `alo-pg`,
+  pg_stat_activity names `alo`; two fresh tenants via `identityctl
+  bootstrap-admin`, real PKCE tokens, debug binary on 127.0.0.1:8080,
+  killed before and after): no token → 401; GET unset → `{"shippingCents":0}`;
+  PUT 450 → 450 **and `site_shop_settings.shipping_cents = 450` on the
+  real database**; PUT −1 → 422 "shipping must be between 0 and 100000
+  cents"; tenant B GET/PUT → 404/404 and the row still 450; the propose
+  door answering its typed unconfigured; the same settings door live at
+  the `/api/*` mount production proxies.
+- **Cuts/flags:** (1) Manual click-path is structural (vitest drives the
+  real views over the real client; the wire pass proves the URLs) — the
+  loop has no browser; the eyes-on walk joins the S3.06 wave review like
+  S2.16b2 did. (2) Applying a `dated` row creates its Billing product
+  only; scheduling the actual event stays in Tickets (a proposal has no
+  dates) — the done-panel links there when a dated item was created.
+  (3) No dedup against existing products: the screen states "approving
+  adds, never replaces" and shows the existing count. (4) `/sites/{id}/
+  shop-settings` reachable by the site-editor grant like the tickets
+  routes — flagged for the S3.06 security re-walk to confirm or narrow.
+- **Next:** S3.05c — shop UI for stock items over the wave-one checkout.
