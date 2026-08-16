@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Ticket buyers now get their ticket by email.** Once a sale is paid and
+  fulfilled, the buyer receives the ticket link, the seats and the amount
+  paid in their inbox, in your site's own language (English, French or
+  Dutch). The mail is sent from alo's own tickets address — never from your
+  mailbox — and a buyer's reply still reaches you directly, because your
+  address travels as the reply-to. Sending is capped per workspace per day
+  and only ever follows a paid order (ADR 0050); deployments switch it on by
+  configuring the tickets address.
+
 - **Your website's assistant now sells your tickets — at your price list's
   price, never its own.** When a visitor asks about an event, the assistant
   points them at that event's own ticket page, showing the name, the day and

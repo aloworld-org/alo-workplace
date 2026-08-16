@@ -8596,3 +8596,65 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   covers the pattern). No new routes, no Caddy note.
 - **Next:** S3.05a — simple stock items over Inventory's seam (S3.04e
   stays blocked on the human-arranged tax review; S3.04h needs its ADR).
+
+## 2026-08-16 — S3.04h The ticket finds the buyer's inbox, behind its ADR
+
+- **Item:** S3.04h — the ticket by email, with the ADR as the item's own
+  prerequisite: alo had never mailed a tenant's stranger automatically, so
+  the abuse story (sender identity, DKIM domain, rate caps, bounce
+  handling) had to be decided before code.
+- **The ADR (0050, written first):** automated mail to a stranger only as
+  the transactional consequence of an action the stranger took and paid
+  for. Identity: one deployment-owned From (`ALO_SITES_MAIL_FROM`, both
+  envelope and header) — never a tenant value; the site's name only as an
+  RFC 2047 display name, the owner's address only as Reply-To resolved
+  inside the sale's own tenant. DKIM: inherited by leaving through the
+  same trusted submission listener as signup codes (which signs by From
+  domain) — no new keys. Caps: paid-order-only recipients, at-most-once
+  per sale (the claim marks `mailed_at` in the statement that selects),
+  a per-tenant daily ceiling (200) enforced in the claim SQL — deferred,
+  never dropped, per-round precise so the batch (25) bounds overshoot.
+  Bounces: DSNs land at the transactional address; no automated parsing in
+  v1 (at-most-once means no retry storm); VERP/suppression recorded as the
+  homework of any future higher-volume path. Rejected alternatives written
+  in the ADR: sending as the owner's own identity (breaks ADR 0034's
+  promise, spends a human's reputation), per-site `no-reply@{subdomain}`
+  From (no mail authority — born spam).
+- **What shipped:**
+  - **Store (`site_ticket_mail`, migration 0333):** expand-only
+    `mailed_at` on `site_ticket_fulfilments` + two partial indexes;
+    `Store::claim_ticket_mails(limit, daily_cap)` — single-statement
+    CTE claim (window position + 24h count vs the cap), offered only
+    after the fulfilment act wrote the sale's description (the mail
+    quotes the record of the sale, never a second catalog read), safe
+    under concurrency via the UPDATE's own `mailed_at IS NULL` recheck.
+  - **Sweep (`alo-jmap::site_ticket_mail`):** EN/FR/NL words by the
+    site's default locale; a pure `build_ticket_mail` (RFC 2047 headers,
+    base64 body, integer-cents money, the `/t/{token}` ticket-page link
+    as the capability); an envelope-recipient plausibility gate; send via
+    `submission::submit`. Spawned from `main.rs` only when
+    `ALO_SITES_MAIL_FROM` + the submission listener are both configured —
+    **default-off; the off-switch is the same config**.
+- **Verified:** DB pruned (2 648 tenants); fmt; clippy `-p alo-store -p
+  alo-jmap --all-targets` clean (only the two pre-existing `meet.rs`
+  type-complexity survivors); test-binary build via the sanctioned
+  background+marker form; nextest green on both crates (see commit);
+  no live sending anywhere — the claim is proven against the local
+  database and the compose is a pure function (ADR 0050's verification
+  discipline). All `claim_ticket_mails` calls live in ONE store test so
+  no concurrent claimer can steal watched rows (the serial-group problem,
+  solved by having no second claimer); it proves: unfulfilled sales are
+  never offered, each fulfilled sale is offered exactly once and paired
+  with its own tenant's site/buyer/token/owner, the owner's address
+  resolves only inside the sale's own tenant (foreign tenant → None),
+  and the cap defers (still `NULL`, released under allowance) rather
+  than drops.
+- **Cuts/flags:** no `.ics` attachment (the linked ticket page serves
+  it); no HTML part (plain text like every alo transactional mail); the
+  link uses the canonical subdomain host; bounce automation deliberately
+  absent (ADR 0050). **Deploy note:** production needs
+  `ALO_SITES_MAIL_FROM` (e.g. `tickets@alomails.com`, a domain the
+  deployment DKIM-signs) set at the next human-present deploy for ticket
+  mail to switch on; no Caddy change, no new routes.
+- **Next:** S3.05a — simple stock items over Inventory's seam (S3.04e
+  stays blocked on the human-arranged tax review).
