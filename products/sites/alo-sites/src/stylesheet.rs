@@ -493,6 +493,19 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   cursor: pointer;
 }
 
+/* The door to the ticket shop. The section is a short offer and one link;
+   the shop itself (prices, seats) is live state on /tix, styled by the same
+   minimal-page chrome as every other service document. */
+.s-tickets {
+  max-width: 38rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+.s-tickets p { color: var(--muted); }
+.s-tickets .actions { margin-top: 1rem; }
+
 /* A custom-code block. The page styles the box around the frame and nothing
    inside it: the frame is another document, and the site's tokens deliberately
    do not reach in. Its height is authored (a sandboxed frame cannot be

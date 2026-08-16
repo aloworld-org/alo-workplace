@@ -227,6 +227,32 @@ pub struct UiStrings {
     pub ticket_seats_label: &'static str,
     /// Ticket page: label before the holder's name.
     pub ticket_holder_label: &'static str,
+    /// Tickets section: the link into the live ticket shop (`/tix`).
+    pub tickets_see_offer: &'static str,
+    /// Ticket shop: heading (and `<title>`) of the `/tix` listing.
+    pub tix_title: &'static str,
+    /// Ticket shop: the listing's empty state.
+    pub tix_empty: &'static str,
+    /// Ticket shop: marker on an event with no seats left.
+    pub tix_sold_out: &'static str,
+    /// Ticket shop: written after a per-seat price ("… per seat").
+    pub tix_per_seat: &'static str,
+    /// Ticket shop: the buy-form button — leads to the provider's page.
+    pub tix_pay: &'static str,
+    /// Ticket shop: shown when no payment provider is wired into this
+    /// installation — the shop tells the truth instead of offering a form
+    /// that could only fail.
+    pub tix_unconfigured: &'static str,
+    /// Order return page: heading (and `<title>`).
+    pub tix_order_title: &'static str,
+    /// Order return page: the payment has not finished yet.
+    pub tix_order_open: &'static str,
+    /// Order return page: paid, the ticket is still being issued.
+    pub tix_order_paid_wait: &'static str,
+    /// Order return page: the payment came to nothing; no seats are held.
+    pub tix_order_dead: &'static str,
+    /// Ticket shop: link back to the event listing.
+    pub tix_back: &'static str,
 }
 
 /// English chrome strings — the v1 default.
@@ -333,6 +359,18 @@ pub const EN: UiStrings = UiStrings {
     ticket_page_title: "Your ticket",
     ticket_seats_label: "Seats",
     ticket_holder_label: "Issued to",
+    tickets_see_offer: "See tickets and dates",
+    tix_title: "Tickets",
+    tix_empty: "No upcoming events right now.",
+    tix_sold_out: "Sold out",
+    tix_per_seat: "per seat",
+    tix_pay: "Continue to payment",
+    tix_unconfigured: "Online ticket sales are not set up on this site yet.",
+    tix_order_title: "Your order",
+    tix_order_open: "Your payment has not finished yet.",
+    tix_order_paid_wait: "Payment received — your ticket is on its way. Reload this page in a moment.",
+    tix_order_dead: "The payment did not complete. No seats are held for you.",
+    tix_back: "Back to tickets",
 };
 
 /// French renderer chrome.
@@ -439,6 +477,18 @@ pub const FR: UiStrings = UiStrings {
     ticket_page_title: "Votre billet",
     ticket_seats_label: "Places",
     ticket_holder_label: "Établi au nom de",
+    tickets_see_offer: "Voir les billets et les dates",
+    tix_title: "Billets",
+    tix_empty: "Aucun événement à venir pour le moment.",
+    tix_sold_out: "Complet",
+    tix_per_seat: "par place",
+    tix_pay: "Continuer vers le paiement",
+    tix_unconfigured: "La vente de billets en ligne n'est pas encore configurée sur ce site.",
+    tix_order_title: "Votre commande",
+    tix_order_open: "Votre paiement n'est pas encore terminé.",
+    tix_order_paid_wait: "Paiement reçu — votre billet arrive. Rechargez cette page dans un instant.",
+    tix_order_dead: "Le paiement n'a pas abouti. Aucune place n'est retenue pour vous.",
+    tix_back: "Retour aux billets",
 };
 
 /// Dutch renderer chrome.
@@ -545,6 +595,18 @@ pub const NL: UiStrings = UiStrings {
     ticket_page_title: "Uw ticket",
     ticket_seats_label: "Plaatsen",
     ticket_holder_label: "Op naam van",
+    tickets_see_offer: "Bekijk tickets en data",
+    tix_title: "Tickets",
+    tix_empty: "Geen aankomende evenementen op dit moment.",
+    tix_sold_out: "Uitverkocht",
+    tix_per_seat: "per plaats",
+    tix_pay: "Doorgaan naar betaling",
+    tix_unconfigured: "Online ticketverkoop is op deze site nog niet ingesteld.",
+    tix_order_title: "Uw bestelling",
+    tix_order_open: "Uw betaling is nog niet afgerond.",
+    tix_order_paid_wait: "Betaling ontvangen — uw ticket komt eraan. Herlaad deze pagina zo dadelijk.",
+    tix_order_dead: "De betaling is niet gelukt. Er worden geen plaatsen voor u vastgehouden.",
+    tix_back: "Terug naar tickets",
 };
 
 /// Renderer chrome for a normalized locale. Region variants inherit their

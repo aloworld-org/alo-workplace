@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **Your website can now sell your tickets.** A new "Tickets" block links your
+  published pages to a live box office at `/tix`: visitors see every upcoming
+  event with its price read from your own price list at that instant, pick
+  their seats, and pay on your payment provider's secure page — the card is
+  never typed on alo. Seats are held while a buyer pays, so two people can
+  never be sold the last one, and the return page hands over the ticket the
+  moment it is issued. A site with no payment provider connected says so
+  honestly instead of showing a checkout that could not work. In English,
+  French, and Dutch.
+
 - **There is now a directory of your agents.** It says what each one is for in
   your own words, exactly which tools it can use and whether each of those
   answers you straight away or asks you to approve it first, which app switch

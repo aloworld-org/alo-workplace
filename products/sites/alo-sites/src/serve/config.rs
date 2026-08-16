@@ -13,6 +13,12 @@
 //!   is terminated by the front proxy).
 //! - `ALO_SITES_ANALYTICS_SECRET` — at least 32 bytes of deployment secret,
 //!   used only for daily-separated visitor HMACs (required).
+//! - `ALO_SITES_PAYMENTS` — the ticket shop's hosted-payment provider.
+//!   Absent or empty means none: the shop stays visible and says online
+//!   sales are not set up. `fixture` wires the deterministic in-memory
+//!   provider (local development and tests only — it moves no money and
+//!   forgets everything on restart). A live provider (Mollie/Adyen, per
+//!   ADR 0041) is wired by a human with its own ADR and its own value here.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -42,6 +48,15 @@ pub enum ConfigError {
     },
 }
 
+/// Which hosted-payment provider the ticket shop runs on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaymentsChoice {
+    /// No provider: the shop answers honestly that online sales are off.
+    None,
+    /// The deterministic in-memory provider — local development and tests.
+    Fixture,
+}
+
 /// Everything the service needs from the environment.
 #[derive(Debug, Clone)]
 pub struct ServeConfig {
@@ -55,6 +70,8 @@ pub struct ServeConfig {
     pub addr: SocketAddr,
     /// Secret for daily visitor HMACs; never written to analytics storage.
     pub analytics_secret: String,
+    /// The ticket shop's hosted-payment provider.
+    pub payments: PaymentsChoice,
 }
 
 impl ServeConfig {
@@ -90,12 +107,30 @@ impl ServeConfig {
                 reason: "must be at least 32 bytes".to_owned(),
             });
         }
+        let payments = match std::env::var("ALO_SITES_PAYMENTS")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .as_deref()
+        {
+            None => PaymentsChoice::None,
+            Some("fixture") => PaymentsChoice::Fixture,
+            Some(other) => {
+                return Err(ConfigError::Invalid {
+                    name: "ALO_SITES_PAYMENTS",
+                    reason: format!(
+                        "`{other}` is not a provider this build knows; \
+                         leave it unset, or use `fixture` for local development"
+                    ),
+                });
+            }
+        };
         Ok(Self {
             database_url,
             sites_domain,
             blob_dir,
             addr,
             analytics_secret,
+            payments,
         })
     }
 }

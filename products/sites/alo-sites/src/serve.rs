@@ -57,6 +57,7 @@ mod orders;
 pub mod rate;
 mod rendered;
 mod ticket_page;
+mod tickets;
 mod unlock;
 pub mod widget;
 
@@ -68,7 +69,7 @@ use axum::http::{HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 
-use alo_store::{PublishedSite, SitePublicStore, StoreError};
+use alo_store::{PublishedSite, SitePaymentProvider, SitePublicStore, StoreError};
 use serde::Deserialize;
 
 use crate::render::EN;
@@ -104,6 +105,11 @@ pub struct AppState {
     unlock: unlock::UnlockSessions,
     /// Secret-keyed visitor hashing. Raw identifiers never cross storage.
     analytics: analytics::VisitorHasher,
+    /// The hosted-payment provider of the ticket shop ([`tickets`]), when the
+    /// deployment has wired one. `None` is the honest default: the shop then
+    /// says online sales are not set up instead of rendering a checkout that
+    /// could only fail.
+    payments: Option<Arc<dyn SitePaymentProvider>>,
 }
 
 impl AppState {
@@ -119,7 +125,20 @@ impl AppState {
         sites_domain: String,
         secret: impl AsRef<[u8]>,
     ) -> Arc<Self> {
+        Self::with_payments(store, sites_domain, secret, None)
+    }
+
+    /// [`Self::new`] with the ticket shop's hosted-payment provider. `None`
+    /// keeps the shop visible but honestly unsellable ([`tickets`]).
+    #[must_use]
+    pub fn with_payments(
+        store: SitePublicStore,
+        sites_domain: String,
+        secret: impl AsRef<[u8]>,
+        payments: Option<Arc<dyn SitePaymentProvider>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
+            payments,
             store,
             sites_domain,
             cache: cache::SiteCache::default(),
@@ -180,6 +199,18 @@ pub fn app(state: Arc<AppState>) -> Router {
         )
         .route("/t/{token}", get(ticket_page::show))
         .route("/t/{token}/calendar.ics", get(ticket_page::calendar))
+        .route("/tix", get(tickets::listing))
+        .route(
+            "/tix/{event}",
+            get(tickets::offer)
+                .post(tickets::checkout)
+                .layer(DefaultBodyLimit::max(tickets::CHECKOUT_BODY_MAX_BYTES)),
+        )
+        .route("/tix/order/{order}", get(tickets::order_status))
+        .route(
+            "/_alo/pay",
+            post(tickets::webhook).layer(DefaultBodyLimit::max(tickets::WEBHOOK_BODY_MAX_BYTES)),
+        )
         .route(
             "/_alo/collect",
             post(beacon::collect).layer(DefaultBodyLimit::max(beacon::BEACON_BODY_MAX_BYTES)),

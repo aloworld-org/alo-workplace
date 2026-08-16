@@ -218,8 +218,35 @@ pub(super) fn body_section(
         Section::Collection(s) => collection(out, site, s, page.collections, m),
         Section::Catalog(s) => catalog(out, site, s, page.catalogs, m),
         Section::Booking(s) => booking(out, site, s, page.bookings, m),
+        Section::Tickets(s) => tickets(out, site, s, m),
         Section::CustomCode(s) => custom_code(out, site, s, m),
     }
+}
+
+/// A `tickets` section: the door to the site's live ticket shop.
+///
+/// The section itself is static bytes — an optional heading, the owner's own
+/// line, and one link — because everything a buyer decides on (what is on
+/// sale, the price, what is left) is live Billing state served on `/tix`,
+/// one navigation away and never cached. That is the same trade the booking
+/// section makes with its free times, and it is what keeps published pages
+/// immutable while prices are not.
+fn tickets(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    section: &alo_store::site_model::TicketsSection,
+    m: Marks,
+) {
+    open_section(out, "section", "s-tickets", m);
+    push_opt_heading(out, section.heading.as_deref(), m);
+    if let Some(body) = &section.body {
+        out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));
+    }
+    out.push_str(&format!(
+        "<p class=\"actions\"><a class=\"button\" href=\"/tix\">{}</a></p>\n",
+        esc(site.strings.tickets_see_offer)
+    ));
+    out.push_str("</section>\n");
 }
 
 /// A `custom_code` section: the tenant's own markup, style, and script, served

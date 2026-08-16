@@ -8391,3 +8391,80 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   reads `sale_items()` once rather than per-event; fine to 200 events.
 - **Next:** S3.04f2 — the `/tix` pages, the `tickets` section + goldens and
   the webhook route on alo-sites.
+
+## 2026-08-16 — S3.04f2 The box office opens on the published site
+
+- **Item:** S3.04f2 — shop pages and checkout on alo-sites (the middle third
+  of the S3.04f split; f1 built the store doors, f3 brings the editor
+  mirror).
+- **Design (implement-skill blocks):** *Surface:* a `tickets` typed section
+  (heading?, body? — presentation only) rendering one link to `/tix`;
+  `GET /tix` (live listing), `GET+POST /tix/{event}` (offer + checkout),
+  `GET /tix/order/{order}` (return page), `POST /_alo/pay` (webhook) on
+  alo-sites; `AppState::with_payments(Option<Arc<dyn SitePaymentProvider>>)`
+  with `ALO_SITES_PAYMENTS` config (unset → none, `fixture` → the S3.04c
+  fixture, anything else refused at boot). *Errors:* misses are one uniform
+  404 (unknown host, foreign event/order, another site's ids); 400 verbatim
+  store sentence on a typo, 409 on the seats' own words ("sold out"), 413
+  oversized, 429 + Retry-After, 503 with the honest "not set up" sentence on
+  an unconfigured POST, provider trouble → terse 503. *Tenancy:* every verb
+  anchored on the Host resolver's `PublishedSite` through the S3.04f1 doors;
+  the webhook is host-independent and resolves only by provider payment id.
+  *Out of scope:* editor mirror + event-management UI (f3), the ticket email
+  (S3.04h, ADR-gated), venue time zone (UTC clock carried from S3.04d), any
+  live provider (human + ADR). *Rejected alternative:* baking the event list
+  into published (cached, immutable) bytes — a price and a seat count are
+  live state, so the section ships one link and the shop reads the seam per
+  request, the same trade the booking section made with its free times.
+- **What shipped:**
+  - **The `tickets` section** through the whole vocabulary: `site_model.rs`
+    (variant, kinds list, validation, images=none), seed (always Ready,
+    words copied only from an existing tickets section), grounding (heading/
+    body prose only — prices stay structured facts per ADR 0040), templates
+    (allowed: binds nothing, claims nothing), renderer + `.s-tickets` CSS +
+    EN/FR/NL strings, goldens (`section_tickets.html`, full-page, site.css,
+    both palette JSONs — all re-blessed and diff-reviewed). `tix` joined
+    `RESERVED_SLUGS` so no page can shadow the shop.
+  - **The shop** (`serve/tickets.rs`): listing and offer pages priced by the
+    seam per request (`no-store`, noindex), the buy form (honeypot, quantity
+    capped at what is left, name, email) posting straight into
+    `public_begin_ticket_checkout` → provider `create_payment` (idempotency
+    key = order id) → `303` to the hosted page; the return page with
+    fetch-on-return settle (asks the provider, never the buyer) showing
+    continue-link / ticket link / the paid-but-minting sentence / the dead
+    sentence; the webhook accepting only `id=…`, resolving by payment id,
+    fetching the status, settling idempotently, and answering probes of
+    unknown ids exactly like success.
+  - **Wiring:** `AppState.payments` (`None` = the unconfigured truth; the
+    offer page then carries the sentence and no form, a POST gets 503 and
+    holds nothing), `main.rs` warns loudly when the fixture provider is on.
+- **Verified:** clippy `-p alo-store -p alo-sites --all-targets` exit 0 (only
+  the two pre-existing `meet.rs` type-complexity survivors, business
+  track's); test-binary build via the sanctioned background+marker form
+  (~25 min); `cargo nextest run -p alo-store -p alo-sites` **2 270/2 270
+  green** (1 pre-existing skip, 31 s; DB pruned first — 1 252 tenants);
+  `cargo check` on alo-jmap and alo-ai against the changed store both clean.
+  New wire proof (in-process axum + real postgres, 5 tests): the arc
+  (listing priced €85.00 → offer with capped form → 303 to the fixture's
+  hosted page → return page "not finished" with the continue link → provider
+  marked paid → return page settles by FETCHING → claim sweep → ticket link →
+  `/t/{token}` names the buyer); the walls (foreign Host gets 404 on offer/
+  checkout/return, unknown host 404, webhook probe 200-and-nothing,
+  malformed webhook 400); honeypot 303s and costs no seat while the real
+  buyer still gets both and the next one hears "sold out" verbatim; the
+  checkout door 429s the eleventh POST per client and not the neighbour;
+  the unconfigured shop shows the sentence, no `<form`, 503 on POST, zero
+  held seats, webhook still quiet, and the published section still links
+  `/tix`.
+- **Cuts/flags:** provider failure AFTER the order is placed leaves the
+  order open until the 30-min hold TTL frees the seats (no public abandon
+  verb; self-healing, journaled rather than built). The UTC wall clock
+  carries through the shop pages (venue zone still open). Webhook is
+  deliberately not rate-limited (body cap + fetch-not-believe are the
+  guards; a provider's retries must not be throttled) — wave review may
+  revisit. No Caddy change: `/tix` and `/_alo/pay` ride the sites vhost.
+  Production compose gains `ALO_SITES_PAYMENTS` only when a human wires a
+  real provider (ADR first).
+- **Next:** S3.04f3 — the shop section in the web editor (mirror, picker
+  thumbnail, event-management UI over the `/sites` ticket routes — wire them
+  if S3.04b left them store-only).
