@@ -10,6 +10,14 @@ contracts.
 
 ## Unreleased
 
+- **The commerce screens now speak their state to screen readers, and their
+  tables fit a phone.** When an invited collaborator opens Shop, Tickets or
+  Shop setup, the "you can look, not change" fact is announced by assistive
+  technology instead of only printed on screen — and Shop setup shows that
+  fact directly rather than a failed-load error. The two-step remove/delete
+  buttons announce their "click again to confirm" step the same way, and the
+  Shop and Tickets tables no longer spend a phone screen's width on their own
+  margins.
 - **Invited website collaborators can no longer see your price list or change
   what you sell.** A person you invite to edit a website could, until now,
   open the ticket and shop pickers — which list every product on your

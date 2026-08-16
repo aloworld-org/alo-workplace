@@ -9246,3 +9246,52 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   collaborator navigating there by URL gets an honest error banner and the
   button is hidden — S3.06b may soften further.
 - **Next:** S3.06b — accessibility, responsiveness and language parity.
+
+## 2026-08-16 — S3.06b The walk-through with a screen reader's ears
+
+- **Item:** S3.06b — Wave-3 accessibility, responsiveness and language
+  parity, against `docs/design/ux-principles.md` and the S2.16b test
+  machinery (dialog contract, landmarks, locale parity — all of which
+  enumerate the module's files, so the Wave-3 screens were already inside
+  them and already green).
+- **The audit, screen by screen:** every Wave-3 surface read at source —
+  TicketsView, ShopView, ShopSetupView, AssistantView + AssistantAppearance
+  + KnowledgePickerDialog (DialogFrame throughout, so the S2.16b keyboard
+  contract covers them), SectionPalette (own focus/Escape handling, own
+  tests), SectionLayoutControls (proper radiogroup), inline text (status
+  region already in PageEditorView). Held: dialog contract, one-main
+  landmarks, accessible names (checkbox rows named per item, sr-only
+  question labels, iframe titles, contrast shown in-screen), reduced-motion
+  (ds/global.css), palette/appearance layouts collapsing at 900/960px,
+  fieldRow + header already phone-safe from S2.16b2, fr/nl parity real
+  translations (ratchet green at 2 locale tests).
+- **Did not hold, fixed:** (1) the S3.06a follow-up — the collaborator's
+  "you can look, not change" fact on Shop/Tickets was a plain paragraph
+  that lands after the async load, which a screen reader past the header
+  never hears: now `role="status"` in both. (2) The armed two-step
+  delete/remove renames its button — a name change nothing announces — so
+  the explaining hint is now a status region too (both screens). (3)
+  `.tableWrapStatic` (the Shop/Tickets/Funnel/SiteView tables) missed the
+  S2.16b2 40rem padding collapse that `.tableWrap` got: added, so the
+  tables stop spending 48px of a 360px screen on margins. (4) The S3.06a
+  cut-4 softening: ShopSetupView fetched the manager-only price list
+  eagerly, greeting a collaborator with a refusal banner — now detail-first
+  (the Shop/Tickets pattern), skipping the refused reads and rendering the
+  read-only status instead of an error.
+- **Shipped:** role="status" + comments in TicketsView/ShopView, the
+  detail-first load + manager gate + read-only state in ShopSetupView, the
+  one-line CSS fix; tests — owner-detail fallback added to ShopSetup.test's
+  harness (the S3.06a pattern), a new collaborator test there (status
+  announced, no describe box, refused reads never made), and status-role
+  pins on the existing Shop/Tickets collaborator tests and Shop's armed-
+  remove test; CHANGELOG entry.
+- **Verified:** `npx vitest run src/sites` **304/304** green (32 files);
+  `npx tsc --noEmit` clean; eslint clean on the six changed files;
+  `npm run build` clean. No Rust touched, no routes changed — web-only.
+- **Cuts/flags:** (1) The eyes-on 360px/keyboard browser walk is S3.06d by
+  design — this pass is source-level plus the testable contracts. (2) Icon
+  `size={16}`-style literals predate the wave and are module-wide; left for
+  a ds sweep rather than churned per screen. (3) `.fieldRow` already
+  collapses at 40rem (found in the S2.16b2 block, not beside the rule —
+  noted here so the next audit doesn't re-find it).
+- **Next:** S3.06c — as-built docs and reconciliation.
