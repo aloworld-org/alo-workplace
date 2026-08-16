@@ -8658,3 +8658,66 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   mail to switch on; no Caddy change, no new routes.
 - **Next:** S3.05a — simple stock items over Inventory's seam (S3.04e
   stays blocked on the human-arranged tax review).
+
+## 2026-08-16 — S3.05a1 The shop reserves the warehouse's own count
+
+- **Item:** S3.05a split first (S3.04f1 precedent — one turn cannot hold the
+  seam, the checkout doors and the public pages at full depth): a1 = the
+  Inventory-owned stock-sale seam, a2 = the checkout doors + shipping rate,
+  a3 = the public pages. This entry is a1.
+- **Design (implement-skill blocks):**
+  - *Surface:* `inv_stock_sale::InvStockSale` — a seam door in the
+    `billing_catalog_read`/`calendar_availability` handshake (opened with a
+    `(tenant, owner)` pair from a trusted row, for Sites the site's record).
+    `stock_for_sale` (NotStocked | Stocked{available_units}), `reserve`
+    (1–20 whole units, TTL 1 min–1 h), `stock_hold`, `release`, `claim`.
+    Availability is computed at EVERY read: the ledger's on-hand at `stock`
+    locations minus live holds, floored to units — no stored copy anywhere
+    (ADR 0041's constraint made structural). Claim marks the hold completed
+    and records the real outbound movement(s) — reason `sale`, fullest shelf
+    first, split across shelves, to the `customer` counterparty, via
+    `record_move_in` in ONE transaction — which is why a completed hold
+    counts for nothing where a completed ticket hold counts forever: the
+    shelf itself already dropped. Claim is idempotent (a retried webhook
+    moves nothing); the note is the caller's sentence, the seam adds no
+    words. Migration 0334 (`inv_stock_sale_holds`, expand-only, composite FK
+    to billing_products with no delete action — 0157's choice); new
+    `InvStockHoldId`.
+  - *Errors:* Validation (units/ttl bounds, non-stocked product), NotFound
+    (foreign/unknown/archived product or hold — existence never disclosed;
+    `stock_for_sale` answers None for the same), Conflict ("sold out" /
+    "only N are left" / expired / released / "the goods have since left
+    stock: N of the reserved M units remain" — that last leaves the hold
+    held and the tx rolled back for a retry after restock), Db.
+  - *Tenancy:* every statement binds the door's tenant; composite FK backs
+    it; the wall test proves a foreign door sees None/NotFound on every verb
+    and that holds never count across tenants.
+  - *Out of scope (recorded in the a2/a3 queue items):* shipping rate, the
+    shop offer/checkout/fulfilment, public pages, refund path, variants,
+    multi-warehouse choice by the tenant.
+  - *Rejected alternative:* riding `inv_so` (confirm-as-reservation) —
+    Inventory documents "confirming reserves nothing" as its own decision,
+    and a checkout hold lives minutes, not days; a shop hold table beside
+    the ledger keeps both truths. Also rejected: any cached availability
+    column (the exact second copy ADR 0041 forbids).
+  - The two races, named: shop-vs-shop is settled by a `(tenant, product)`
+    advisory xact lock (exactly one of two simultaneous buyers gets the last
+    unit); shop-vs-warehouse is deliberately NOT settled — holds bind the
+    shop, never Inventory's own doors — the ledger stays non-negative via
+    `record_move`'s own rule and the claim refuses cleanly instead.
+- **Verified:** DB pruned (3 418 tenants after); fmt; clippy `-p alo-store
+  --all-targets` exit 0 (only the two pre-existing `meet.rs`
+  type-complexity survivors); test-binary build via the sanctioned
+  background+marker form (20 m 33 s); `cargo nextest run -p alo-store`
+  **2 079/2 079 green** (1 pre-existing skip, 21 s) incl. the 9 new DB tests
+  (availability from the ledger live, hold expiry by time predicate, the
+  buyer race, claim-once split across two shelves with the customer
+  counterparty balance and the move notes checked, lapsed/released refusals,
+  warehouse-got-there-first with retry-after-restock, the tenant wall on
+  every verb, the no-buyer-columns schema proof) and 3 in-module unit tests
+  (state words, unit flooring); `cargo check -p alo-jmap` clean. No HTTP
+  routes in this slice — store-only like S1.16a — so no wire pass; the DB
+  suite runs the real SQL against the real postgres.
+- **Cuts/flags:** none beyond the split itself; no new route prefix, no
+  Caddy note, no user-facing strings (no i18n).
+- **Next:** S3.05a2 — stock checkout doors on the store.

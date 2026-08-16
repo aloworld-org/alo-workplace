@@ -167,7 +167,9 @@ reserved through their owner, never stored again (ADR 0041).
 
 ### Commerce wave two — stock items (ADR 0041)
 
-- [ ] S3.05a Simple stock items: one price, one tax, one shipping rate, with stock read and reserved through Inventory's seam and never copied.
+- [x] S3.05a1 Inventory's stock-sale seam (split from S3.05a 2026-08-16, the S3.04f1 precedent — one turn cannot hold the seam, the checkout doors and the public pages at full depth): the Inventory-owned `inv_stock_sale` door — available-to-sell computed at every read from the ledger's own on-hand minus live holds (never a stored copy), race-safe reserve-with-expiry under a per-product lock, release, and a claim that records the real `sale` movement to the customer counterparty in the same transaction; concurrency, expiry, wrong-tenant, warehouse-got-there-first and no-buyer-columns tests.
+- [ ] S3.05a2 Stock checkout doors on the store: the public shop's stock offer (product references priced by the Billing seam at every read, availability by the S3.05a1 seam), the site's one flat shipping rate (integer cents, VAT treatment following the goods, stored as the site's own delivery price — not a copy of anything), begin-checkout in the safe order (typo gate → reserve → order), settle → claim + fulfilment (invoice, CRM contact) through the owned seams, and the honest path when a claim finds the goods gone (order marked failed with the refund named, never a silent oversell); DB tests + wire transcript.
+- [ ] S3.05a3 Stock shop pages on alo-sites: the stock items in the shop section renderer (goldens, mobile CSS, EN/FR/NL), public listing/offer pages priced through the doors at every read, checkout POST → hosted payment → return page reusing the wave-one machinery, rate limits + honeypot; in-process wire tests incl. Host isolation.
 - [ ] S3.05b Propose the configuration: from a sentence about the business, draft the catalog, the VAT treatment per item and the shipping, and present it for approval with every guess flagged — the screen where Odoo loses the customers who cannot afford a consultant. Fixtures only.
 - [ ] S3.05c Shop UI for stock items, sharing the checkout built in wave one.
 

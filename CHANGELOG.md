@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Your web shop can now promise goods it actually has.** Groundwork for
+  selling stock items landed: while a buyer checks out, the item is reserved
+  against your warehouse's own count — the same number Inventory shows,
+  never a copy — so two buyers can't both take the last one. When the sale
+  completes, the delivery is recorded as a real inventory movement to your
+  customer counterparty, visible in the stock history like any other. An
+  abandoned checkout frees the goods by itself within the hour (ADR 0041;
+  the shop pages and checkout for stock items follow next).
+
 - **Ticket buyers now get their ticket by email.** Once a sale is paid and
   fulfilled, the buyer receives the ticket link, the seats and the amount
   paid in their inbox, in your site's own language (English, French or
