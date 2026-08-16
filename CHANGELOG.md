@@ -17,8 +17,10 @@ contracts.
   rate, ready for you to review. Everything it was not told is flagged: a
   price you never stated arrives as a blank to fill in (never a number it
   made up), and every VAT rate is presented as a guess for your accountant
-  to confirm. Nothing is applied until you approve it. (ADR 0041; the
-  review screen itself is on its way.)
+  to confirm. Nothing is applied until you approve it. Proposals are served
+  by the workspace API and are for owners only — invited site editors never
+  see your prices or VAT. (ADR 0041; the review screen itself is on its
+  way.)
 
 - **Your website now has a public shop for the goods on your shelf.** A new
   "shop" section links visitors to `/shop`, where your chosen stock items

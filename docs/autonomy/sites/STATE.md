@@ -8950,3 +8950,62 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   contract). VAT here is a flagged guess pipeline, not a rules table —
   the S3.04e human tax review stays the authority the moment it exists.
 - **Next:** S3.05b2 — the proposal route.
+
+## 2026-08-16 — S3.05b2 The proposal on the wire, and the door only owners may knock on
+
+- **Item:** S3.05b2 — POST `/sites/shop-config/propose`: the S3.05b engine
+  behind one authenticated route, returned for review and never applied
+  server-side; owner/workspace auth only, NOT the per-site editor grant.
+- **Design (implement-skill blocks):**
+  - *Surface:* new `products/mail/alo-jmap/src/sites_shop_config.rs` (one
+    file, one reason: the shop-setup proposal on the wire), registered as a
+    STATIC path beside `/sites/generate` with the same 16 KB body limit and
+    the same handler shape: authenticate → validate (empty 400 / >8 000
+    chars 413 / unknown field 400) → `tenant_ai_config` →
+    `alo_ai::site_shop_config::propose_shop_config` → `{"proposal": …}`,
+    the parser-enforced envelope verbatim (stated-or-needs_input prices,
+    `vat_guess`, shipping-follows-the-goods). No store read or write on any
+    path — applying is S3.05b3's job through the owned routes.
+  - *The auth wall, by construction rather than by a new gate:* the
+    site-editor middleware (`scoped_roles.rs`) allowlists only `/sites`
+    GET, two static GETs and `/sites/{id}…` with `can_edit_site`; a static
+    POST outside that list is refused 403 at BOTH mounts before the handler
+    runs. The item's S2.03a prerequisite is therefore a *test* (knock at
+    both mounts), not new code — the matrix suite's "the only way to know
+    the guard is there is to knock" rule.
+  - *Errors:* the S1.28a shape exactly — 503 `{"reason":"unconfigured"}`
+    ("set up the catalog by hand instead", the manual path the UI keeps),
+    502 `unreachable`, 422 `{"reason":"invalid_proposal"}` after the one
+    repair; Problem errors throughout.
+  - *Tenancy:* nothing tenant-scoped read or written; the description is
+    prompt input bounded like generation's.
+- **Shipped:** the module + route + `pub mod` line;
+  `MAX_SITE_DESCRIPTION_CHARS` made `pub(crate)` (shared cap, one owner);
+  test suite `tests/sites_shop_config_http.rs` (5 tests); CHANGELOG's
+  S3.05b entry extended with the owners-only sentence.
+- **Verified:** DB pruned (1 345 gone); fmt; clippy `-p alo-jmap
+  --all-targets` exit 0 (the two pre-existing alo-store survivors only;
+  14 m across two calls); test-binary build via the sanctioned marker form
+  (14 m 49 s); `cargo nextest run -p alo-jmap` **1 241/1 241 green**
+  (82 s) incl. the 5 new: 401→typed-unconfigured, validation-before-model,
+  fixture envelope verbatim on the wire (stated cents, `vat_guess` key
+  present and `vat` absent, shipping stated) + model-shown-the-description
+  + `billing_products` stays empty, invented-price → exactly one repair →
+  422 typed, and the site-editor 403 at `/sites/…` AND `/api/sites/…`.
+  **Wire transcript on the local backend** (fresh `shopcfg-wire` tenant via
+  `identityctl bootstrap-admin`, PKCE token, debug binary on
+  `127.0.0.1:8080` against docker `alo-pg` — pg_stat_activity says `alo`;
+  server killed before and after): no token → 401; blank description → 400
+  verbatim; unknown field → 400 notJSON; no provider → 503
+  `{"reason":"unconfigured"}`; scripted localhost model serving the valid
+  fixture → 200 with the full flagged envelope; the invented-price fixture
+  → 422 `{"reason":"invalid_proposal"}` after the one repair; then
+  `select count(*) from billing_products where tenant_id=…` → **0** — the
+  proposal wrote nothing, proven on the real database.
+- **Cuts/flags:** none. First-run gotcha journaled: a test-file helper
+  email must not share its prefix with the harness tag — the harness user
+  IS `<tag>-<tenant>@example.test`, so `shop-config-editor` collided with
+  itself (unique-constraint Conflict) and was renamed `shop-config-collab`.
+  No new top-level route prefix (`/sites/*` already proxied) — no Caddy
+  note needed. No UI strings (no UI in this slice).
+- **Next:** S3.05b3 — the proposal screen.
