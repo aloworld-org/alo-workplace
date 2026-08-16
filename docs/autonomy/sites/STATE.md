@@ -8721,3 +8721,98 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
 - **Cuts/flags:** none beyond the split itself; no new route prefix, no
   Caddy note, no user-facing strings (no i18n).
 - **Next:** S3.05a2 — stock checkout doors on the store.
+
+## 2026-08-16 — S3.05a2 The shop's checkout doors: paid means the shelf drops
+
+- **Item:** S3.05a2 — stock checkout doors on the store: the site's own shop
+  shelf, its flat delivery price, the safe-order checkout, settle→claim
+  through Inventory's seam, fulfilment through Billing's and CRM's, and the
+  two honest refund paths. Migration 0335; store modules `site_shop_items`,
+  `site_stock_orders`, `site_public_stock`, `site_stock_fulfil`; sweep
+  `alo-jmap::site_stock_worker` beside the ticket one.
+- **Design (implement-skill blocks):**
+  - *The shelf:* `site_shop_items` — the site's decision to sell product X,
+    a pure reference (the ticket-event registry minus date/capacity: the
+    warehouse's ledger IS the capacity). Add validates against BOTH owning
+    seams: the price list must answer and Inventory must call it stocked.
+    Delisting never touches a sale (orders keep their own product ref, so
+    the registry row carries no FK from orders).
+  - *Delivery:* `site_shop_settings.shipping_cents` — one flat rate per
+    order, integer cents, the site's OWN price (delivery is something the
+    site sells; nothing to copy). Deliberately no VAT rate column: an
+    ancillary cost follows the main supply, so the order snapshots the
+    goods' rate for both.
+  - *The order:* `site_stock_orders` mirrors the ticket order (state
+    machine, one-order-per-hold replay token, one-payment-one-order global
+    index, webhook-is-a-doorbell) plus the buyer's delivery address
+    (line/city/postcode/ISO-2 country — a stock sale ships somewhere; the
+    ticket order needed none). Price struck server-side at creation:
+    catalog price × units + stored shipping; the request carries no figure.
+  - *What "paid" does — the item's point:* settling claims the hold through
+    `InvStockSale::claim`, which records the real outbound `sale` movement
+    (note = the order id, the sale's own reference — no invented words). A
+    completed hold found at settle = crash recovery, order just finishes
+    (claim's idempotency covers the window). The two honest failures both
+    close the order as failed with the refund NAMED and move nothing:
+    `STOCK_ORDER_PAID_AFTER_LAPSE` (hold lapsed/released before the money)
+    and `STOCK_ORDER_GOODS_GONE` (warehouse's own doors took the goods —
+    the hold is then released so what remains goes back on open sale).
+    Dead payment statuses release the hold. A paid order is never unsold.
+  - *Public doors (`site_public_stock`, Host-anchored on `PublishedSite`
+    like every public door):* offer list/get priced by the catalog and
+    counted by the ledger at every read (an item off either seam is simply
+    not offered), shipping read, begin-checkout in the only safe order
+    (typo gate incl. address → reserve 30 min → order, hold released if the
+    order refuses), open-payment, return-page status (includes the failure
+    sentence deliberately — the return page owes the buyer the honest
+    words; both sentences are written to be shown), payment target, settle.
+    Unknown/foreign/malformed ids are one uniform None.
+  - *Fulfilment:* `site_stock_fulfil` claims paid orders by inserting the
+    row (at-most-once, `FOR UPDATE SKIP LOCKED`), then CRM first (so the
+    invoice's customer can't shadow the lead), then Billing's document born
+    settled: VAT carved OUT of the exact charge, delivery on its own line
+    at the goods' rate, the two nets split from one carve
+    (`net(total) − net(shipping)`) so the billed gross equals the charge to
+    the cent — proven in a unit test against Billing's own subtotal
+    rounding. Customer's country = the buyer's delivery country.
+  - *Rejected alternative:* section-JSON as the offer anchor (scan
+    published pages for product refs) — a registry row is queryable,
+    cappable (200/site) and owner-manageable; the a3 section will render
+    from it the way `/tix` renders from the event registry.
+- **Verified:** DB pruned (903 gone); fmt; clippy `-p alo-store -p alo-jmap
+  --all-targets` exit 0 (only the two pre-existing `meet.rs` survivors);
+  test-binary build via the sanctioned background+marker form (37 m 49 s);
+  `cargo nextest run -p alo-store` **2 092/2 092 green** (1 pre-existing
+  skip, 20 s) incl. the 8 new DB tests (offer = the seams' answer now with
+  reprice/archive/delist/unlisted walls; typo gate takes no hold; the full
+  arc offer→reserve→order→hosted payment→webhook target→settle→ledger
+  movement with the order id as its note→claim-once→invoice with delivery
+  line and exact money→CRM card; paid-after-lapse and goods-gone both
+  failing visibly naming the refund and moving nothing; dead payment frees
+  the goods; tenant+site walls on every verb; the no-card-columns schema
+  proof) and the module unit tests; `-p alo-jmap` **1 236/1 236 green**.
+- **Gate incident, written down for the next iteration:** mid-gate, DB
+  suites started failing with `PoolTimedOut` — first 8 tests in the full
+  run, then ANY suite run alone. Cause: `tests/common::database_url()`
+  falls back to `127.0.0.1:5433`, which nothing serves here, and
+  `DATABASE_URL` is not in this harness shell's env; whatever had been
+  papering over that earlier stopped. Fix that holds: **export
+  `DATABASE_URL=postgres://alo:alo-dev-only@localhost:5432/alo` on every
+  nextest command on this machine** (the Gatekeeper memory note said
+  exactly this; it is now proven). With it set, the same "failing" tests
+  pass in 0.4 s.
+- **Cuts/flags:** (1) The queue said "DB tests + wire transcript" — no HTTP
+  route ships in this slice (store doors only, the S3.04f1/S1.16a shape),
+  so the wire transcript belongs to a3's public pages; the DB suite drives
+  the identical arc against the real postgres. (2) VAT stays the goods'
+  snapshot rate with the buyer's country recorded on order+customer —
+  destination-based rules (OSS distance selling) wait for the S3.04e table
+  (blocked on its human tax review); strict reading, flagged, never
+  guessed. (3) No order-confirmation email (ADR 0050 covers ticket mail
+  only; extending it is its own decision). (4) Offer photos deferred to a3
+  (renderer decides how images serve). (5) The offer list prices per item
+  through the seam (N+1 for a ≤200-item shop) — a3 may batch if the public
+  page needs it. No new route prefix, no Caddy note, no user-facing
+  strings (worker words live in their own per-locale tables like the
+  ticket worker's).
+- **Next:** S3.05a3 — stock shop pages on alo-sites.

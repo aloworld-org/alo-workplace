@@ -10,6 +10,18 @@ contracts.
 
 ## Unreleased
 
+- **Your site can now sell what is on your shelf.** A site's shop lists
+  chosen stock items and sells them the honest way end to end: the price is
+  read from your Billing price list and availability from your Inventory
+  ledger at every look — never a stored copy — plus one flat delivery price
+  you set per site, its VAT following the goods. A buyer's checkout reserves
+  the goods first and pays on the provider's hosted page (no card data ever
+  touches alo); a paid order records the real stock movement, raises a
+  settled invoice with delivery on its own line, and files the buyer in CRM.
+  If the goods left your warehouse before the payment landed, the order
+  fails visibly naming the refund — never a silent oversell. (ADR 0041; the
+  public shop pages follow next.)
+
 - **Your web shop can now promise goods it actually has.** Groundwork for
   selling stock items landed: while a buyer checks out, the item is reserved
   against your warehouse's own count — the same number Inventory shows,
