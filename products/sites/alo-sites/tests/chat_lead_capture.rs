@@ -169,7 +169,15 @@ async fn the_aggregate_table_has_no_column_a_visitor_could_travel_in() {
     let names: Vec<&str> = columns.iter().map(|(name,)| name.as_str()).collect();
     assert_eq!(
         names,
-        ["day", "hits", "site_id", "source_id", "source_kind", "stage", "tenant_id"]
+        [
+            "day",
+            "hits",
+            "site_id",
+            "source_id",
+            "source_kind",
+            "stage",
+            "tenant_id"
+        ]
     );
 }
 
@@ -225,7 +233,10 @@ async fn a_second_capture_from_the_same_address_answers_known() {
         assert_eq!(body["state"], expected, "round {round}");
         assert_eq!(body.as_object().unwrap().len(), 1, "state and nothing else");
     }
-    assert_eq!(acc.crm_deals(&DealFilter::default()).await.unwrap().len(), 1);
+    assert_eq!(
+        acc.crm_deals(&DealFilter::default()).await.unwrap().len(),
+        1
+    );
 }
 
 /// A field CRM refuses comes back 400 with the store's own sentence in
@@ -251,7 +262,12 @@ async fn a_refused_field_is_a_verbatim_400_and_writes_nothing() {
         body["detail"].as_str().unwrap().contains("valid address"),
         "{body}"
     );
-    assert!(acc.crm_deals(&DealFilter::default()).await.unwrap().is_empty());
+    assert!(
+        acc.crm_deals(&DealFilter::default())
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 /// The gates in front of the capture: an unknown host is the uniform 404, a
@@ -283,5 +299,10 @@ async fn the_gates_hold_before_crm_is_reached() {
     .await;
     assert_eq!(oversized.status(), StatusCode::BAD_REQUEST);
 
-    assert!(acc.crm_deals(&DealFilter::default()).await.unwrap().is_empty());
+    assert!(
+        acc.crm_deals(&DealFilter::default())
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }

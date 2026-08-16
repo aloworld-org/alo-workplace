@@ -39,17 +39,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let store = SitePublicStore::connect(&config.database_url, blobs)
         .await
         .map_err(|_| "cannot connect to the database")?;
-    let payments: Option<std::sync::Arc<dyn alo_store::SitePaymentProvider>> =
-        match config.payments {
-            alo_sites::serve::config::PaymentsChoice::None => None,
-            alo_sites::serve::config::PaymentsChoice::Fixture => {
-                tracing::warn!(
-                    "ticket-shop payments run on the in-memory fixture provider: \
+    let payments: Option<std::sync::Arc<dyn alo_store::SitePaymentProvider>> = match config.payments
+    {
+        alo_sites::serve::config::PaymentsChoice::None => None,
+        alo_sites::serve::config::PaymentsChoice::Fixture => {
+            tracing::warn!(
+                "ticket-shop payments run on the in-memory fixture provider: \
                      no money moves, and payments are forgotten on restart"
-                );
-                Some(std::sync::Arc::new(alo_store::FixtureSitePayments::new()))
-            }
-        };
+            );
+            Some(std::sync::Arc::new(alo_store::FixtureSitePayments::new()))
+        }
+    };
     let state = AppState::with_payments(
         store,
         config.sites_domain.clone(),

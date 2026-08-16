@@ -150,7 +150,10 @@ async fn get(venue: &Venue, host: &str, path: &str) -> Response {
         .header(header::HOST, host)
         .body(Body::empty())
         .unwrap();
-    app(Arc::clone(&venue.state)).oneshot(request).await.unwrap()
+    app(Arc::clone(&venue.state))
+        .oneshot(request)
+        .await
+        .unwrap()
 }
 
 async fn post(venue: &Venue, host: &str, path: &str, client: &str, body: &str) -> Response {
@@ -162,7 +165,10 @@ async fn post(venue: &Venue, host: &str, path: &str, client: &str, body: &str) -
         .header("x-forwarded-for", client)
         .body(Body::from(body.to_owned()))
         .unwrap();
-    app(Arc::clone(&venue.state)).oneshot(request).await.unwrap()
+    app(Arc::clone(&venue.state))
+        .oneshot(request)
+        .await
+        .unwrap()
 }
 
 async fn body_string(response: Response) -> String {
@@ -194,7 +200,10 @@ async fn the_shop_sells_a_seat_from_listing_to_ticket() {
     );
     let page = body_string(listing).await;
     assert!(page.contains("Letterpress workshop"), "{page}");
-    assert!(page.contains("€\u{a0}85.00") || page.contains("€\u{a0}85,00"), "{page}");
+    assert!(
+        page.contains("€\u{a0}85.00") || page.contains("€\u{a0}85,00"),
+        "{page}"
+    );
     assert!(
         page.contains(&format!("/tix/{}", v.event.as_str())),
         "the listing links the offer: {page}"
@@ -206,7 +215,10 @@ async fn the_shop_sells_a_seat_from_listing_to_ticket() {
     let page = body_string(offer).await;
     assert!(page.contains("name=\"quantity\""), "{page}");
     assert!(page.contains("max=\"10\""), "{page}");
-    assert!(page.contains("name=\"website\""), "the honeypot rides: {page}");
+    assert!(
+        page.contains("name=\"website\""),
+        "the honeypot rides: {page}"
+    );
 
     // The purchase: 303 to the provider's hosted page.
     let bought = post(
@@ -234,12 +246,17 @@ async fn the_shop_sells_a_seat_from_listing_to_ticket() {
     assert_eq!(waiting.status(), StatusCode::OK);
     assert_eq!(header_value(&waiting, header::CACHE_CONTROL), "no-store");
     let page = body_string(waiting).await;
-    assert!(page.contains("Your payment has not finished yet."), "{page}");
+    assert!(
+        page.contains("Your payment has not finished yet."),
+        "{page}"
+    );
     assert!(page.contains(&checkout_url), "{page}");
 
     // The buyer pays on the hosted page; the return page FETCHES the truth
     // (no webhook needed) and settles.
-    v.provider.mark(&payment_id, SitePaymentStatus::Paid).unwrap();
+    v.provider
+        .mark(&payment_id, SitePaymentStatus::Paid)
+        .unwrap();
     let paid = get(&v, &v.host, &format!("/tix/order/{order_id}")).await;
     let page = body_string(paid).await;
     assert!(
@@ -315,7 +332,14 @@ async fn the_walls_hold_on_every_host() {
     assert_eq!(nowhere.status(), StatusCode::NOT_FOUND);
 
     // The webhook door answers an id nobody holds exactly like success.
-    let probe = post(&a, "any.host.at.all", "/_alo/pay", "3.3.3.5", "id=fixpay-never-was").await;
+    let probe = post(
+        &a,
+        "any.host.at.all",
+        "/_alo/pay",
+        "3.3.3.5",
+        "id=fixpay-never-was",
+    )
+    .await;
     assert_eq!(probe.status(), StatusCode::OK);
     assert!(body_string(probe).await.is_empty());
     let malformed = post(&a, "any.host.at.all", "/_alo/pay", "3.3.3.6", "ring=ring").await;
@@ -411,7 +435,10 @@ async fn an_unconfigured_shop_tells_the_truth() {
         page.contains("Online ticket sales are not set up on this site yet."),
         "{page}"
     );
-    assert!(!page.contains("<form"), "no checkout that can only fail: {page}");
+    assert!(
+        !page.contains("<form"),
+        "no checkout that can only fail: {page}"
+    );
 
     // A POST anyway (an old tab, a script) is the same honest sentence, and
     // no seat is held for it.

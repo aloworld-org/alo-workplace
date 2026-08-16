@@ -299,6 +299,29 @@ const SCRIPT: &str = r#"<script>(function () {
     });
     if (formPath) { anchor(reply, formPath, word("bookmore")); }
   }
+  function ticketsOffer(reply, body) {
+    var event = body.event && typeof body.event === "object" ? body.event : {};
+    var name = typeof event.name === "string" ? event.name : "";
+    var when = typeof event.when === "string" ? event.when : "";
+    var price = typeof event.price === "string" ? event.price : "";
+    var path = typeof body.offerPath === "string" && body.offerPath.charAt(0) === "/"
+      ? body.offerPath : null;
+    reply.textContent = name + (when ? " — " + when : "");
+    if (price) {
+      var line = document.createElement("p");
+      line.className = "alo-chat-day";
+      line.textContent = price + " " + word("tixseat");
+      reply.appendChild(line);
+    }
+    if (event.soldOut === true) {
+      var sold = document.createElement("p");
+      sold.className = "alo-chat-day";
+      sold.textContent = word("tixsold");
+      reply.appendChild(sold);
+    } else if (path) {
+      anchor(reply, path, word("tixget"));
+    }
+  }
   function cite(msg, list) {
     if (!list || !list.length) { return; }
     var line = document.createElement("p");
@@ -370,6 +393,8 @@ const SCRIPT: &str = r#"<script>(function () {
         bookingOffer(reply, body);
       } else if (body && body.state === "lead") {
         leadForm(reply);
+      } else if (body && body.state === "tickets") {
+        ticketsOffer(reply, body);
       } else if (body && body.state === "refusal") {
         reply.textContent = word("refusal");
         offer(reply, body.contactPath);
@@ -503,7 +528,8 @@ fn markup(
          data-bookname=\"{bookname}\" data-bookemail=\"{bookemail}\" \
          data-leadask=\"{leadask}\" data-leadcompany=\"{leadcompany}\" \
          data-leadsend=\"{leadsend}\" data-leadsaved=\"{leadsaved}\" \
-         data-leadknown=\"{leadknown}\">\n\
+         data-leadknown=\"{leadknown}\" data-tixseat=\"{tixseat}\" \
+         data-tixsold=\"{tixsold}\" data-tixget=\"{tixget}\">\n\
          <button type=\"button\" id=\"alo-chat-open\" aria-expanded=\"{expanded}\" \
          aria-controls=\"alo-chat-panel\">{icon}{open}</button>\n\
          <section id=\"alo-chat-panel\" role=\"dialog\" aria-label=\"{title}\"{hidden}>\n\
@@ -549,6 +575,9 @@ fn markup(
         leadsend = esc(strings.chat_lead_send),
         leadsaved = esc(strings.chat_lead_saved),
         leadknown = esc(strings.chat_lead_known),
+        tixseat = esc(strings.tix_per_seat),
+        tixsold = esc(strings.tix_sold_out),
+        tixget = esc(strings.chat_tix_get),
         open = esc(strings.chat_open),
         title = esc(name),
         close = esc(strings.chat_close),
@@ -587,12 +616,7 @@ pub fn preview_document(
          <style>html,body{{height:100%;margin:0}}body{{background:var(--bg,#fff)}}</style>\n\
          </head>\n<body>\n{markup}{STYLE}</body>\n</html>\n",
         lang = esc(strings.lang),
-        title = esc(
-            appearance
-                .bot_name
-                .as_deref()
-                .unwrap_or(strings.chat_title)
-        ),
+        title = esc(appearance.bot_name.as_deref().unwrap_or(strings.chat_title)),
         markup = markup(strings, appearance, avatar_src, true),
     )
 }
@@ -662,21 +686,24 @@ mod tests {
     /// card are ~5.4 KiB the assistant-on page pays for the visitor being
     /// able to book without leaving the conversation. Raised again (17 KiB →
     /// 19 KiB) for the lead form (S3.03d): the details form, its five
-    /// localized words and the two outcome states are ~1.8 KiB more.
+    /// localized words and the two outcome states are ~1.8 KiB more. Raised
+    /// again (19 KiB → 20 KiB) for the tickets offer (S3.04g): rendering the
+    /// event, the seam-read price and the link to the shop's checkout is
+    /// ~0.9 KiB more.
     #[test]
     fn the_widget_stays_within_its_byte_budget() {
         let default = SiteChatAppearance::default();
         for strings in [&EN, &FR, &NL] {
             let bare = fragment(strings, &default);
             assert!(
-                bare.len() < 19456,
+                bare.len() < 20480,
                 "default widget fragment is {} bytes for {}",
                 bare.len(),
                 strings.lang
             );
             let maxed = fragment(strings, &maximal());
             assert!(
-                maxed.len() < 23552,
+                maxed.len() < 24576,
                 "maximal widget fragment is {} bytes for {}",
                 maxed.len(),
                 strings.lang
@@ -731,6 +758,12 @@ mod tests {
             "data-leadsend=\"Send my details\"",
             "data-leadsaved=",
             "data-leadknown=",
+            // The tickets offer's words ride the same way (S3.04g); the
+            // price itself never does — it arrives per reply, read from the
+            // catalog seam by the server.
+            "data-tixseat=\"per seat\"",
+            "data-tixsold=",
+            "data-tixget=\"Get tickets\"",
         ] {
             assert!(fragment.contains(needle), "missing {needle}");
         }

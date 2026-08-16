@@ -117,13 +117,12 @@ async fn sold_out_venue(store: &Store, pool: &sqlx::PgPool, tag: &str) -> (Strin
         if let Some(claim) = claims.into_iter().find(|claim| claim.order == order.id) {
             break claim.token;
         }
-        let minted: Option<String> = sqlx::query_scalar(
-            "SELECT token FROM site_ticket_fulfilments WHERE order_id = $1",
-        )
-        .bind(order.id.as_str())
-        .fetch_optional(pool)
-        .await
-        .unwrap();
+        let minted: Option<String> =
+            sqlx::query_scalar("SELECT token FROM site_ticket_fulfilments WHERE order_id = $1")
+                .bind(order.id.as_str())
+                .fetch_optional(pool)
+                .await
+                .unwrap();
         if let Some(token) = minted {
             break token;
         }
@@ -187,10 +186,7 @@ async fn a_token_answers_only_on_the_site_it_was_minted_for() {
     let (_, token) = sold_out_venue(&store, &pool, "walled").await;
     let (other_sub, _) = sold_out_venue(&store, &pool, "other").await;
 
-    for path in [
-        format!("/t/{token}"),
-        format!("/t/{token}/calendar.ics"),
-    ] {
+    for path in [format!("/t/{token}"), format!("/t/{token}/calendar.ics")] {
         let foreign = get_on(&state, &other_sub, &path).await;
         assert_eq!(
             foreign.status(),

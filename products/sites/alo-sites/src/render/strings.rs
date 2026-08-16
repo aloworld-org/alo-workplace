@@ -207,6 +207,8 @@ pub struct UiStrings {
     /// Assistant widget, lead capture: the honest answer when the business
     /// already knows this address — nothing was filed twice.
     pub chat_lead_known: &'static str,
+    /// The conversation's link to a ticketed event's offer page (S3.04g).
+    pub chat_tix_get: &'static str,
     /// Appointment pages and confirmation cards: the .ics download link.
     pub booking_add_calendar: &'static str,
     /// Appointment pages and confirmation cards: the cancel affordance.
@@ -349,6 +351,7 @@ pub const EN: UiStrings = UiStrings {
     chat_lead_send: "Send my details",
     chat_lead_saved: "Thanks — your details have been passed on. You will hear from us.",
     chat_lead_known: "Thanks — we already have your details, and you will hear from us.",
+    chat_tix_get: "Get tickets",
     booking_add_calendar: "Add to your calendar",
     booking_cancel: "Cancel this appointment",
     booking_manage_title: "Your appointment",
@@ -467,6 +470,7 @@ pub const FR: UiStrings = UiStrings {
     chat_lead_send: "Envoyer mes coordonnées",
     chat_lead_saved: "Merci — vos coordonnées ont été transmises. Nous reviendrons vers vous.",
     chat_lead_known: "Merci — nous avons déjà vos coordonnées, nous reviendrons vers vous.",
+    chat_tix_get: "Acheter des billets",
     booking_add_calendar: "Ajouter à votre agenda",
     booking_cancel: "Annuler ce rendez-vous",
     booking_manage_title: "Votre rendez-vous",
@@ -585,6 +589,7 @@ pub const NL: UiStrings = UiStrings {
     chat_lead_send: "Mijn gegevens versturen",
     chat_lead_saved: "Bedankt — uw gegevens zijn doorgegeven. U hoort van ons.",
     chat_lead_known: "Bedankt — wij hebben uw gegevens al, u hoort van ons.",
+    chat_tix_get: "Tickets kopen",
     booking_add_calendar: "Toevoegen aan uw agenda",
     booking_cancel: "Deze afspraak annuleren",
     booking_manage_title: "Uw afspraak",

@@ -69,7 +69,13 @@ pub(super) async fn calendar(
         return super::not_found(state.unknown_host.clone());
     };
     let host = host.unwrap_or_default();
-    let document = ics_document(&ticket, &site.name, &host, &token, OffsetDateTime::now_utc());
+    let document = ics_document(
+        &ticket,
+        &site.name,
+        &host,
+        &token,
+        OffsetDateTime::now_utc(),
+    );
     (
         StatusCode::OK,
         [
@@ -172,7 +178,10 @@ fn ics_document(
         format!("UID:{token}@sites.alo"),
         format!("DTSTAMP:{}", ics_time(now)),
         format!("DTSTART:{}", ics_time(ticket.starts_at)),
-        format!("SUMMARY:{}", ics_escape(shown_description(ticket, site_name))),
+        format!(
+            "SUMMARY:{}",
+            ics_escape(shown_description(ticket, site_name))
+        ),
         format!("DESCRIPTION:{}", ics_escape(&format!("Ticket: {link}"))),
         format!("URL:{}", ics_escape(&link)),
         "END:VEVENT".to_owned(),

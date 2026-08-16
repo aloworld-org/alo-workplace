@@ -290,7 +290,8 @@ async fn a_service_nobody_may_book_is_one_uniform_absence() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "booking-absent").await;
     let (site, offered, _) = live_site_with_booking(&owner, "booking-absent", &[], true).await;
-    let (_asleep_site, asleep, _) = live_site_with_booking(&owner, "booking-asleep", &[], false).await;
+    let (_asleep_site, asleep, _) =
+        live_site_with_booking(&owner, "booking-asleep", &[], false).await;
     let day = wednesday_ahead()
         .format(&time::macros::format_description!("[year]-[month]-[day]"))
         .unwrap();
@@ -475,8 +476,7 @@ async fn json_body(response: Response) -> serde_json::Value {
 async fn booking_from_the_conversation_reserves_and_is_reversible_by_its_links() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "chat-book").await;
-    let (site, booking, subdomain) =
-        live_site_with_booking(&owner, "chat-book", &[], true).await;
+    let (site, booking, subdomain) = live_site_with_booking(&owner, "chat-book", &[], true).await;
     let day = wednesday_ahead();
     let date = day
         .format(&time::macros::format_description!("[year]-[month]-[day]"))
@@ -514,16 +514,16 @@ async fn booking_from_the_conversation_reserves_and_is_reversible_by_its_links()
     assert_eq!(transcript.len(), 1);
     assert_eq!(transcript[0].kind, alo_store::SiteChatActionKind::Booked);
     assert_eq!(transcript[0].fact.as_deref(), Some("Consultation"));
-    let slot_instant = time::OffsetDateTime::parse(
-        &slot,
-        &time::format_description::well_known::Rfc3339,
-    )
-    .unwrap();
+    let slot_instant =
+        time::OffsetDateTime::parse(&slot, &time::format_description::well_known::Rfc3339).unwrap();
     assert_eq!(transcript[0].slot_at, Some(slot_instant));
 
     // The slot is gone for the next visitor…
     let after = body_string(get_day(&state, booking.as_str(), &date).await).await;
-    assert!(!after.contains(">09:00<"), "the slot must be taken: {after}");
+    assert!(
+        !after.contains(">09:00<"),
+        "the slot must be taken: {after}"
+    );
     // …and booking it through the conversation again says taken.
     let clash = post_chat_book(
         &state,
@@ -579,7 +579,10 @@ async fn booking_from_the_conversation_reserves_and_is_reversible_by_its_links()
     let text = body_string(cancelled).await;
     assert!(text.contains("cancelled"), "{text}");
     let freed = body_string(get_day(&state, booking.as_str(), &date).await).await;
-    assert!(freed.contains(">09:00<"), "cancelling frees the time: {freed}");
+    assert!(
+        freed.contains(">09:00<"),
+        "cancelling frees the time: {freed}"
+    );
     // A cancelled appointment has nothing left to import.
     assert_eq!(
         get_on(&state, &subdomain, &ics).await.status(),
@@ -592,8 +595,7 @@ async fn a_conversation_booking_is_scoped_to_the_serving_site() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "chat-book-scope-a").await;
     let stranger = fresh_account(&store, "chat-book-scope-b").await;
-    let (_site_a, booking_a, sub_a) =
-        live_site_with_booking(&owner, "cb-scope-a", &[], true).await;
+    let (_site_a, booking_a, sub_a) = live_site_with_booking(&owner, "cb-scope-a", &[], true).await;
     let (_site_b, _booking_b, sub_b) =
         live_site_with_booking(&stranger, "cb-scope-b", &[], true).await;
     let day = wednesday_ahead();
@@ -658,8 +660,7 @@ async fn a_conversation_booking_is_scoped_to_the_serving_site() {
 async fn a_conversation_booking_refuses_bad_input_with_the_stores_own_words() {
     let (store, state) = harness().await;
     let owner = fresh_account(&store, "chat-book-guards").await;
-    let (_site, booking, subdomain) =
-        live_site_with_booking(&owner, "cb-guards", &[], true).await;
+    let (_site, booking, subdomain) = live_site_with_booking(&owner, "cb-guards", &[], true).await;
     let day = wednesday_ahead();
     let date = day
         .format(&time::macros::format_description!("[year]-[month]-[day]"))

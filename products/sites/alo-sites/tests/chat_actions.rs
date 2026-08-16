@@ -257,7 +257,14 @@ async fn leads_record_their_entries_and_only_on_the_serving_hosts_tenant() {
         "email": "vera@newco.example",
         "company": "Newco BV",
     });
-    let response = post_json(&state, &sub, "/_alo/chat/lead", "203.0.113.83", lead.clone()).await;
+    let response = post_json(
+        &state,
+        &sub,
+        "/_alo/chat/lead",
+        "203.0.113.83",
+        lead.clone(),
+    )
+    .await;
     assert_eq!(json_body(response).await["state"], "lead_saved");
     // The same address again: CRM answers "we know you", and the transcript
     // records that one bit — never which record.

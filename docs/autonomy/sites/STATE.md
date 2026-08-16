@@ -8537,3 +8537,62 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   the screen edits capacity only, as the routes do. No new route prefix
   (`/sites/*` already proxied) — no Caddy note.
 - **Next:** S3.04g — the arc: bot → offer → pay → ticket/contact/invoice.
+
+## 2026-08-16 — S3.04g The bot sells tickets at the list's price
+
+- **Item:** S3.04g — the arc: a visitor asks the bot about an event, is
+  offered tickets at a price read from the catalog, pays on the provider's
+  page, and the ticket, the contact and the invoice all exist. No price the
+  model invented.
+- **What shipped:**
+  - **The contract (`alo-ai::site_chat`):** a third action verb. The prompt
+    now carries a numbered "Ticketed events:" list — labels only ("name —
+    UTC day"), **no price ever enters the prompt** — and the rules gain the
+    tickets sentence ("never state a price or how many seats are left
+    yourself"). `SiteChatReply::OfferTickets{event}`, refusal
+    `UnknownEvent`, `{"tickets":N}` in the strict parse; two acts in one
+    reply (or an act beside a refusal) still refuses, and `pay`/`charge`/
+    `invoice` remain shape errors — the vocabulary stays closed in code.
+  - **The transcript (`site_chat_actions`, migration 0332):** kind
+    `tickets_offered` (expand-only CHECK widen), fact = the same label the
+    visitor and model saw; `NewChatAction::tickets_offered`.
+  - **The endpoint (`serve/chat.rs`):** reads `public_ticket_events` beside
+    the bookable services (labels to the model, the full offer kept
+    server-side), answers `{"state":"tickets","event":{name, when, price,
+    soldOut},"offerPath":"/tix/{id}"}` — the price formatted from the
+    seam's cents at THIS read, exactly as the offer page will show it — and
+    records the offer on the tenant's transcript. A failed events read
+    answers without tickets rather than not at all.
+  - **The widget:** the `tickets` state rendered like the booking offer —
+    name and day, the price per seat, and a "Get tickets" link to the
+    shop's own checkout; three new data-* words (EN/FR/NL, two reused from
+    the shop). Byte budget raised 19 KiB → 20 KiB with the rationale in the
+    test's comment history (the tickets card is ~0.9 KiB).
+  - **Web transcript screen:** `tickets_offered` sentence ("Offered tickets
+    for “X” at the price list's own price") + Ticket icon, EN/FR/NL.
+- **Verified:** DB pruned (2 641 tenants); fmt; clippy `-p alo-store -p
+  alo-ai -p alo-sites --all-targets` exit 0 (only the two pre-existing
+  `meet.rs` type-complexity survivors); test-binary build via the
+  sanctioned background+marker form (25 m 28 s); `cargo nextest run` on the
+  three crates **2 516/2 516 green** (1 pre-existing skip, 32 s);
+  `cargo check -p alo-jmap` clean. Web: tsc, eslint, vitest **927/927**,
+  build — all clean. The item's own proof is
+  `tests/chat_ticket_arc.rs` (in-process axum + real postgres + the
+  OpenAI-wire fixture + the fixture payment provider): ask → `tickets`
+  state priced €85.00 from the seam → the recorded prompt contains the
+  event list and **no price shape at all** (85.00/85,00/8500/€ all absent)
+  while the canned model reply is only `{"tickets":1}` → transcript holds
+  `tickets_offered` with the label → the reply's own offerPath → buy form →
+  303 to the hosted page → paid → webhook → claim + fulfil → the ticket
+  names the buyer, the invoice references the order (paid 8 500 cents, VAT
+  carved out), the CRM deal exists ("Ticket sale — Venue"). The wall: the
+  same `{"tickets":1}` on a site with nothing on sale is refused — a model
+  reply can only index the serving Host's own list.
+- **Cuts/flags:** the conversation offers and links; it does not hold seats
+  in-chat (ADR 0040 §2 allows a short hold, but the shop's checkout already
+  holds at POST — a second hold path would be a second copy of that
+  machinery for no visitor benefit). The web transcript case is a pure
+  label mapping exercised by tsc; no new vitest (the booking twin's test
+  covers the pattern). No new routes, no Caddy note.
+- **Next:** S3.05a — simple stock items over Inventory's seam (S3.04e
+  stays blocked on the human-arranged tax review; S3.04h needs its ADR).

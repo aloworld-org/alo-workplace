@@ -410,10 +410,17 @@ async fn settle(
 /// The facts every surface states about an event: when it is, what one seat
 /// costs, and — only when they are gone — that the seats are gone.
 fn push_event_facts(out: &mut String, event: &PublicTicketEvent, strings: &UiStrings) {
-    out.push_str(&format!("<p class=\"tix-when\">{}</p>\n", esc(&when(event))));
+    out.push_str(&format!(
+        "<p class=\"tix-when\">{}</p>\n",
+        esc(&when(event))
+    ));
     out.push_str(&format!(
         "<p class=\"tix-price\">{} {}</p>\n",
-        esc(&format_price(event.unit_price_cents, &event.currency, strings)),
+        esc(&format_price(
+            event.unit_price_cents,
+            &event.currency,
+            strings
+        )),
         esc(strings.tix_per_seat)
     ));
     if event.remaining <= 0 {
@@ -462,8 +469,9 @@ fn push_buy_form(out: &mut String, event: &PublicTicketEvent, strings: &UiString
 }
 
 /// The event's start as a UTC day and wall clock — the venue's own zone is a
-/// journaled cut carried from S3.04d.
-fn when(event: &PublicTicketEvent) -> String {
+/// journaled cut carried from S3.04d. Shared with the conversation's tickets
+/// offer ([`super::chat`]), which states the same instant the same way.
+pub(super) fn when(event: &PublicTicketEvent) -> String {
     let start = event.starts_at.to_offset(time::UtcOffset::UTC);
     format!(
         "{} {:02}:{:02} UTC",

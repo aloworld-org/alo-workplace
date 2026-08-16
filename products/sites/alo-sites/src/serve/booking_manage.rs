@@ -79,12 +79,7 @@ pub(super) async fn show(
             esc(strings.booking_cancel)
         ));
     }
-    page(
-        StatusCode::OK,
-        strings,
-        strings.booking_manage_title,
-        &body,
-    )
+    page(StatusCode::OK, strings, strings.booking_manage_title, &body)
 }
 
 /// The cancellation itself.

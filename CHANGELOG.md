@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **Your website's assistant now sells your tickets — at your price list's
+  price, never its own.** When a visitor asks about an event, the assistant
+  points them at that event's own ticket page, showing the name, the day and
+  the price read live from your price list at that moment — the AI only picks
+  which event fits the question and can never state a price, a discount or a
+  seat count itself. The purchase happens on the shop's checkout as always
+  (payment on your provider's page), and afterwards the ticket, the customer
+  in CRM and the invoice in Billing all exist, exactly as for any other sale.
+  Each offer appears on the assistant's action transcript with the event it
+  named. In English, French, and Dutch.
 - **You can now run your box office from the website editor.** A Tickets
   screen on each site lists your ticketed events with the price read live from
   your own price list, how many seats are sold, on hold, and left; you create

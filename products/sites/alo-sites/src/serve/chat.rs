@@ -33,6 +33,12 @@
 //! - `{"state":"lead"}` — the visitor asked to be contacted (S3.03d): the
 //!   widget shows its own name-and-address form, and the capture itself is
 //!   `POST /_alo/chat/lead` ([`super::chat_lead`]) — again offer, never act.
+//! - `{"state":"tickets","event":{…},"offerPath":…}` — the visitor asked
+//!   about a ticketed event (S3.04g): the reply carries that event's name,
+//!   day and **the price the catalog seam answers at this instant** — never
+//!   a number from the model (ADR 0041) — plus the path of the shop's own
+//!   offer page, where the purchase actually happens. Money always leaves
+//!   the conversation (ADR 0040 §2): there is no buy verb on this surface.
 //! - `{"state":"refusal","contactPath":…}` — the assistant will not answer
 //!   this question (nothing retrievable, an uncited reply, a booking offer
 //!   for a service never listed, or the model's own refusal — deliberately
@@ -62,8 +68,8 @@ use serde_json::json;
 
 use alo_ai::{SiteChatError, SiteChatRefusal, SiteChatReply, SiteChatVoice};
 use alo_store::{
-    ChatActionCitation, ChatGate, NewChatAction, PublicBookingService, PublishedSite,
-    SiteChatAppearance, chat_month_key, local_day, local_wall_clock,
+    ChatActionCitation, ChatGate, NewChatAction, PublicBookingService, PublicTicketEvent,
+    PublishedSite, SiteChatAppearance, chat_month_key, local_day, local_wall_clock,
 };
 use time::OffsetDateTime;
 
@@ -226,6 +232,23 @@ async fn answer(
         .iter()
         .map(|service| service.published.name.clone())
         .collect();
+    // What is on sale here (S3.04g): the shop's upcoming events, priced by
+    // the catalog seam right now. The model is shown labels only — the
+    // price never enters the prompt, so there is no price for it to
+    // restate; what the visitor sees is this read's own number. A failed
+    // read answers without tickets rather than not at all.
+    let ticket_events = match state
+        .store
+        .public_ticket_events(site, OffsetDateTime::now_utc())
+        .await
+    {
+        Ok(events) => events,
+        Err(error) => {
+            tracing::error!(site = %site.site, %error, "chat ticket events read failed");
+            Vec::new()
+        }
+    };
+    let event_labels: Vec<String> = ticket_events.iter().map(event_label).collect();
     // The tenant's voice (ADR 0040 §5): tone and note shape the prompt's
     // style guidance — the answering rules stay absolute in `alo-ai`. A
     // failed read answers in the default voice rather than not at all.
@@ -234,7 +257,16 @@ async fn answer(
         tone: appearance.tone,
         note: appearance.tone_note.as_deref(),
     };
-    match alo_ai::answer_site_question(&config, question, &corpus, &service_names, &voice).await {
+    match alo_ai::answer_site_question(
+        &config,
+        question,
+        &corpus,
+        &service_names,
+        &event_labels,
+        &voice,
+    )
+    .await
+    {
         Ok(SiteChatReply::Answer { text, citations }) => {
             record_spend(state, site, month).await;
             // The fact's sources, resolved once: what the wire cites is
@@ -286,6 +318,27 @@ async fn answer(
             record_lead_offer(state, site).await;
             record_action(state, site, &NewChatAction::lead_offered()).await;
             state_json(StatusCode::OK, json!({"state": "lead"}))
+        }
+        // The model may only *point at* a ticketed event it was shown
+        // (S3.04g): everything the visitor sees — the price, the sold-out
+        // truth, the checkout — is this read of the catalog seam and the
+        // shop's own pages, never the model (ADR 0041). The transcript's
+        // fact is the same label the visitor got.
+        Ok(SiteChatReply::OfferTickets { event }) => {
+            record_spend(state, site, month).await;
+            match ticket_events.get(event - 1) {
+                Some(event) => {
+                    record_action(
+                        state,
+                        site,
+                        &NewChatAction::tickets_offered(&event_label(event)),
+                    )
+                    .await;
+                    tickets_state(site, event)
+                }
+                // The list changed between the read and the reply.
+                None => unavailable_state(state, site).await,
+            }
         }
         Ok(SiteChatReply::Refusal(refusal)) => {
             // An off-topic question refused at retrieval never reached the
@@ -390,6 +443,44 @@ pub(super) async fn booking_state(
             "direct": direct,
             "formPath": format!("/b/{}", service.published.booking_id.as_str()),
             "days": days,
+        }),
+    )
+}
+
+/// One ticketed event's label, as both the prompt and the transcript carry
+/// it: the price list's name and the event's UTC day — the tenant's own
+/// published facts, never a price.
+fn event_label(event: &PublicTicketEvent) -> String {
+    let start = event.starts_at.to_offset(time::UtcOffset::UTC);
+    format!(
+        "{} — {:04}-{:02}-{:02}",
+        event.name,
+        start.year(),
+        u8::from(start.month()),
+        start.day()
+    )
+}
+
+/// The `tickets` state: one upcoming event the visitor may buy seats to, on
+/// the shop's own pages. Every number is this request's read of the catalog
+/// seam — the model contributed only which event to name. `price` is
+/// pre-formatted server-side so the widget renders it verbatim, exactly as
+/// the offer page will.
+fn tickets_state(site: &PublishedSite, event: &PublicTicketEvent) -> Response {
+    let strings = crate::render::strings_for(&site.default_locale);
+    let price =
+        crate::render::money::format_price(event.unit_price_cents, &event.currency, strings);
+    state_json(
+        StatusCode::OK,
+        json!({
+            "state": "tickets",
+            "event": {
+                "name": event.name,
+                "when": super::tickets::when(event),
+                "price": price,
+                "soldOut": event.remaining <= 0,
+            },
+            "offerPath": format!("/tix/{}", event.id.as_str()),
         }),
     )
 }
