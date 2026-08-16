@@ -211,19 +211,20 @@ list views over the same data, personal and team. ADRs 0021–0023.
   - [L] Grid + formula engine, multi-sheet, cell formatting, number formats, alignment, merge, freeze panes
   - [L] Open a real `.xlsx` → best-effort import; **export any sheet back to `.xlsx`**
   - [2] Pivot tables, sorting/filtering, data validation (Univer plugins, wired incrementally)
-  - [2] ★ **Charts — a decision, not a wiring job.** This line used to sit with
-    the others above and it was wrong to. The Univer preset list `SheetEditor`
-    registers has no chart among its eleven, and the only implementation in
-    that ecosystem is **`@univerjs-pro/sheets-chart` — a Univer *Pro* package
-    with no `license` field**, present in `node_modules` only as a transitive
-    dependency and imported nowhere. So today a chart cannot be created, cannot
-    be imported (`importOffice.ts` reads `.xlsx` into `cellData` and drops them
-    by construction) and cannot be exported. Three ways forward, in order of
-    preference: **build charts natively** as alo's own feature over the grid;
-    **adopt the Pro plugin under an ADR**, which means a commercial dependency
-    inside a sovereignty product and is the decision that needs arguing; or
-    leave sheets chartless and answer chart questions in Insights, which has
-    its own typed `ChartSpec` path ([BI-1]) and no such problem.
+  - [2] ★ **Charts, owned by alo rather than by the grid engine (ADR 0051)** —
+    bar, line and pie over a range you pick, drawn by the chart engine alo
+    already ships (Apache ECharts, Apache-2.0, already bundled and already
+    themed for Insights). A chart is **alo's own record** — kind, title, and
+    the ranges it reads — stored beside the Univer snapshot rather than inside
+    it, so it survives an engine change and cannot be held hostage by a
+    plugin. It stores **ranges, not values**, so a chart can never disagree
+    with the cells it came from. Deliberately *not* `@univerjs-pro/sheets-chart`:
+    a commercial licence in a sovereignty product, for a renderer we already
+    own outright.
+  - Known honest limit on charts: **a chart does not survive a round-trip to
+    Excel.** Import reads `.xlsx` into cells and drops chart parts by
+    construction; export writes none. Worth having anyway, and worth saying
+    plainly rather than discovering.
   - Known honest limits: **VBA macros do not run**; complex `.xlsx` styling/charts may not survive import (see product doc §6)
 
   **alo Slides (PowerPoint-like)** — native canvas built in-house (no open engine covers it; ADR 0033)
