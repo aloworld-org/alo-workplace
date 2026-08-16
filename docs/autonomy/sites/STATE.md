@@ -9182,3 +9182,67 @@ state looks pathological — 42 h CPU on an 8-day uptime); (3) failing those,
   shop setup/Billing rather than duplicating a receive flow.
 - **Next:** S3.06 — the wave review (S3.04e stays `[!]` blocked on the
   human-arranged tax review).
+
+## 2026-08-16 — S3.06a The re-walk: the assistant's doors held, the shop's did not
+
+- **Item:** S3.06a — Wave-3 security reconciliation, first slice of the wave
+  review. S3.06 bundled four items' worth (arcs, accessibility, docs, and
+  this); split a–d in QUEUE.md on the S2.16 precedent, and took the slice two
+  prior items had explicitly flagged work into (S3.05b3 cut 4, S3.05c cut 3).
+- **The walk:** every authenticated route Wave 3 added, checked at both
+  mounts against the site-editor grant (S2.03a) and the S2.16a line —
+  "the middleware decides the surface, the handler decides the door."
+  - **Held:** all six `chat-*` handlers and all three `chat-knowledge`
+    handlers go through `require_site_manager` (spend ceiling is money,
+    knowledge is publish-to-the-internet, ADR 0040); the shop-setup
+    proposal door sits on a static path the collaborator allowlist never
+    matches; the S3.01 editing/palette routes are page editing — the
+    invited job — and `sites_palette` reads only the tenant's own site.
+  - **Did not hold:** `GET ticket-products` and `GET shop-products`
+    answered a collaborator with the tenant's WHOLE active Billing price
+    list through the catalog seam — the door the role exists to close
+    (the S3.05c flag's "same facts the catalog picker shows" was wrong:
+    site catalogs are Sites-owned typed prices; no pre-Wave-3 editor-open
+    route read `billing_catalog_read`). And the sale verbs — event
+    create/capacity/delete, shelf add/remove, the delivery rate PUT —
+    let an invited outsider change what the business sells.
+- **Fix:** `require_commerce_site` in sites.rs (require_site + manager,
+  refusal spoken: "Only this website's owner can change what it sells and
+  charges.") on both pickers and all six write verbs. Kept editor-open, as
+  a decision not an accident: GET tickets / shop-items / shop-settings —
+  facts the published pages state to strangers, and what the page editor's
+  section forms read (SectionForm uses only ticketEvents/shopItems). Web:
+  ShopView/TicketsView fetch the site detail first and skip the picker for
+  a collaborator, hide add/capacity/delete/delivery-change, and state
+  read-only in words (`sitesCommerceReadOnly`, en/fr/nl); the Shop-setup
+  button joins the assistant behind `canManageCollaborators` in SiteView.
+- **Shipped:** guard + refusals in sites.rs, sites_tickets.rs,
+  sites_shop_items.rs, sites_shop_settings.rs (module docs updated); the
+  matrix pin test extended over the whole Wave-3 surface (3 new editor-OK
+  reads, 6 new per-handler 403s, 5 write-verb 403s, the propose door 403
+  — all at `/api`); web views + 2 new vitest tests (collaborator sees
+  read-only, picker never asked for) + owner-detail fallback in both test
+  harnesses; design-doc matrix paragraph; CHANGELOG entry; QUEUE split.
+- **Verified:** DB pruned (1 576 gone); fmt; clippy `-p alo-jmap
+  --all-targets` exit 0 across two calls (ceiling split, only the two
+  pre-existing alo-store type_complexity survivors); test-binary build via
+  the sanctioned marker form; **`cargo nextest run -p alo-jmap` 1 248/1 248
+  green** (78 s, DATABASE_URL exported per the S3.05c gate note) incl. the
+  extended matrix test knocking every new door at the `/api` mount through
+  the real router+middleware+DB — the same proof standard S2.16a used; no
+  new routes, so no live-server pass. Web: tsc clean, eslint clean,
+  `vitest run src/sites` **303/303** (one pre-existing test disambiguated:
+  the header Add button and the empty-shelf CTA share a name and now
+  appear in the same commit), `npm run build` clean.
+- **Cuts/flags:** (1) A collaborator opening Shop/Tickets sees rows priced
+  through the Billing seam — but only for items already on public sale;
+  the price is on the published page. Stated in the matrix rather than
+  discovered. (2) `chat-actions` (the bot's transcript) stays owner-only —
+  it was shipped that way under ADR 0040 and the walk confirms rather than
+  widens; if answering-enquiries-via-bot becomes a collaborator job, that
+  is a product decision for the invite screen first. (3) The read-only
+  screens' assistive-tech surfacing (aria-live on the hint, etc.) is named
+  in S3.06b. (4) ShopSetupView still fetches `ticketProducts` eagerly; a
+  collaborator navigating there by URL gets an honest error banner and the
+  button is hidden — S3.06b may soften further.
+- **Next:** S3.06b — accessibility, responsiveness and language parity.

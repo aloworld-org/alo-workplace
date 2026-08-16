@@ -1414,6 +1414,25 @@ What it found and what it fixed:
   yet) and `POST /sites/domain-payments/settle`, which carries the deployment's
   settlement secret because a tenant may not declare their own payment
   settled. Both are documented at their handlers.
+- **The Wave-3 re-walk (S3.06a).** The assistant's doors all held: every
+  `chat-*` route — the switch and monthly spend ceiling, appearance, the
+  action transcript, the Public-knowledge collection — is owner-only by its
+  own handler (ADR 0040), and the shop-setup proposal, which names Billing
+  prices and VAT, sits on a static path the collaborator allowlist never
+  matches. The commerce doors did not hold: the ticket and shop pickers
+  (`ticket-products`, `shop-products`) answered a collaborator with the
+  tenant's whole active price list — a Billing read the role exists to
+  close — and the sale verbs (event create/capacity/delete, shelf
+  add/remove, the delivery rate) let an invited outsider change what the
+  business sells. All of those are now owner-only through
+  [`require_commerce_site`], with the refusal spoken: what a website sells
+  and charges is the business's decision, not the website builder's. What
+  stays a collaborator's read — the event list, the shelf as listed, and the
+  delivery rate — are facts the published pages already state to strangers,
+  and what the page editor's section forms need. The pin test knocks on the
+  whole Wave-3 surface at the `/api` mount, and the Shop and Tickets screens
+  degrade to a stated read-only view for a collaborator rather than
+  discovering the refusals one click at a time.
 
 ## Out of scope (v1 — cuts are decisions)
 

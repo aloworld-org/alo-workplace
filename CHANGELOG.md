@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Invited website collaborators can no longer see your price list or change
+  what you sell.** A person you invite to edit a website could, until now,
+  open the ticket and shop pickers — which list every product on your
+  Billing price list with its price — and add, remove or reprice what the
+  site sells, including the delivery rate. Those doors are now owner-only:
+  collaborators still see what is already on sale (the facts your public
+  pages state anyway) but read-only, and the Shop and Tickets screens say so
+  instead of failing click by click. The assistant's settings and the
+  shop-setup proposal were already owner-only.
 - **Your site now has a Shop screen, and pages a Shop block to match.** Under
   the new "Shop" button, pick which stocked products your site sells: each
   row shows the name and price from your Billing price list and what is on
