@@ -52,7 +52,7 @@ propose/approve UI); each agent is a thin, product-scoped tool set + prompt.
 - [2] ★ **Agenda (Calendar) agent** — find times, schedule, summarize the day/week, prep a meeting, propose events from mail *(reads built)*
 - [2] ★ **Chat agent** — catch up on a room, find what was said and where it was decided *(reads built)*
 - [2] ★ **Drive agent** — find & organise files, summarize a document, extract from attachments *(find built)*
-- [2] ★ **Sheet agent** — formulas from intent, analysis, clean/transform data, chart-from-intent
+- [2] ★ **Sheet agent** — formulas from intent, explain a formula, clean a column, answer from the data with the cells cited *(built)*. **Chart-from-intent is not here**, and deliberately: an agent cannot propose a chart into a product that has no charts (see alo Sheets below). It returns when charts do.
 - [2] ★ **Website (Sites) agent** — answer from the live site ("what do we promise on pricing?"), draft and edit a page, translate the whole site, review SEO; publishing is proposed, never silent (ADR 0036)
 - [2] ★ **Insights agent** — answer from the numbers, explain a change, build a report
 - [L] ★ **Billing agent** — invoice, convert a quote, chase *(built, wave B1)*
@@ -210,7 +210,20 @@ list views over the same data, personal and team. ADRs 0021–0023.
   **alo Sheets (Excel-like)** — alo's own ribbon UI on **Univer** (Apache-2.0)
   - [L] Grid + formula engine, multi-sheet, cell formatting, number formats, alignment, merge, freeze panes
   - [L] Open a real `.xlsx` → best-effort import; **export any sheet back to `.xlsx`**
-  - [2] Charts, pivot tables, sorting/filtering, data validation (Univer plugins, wired incrementally)
+  - [2] Pivot tables, sorting/filtering, data validation (Univer plugins, wired incrementally)
+  - [2] ★ **Charts — a decision, not a wiring job.** This line used to sit with
+    the others above and it was wrong to. The Univer preset list `SheetEditor`
+    registers has no chart among its eleven, and the only implementation in
+    that ecosystem is **`@univerjs-pro/sheets-chart` — a Univer *Pro* package
+    with no `license` field**, present in `node_modules` only as a transitive
+    dependency and imported nowhere. So today a chart cannot be created, cannot
+    be imported (`importOffice.ts` reads `.xlsx` into `cellData` and drops them
+    by construction) and cannot be exported. Three ways forward, in order of
+    preference: **build charts natively** as alo's own feature over the grid;
+    **adopt the Pro plugin under an ADR**, which means a commercial dependency
+    inside a sovereignty product and is the decision that needs arguing; or
+    leave sheets chartless and answer chart questions in Insights, which has
+    its own typed `ChartSpec` path ([BI-1]) and no such problem.
   - Known honest limits: **VBA macros do not run**; complex `.xlsx` styling/charts may not survive import (see product doc §6)
 
   **alo Slides (PowerPoint-like)** — native canvas built in-house (no open engine covers it; ADR 0033)

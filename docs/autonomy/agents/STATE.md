@@ -3628,11 +3628,45 @@ GB is below what a full `nextest --no-run` needed the last time it failed with
 `LNK1180`. The next `alo-store` gate on this box — this track's or another's —
 fails on space before it fails on anything else. That is a human fix too.
 
-**LOOP HALT: agents queue closed (only A2.2b remains, blocked on a chart
-decision only a human can take) and C: at 5.8 GB free, below what the next
-alo-store gate needs.**
+**LOOP HALT (resolved 2026-08-16 — see the closing entry below).**
 
 To restart this track a human must do one of: adopt a commercially licensed
 chart plugin under an ADR, build charts natively as their own feature, or drop
 chart-from-intent and queue new work. Recommendation unchanged — drop it, and
 free disk before the next build.
+
+
+---
+
+## LOOP COMPLETE — the queue is closed, and both of its blockers with it (2026-08-16)
+
+The halt above named two things a loop could not do for itself. Both are done.
+
+**The disk.** C: had fallen to **320 MB** — well past the 5.8 GB the halt warned
+about — and Docker was wedged exactly as this journal predicted it would be:
+`docker ps` and `docker system df` hanging rather than erroring, because the
+daemon stops answering when it cannot write. Recovered to **28 GB** by removing
+two idle checkouts' `target/` directories (25.5 GB and 13.4 GB — no build was
+running in either) and pruning 7.9 GB of unused Docker images, containers and
+build cache. Docker restarted and answers again; `alo-pg` is up and the test
+database is 241 MB.
+
+**A2.2b is dropped rather than deferred.** The finding was right and complete —
+alo Sheets cannot hold a chart at all, through create, import or export — but
+the conclusion drawn from it was one level off. This was never an agent item.
+**An agent cannot propose a chart into a product that has no charts**, so no
+amount of agent work unblocks it, and holding a finished queue open on a Sheets
+decision would have kept it open indefinitely.
+
+It now lives in `features.md` under alo Sheets, where it was already listed —
+wrongly — beside pivot tables and data validation as though it were a wiring
+job. That line is corrected: the three ways forward are building charts
+natively, adopting the Pro plugin under an ADR (a commercial dependency inside a
+sovereignty product, which is the argument that has to be had), or leaving
+sheets chartless and answering chart questions in Insights, which has its own
+typed `ChartSpec` path and none of this problem.
+
+The Sheet agent's `features.md` entry now says plainly that chart-from-intent is
+absent and why, so nobody reads its absence as an oversight.
+
+**LOOP COMPLETE: 20 items shipped, 1 dropped with its reasoning, 0 blocked.**
