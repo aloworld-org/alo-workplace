@@ -540,7 +540,28 @@ Before C2.1 can start:
   |---|---|---|
   | `news.alomails.com` TXT | `v=spf1 ip4:159.195.89.28 -all` | authorises the campaign IP and nothing else |
   | `<selector>._domainkey.news.alomails.com` TXT | the DKIM public key | generated **on the sending host**; the private half never leaves it |
-  | `_dmarc.news.alomails.com` TXT | `v=DMARC1; p=none; rua=…` | starts the new identity in report-only while the parent stays at `quarantine` |
+  | `_dmarc.news.alomails.com` TXT | `v=DMARC1; p=none; adkim=s; aspf=s; rua=…` | report-only while the parent stays at `quarantine`, and **strict alignment from the start** |
+
+  **Published 2026-08-17** and verified at Google and the registrar's own
+  resolvers: SPF, the 410-character DKIM key (byte-identical to the generated
+  one, decoding to a well-formed RSA-2048 DER key, so not silently truncated by
+  the 255-byte TXT string limit), and the subdomain DMARC. The parent's
+  `v=spf1 mx -all` and `p=quarantine` were not touched.
+
+  **Alignment is strict from the first day, deliberately.** A subdomain policy
+  record carries no alignment tags by default, which means relaxed — and under
+  relaxed a message `From: @news.alomails.com` can pass DMARC on a DKIM
+  signature of `d=alomails.com`, because the two share an organizational domain.
+  That would let the campaign identity authenticate with the transactional key,
+  which is the separation the second IP exists to create. Strict costs nothing
+  while `p=none` only reports, and tightening `p=` later then changes one
+  variable instead of two.
+
+  Watch during warm-up rather than before it: a VERP return path for
+  per-recipient bounce attribution (C2.10) lives at a sub-subdomain and will not
+  align under `aspf=s`. DMARC passes if **either** identifier aligns, so a
+  correct `d=news.alomails.com` signature carries it — and the `p=none` reports
+  will say so before anything is enforced.
 
   That last row is load-bearing and easy to miss: `_dmarc.alomails.com` carries
   **no `sp=` tag**, so subdomains inherit `p=quarantine` today. Warming a new
