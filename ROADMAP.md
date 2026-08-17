@@ -463,6 +463,66 @@ abbreviations on an axis (BI1.08).
 Later waves (post-traction, unordered): manufacturing-lite, POS, subscriptions,
 e-signature (eIDAS), marketing sends, storefront, DATEV/PSD2 integrations.
 
+## Order track — the goods half of the business (ADR to write) ⇄ after Campaigns C1
+
+**What is missing, stated plainly.** alo has the money half of an ERP and not the
+goods half. Walking the live flow on 2026-08-17 with a fan manufacturer's data,
+a EUR 29,736.96 order went quote to invoice in one step: nothing was reserved,
+nothing was picked, and no stock moved. In Odoo or SAP that same acceptance
+would have created a sales order, reserved the parts and produced a delivery
+note.
+
+```
+Odoo / SAP:  quote -> SALES ORDER -> production -> DELIVERY -> invoice
+alo today:   quote  ----------------------------------------> invoice
+```
+
+The consequence is not cosmetic: there is no record of **ordered but not yet
+delivered**, which for a manufacturer is most of the business at any moment.
+The order book cannot be answered, a fan can be sold twice, and an invoice is
+raised for goods that may never have shipped.
+
+**Prerequisite: an ADR, before any of O1.** It decides three things a queue must
+not decide for itself — whether the sales order is a new object or an invoice in
+another state; whether reservation is soft (a promise) or hard (stock moved into
+a holding location); and whether invoicing follows the *order* or the
+*delivery*, which is the difference between billing what was promised and
+billing what left the building. Write it first; the S2.15 domain build shipped
+without its ADR and the review had to be retrofitted.
+
+**A quote for services must still become an invoice directly.** Products already
+carry `stocked`; a quote of consultancy days has nothing to reserve or deliver,
+and routing it through an order would add a step that serves nobody. The order
+exists for the lines that move.
+
+Migrations take the **`07xx`** block (campaigns `05xx`, mail/platform `06xx`).
+
+### Wave O1 - order, reservation and delivery
+
+- [ ] O1.0 The ADR above. No code in this item.
+- [ ] O1.1 The sales order: created from an accepted quote whose lines include stocked goods, carrying ordered quantity per line and what has been reserved, delivered and invoiced so far. The order is the thing that answers "where is this?" and every later item hangs off it.
+- [ ] O1.2 Accepting a quote routes by content - an order where lines are stocked, an invoice draft where they are not. Today's direct-to-invoice path stays exactly as it is for services, and a test pins that so the change cannot regress the flow that already works.
+- [ ] O1.3 Reservation against inventory: confirming an order reserves its stocked lines, and the reserved quantity is visible beside on-hand and on-order. **A fan promised twice is the failure this exists to prevent** - the wrong-tenant test has a sibling here, an over-commitment test.
+- [ ] O1.4 Delivery notes: goods leave against an order, stock moves through the existing `record_move`, partial deliveries are normal rather than exceptional, and the note is a document a driver can carry.
+- [ ] O1.5 Invoice from what was delivered, not from what was ordered - with the order line carrying the invoiced quantity so a part-delivered order bills correctly and the remainder stays visible.
+- [ ] O1.6 The order book: ordered, reserved, delivered, invoiced and outstanding, per order and in total. This is the screen a manufacturer opens first in the morning and the one alo cannot draw today.
+- [ ] O1.7 The Orders agent: answer where an order is, what is short, and what can ship today - reads, answering in the room, per ADR 0047.
+
+### Exit gate - O1 done when:
+
+- [ ] The fan quote from the walkthrough becomes an order, reserves six AF-630s, ships four on one note and two on another, and bills each delivery - with the order book showing the remainder at every step
+- [ ] Stock cannot be committed twice, proven by a test rather than by care
+- [ ] A services quote still becomes an invoice directly, unchanged
+
+### Wave O2 - making the thing *(not started; needs O1)*
+
+Bill of materials, works orders and capacity. A manufacturer that can take an
+order it cannot build has moved the problem rather than solved it - but an order
+book with no reservation is the more urgent absence, and O1 is worth shipping
+before this begins.
+
+---
+
 ## Campaigns track — bulk email that cannot poison the mailbox (ADR 0044) ⇄ after the Agent track
 
 Ordered so the half blocked on a purchase does not block the half that is not.

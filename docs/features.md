@@ -66,6 +66,24 @@ propose/approve UI); each agent is a thin, product-scoped tool set + prompt.
 
 ---
 
+## Orders and delivery - the goods half (ADR to write)
+
+alo bills well and ships nothing. A quote becomes an invoice in one step, so
+there is no record of **ordered but not yet delivered** - which for anyone
+selling physical goods is most of the business at any moment. This is the
+clearest gap against Odoo and SAP and the honest reason not to claim parity for
+manufacturing yet.
+
+- [2] * **Sales order** - what a customer has ordered, and how much of it has been reserved, delivered and invoiced. Created when an accepted quote contains stocked lines; a services quote still becomes an invoice directly, because there is nothing to reserve or deliver.
+- [2] * **Reservation** - confirming an order commits stock, shown beside on-hand and on-order. Selling the same fan twice is the failure this prevents.
+- [2] * **Delivery notes** - goods leave against an order, stock moves, partial deliveries are ordinary, and the note is a document a driver can carry.
+- [2] * **Invoice what shipped, not what was promised** - a part-delivered order bills correctly and the remainder stays visible.
+- [2] * **The order book** - ordered, reserved, delivered, invoiced, outstanding. The screen a manufacturer opens first, and the one alo cannot draw today.
+- [3] * **Orders agent** - where is this order, what is short, what can ship today.
+- [3] Bill of materials, works orders and capacity. Taking an order you cannot build moves the problem rather than solving it, but an order book with no reservation is the more urgent absence.
+
+---
+
 ## alo Campaigns — bulk email that cannot poison the mailbox (ADR 0044)
 
 Mailchimp's weakness is that it is a separate company holding a copy of your
