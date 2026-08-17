@@ -143,3 +143,113 @@ anything about it" applies to the test runner too.
   put the trailer in the message before committing, not after.
 - **Next:** C1.2 — consent as a record (provenance, not a boolean), taking
   migration `0500`.
+
+---
+
+## C1.2 — consent as a record (2026-08-17)
+
+**Shipped.** Migration `0500_campaign_consent.sql`,
+`platform/alo-store/src/campaign_consent.rs` (the record and its history), and
+the gate itself inside `campaign_audience.rs`:
+`AccountStore::campaign_recipients` / `campaign_recipient_count`, which are the
+audience query with `consented_at IS NOT NULL` applied **inside** it.
+
+**The shape, and why it is this shape.**
+
+- **A table of events, keyed by address.** Every act of consent is its own row
+  and nothing is ever updated or deleted. "Did they agree" and "how do we know"
+  are different questions and only the second survives a complaint, so a person
+  who ticked a box in March and was re-confirmed by an import in June has two
+  rows and a question about June is answered with June's statement. Keyed by
+  address rather than by customer or deal because ADR 0044's claim is that
+  there is no list — the same person is a customer, a deal contact and a form
+  submitter at once, and the thing they agreed with is their address. It also
+  means the evidence outlives the record it came from.
+- **Three provenance columns, because a summary of them is not evidence.**
+  `source` (what kind of thing), `source_ref` (which one), `statement` (what
+  the tenant says they agreed to, in the tenant's words). `ConsentSource` is
+  deliberately *wider* than `AudienceSource` — it adds `import` and `manual` —
+  because ADR 0044 §2 calls imported lists the dangerous path, and a path that
+  cannot be named as itself cannot be treated as such. `Import` and `SiteForm`
+  must say which one (`requires_reference`); customer, deal and a colleague's
+  note may honestly have nothing to point at, and demanding a made-up reference
+  there buys a filled-in column rather than evidence.
+- **Two timestamps.** `occurred_at` is when the person agreed, `recorded_at`
+  when this workspace was told. An import carries consent obtained months
+  earlier, and dating it from the typing would overstate how fresh it is.
+  Consent dated more than five minutes ahead of the server clock is refused:
+  clock skew is not a lie, next year is.
+- **The gate is a type, not only a predicate.** `campaign_recipients` returns
+  `CampaignRecipient`, which holds a `ConsentEvidence` — not an
+  `Option<ConsentEvidence>` — and nothing converts an `AudienceMember` into one.
+  So a sender cannot be handed the audience by mistake, and code holding a
+  recipient is also holding the reason they are one. The SQL exclusion and the
+  type say the same thing twice, in the two places a mistake could be made.
+- **The audience still shows everybody**, each carrying their consent or the
+  absence of it, because C1.4 and C1.5 need the excluded people *named with the
+  reason* — a count with no visible exclusions is not auditable. One `Reach`
+  enum builds all four queries, so the page and the count cannot drift apart.
+- **The consent join is `DISTINCT ON (address) … ORDER BY occurred_at DESC, id
+  DESC`,** tie-broken on `id`: a campaign that reported a different provenance
+  on each refresh would be evidence of nothing.
+- **A partial consent triple is a decode error, not a default.** All three
+  joined columns come from one row of one table; inventing the missing part
+  would put a person into a send with provenance we made up.
+
+**Who may not be mailed, quoted rather than summarised.**
+
+- `campaign_consent_tenancy.rs::a_person_with_no_consent_record_cannot_be_a_recipient`
+  — three people the tenant knows well, one consent record: the audience is all
+  three, the recipients are one, and both counts agree. It then reads the
+  exclusions back by name (`hello@bravo.test`, `orders@acme.test`) and follows
+  the kept person's evidence id to the record, asserting the stored statement.
+- `a_neighbours_consent_does_not_make_our_address_mailable` — the sharpest case:
+  both tenants hold `orders@acme.test`, only the neighbour was given permission.
+  Our recipients are empty, our count is 0, and their evidence is not even
+  readable from here; asserted from both sides so a leak shows up as a named row.
+- `consent_for_somebody_no_source_holds_does_not_invent_a_recipient` — consent
+  is permission, not existence.
+- `a_record_that_is_not_evidence_is_refused_rather_than_stored` — a blank
+  statement, an import that cannot say where it came from, consent dated two
+  hours in the future, and an address that is not one; then it asserts the
+  customer is *still* unmailable, so a refusal that half-wrote would be caught.
+- `consent_recorded_in_any_casing_reaches_the_person_it_was_given_for` — the
+  deal spells them `Ann.Dupont@Example.TEST`, the consent arrives lowercased and
+  padded; one person, mailed once, because an unsubscribe of one copy would
+  never reach the other.
+- Unit tests: `only_the_recipients_queries_exclude_people_with_no_consent_record`
+  (the gate is in the recipients SQL and deliberately *not* in the audience
+  SQL), and `the_cursor_test_is_bracketed_so_the_consent_gate_cannot_be_ored_away`
+  — `WHERE a OR b AND c` binds as `a OR (b AND c)`, which would have returned
+  everybody on the first page of the recipients, invisible to any test that
+  reads one page of a fully-consented tenant.
+- The `contacts` promise is now carried by both modules: the audience's
+  `no_query_in_this_module_can_read_the_per_user_address_book` walks four
+  queries instead of two, and `campaign_consent.rs` has its own copy.
+
+**How verified.** `cargo fmt`; `SQLX_OFFLINE=true CARGO_PROFILE_TEST_DEBUG=0
+cargo clippy -p alo-store --all-targets` — clean for this change (the same two
+pre-existing `type_complexity` warnings in `meet.rs`, untouched); test binaries
+built in 4 m 32 s via the sanctioned background+marker form; `DATABASE_URL=…
+5432/alo_loop cargo nextest run -p alo-store` → **2 132 tests, all passed**
+(1 skipped), 81 s. The 6 new integration tests and 13 new/changed unit tests
+passed.
+
+**No CHANGELOG line, deliberately.** Nothing user- or operator-visible changed:
+this is store-side only, with no route and no screen, exactly as C1.1 was. The
+first campaigns CHANGELOG entry belongs to C1.5, when there is something to
+open.
+
+**Flag: `scripts/prune-test-db.sh` is hardcoded to database `alo`.** C1.1
+flagged that its *default* was wrong for this checkout; the sharper fact is that
+`DATABASE_URL` does not help — `psql_q()` passes `-d alo` literally, so the
+script cannot prune `alo_loop` at all. This iteration pruned by hand with the
+script's own statements against `alo_loop` (nothing was old enough to delete:
+5 913 tenants, 80 MB, all created within the cutoff by the loops running now).
+The fix is a one-line `-d "${ALO_PG_DB:-alo}"`, but the script is outside this
+item's write scope, so it is recorded here rather than changed.
+
+- **Cuts:** none.
+- **Next:** C1.3 — suppression, absolute and tenant-wide, excluded in SQL inside
+  `people_cte` alongside the consent join, with the test that an import cannot
+  resurrect a suppressed address. Migration `0501`.
