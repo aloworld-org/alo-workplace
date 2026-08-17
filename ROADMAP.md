@@ -557,6 +557,14 @@ Before C2.1 can start:
   while `p=none` only reports, and tightening `p=` later then changes one
   variable instead of two.
 
+  **Strict alignment makes three things exact, and the sender must be built for
+  it** — this is a constraint on C2.1's code half, not a DNS detail. All three
+  must be exactly `news.alomails.com`, with no parent domain and no deeper
+  label: the **From: header domain**, the **envelope-from** (`aspf=s`), and the
+  DKIM **`d=`** (`adkim=s`). A sender that defaults its bounce domain elsewhere
+  fails alignment even while SPF and DKIM each pass on their own, which is the
+  confusing failure to expect — two green checks and a DMARC fail.
+
   Watch during warm-up rather than before it: a VERP return path for
   per-recipient bounce attribution (C2.10) lives at a sub-subdomain and will not
   align under `aspf=s`. DMARC passes if **either** identifier aligns, so a
