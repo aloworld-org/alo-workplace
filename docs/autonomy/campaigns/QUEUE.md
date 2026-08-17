@@ -64,7 +64,7 @@ kept the website agent out of the sites track's files.
 
 ## Wave C1 — the audience, and the two rules that make it safe
 
-- [ ] C1.1 The reachable audience: one tenant-scoped, address-deduplicated view over billing customers, CRM deal contacts and site form submissions. A person is one row however many sources hold them. **A test proves `contacts` is never read** — assert it against the module's own SQL, not by inspection.
+- [x] C1.1 The reachable audience: one tenant-scoped, address-deduplicated view over billing customers, CRM deal contacts and site form submissions. A person is one row however many sources hold them. **A test proves `contacts` is never read** — assert it against the module's own SQL, not by inspection.
 - [ ] C1.2 Consent as a record: when, from which source, from which address. Provenance stored rather than a boolean, because "did they agree" and "how do we know" are different questions and only the second survives a complaint. A person with no consent record cannot be a recipient, proven by a test rather than by a filter a caller remembers.
 - [ ] C1.3 Suppression, absolute and tenant-wide: unsubscribe, hard bounce and complaint each suppress, and **the audience query excludes them in SQL**. A test proves an import cannot resurrect a suppressed address. If the sender applies the rule, it is not absolute — that is the whole item.
 - [ ] C1.4 Segments: a saved query over the audience with the conditions ADR 0044 names — bought or not bought within a period, country, has or has not received a given campaign. The count **and its exclusions** are both readable; a number without them is not auditable.

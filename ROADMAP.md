@@ -489,7 +489,7 @@ and C5.4 writes one before anything is built.
 
 ### Wave C1 — the audience, and the two rules that make it safe
 
-- [ ] C1.1 The reachable audience: one tenant-scoped view over **billing customers, CRM deal contacts and site form submissions**, deduplicated by address. Explicitly **not** the `contacts` table — it is a per-user address book, and a company campaign drawn from it would mail somebody's private contacts. A test proves that table is never a source.
+- [x] C1.1 The reachable audience: one tenant-scoped view over **billing customers, CRM deal contacts and site form submissions**, deduplicated by address. Explicitly **not** the `contacts` table — it is a per-user address book, and a company campaign drawn from it would mail somebody's private contacts. A test proves that table is never a source.
 - [ ] C1.2 Consent as a record: when, from which source, from which address, provenance stored rather than a boolean. A person with no consent record cannot be a recipient, proven by a test rather than by a filter in the caller.
 - [ ] C1.3 Suppression, absolute and global to the tenant: unsubscribe, hard bounce and complaint each suppress, and **the audience query itself excludes them in SQL**. A test proves an import cannot resurrect a suppressed address — if the sender applies the rule, it is not absolute.
 - [ ] C1.4 Segments: a saved query with the conditions ADR 0044 names — bought/not bought within a period, country, has/has not received a given campaign. The count and the exclusions are both readable, because a number without its exclusions is not auditable.
