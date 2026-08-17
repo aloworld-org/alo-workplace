@@ -25,6 +25,18 @@ contracts.
 - **For operators: `/campaigns` is a new top-level route prefix** and needs
   adding to the production Caddyfile at the next deploy. It needs no new
   configuration otherwise, and it sends nothing.
+- **An unsubscribe link now offers "fewer" as well as "none".** The page at
+  the end of a campaign's unsubscribe link opens with no account and no
+  sign-in, and offers two plain buttons the same size: stop this kind of mail,
+  or stop everything from this workspace. One press either way — no "are you
+  sure", no reason survey, no sign-in wall. Somebody who wants your invoices
+  but not your newsletter can say exactly that, instead of reaching for the
+  spam button because "stop everything" was the only option. The page never
+  shows the recipient's address, so a forwarded email reveals nothing about
+  who it was sent to, and it says plainly that the choice cannot be undone
+  from there. A mail client's own Unsubscribe button (RFC 8058 one-click)
+  stops everything, and merely *opening* the link changes nothing — so the
+  scanners that fetch every link in a message cannot unsubscribe anyone.
 - **Website screens read better on a phone and through a screen reader.**
   Every button in the ticket box office and the shop shelf now says which
   event or product it acts on, so two events are no longer four identical

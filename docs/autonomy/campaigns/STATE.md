@@ -910,3 +910,169 @@ sweep LOOP describes had little to do this time.
   "fewer" half needs a per-kind preference this queue has no table for yet —
   decide there whether that is a new column or a new table, and say why in
   STATE.
+
+## C2s.2 — the page at the end of the link, offering fewer as well as none (2026-08-18)
+
+**Shipped, and the first thing to record is that it was half-written already.**
+This iteration opened on eight untracked files from a previous invocation that
+died mid-turn — the migration, both store modules' new halves, the route, both
+test suites and the two web files. All of it was good and none of it was
+*wired*: no `mod` line, no `pub use`, no id newtype, no route registration, no
+i18n key, no CSS class, no SPA route. The tree looked finished and did not
+compile. What this iteration added is the wiring, the topic on the token that
+everything written assumed, and the gate.
+
+**The surface.** `GET /jmap/campaign-unsubscribe/{token}` draws the page and
+writes nothing; `POST` on the same path is the act. Public — the only route in
+this product a stranger reaches, deliberately outside the authenticated
+`/campaigns/*` block, because a recipient is not a member of the workspace that
+mailed them. Under `/jmap/*` for the reason `/jmap/invite/{token}` is: the SPA
+owns `/unsubscribe/:token`, Caddy proxies whole prefixes, and an API route at
+the page's path would answer a browser with JSON.
+
+**The item's hard half — "fewer rather than only none" — needed a table, and
+the two new shapes are deliberately different.**
+
+- `campaign_unsubscribe_tokens.topic` is a **column** (migration 0504): the kind
+  of mail is a property of the *send*, decided once when the message is built,
+  and the token row is the only thing that knows which send a link came from.
+  Nullable, and null is honest rather than lazy — the page then draws one button
+  instead of a narrower one that would decline a category no send matches, and
+  `scope=topic` against such a link is a `422` that says so in a sentence naming
+  what to do instead.
+- `campaign_topic_optouts` is a **table**: an opt-out is a fact about a *person*
+  and must outlive every token, every send and every campaign, and one person can
+  decline several kinds — neither of which a column can hold.
+
+**The fold, and where it is and is not applied.** The token keeps the label as
+the sender wrote it, because a human reads it on the page. The opt-out keeps
+`normalise_topic` (trim, collapse inner whitespace, lowercase), because a query
+compares it, and the schema `CHECK`s the folded form so a row that skipped the
+function cannot exist. Deriving the comparable form where the comparison happens
+— rather than storing a second folded copy on the token — is the point: two
+spellings of one topic in two tables is the disagreement that mails somebody the
+kind they declined. Same argument, same shape, as the address fold in
+`campaign_audience`.
+
+**Three failures, each with a test rather than a paragraph.**
+
+- *"Fewer" that is really "none".* The one assertion nobody writes by accident:
+  after pressing the narrower button, Ann is **still in `campaign_recipients`**.
+  A narrower button that quietly suppressed everything would pass every
+  assertion about her being off the newsletter and would be exactly the failure
+  the item exists to prevent. Held in both suites —
+  `declining_one_kind_of_mail_is_not_declining_all_of_it` (store) and
+  `a_stranger_with_the_link_is_offered_fewer_as_well_as_none` (HTTP).
+- *A prefetching scanner unsubscribing people who never clicked.*
+  `looking_at_the_page_never_unsubscribes_anybody` fetches the GET five times
+  and then asserts the audience, the suppression and the preferences are all
+  untouched. This is why RFC 8058 requires a POST, and it is load-bearing here
+  because ADR 0044 §2 makes a suppression unliftable: a GET with a side effect
+  would be permanent *and* would read as the feature working.
+- *An oracle for which addresses this deployment holds.*
+  `a_guess_teaches_a_stranger_nothing_about_who_we_hold` posts five shapes of
+  wrong token — including a near miss one character off a real one — on both
+  methods, and asserts every answer is byte-identical to the first. A malformed
+  token, an unknown one and one for an address we have never heard of are the
+  same `404` with the same sentence.
+
+Plus `a_neighbours_link_stops_a_neighbours_mail_and_never_ours`, the mandatory
+wrong-tenant test in the shape that could actually break: two workspaces, the
+**same** person on both their lists, one deployment and one table. Each link
+resolves to the workspace that minted it, and using theirs leaves ours flowing.
+
+**Two judgement calls worth the next reader's time.**
+
+- **RFC 8058 one-click means *all of it*, and anything else is a `422`.** A mail
+  client posts `List-Unsubscribe=One-Click` as a form body with no page and no
+  chance for the recipient to choose. That is one unconditional gesture; reading
+  it as "only this kind" would leave them receiving mail they believed they had
+  stopped, and the next press is the spam button. The mirror of that decision is
+  that a form body which is *not* the RFC's sentence is refused rather than
+  guessed at — being permissive there would hand whatever posted it the power to
+  end a customer relationship nothing can restore.
+- **The topic is returned to the page; the address never is.** The topic
+  describes the *mail*, so it tells whoever holds the link only what they have
+  already read. The address describes the *person*, and a link is forwarded,
+  quoted in replies and read by scanners — a page that echoed it back would turn
+  a forwarded mail into a disclosure. "The page names the recipient" is asserted
+  against the whole serialised body, not against a field.
+
+**Nothing enforces these preferences yet, deliberately.** No query excludes a
+declined topic, because nothing yet builds a message that names a kind — the
+campaign record is C3.1 and the send record is C5m.1. The exclusion belongs in
+`campaign_audience`'s `Reach` predicate beside consent and suppression, on the
+day a send can say which topic it is. Threading a topic parameter through four
+queries now, for a caller that does not exist, is the guess this queue refused
+when it left `received_campaign_id` out of 0502. **C2s.3 is unaffected** — the
+wider button already fires `suppress_campaign_address` through C1.3, and the
+"one second later" assertion it asks for is what `recipients(&h)` proves
+immediately after each press here.
+
+**How verified.** `cargo fmt -p alo-store -p alo-jmap`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` and the same
+for `-p alo-jmap` — clean for this change (the same two pre-existing
+`type_complexity` warnings in `meet.rs`, untouched). Test binaries built in
+**25 m 05 s** via the sanctioned background+marker form. `alo-store` →
+**2 225 tests, 2 225 passed, 1 skipped, 162 s**. `alo-jmap` → **1 273 tests,
+1 272 passed, 1 failed, 367 s**; the failure is
+`site_schedule_http::a_publish_is_scheduled_moved_and_called_off`, which is the
+sites-owned timestamp-precision defect this track first flagged in the C1.5
+entry — `left: …346539, right: …3465399`, Postgres microseconds against Rust's
+100 ns, nothing to do with campaigns. All six new `campaign_unsubscribe_http`
+tests and all five new `campaign_topic_optout_tenancy` tests pass. Web:
+`npx tsc --noEmit` clean, `npx eslint` on the five changed files clean,
+`npm run build` succeeded.
+
+**Cut, and stated rather than glossed: the curl-against-the-debug-binary
+wire-verify was not run.** C: was at 100 % with 2.6 GB free at the end of the
+test build (see below), and linking a fresh `alo-jmap` debug binary would very
+likely have hit `LNK1180` and cost the iteration. What it would have proved —
+that the route is registered and answers an anonymous caller — is what
+`campaign_unsubscribe_http` proves through `server::router()` over the real
+Postgres, on the same code path minus the TCP socket. The residual risk is Caddy
+configuration, which is a deploy-time concern and is flagged below.
+
+**For the next deploy: `/unsubscribe` is a NEW top-level SPA route prefix.** It
+is a page, not an API — the API half lives under the already-proxied `/jmap/*` —
+so it needs the production Caddyfile's SPA fallback to cover it, exactly as
+`/invite` and `/sites/invite` do. `deploy/` is not this loop's to touch.
+
+**Disk, checked first per LOOP's own rule, and it got worse rather than
+better.** C: opened at 99 % with 9.2 GB free; 247 `.pdb` files in
+`target/debug/deps` were 7.5 GB of it and were deleted, taking it to 17 GB. The
+test build then consumed **14 GB** and finished with 2.6 GB free — 399 test
+binaries under `CARGO_PROFILE_TEST_DEBUG=0`, so this is the floor rather than a
+symptom. Sweeping the 158 stale duplicate `.exe`s (1.8 GB) afterwards brought it
+back to 4.4 GB. **The next iteration on this box should expect to sweep before
+it starts and should not assume a full two-crate test build fits.** The durable
+fix is the test-binary consolidation item LOOP already names.
+
+**A note for whoever wrote migration `0600_dkim_one_active_key_per_algorithm`:**
+it is sitting untracked in this checkout and was applied by every test run
+above (it is fine — `dkim_keys.algorithm` has existed since 0016). It is not
+this track's file and was deliberately left uncommitted. `06xx` and `05xx` do
+not collide.
+
+**Flag, now for the seventh time and unchanged: `scripts/prune-test-db.sh` is
+hardcoded to database `alo`.** `psql_q()` passes `-d alo` literally, so
+`DATABASE_URL` does not reach it and it cannot prune this checkout's `alo_loop`.
+Its statements were run by hand again (3 597 tenants → **0**, 102 MB). The fix
+is a one-line `-d "${ALO_PG_DB:-alo}"`; `scripts/` is not this item's write
+scope.
+
+- **Cuts:** the wire-verify above, and nothing else. No feature scope was
+  narrowed: both buttons, both body shapes, the null-topic path, the
+  already-stopped states and every error path shipped whole.
+- **Next:** C2s.3 — an unsubscribe suppresses immediately through C1.3, and a
+  test proves a recipient who unsubscribes cannot appear in a segment evaluated
+  one second later. Notes for it: the *suppression* half is already wired and
+  proven through the audience (`campaign_recipients`) in this item's HTTP
+  suite, so the work left is the **segment** half — `campaign_segments`
+  evaluates its own reach, and the item asks for the proof against a *saved
+  segment's* tally and list rather than against the raw audience. Write it as
+  one test that presses the wider button and then re-evaluates a segment that
+  matched the person a moment earlier, asserting both the count and that they
+  appear under the `unsubscribe` exclusion reason with a number beside it — the
+  exclusions are the auditable half, and a count that silently dropped somebody
+  is the failure C1.4 exists to prevent.
