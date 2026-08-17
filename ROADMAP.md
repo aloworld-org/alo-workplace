@@ -465,22 +465,35 @@ e-signature (eIDAS), marketing sends, storefront, DATEV/PSD2 integrations.
 
 ## Campaigns track — bulk email that cannot poison the mailbox (ADR 0044) ⇄ after the Agent track
 
-Ordered so that the half blocked on a purchase does not block the half that is
-not. **C1 needs no second IP and no sending at all** — it is the audience, the
-consent record and the suppression rule, which are the differentiator and the
-part nobody else can copy. C2 is the sending identity and cannot start until
-there is a second IP; C3 is the campaign itself.
+Ordered so the half blocked on a purchase does not block the half that is not.
+**C1 needs no second IP and sends nothing** — the audience, the consent record
+and the suppression rule are the differentiator and the part nobody else can
+copy. C2 is the sending identity and cannot start until there is a second IP.
 
-Migrations take the **`05xx`** block. The agent track holds `04xx` and the
-sites track `03xx`.
+Migrations take the **`05xx`** block (agents hold `04xx`, sites `03xx`).
+
+**On measurement, stated once here so no item has to re-argue it.** Four
+different qualities of number get called "analytics" in this business, and the
+reporting screen must never mix them:
+
+| | trust | how it is known |
+|---|---|---|
+| delivered, bounced, complained | **fact** | our own SMTP result and the feedback loop |
+| clicked | **reliable** | a redirect the recipient actually followed |
+| opened | **weak** | a remote image; Apple pre-fetches it, so an unknown share are machines |
+| how long it was read | **very weak** | the same image held open; most clients block it, many cache it |
+
+Delivery and clicks are earned. Opens are an opt-in per campaign, off unless
+chosen and disclosed (ADR 0044 §5). **Read duration is not decided by any ADR**,
+and C5.4 writes one before anything is built.
 
 ### Wave C1 — the audience, and the two rules that make it safe
 
 - [ ] C1.1 The reachable audience: one tenant-scoped view over **billing customers, CRM deal contacts and site form submissions**, deduplicated by address. Explicitly **not** the `contacts` table — it is a per-user address book, and a company campaign drawn from it would mail somebody's private contacts. A test proves that table is never a source.
-- [ ] C1.2 Consent as a record: when, from which source, from which address, with the provenance stored rather than a boolean. A person with no consent record cannot be a recipient, proven by a test rather than by a filter in the caller.
-- [ ] C1.3 Suppression, absolute and global to the tenant: unsubscribe, hard bounce and complaint each suppress, and **the audience query itself excludes them in SQL**. A test proves an import cannot resurrect a suppressed address, because if the sender applies the rule it is not absolute.
-- [ ] C1.4 Segments: a saved query over the audience with the conditions ADR 0044 names — bought/not bought within a period, country, has/has not received a given campaign. The count and the exclusions are both readable, because a number without its exclusions is not auditable.
-- [ ] C1.5 The audience screen: the segment reading as a question with the count moving as it is refined, and the excluded people named with the reason. Wrong-tenant and wrong-user tests per surface.
+- [ ] C1.2 Consent as a record: when, from which source, from which address, provenance stored rather than a boolean. A person with no consent record cannot be a recipient, proven by a test rather than by a filter in the caller.
+- [ ] C1.3 Suppression, absolute and global to the tenant: unsubscribe, hard bounce and complaint each suppress, and **the audience query itself excludes them in SQL**. A test proves an import cannot resurrect a suppressed address — if the sender applies the rule, it is not absolute.
+- [ ] C1.4 Segments: a saved query with the conditions ADR 0044 names — bought/not bought within a period, country, has/has not received a given campaign. The count and the exclusions are both readable, because a number without its exclusions is not auditable.
+- [ ] C1.5 The audience screen: the segment reading as a question with the count moving as it is refined, and excluded people named with the reason. Wrong-tenant and wrong-user tests per surface.
 
 ### Exit gate — C1 done when:
 
@@ -490,24 +503,51 @@ sites track `03xx`.
 
 ### Wave C2 — the sending identity *(blocked: needs a second IP — a purchase, not a decision)*
 
-- [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and verifiable on the wire like the transactional trust stack was
-- [ ] C2.2 A separate queue and egress path, so a campaign backlog cannot delay a password reset — proven by a test that queues a campaign and sends a transactional message behind it
-- [ ] C2.3 Per-tenant warm-up and rate limits, with the cap and its reason **shown in the send flow**
-- [ ] C2.4 `List-Unsubscribe` with one-click (RFC 8058) on every campaign message, working without a login — the writer half of what `unsubscribe.rs` already reads
+- [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and verified on the wire as the transactional trust stack was
+- [ ] C2.2 A separate queue and egress path, proven by a test that queues a campaign and sends a password reset behind it — the reset must not wait
+- [ ] C2.3 Per-tenant warm-up and rate limits, with the cap and its reason shown in the send flow
+- [ ] C2.4 `List-Unsubscribe` with one-click (RFC 8058) on every message, working without a login — the writer half of what `unsubscribe.rs` already reads
 - [ ] C2.5 Bounce and complaint feedback acted on: hard suppresses, soft retries then suppresses, complaints count against the tenant's rate
 
-### Wave C3 — the campaign, and the number it reports
+### Wave C3 — building the email
 
-- [ ] C3.1 The composer over the Docs block model, compiled to email-safe HTML — one content model, a second renderer
-- [ ] C3.2 Send: consent check, warm-up cap, test send, schedule — the safety screen, not a marketing screen
-- [ ] C3.3 Attribution: delivered → clicked → visited → converted → **invoiced**, in euros, joined to the invoice rather than estimated. No tracking pixel unless chosen per campaign, and disclosed when it is
-- [ ] C3.4 ★ The Campaigns agent: a sentence becomes a segment you can see and edit — the query is the artefact, never the copy
+- [ ] C3.1 The content model is the Docs block model — one editor, not a second one. A campaign is blocks, plus a subject and a preheader.
+- [ ] C3.2 The email renderer: blocks → **email-safe HTML**, table layout and inline CSS, because Outlook still renders through Word. This is the hard part of the wave, and it is a compiler rather than a stylesheet.
+- [ ] C3.3 A plain-text alternative generated from the same blocks, sent as `multipart/alternative`. Not optional: a campaign with no text part is scored as spam by filters older than every design decision here.
+- [ ] C3.4 Personalisation from the record — first name, company, last order — with a **visible fallback for every field**. "Hi ," is the classic bulk-mail failure and it comes from a merge field nobody defaulted.
+- [ ] C3.5 Dark mode, blocked images and accessibility: the mail must read with images off, every image carries alt text, and colour is never the only carrier of meaning. Half of recipients see the degraded version, and they are not a degraded audience.
+- [ ] C3.6 Preview and test send: the rendered mail, its text part, and a send to a seed address before any audience may be chosen. **Honest limit written into the screen** — we own no rendering farm, so a preview is our renderer's opinion, not proof of how Outlook 2016 will draw it.
+
+### Wave C4 — sending it
+
+- [ ] C4.1 A send is a durable job with per-recipient rows, so a crash resumes rather than restarts and **nobody is mailed twice** — idempotency on (campaign, address), enforced in the store.
+- [ ] C4.2 Rendering happens per recipient at send time, and a render failure suppresses that one recipient rather than failing the campaign.
+- [ ] C4.3 Pacing: batches sized by the tenant's warm-up cap, spread rather than burst, and a campaign backlog that never delays transactional mail — C2.2's guarantee, tested again under load.
+- [ ] C4.4 Schedule, and **pause/stop mid-send**. The control that matters most: the first thing anybody notices after pressing send is the typo. Stopping is immediate, and what has already gone is reported honestly.
+- [ ] C4.5 The send screen as a safety screen: consent count, exclusions named, sending identity shown, warm-up cap and its reason, and a test send required before the button is live.
+
+### Wave C5 — what actually happened
+
+- [ ] C5.1 Delivery events, which are **facts**: accepted, deferred, hard bounce, soft bounce, complaint — from our own SMTP result and the feedback loop, per recipient, with C2.5's suppression firing off them.
+- [ ] C5.2 Click tracking by redirect — a first-party link the recipient followed, so it is **reliable**. Per link and per recipient, fast, and it must never lose the destination when tracking is off.
+- [ ] C5.3 Open tracking, **opt-in per campaign and disclosed** (ADR 0044 §5), reported as an estimate and never as a headline: the screen itself states that Apple pre-fetches images, so the figure includes machines. A number shown without that caveat is a lie told by omission.
+- [ ] C5.4 **Read duration — ADR first, then build or drop.** It needs a pixel held open and reporting, which most clients block and many cache, so the measurement is weak where it is not absent. The ADR decides whether a number this unreliable belongs in a product sold on not tracking people, and what it may honestly be called if it ships. Not to be built before that is written.
+- [ ] C5.5 Attribution: delivered → clicked → visited → converted → **invoiced**, joined to the invoice rather than estimated, in euros. The campaign list's headline column, and the reason the wave exists.
+- [ ] C5.6 The report screen, ordered by trustworthiness: money and delivery first, clicks next, opens last and labelled an estimate. The campaign's numbers export, because a customer's results are theirs.
+
+### Wave C6 — the campaign that sends itself
+
+- [ ] C6.1 Automations: a send triggered by a CRM stage change, an invoice going unpaid, or a form submission — the same consent, suppression and identity rules, and no new sending path.
+- [ ] C6.2 A/B on subject and content, decided on **clicks and revenue** rather than opens: the metric a test optimises had better be one that means something.
+- [ ] C6.3 ★ The Campaigns agent: a sentence becomes a segment you can see and edit, and a draft campaign proposed for approval. The query is the artefact, never the copy.
 
 ### Exit gate — Campaigns done when:
 
-- [ ] A real campaign goes to a real segment from a dedicated subdomain, and the transactional domain's reputation is untouched — measured, not assumed
-- [ ] The campaign's row in the list shows money invoiced, traced to the invoices behind it
-- [ ] An unsubscribe from that campaign is honoured everywhere, immediately, and survives a re-import
+- [ ] A real campaign goes to a real segment from a dedicated subdomain, and the transactional domain's reputation is measurably untouched
+- [ ] The campaign's row shows money invoiced, traced to the invoices behind it
+- [ ] An unsubscribe is honoured everywhere immediately and survives a re-import
+- [ ] A send was paused mid-flight, and the report says truthfully how many had already gone
+- [ ] The report screen states, in the interface, which of its numbers are facts and which are estimates
 
 ---
 
