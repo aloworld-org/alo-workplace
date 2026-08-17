@@ -32,7 +32,7 @@ Rules of this file:
 - [ ] EU hosting partner selected (Open Decisions closes); first server live
 - [x] `deploy/` composes the engine set (Synapse, LiveKit, Collabora, Garage, Postgres, Rspamd) at pinned versions
 - [ ] Test domain configured: DNS, rDNS, first DKIM/SPF records (BLOCKED until constant-time credential compare lands — no public 587 with a timing oracle)
-- [ ] IP warming begins now — sending reputation is grown for launch, not at launch
+- [ ] IP warming begins now — sending reputation is grown for launch, not at launch. *(The campaign IP `159.195.89.28` was bought 2026-08-17 and is clean; warm-up starts once it is attached and has reverse DNS — Campaigns track, C2.0.)*
 
 ### Exit gate — Phase 0 done when:
 
@@ -501,7 +501,32 @@ and C5.4 writes one before anything is built.
 - [ ] A suppressed address cannot be returned by any segment, and re-importing it does not bring it back
 - [ ] No query in the module reads the per-user `contacts` table
 
-### Wave C2 — the sending identity *(blocked: needs a second IP — a purchase, not a decision)*
+### Wave C2 — the sending identity *(the IP is bought; three steps remain)*
+
+**`159.195.89.28`** — netcup, Nürnberg, ordered 2026-08-17, €2.03/mo on a
+12-month term. Verified clean at allocation: 0 of 60 blocklists at MXToolbox
+(Spamhaus ZEN, SpamCop, Barracuda, UCEPROTECT L1–L3, Abusix, ivmSIP, Mailspike,
+PSBL, LASHBACK among them) and "no issues" at Spamhaus. It sits in
+`159.195.88.0/23` (`DE-NETCUP-SERVER`) rather than the `152.53.176.0/22` the
+transactional IP is in — a legacy ERX block, same registrant and same admin
+contact, confirmed at RIPE. That is exactly the kind of range where recycled
+reputation hides, which is why the check mattered rather than being a formality.
+
+Before C2.1 can start:
+
+- [ ] C2.0a Attach the IP to the server — netcup **SCP → server → Network →
+      select the ordered IPv4 → Save**. It is a separate CCP product until then
+      and has no rDNS field of its own.
+- [ ] C2.0b Reverse DNS `159.195.89.28 → news.alomails.com`, set at netcup once
+      attached. Not in the domain's zone. Gmail and Outlook spam-file mail whose
+      PTR does not match the sending host.
+- [ ] C2.0c Forward record `news.alomails.com → 159.195.89.28` at **Namecheap**,
+      where alomails.com is registered. Both directions must agree.
+- [ ] C2.0d **Begin warm-up as soon as it can send**, not when C2 starts. This is
+      Phase 0's long-unchecked "IP warming begins now", and it is the only item
+      in this track whose cost is calendar time that cannot be recovered later —
+      a cold IP sending its first real campaign is filtered however correct the
+      DKIM is.
 
 - [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and verified on the wire as the transactional trust stack was
 - [ ] C2.2 A separate queue and egress path, proven by a test that queues a campaign and sends a password reset behind it — the reset must not wait
