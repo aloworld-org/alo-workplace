@@ -1076,3 +1076,125 @@ scope.
   appear under the `unsubscribe` exclusion reason with a number beside it — the
   exclusions are the auditable half, and a count that silently dropped somebody
   is the failure C1.4 exists to prevent.
+
+## C2s.3 — the press reaches the saved segment, in the same breath (2026-08-18)
+
+**What shipped: the proof, and nothing else — because the mechanism was already
+whole.** The item reads *an unsubscribe suppresses immediately through C1.3, and
+a test proves a recipient who unsubscribes cannot appear in a segment evaluated
+one second later.* Both halves existed before this iteration: C2s.2's landing
+page writes a suppression through `suppress_campaign_address`, and C1.3's
+`suppression_cte` is `LEFT JOIN`ed into `people`, which every segment query is a
+`WHERE` over. What did **not** exist was a single test that walks the whole
+chain — the store suites suppress by calling the store, and the landing-page
+suite reads the raw audience back, so nobody had shown a colleague's *saved
+question* changing its answer because a stranger with no account pressed a
+button. That gap is the item, and it is now
+`products/mail/alo-jmap/tests/campaign_unsubscribe_segment_http.rs` (four tests,
+one new binary, no production code touched).
+
+**Why no code changed, stated plainly rather than glossed.** Three candidate
+defects were looked for and none is there: the segment holds no membership and
+no cached count (ADR 0044's "there is nothing to sync"), so there is nothing to
+invalidate; `suppression_cte` carries no time predicate, so a suppression is
+live the instant its row commits, whatever `occurred_at` says; and
+`campaign_segment_recipients` gets its exclusion from `Reach::Mailable` inside
+the SQL rather than from a caller. An item whose mechanism is already correct is
+done when the mechanism is *held down* — which is what this queue's own "Done
+means" says: a rule with no failing case written down is a comment.
+
+**What the four tests hold down.**
+
+- `a_press_on_the_link_leaves_the_saved_segment_at_once` — three consenting
+  customers (two BE, one NL), a segment saved through `POST
+  /campaigns/segments`, read back through `GET /campaigns/segments/{id}`, and
+  counted by putting **its own answer** back on the URL of
+  `/campaigns/audience/tally`. That round trip is asserted deliberately: a saved
+  segment is counted by re-stating its conditions, so if the write shape and the
+  query shape ever drift, a saved segment would silently be counted as a
+  different question. Before the press: mailable 2, matched 2, no exclusions.
+  Then the anonymous `POST /jmap/campaign-unsubscribe/{token}` with
+  `scope=all`. After, with **no sleep and no refresh**: mailable 1, matched 2,
+  `suppressed:unsubscribe` 1. "One second later" is the weaker claim; this
+  re-asks in the same breath. The person is still *listed*, carrying
+  `mailable:false` and `exclusionReason:"suppressed:unsubscribe"`, because a
+  count that dropped her quietly is the unauditable number C1.4 exists to
+  prevent — she is still a customer this tenant invoices. The stored segment row
+  is re-read and compared before and after: nothing wrote to it.
+- `an_import_that_restates_consent_cannot_put_them_back_in_the_segment` — the
+  realistic shape of "one second later" is a nightly import landing after the
+  press. `POST /campaigns/consent` with `source: import` is **accepted** (200,
+  and the history grows to two records — evidence is never deleted) and the
+  segment's tally is unmoved. Suppression outranks consent, and the proof is
+  that both facts survive.
+- `the_narrower_button_leaves_the_segment_where_it_was` — the direction an
+  over-eager fix breaks. `scope=topic` must not shrink a segment; the tally is
+  identical before and after, a topic decline is recorded, and
+  `campaign_suppression_for` is still `None`.
+- `a_neighbours_unsubscribe_never_shrinks_our_segment` — two tenants on one
+  store, both holding the same address, both with a Belgian-customers segment.
+  The neighbour's link is pressed **against our router** (one deployment, one
+  table, so this is the real test): their segment drops to 1 with the reason
+  named, ours stays at 2, and the store-level recipient lists of both are
+  asserted whole so a leak has to appear as a named extra row.
+
+**How verified.** `cargo fmt -p alo-jmap`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-jmap --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in
+`alo-store`'s `meet.rs`, untouched). Test binaries built in **13 m 17 s**; the
+first foreground attempt was cut off at the 600 s ceiling and the sanctioned
+marker poll carried it to `BUILD_EXIT=0`. `DATABASE_URL=…5432/alo_loop cargo
+nextest run -p alo-jmap --no-fail-fast` → **1 277 tests, 1 276 passed, 1
+failed, 165 s**. The failure is
+`site_schedule_http::a_publish_is_scheduled_moved_and_called_off` — `left:
+…490364, right: …4903641`, the sites-owned Postgres-microseconds-against-Rust's
+-100 ns defect this track has now flagged in four consecutive entries. All four
+new `campaign_unsubscribe_segment_http` tests pass (2.7 s for the binary alone).
+
+**`alo-store` was deliberately not re-run, and that is not a skipped gate.** No
+file in that crate was touched — no source, no test, no migration — so there is
+no change for its suite to regress against; LOOP's rule is the crates *touched*.
+The store-side behaviour this item depends on is exercised by the new tests
+anyway, through `campaign_segment_recipients` called directly on the account
+store.
+
+**No CHANGELOG line and no i18n, on purpose.** Nothing a user can see changed:
+the button, the page and the immediacy all shipped with C2s.2, and a changelog
+entry restating them would tell a reader something happened that did not. No new
+route prefix either — the two routes involved were both registered in earlier
+items, so the production Caddyfile needs nothing beyond the `/unsubscribe` SPA
+prefix the C2s.2 entry already flagged.
+
+**Disk, checked first per LOOP's own rule, and the sweep is now the routine
+rather than the emergency.** C: opened at 99 % with 7.8 GB free. 398 `.pdb`
+files in `target/debug/deps` were **9.1 GB** — deleted, taking it to 17 GB —
+and 158 stale duplicate `.exe`s (399 binaries for 241 distinct targets) another
+2 GB, to 19 GB. The test build then consumed 5 GB and finished with 14 GB free.
+Note that the `.pdb` files came back despite `CARGO_PROFILE_TEST_DEBUG=0` being
+used throughout the previous iteration: that setting stops *test* targets
+emitting them, and these are the lib and bin targets' own. **Sweep both before
+every gate; neither invalidates anything cargo will not relink anyway.**
+
+**Flag, now for the eighth time and still one line of work:
+`scripts/prune-test-db.sh` is hardcoded to database `alo`.** `psql_q()` passes
+`-d alo` literally, so `DATABASE_URL` cannot reach it and it cannot prune this
+checkout's `alo_loop`. Its statements were run by hand again; nothing was old
+enough to delete (1 422 tenants, 85 MB — healthy, because the previous
+iteration's prune held). The fix is `-d "${ALO_PG_DB:-alo}"`; `scripts/` is not
+this item's write scope.
+
+- **Cuts:** none. The item shipped whole, and no scope was narrowed.
+- **Next:** C3.1 — the campaign record: subject, preheader, and content as the
+  **Docs block model**, one editor rather than a second one. Notes for it: read
+  how a document stores its blocks before inventing a shape — the item's whole
+  point is that a campaign body is the *same* block model a document is, so the
+  campaign row should reference or embed that structure rather than define a
+  parallel one. Migrations are `05xx` and the next free number must be
+  re-checked against the directory immediately before rebasing (`0600_dkim_…`
+  is another track's file and still sits untracked in this checkout; `06xx` and
+  `05xx` do not collide). C3.1 is also where `campaign_unsubscribe`'s
+  `send_ref` and `topic` finally get something real to point at, and where the
+  topic preferences C2s.2 stored — and which nothing yet enforces — acquire a
+  caller: the exclusion belongs in `campaign_audience`'s `Reach` predicate
+  beside consent and suppression on the day a send can say which kind of mail it
+  is.

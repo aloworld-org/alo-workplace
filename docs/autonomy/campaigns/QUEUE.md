@@ -74,7 +74,7 @@ kept the website agent out of the sites track's files.
 
 - [x] C2s.1 A per-recipient unsubscribe **token**: unguessable, identifying the send and the recipient, revealing neither to whoever holds it. Two failures it prevents and both need a test — iterating identifiers to unsubscribe other people, and confirming an address is live by watching what the endpoint does.
 - [x] C2s.2 The landing page and its route, working with **no account and no login**, offering **fewer rather than only none** — this kind of mail, or all of it. One click either way, no confirmation maze. A recipient offered only all-or-nothing presses the spam button instead, and that is the signal that ends a sending reputation.
-- [ ] C2s.3 An unsubscribe suppresses immediately through C1.3, and a test proves a recipient who unsubscribes cannot appear in a segment evaluated one second later.
+- [x] C2s.3 An unsubscribe suppresses immediately through C1.3, and a test proves a recipient who unsubscribes cannot appear in a segment evaluated one second later.
 
 ## Wave C3 — building the email
 
