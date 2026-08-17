@@ -499,7 +499,7 @@ Migrations take the **`07xx`** block (campaigns `05xx`, mail/platform `06xx`).
 
 ### Wave O1 - order, reservation and delivery
 
-- [ ] O1.0 The ADR above. No code in this item.
+- [x] O1.0 **ADR 0053** — the sales order is its own object with its own numbering (an invoice is a legal document and the relationship is many-to-many); reservation is **soft**, with `reserved <= on_hand + on_order` enforced in SQL rather than by the caller; and invoices follow **deliveries** by default, with order-based invoicing kept for deposits — which the walkthrough proved is real, since that fan order took a EUR 10,000 deposit before anything shipped.
 - [ ] O1.1 The sales order: created from an accepted quote whose lines include stocked goods, carrying ordered quantity per line and what has been reserved, delivered and invoiced so far. The order is the thing that answers "where is this?" and every later item hangs off it.
 - [ ] O1.2 Accepting a quote routes by content - an order where lines are stocked, an invoice draft where they are not. Today's direct-to-invoice path stays exactly as it is for services, and a test pins that so the change cannot regress the flow that already works.
 - [ ] O1.3 Reservation against inventory: confirming an order reserves its stocked lines, and the reserved quantity is visible beside on-hand and on-order. **A fan promised twice is the failure this exists to prevent** - the wrong-tenant test has a sibling here, an over-commitment test.
