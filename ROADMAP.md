@@ -506,8 +506,13 @@ and C5.4 writes one before anything is built.
 - [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and verified on the wire as the transactional trust stack was
 - [ ] C2.2 A separate queue and egress path, proven by a test that queues a campaign and sends a password reset behind it — the reset must not wait
 - [ ] C2.3 Per-tenant warm-up and rate limits, with the cap and its reason shown in the send flow
-- [ ] C2.4 `List-Unsubscribe` with one-click (RFC 8058) on every message, working without a login — the writer half of what `unsubscribe.rs` already reads
-- [ ] C2.5 Bounce and complaint feedback acted on: hard suppresses, soft retries then suppresses, complaints count against the tenant's rate
+- [ ] C2.4 `List-Unsubscribe` and `List-Unsubscribe-Post` on every campaign message — the **writer** half of what `unsubscribe.rs` already reads. This is the header the mail client turns into its own Unsubscribe button, and it must work with a single POST and no login.
+- [ ] C2.5 **The visible link in the mail**, because the header is not enough: only some clients render a button from it, and everyone else scrolls to the footer looking for the word. Every campaign carries one, it is never disguised as anything else, and it goes to a page that works with no account and no login.
+- [ ] C2.6 The unsubscribe link is a **per-recipient unguessable token**, not an address in a query string. Two failures it prevents: somebody iterating identifiers to unsubscribe other people, and a scraper confirming an address is live by watching what the page does. The token identifies the send and the recipient, and reveals neither to whoever holds it.
+- [ ] C2.7 The landing page offers **fewer rather than only none** — this campaign type, or everything. A recipient who only wanted the newsletter to stop has no way to say so if the single button is "unsubscribe from all", and the alternative they reach for is the spam button, which is the signal that ends a sending reputation. Confirmed in one click either way, with no "are you sure" maze.
+- [ ] C2.8 **Transactional mail never carries an unsubscribe** — an invoice, a password reset and a meeting invitation are not marketing, and offering to stop them is both wrong and a support ticket. The separate sending identity (C2.1) is what makes this distinction structural rather than a flag somebody sets.
+- [ ] C2.9 An unsubscribe suppresses **immediately and tenant-wide** through C1.3's rule, before the next batch of the same send goes out — a recipient who unsubscribes at 10:00 and receives batch four at 10:05 has been told the button does not work.
+- [ ] C2.10 Bounce and complaint feedback acted on: hard suppresses, soft retries then suppresses, complaints count against the tenant's rate
 
 ### Wave C3 — building the email
 
@@ -545,7 +550,8 @@ and C5.4 writes one before anything is built.
 
 - [ ] A real campaign goes to a real segment from a dedicated subdomain, and the transactional domain's reputation is measurably untouched
 - [ ] The campaign's row shows money invoiced, traced to the invoices behind it
-- [ ] An unsubscribe is honoured everywhere immediately and survives a re-import
+- [ ] An unsubscribe is honoured everywhere immediately and survives a re-import — tested from **both** doors: the client's own header button, and the link in the footer
+- [ ] Somebody who unsubscribes mid-send does not receive the batches that follow
 - [ ] A send was paused mid-flight, and the report says truthfully how many had already gone
 - [ ] The report screen states, in the interface, which of its numbers are facts and which are estimates
 
