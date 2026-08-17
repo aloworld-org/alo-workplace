@@ -583,3 +583,18 @@ slow, this is why a prune can look like it ran and have done nothing.**
   question is refined, and the excluded named with the reason — and
   `campaign_segment_tally` deliberately takes conditions rather than a saved id
   so an unsaved draft can be counted.
+
+---
+
+## C1.5 (in progress) — the `/campaigns/*` API (2026-08-17)
+
+**The API half is committed; the audience screen is the same item and follows
+in the next commit.** Recorded here rather than left implicit so an interrupted
+iteration finds a clean tree and a stated position rather than guessing from a
+half-checked queue. If this note is still the last entry, the routes below are
+on `main`, gated and tested, and `web/src/campaigns/**` does not exist yet.
+
+**Note for the deploy the human runs: the production Caddyfile needs the
+`/campaigns` prefix added.** It is a new top-level route prefix, and `deploy/`
+is not this loop's to touch.
+
