@@ -787,3 +787,126 @@ loop's to touch. It is also in the CHANGELOG under the operator line.
   unsubscribe other people, and confirming an address is live by watching what
   the endpoint does. It takes migration `0503`.
 
+
+## C2s.1 — the link in the mail that ends it (2026-08-17)
+
+**Shipped.** `platform/alo-store/src/campaign_unsubscribe.rs`, migration
+`0503_campaign_unsubscribe_tokens.sql`, the `CampaignUnsubscribeTokenId`
+newtype, and `tests/campaign_unsubscribe_tenancy.rs`. Store-side only: the
+landing page and the route that redeem these are C2s.2, and the suppression they
+fire is C2s.3. Nothing here sends, and nothing here suppresses.
+
+**The shape.** `TenantStore::mint_campaign_unsubscribe_token` returns the raw
+token exactly once; the row keeps `sha256(token)` and nothing else, exactly as
+`file_shares` (0026) has since alo Transfer.
+`Store::resolve_campaign_unsubscribe_token` is the only way back in,
+cross-tenant on purpose — the public route has no login, so the token is the
+only thing that names a tenant, and the tenant comes back so every read and
+write after it goes through a tenant-scoped door.
+
+**The two failures the item names, each with a test rather than a paragraph.**
+
+- *Iterating identifiers to unsubscribe other people.* The token is 256 random
+  bits from the same source as every opaque id, drawn twice — 128 is the id
+  budget, and this is a bearer credential in a URL that strangers read. It
+  encodes neither the address nor the send, so there is nothing to decode and
+  nothing to increment. `a_link_cannot_be_guessed_from_the_person_it_is_for`
+  mints two links for the same person and the same send, asserts they differ,
+  asserts the token spells out no part of the address or the send reference, and
+  asserts the *record id* — the safe-to-log handle — does not work as a link.
+  `holding_the_stored_row_is_not_holding_the_link` reads `token_hash` straight
+  out of Postgres and presents it back: `None`. That is what a database dump, a
+  backup on a laptop and a `SELECT *` over somebody's shoulder actually yield.
+- *Confirming an address is live by watching what the endpoint does.* There is
+  exactly one lookup and it is keyed on the digest.
+  `a_guess_teaches_a_spammer_nothing_about_who_we_hold` posts eight shapes of
+  wrong token — empty, blank, an address, `1`, a run of zeroes, a traversal, a
+  percent-encoded NUL, a sentence — and every one is the same `Ok(None)` as a
+  token for an address this deployment has never heard of. A malformed token is
+  not an error, deliberately: an error and a miss are distinguishable, and that
+  distinction is the oracle. The unit test
+  `the_only_way_to_reach_a_token_is_to_hold_it` holds the module's own SQL to
+  it, so a convenience lookup by address or by send added next year fails a test
+  instead of shipping an oracle.
+
+Plus `a_neighbours_link_is_never_ours`, the mandatory wrong-tenant test in the
+shape this module could actually break: two workspaces mint a link for **the
+same address**, which is ordinary and is exactly when a mixed-up tenant leaks.
+Each resolves to the workspace that minted it, and to that workspace's send.
+
+**Three judgement calls, all recorded in the migration where the next reader
+will be standing.**
+
+- **No expiry, and that is the difference from `file_shares`.** A share link
+  lends a file for a fortnight; this is a person's ability to make us stop, and
+  it has to work when they find the mail two years later while searching for
+  something else. A column that eventually turns an unsubscribe into a `404` is
+  a column that eventually earns a complaint, and ADR 0044 §4 says a complaint
+  is the expensive one.
+- **No revoke, no update, no re-issue.** Minting again for the same person and
+  the same send adds a second live row rather than replacing the first. We hold
+  only a digest, so "replace" means killing a link already sitting in an inbox —
+  and a dead unsubscribe link is precisely what makes somebody press the spam
+  button instead, which is the signal ADR 0044 §3 exists to avoid. Unit tests
+  assert no `UPDATE` and no `DELETE` appears in the module's SQL, the same shape
+  `campaign_suppression.rs` uses to hold "absolute" to its word.
+- **`send_ref` is opaque TEXT with no foreign key**, the same call 0502 made
+  about `received_campaign_id`: the per-recipient send record is C5m.1, and a
+  reference to a table that does not exist is a guess. The FK is additive when
+  there is something for it to point at. It is validated non-blank and bounded
+  at 200 characters, matched to `SUPPRESSION_SOURCE_REF_MAX` because the one
+  flows into the other: a suppression written by C2s.3 names the token's
+  **record id** as its `source_ref`, so "which send did they leave over" stays
+  answerable without the working credential being copied into a second table.
+
+**How verified.** `cargo fmt -p alo-store`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in `meet.rs`,
+untouched). Test binaries built in **6 m 26 s** via the sanctioned
+background+marker form. `DATABASE_URL=…5432/alo_loop cargo nextest run -p
+alo-store --no-fail-fast` → **2 205 tests, 2 205 passed, 1 skipped, 118 s**. The
+six new integration tests pass alone in 0.4 s. No web, no route and no i18n key,
+so no TypeScript gate was owed.
+
+**Flag for the sites track — `site_ticket_orders::the_ticket_mail_waits_for_fulfilment_claims_once_and_never_crosses_tenants`
+flaked once under load.** It failed on the first full-suite run and passed both
+in isolation and on the immediate re-run of the whole suite, so it is
+timing-sensitive rather than broken, and nothing in this iteration touches
+`site_*`. Recorded because a claim-once test that only fails under concurrency
+is the kind that gets dismissed twice and then debugged at the worst moment.
+This is a *second* sites-owned test flagged from this track; the
+timestamp-precision one in `site_schedule_http` is in the C1.5 entry above, and
+that one is a latent defect rather than a flake.
+
+**Flag, now for the sixth time and unchanged: `scripts/prune-test-db.sh` is
+hardcoded to database `alo`.** `psql_q()` passes `-d alo` literally, so
+`DATABASE_URL` does not reach it and it cannot prune this checkout's `alo_loop`
+at all. Its statements were run by hand again (2 715 tenants → **1 863**,
+107 MB). The fix is a one-line `-d "${ALO_PG_DB:-alo}"`; `scripts/` is not this
+item's write scope.
+
+**Disk, per LOOP's own rule, checked first: C: was at 99 % with 9.0 GB free.**
+276 `.pdb` files in `target/debug/deps` were 7.6 GB of it — deleted, taking the
+disk to 17 GB free, and the gate ran with `CARGO_PROFILE_TEST_DEBUG=0` so none
+came back. Only 7 stale duplicate test binaries existed (82 MB), so the second
+sweep LOOP describes had little to do this time.
+
+- **Cuts:** none. One thing deliberately not written: a CHANGELOG line. Nothing
+  a user or an operator can see changed — no route, no screen, no configuration
+  — and the honest place for the user-voice sentence about unsubscribing is
+  C2s.2, where the landing page becomes something a recipient can press.
+- **Next:** C2s.2 — the landing page and its route, working with no account and
+  no login, offering **fewer rather than only none**: this kind of mail, or all
+  of it, one click either way. Notes for it: it redeems what this item mints, so
+  the route hands the incoming token to
+  `Store::resolve_campaign_unsubscribe_token` and goes through
+  `Store::for_tenant` with what comes back. **RFC 8058 requires the acting
+  request to be a POST**, because link-prefetching scanners fetch every URL in a
+  mail and a GET that unsubscribed would unsubscribe people who never clicked —
+  which is why the resolve here deliberately has no side effect. It is a public
+  route outside the authenticated `/campaigns/*` surface, so it must render for
+  an anonymous caller, and the answer for an unknown token must be
+  indistinguishable from the answer for a token that was never minted. The
+  "fewer" half needs a per-kind preference this queue has no table for yet —
+  decide there whether that is a new column or a new table, and say why in
+  STATE.
