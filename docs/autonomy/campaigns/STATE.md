@@ -253,3 +253,147 @@ item's write scope, so it is recorded here rather than changed.
 - **Next:** C1.3 — suppression, absolute and tenant-wide, excluded in SQL inside
   `people_cte` alongside the consent join, with the test that an import cannot
   resurrect a suppressed address. Migration `0501`.
+
+---
+
+## C1.3 — suppression, absolute and tenant-wide (2026-08-17)
+
+**Shipped.** Migration `0501_campaign_suppression.sql`,
+`platform/alo-store/src/campaign_suppression.rs` (the record and the three
+`TenantStore` methods), and the enforcement inside `campaign_audience.rs`:
+`suppression_cte()` joined in `people_cte`, and `Reach::Mailable` — renamed from
+`Reach::OnlyConsented` — carrying `consented_at IS NOT NULL AND suppressed_at IS
+NULL` as one predicate.
+
+**The shape, and why it is this shape.**
+
+- **A table of state, where consent is a table of events.** Consent keeps every
+  statement ever given, because "how do we know they agreed" is answered by the
+  wording of a particular agreement. Suppression asks one question — *is this
+  address suppressed* — and that must have exactly one answer, so the primary
+  key is `(tenant_id, address)` and there is one row per person.
+- **The first reason stands.** `suppress_campaign_address` is idempotent via `ON
+  CONFLICT (tenant_id, address) DO NOTHING`, and a `UNION ALL … NOT EXISTS
+  (SELECT 1 FROM inserted)` returns the record actually in force rather than the
+  one just offered. Never `DO UPDATE`: a hard bounce three months after somebody
+  unsubscribed must not rewrite "they asked to stop" into "their mailbox was
+  full", which reads as a technical problem somebody might try to fix. The
+  caller therefore gets the same answer to "so are they suppressed, and why"
+  whether or not its own call was the one that did it.
+- **There is no way to lift one.** No `unsuppress`, no `lifted_at`, no delete
+  path. ADR 0044 §2 says *no segment, import or re-upload can bring them back*,
+  and an API that can remove a row is an API a bulk importer is eventually
+  pointed at. Somebody who suppressed themselves by mistake gives fresh consent
+  through the site form like anyone else — which is evidence, where a tenant
+  deleting the row is not. `nothing_in_this_module_can_take_a_suppression_away`
+  holds the module's own SQL to it rather than trusting review.
+- **On `TenantStore`, not `AccountStore`, and with no `recorded_by`.** The
+  loudest future source of these rows has no logged-in colleague behind it at
+  all: the one-click unsubscribe endpoint (RFC 8058, C2s.2) works with no
+  account and no login. A column that would be NULL for the case that matters
+  most is not provenance, so who acted is answered by `reason` and `source_ref`
+  instead. This is the first campaigns method not on the account door, and it is
+  deliberate: suppression is a fact about the tenant, not about a mailbox.
+- **Four reasons, not three.** ADR 0044 §2 names unsubscribe, hard bounce and
+  complaint. `manual` is added for the person who phones and asks to be taken
+  off the list: recording that as an `unsubscribe` would put a phone call into
+  the number a sending reputation is judged on, and a complaint rate that lies
+  to us is worse than one that lies to a regulator.
+  `SuppressionReason::is_a_persons_decision` is the distinction C4's numbers will
+  need — a dead mailbox says nothing about whether the mail was wanted.
+- **Two rules, one predicate, on purpose.** `Reach::Mailable` emits consent and
+  suppression together. They are different rules — permission given, and
+  permission taken back — but no query in this crate wants one without the
+  other, and offering the choice is how a "just the consented ones" call site
+  eventually mails somebody who unsubscribed.
+- **The audience still shows suppressed people, carrying the reason.**
+  `AudienceMember` gains `suppression: Option<SuppressionEvidence>`, the mirror
+  of its consent field. A stricter reading of the item would drop them from the
+  audience too, but somebody who unsubscribed is usually still a customer the
+  tenant invoices, and C1.5 has to name the excluded *with the reason* — a count
+  that quietly dropped them could not be audited. The exclusion the item demands
+  is in the query the sender reads, which is where "if the sender applies the
+  rule, it is not absolute" actually bites.
+- **`CampaignRecipient` gained no suppression field**, deliberately: the only
+  honest value would be a permanent `None`, and an `Option` a sender can read
+  invites a sender that checks it. Instead `MemberRow::into_recipient` *refuses*
+  a row that arrives carrying a suppression — the same discipline as C1.2's
+  missing-consent decode error, in the direction where the failure lands in the
+  inbox of somebody who has already asked us to stop.
+
+**Who may not be mailed, quoted rather than summarised.**
+
+- `campaign_suppression_tenancy.rs::an_import_cannot_resurrect_a_suppressed_address`
+  — the item's named test, walked end to end: the customer is mailable, they
+  unsubscribe, and then an `Import` consent record dated today, from
+  `newsletter-2026.csv`, with the statement a real tenant would type, is written
+  for `ORDERS@Acme.TEST `. Recipients stay empty and the count stays 0. The
+  import is **not** refused and the assertion says why — the record is kept
+  because an import claiming an agreement is itself evidence worth having; it
+  simply grants nothing. The test then reads the audience back and asserts the
+  person is still there, `suppression.reason == Unsubscribe` *and*
+  `consent.is_some()`: the exclusion is not a claim they never agreed.
+- `a_neighbours_suppression_does_not_silence_our_address` — the wrong-tenant
+  test, sharpened into both directions. Both tenants hold and may mail
+  `orders@acme.test`; one receives a complaint. Theirs goes empty, **ours keeps
+  them** ("unsubscribing from one company is not unsubscribing from every
+  company on the platform"), their record is not readable from our handle and
+  their list is empty from ours, asserted from both sides.
+- `a_second_suppression_does_not_rewrite_why_the_first_happened` — an
+  unsubscribe 90 days ago, then a hard bounce today in different casing: same
+  id, same reason, same `source_ref`, same `occurred_at`, one row.
+- `suppression_reaches_the_person_it_was_given_for_however_it_is_spelled` — the
+  customer is `Ann.Dupont@Example.TEST`, the click arrives as
+  ` ANN.DUPONT@Example.test `; one copy of a person still being mailed is
+  exactly the failure ADR 0044's "cannot unsubscribe from one copy of
+  themselves" names.
+- `a_suppression_that_could_never_be_applied_is_refused_at_the_door` — five
+  non-addresses, a future date and an over-long reference are each refused, then
+  it asserts the list is empty and the customer is *still* mailable, so a
+  half-written suppression would be caught. A suppression row that does not join
+  is not a near miss: it is somebody who asked to stop and is still being mailed.
+- `suppression_stands_alone_and_does_not_need_a_consent_record` — a hard bounce
+  for a stranger, who later becomes a consenting customer and is still not
+  mailable: the suppression was waiting for them.
+- Unit tests: `the_recipients_queries_exclude_suppressed_people_in_sql` (the
+  gate is in the string, and *not* in the audience query, which must keep
+  `suppression_reason`); `nothing_but_a_suppression_row_can_suppress` (the
+  table is named exactly once — suppression comes from one place or it is not
+  absolute); `a_suppressed_person_can_never_be_read_as_a_recipient` across all
+  four reasons, with the un-suppressed control beside it, because "we only
+  forgot the bounces" is how this returns;
+  `half_a_suppression_record_is_reported_rather_than_completed` — the half we
+  would have to invent is "there is no suppression", which is a person the
+  tenant is told it may mail. The tenant-predicate test now demands **five**
+  `tenant_id = $1` (three sources, two joins), and the `contacts` promise is
+  carried by a third module's own copy.
+
+**How verified.** `cargo fmt -p alo-store`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in `meet.rs`,
+untouched); test binaries built in 4 m 28 s via the sanctioned background+marker
+form; `DATABASE_URL=…5432/alo_loop cargo nextest run -p alo-store` → **2 156
+tests, all passed** (1 skipped), 64.5 s, up from C1.2's 2 132. A second targeted
+run of the 51 campaign tests was green on its own.
+
+**No CHANGELOG line, deliberately** — same reason as C1.1 and C1.2: store-side
+only, no route and no screen. The first campaigns entry belongs to C1.5.
+
+**Flag, unchanged from C1.2 and worth repeating because it will bite the next
+iteration too: `scripts/prune-test-db.sh` is hardcoded to database `alo`**
+(`psql_q()` passes `-d alo` literally, so `DATABASE_URL` does not help), and
+this checkout's test database is `alo_loop`. Nothing needed pruning this
+iteration — 6 766 tenants — so the script was not run at all. Still outside this
+item's write scope; the fix is a one-line `-d "${ALO_PG_DB:-alo}"`.
+
+- **Cuts:** none. One thing deliberately *not* built: nothing reacts to a bounce
+  or a complaint automatically, because nothing sends and there is no send
+  record to react from. C5m.1 is where the events that will call
+  `suppress_campaign_address` get their table, and its `source_ref` column is
+  already the place a send id goes.
+- **Next:** C1.4 — segments: a saved query over the audience with ADR 0044's
+  conditions (bought or not within a period, country, has or has not received a
+  given campaign), with the count **and its exclusions** both readable. Note for
+  it: "has not received a given campaign" has no campaign to name yet, so expect
+  to cut that condition to the ones the data supports and journal it, rather
+  than inventing a campaign table ahead of C3.1. Migration `0502`.
