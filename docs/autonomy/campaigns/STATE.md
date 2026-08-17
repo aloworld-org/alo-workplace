@@ -397,3 +397,189 @@ item's write scope; the fix is a one-line `-d "${ALO_PG_DB:-alo}"`.
   it: "has not received a given campaign" has no campaign to name yet, so expect
   to cut that condition to the ones the data supports and journal it, rather
   than inventing a campaign table ahead of C3.1. Migration `0502`.
+
+---
+
+## C1.4 — segments: the saved question, and the count that names who it leaves out (2026-08-17)
+
+**Shipped.** Migration `0502_campaign_segments.sql`,
+`platform/alo-store/src/campaign_segments.rs` (the record, its CRUD, the tally
+and the two page reads), `tests/campaign_segments_tenancy.rs`, and a small
+opening-up of `campaign_audience.rs` so a segment narrows the audience instead
+of re-reading it.
+
+**Adopted rather than started.** The tree already held an interrupted
+iteration's C1.4 — module, migration and tests, uncommitted. It was read in
+full, not trusted: gating it found four real defects, each fixed here. Recorded
+because "the work was already there" is exactly the claim that should arrive
+with the list of what was wrong with it.
+
+**The shape, and why it is this shape.**
+
+- **Conditions, never people.** There is no membership table and no cached
+  count. Every read re-asks the question of `campaign_audience` at the moment of
+  asking, so consent (C1.2) and suppression (C1.3) apply then rather than when
+  the segment was saved. A stored member list is a copy of the audience, and a
+  copy is how somebody who unsubscribed on Monday is mailed on Tuesday.
+- **A segment is `SELECT * FROM people WHERE <conditions>`.** `people_cte()`,
+  `Reach`, `MemberRow` and `MEMBER_COLUMNS` became `pub(crate)` for this, and
+  that is the point: the privacy boundary, the consent join and the suppression
+  join are the *same text* for a segment as for the whole audience. A segment
+  that assembled its own `FROM` would be a second place `contacts` could be read
+  and a second place suppression could be forgotten.
+  `a_segment_reads_the_audience_rather_than_assembling_its_own` holds it to that
+  by asserting the string rather than trusting review.
+- **Typed columns, not a JSON definition.** The set of conditions ADR 0044 names
+  is small and closed, and each is a rule somebody's inbox depends on — so a
+  country that is not a country, a period of minus ten days, and a `not_bought`
+  with no period are refused by CHECK constraints rather than by whichever
+  caller happens to be careful. Adding a condition later is an additive column,
+  which is the expand-only migration this repository already requires.
+- **The tally is one query, not one per bucket.** Two queries over a live
+  audience are two different moments, and a form submitted between them would
+  make the parts disagree with the whole. `SegmentTally` therefore holds no
+  stored total at all: `matched()` adds `mailable` and the exclusions up, so a
+  total that disagreed with its own parts is unrepresentable.
+- **Suppression outranks consent, decided in one `CASE`.** Somebody who never
+  consented *and* complained is reported as having complained — the stronger
+  fact, and the one a colleague cannot fix by going and asking nicely.
+  `ExclusionReason::for_member` applies the same precedence in Rust, for the
+  screen that lists people rather than counts them.
+- **`EXISTS`, never `NOT IN`.** `address NOT IN (SELECT …)` is `NULL` — not
+  `true` — the moment the subquery yields one NULL, which would silently empty a
+  "has not bought" segment. The subquery cannot produce one today; the shape is
+  chosen so that a later change to it cannot make the segment lie.
+- **A purchase is an *issued* invoice, never a draft, a void one or a credit
+  note.** A draft is an intention somebody may still delete and a void invoice is
+  a purchase that was cancelled; counting either puts people who bought nothing
+  into a send written to reach customers.
+- **A country condition excludes people whose country is unknown.** Only billing
+  customers carry one, so `country = ANY($2)` is `NULL` — and therefore not a
+  match — for a deal contact or a form submitter. That is the honest reading:
+  somebody we cannot place is not evidence of being in Belgium. Documented at
+  the migration, at the query and in the test, because it is the kind of
+  decision that reads as a bug to whoever meets it next.
+- **An empty country list is the absence of the condition**, not a filter that
+  matches nobody — the difference between "everyone" and "no one" on a screen.
+- **The tally takes conditions, not a saved id.** C1.5's screen shows the count
+  moving as a segment is *being* refined, before anybody presses save; a segment
+  that had to be saved to be counted would make every experiment a stored object
+  somebody has to clean up afterwards.
+
+**Cut, exactly as C1.3 predicted: "has or has not received a given campaign".**
+ADR 0044 names it and it is part of the differentiator, but there is no campaign
+to name yet — the campaign record is C3.1 and the per-recipient send record
+C5m.1. A column referencing a table that does not exist is a guess, not a
+schema. Both the migration and the module docs say where it goes and what it
+waits on; it is an additive column and one more CTE on the day it has something
+to point at.
+
+**Who may not be mailed, quoted rather than summarised.**
+
+- `campaign_segments_tenancy.rs::the_count_and_every_person_it_leaves_out_are_both_readable`
+  — the item, stated as a test. Five people, one mailable: one never asked, one
+  unsubscribed, one hard-bounced, and one who *both* never consented and
+  complained. The tally is asserted whole and the last is reported as
+  `Complaint`, not `NoConsent`. Then the arithmetic that makes the number
+  auditable — `matched() == 5`, and `matched() - mailable` equal to the
+  exclusions summed — followed by the same precedence read off each member, and
+  finally `recipients == ["yes@cseg.test"]`: the send reaches exactly the one
+  person the tally promised.
+- `a_segment_cannot_reach_somebody_the_audience_would_not` — two customers who
+  both bought last week, one of whom unsubscribed. The segment names both as
+  members with the reason and mails one. Then an `Import` consent record dated
+  this morning, from `newsletter-2026.csv`, for ` QUIT@Cseg.TEST `: the
+  recipients do not move, and **the tally does not move either**
+  (`assert_eq!(after, tally)`). C1.3's promise, re-proved through the door C1.4
+  opened.
+- `a_period_means_what_a_colleague_reading_it_would_think` — "has not bought in
+  ninety days" must contain the person who never bought, the person whose
+  invoice is 120 days old (backdated in the database, since a test cannot wait
+  four months), the person whose invoice is still a draft, and the person whose
+  invoice was voided; and must exclude only the person who bought last week.
+  Widening to 180 days brings the lapsed customer back — the boundary is the
+  date, not the existence of an invoice. `NotBought` with no period asserts
+  `["never@cseg.test", "void@cseg.test"]`, with the message *'has never bought'
+  must not be emptied by a NULL in the purchases subquery*.
+- `a_country_segment_excludes_the_people_it_cannot_place` — a Belgian customer,
+  a Dutch one, and a deal contact nobody placed. Lowercase `"be"` still means
+  Belgium; the unplaced person is not in it; the empty list returns all three.
+- `a_neighbours_customers_invoices_and_segments_are_all_unreachable` — the
+  mandatory wrong-tenant test, sharpened the way C1.1–C1.3 were: both tenants
+  hold `orders@acme.test` and both have consent for it, but only the neighbour
+  has ever invoiced them. A "has bought" segment is empty here and one person
+  there, asserted from both sides, so a leak would have to appear as a named
+  row. Their saved segment is then unreadable, unwritable and undeletable from
+  our handle, and absent from our list.
+- `the_per_user_address_book_is_never_a_source_of_a_segment` — the promise the
+  queue puts above the suite, now carried by a fourth module: a contact is
+  seeded into the acting user's private address book, **read back through
+  `contact()` to prove the row exists and is readable by its owner**, and then
+  no segment — unconditioned, by country, by purchase — contains them.
+- `a_segment_that_would_mean_nothing_is_refused_rather_than_saved` and
+  `a_saved_segment_can_be_renamed_rewritten_and_forgotten` cover the CRUD error
+  paths, including the duplicate name and a cursor that is not an address.
+- Unit tests (21) hold the SQL itself: `a_segment_cannot_widen_who_may_be_mailed`
+  (the `Mailable` predicate is present, and deliberately absent from the members
+  query so exclusions stay visible);
+  `every_source_and_join_including_the_purchase_one_carries_a_tenant` demands
+  **six** `tenant_id = $1` — three sources, two joins, and now the invoices a
+  purchase condition reads, because a neighbour's invoices must not decide who
+  we may mail any more than their customers do;
+  `a_bucket_this_build_cannot_name_fails_the_tally_rather_than_shrinking_it`;
+  and `a_purchase_condition_this_build_cannot_read_fails_rather_than_widening`,
+  since dropping an unknown condition would turn "has not bought in ninety days"
+  into "everybody" and the mistake would arrive as mail.
+
+**The four defects the gate found in the adopted tree.** None reached the
+commit, and they are listed because a green suite is only evidence if the
+failures are on record too:
+
+1. `every_query_is_scoped_to_one_tenant` **failed** — an `INSERT` has no `WHERE`,
+   so it cannot carry `tenant_id = $1`. `campaign_consent.rs` met the same
+   problem and solved it by loosening its assertion to
+   `sql.contains("tenant_id")`, which would pass on a column list that merely
+   mentions the tenant. Fixed the other way here: the insert must *start*
+   `INSERT INTO campaign_segments (tenant_id, id, ` and bind `VALUES ($1, $2, `
+   — tenancy proven as a shape rather than as a substring.
+2. `tests/campaign_segments_tenancy.rs` did not compile: `billing_customers`
+   takes one argument, not two.
+3. Two `expect()` calls in unit tests — `expect_used` is `deny` workspace-wide
+   (Cargo.toml `[workspace.lints.clippy]`), and a test file's own `#![allow]`
+   does not reach `src/`.
+4. A `collapsible_if` warning in `validate_conditions`.
+
+**How verified.** `cargo fmt -p alo-store`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in `meet.rs`,
+untouched); test binaries built in 4 m 50 s via the sanctioned background+marker
+form; `DATABASE_URL=…5432/alo_loop cargo nextest run -p alo-store` → **2 189
+tests, all passed** (1 skipped), 140.6 s, up from C1.3's 2 156. The 9 new
+integration tests were then re-run alone and passed in 0.63 s, and the 68
+campaign unit tests in 0.98 s.
+
+**No CHANGELOG line, deliberately** — same reason as C1.1–C1.3: store-side only,
+no route and no screen. The first campaigns entry belongs to C1.5, which is the
+item that gives a colleague something to open.
+
+**Flag, now for the fourth time: `scripts/prune-test-db.sh` is hardcoded to
+database `alo`.** `psql_q()` passes `-d alo` literally, so `DATABASE_URL` does
+not help and the script cannot prune this checkout's `alo_loop` at all. This
+iteration ran the script's own statements by hand against `alo_loop`: nothing
+was old enough to delete (7 618 tenants, every one created inside the two-hour
+cutoff by the loops running now), and the suite still finished in 140 s. The fix
+is a one-line `-d "${ALO_PG_DB:-alo}"`; the script is outside this item's write
+scope, so it stays a flag. **If a later iteration finds the gate mysteriously
+slow, this is why a prune can look like it ran and have done nothing.**
+
+- **Cuts:** the "has or has not received a given campaign" condition, above,
+  with the place it goes recorded in the migration and the module docs.
+- **Next:** C1.5 — the `/campaigns/*` API for C1.1–C1.4, wrong-tenant tested per
+  route, and the audience screen. Notes for it: this is the first campaigns item
+  with a route and a screen, so it carries the first CHANGELOG line, the first
+  i18n strings, and a STATE note that the production Caddyfile needs the
+  `/campaigns` prefix at the next deploy (do not touch `deploy/`).
+  `SegmentTally` is the shape the screen reads — the count moving as the
+  question is refined, and the excluded named with the reason — and
+  `campaign_segment_tally` deliberately takes conditions rather than a saved id
+  so an unsaved draft can be counted.
