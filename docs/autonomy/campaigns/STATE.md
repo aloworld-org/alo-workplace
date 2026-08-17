@@ -136,5 +136,10 @@ explicitly. LOOP.md's "check which database your server is on before you conclud
 anything about it" applies to the test runner too.
 
 - **Cuts:** none.
+- **Housekeeping, for the next iteration:** C1.1's commit went out without the
+  `Co-Authored-By: Claude …` trailer — the harness did not append it and the
+  message was written whole, so it has to be typed. It is not fixable after the
+  fact (rewriting pushed history is a hard rail), so the note is here instead:
+  put the trailer in the message before committing, not after.
 - **Next:** C1.2 — consent as a record (provenance, not a boolean), taking
   migration `0500`.
