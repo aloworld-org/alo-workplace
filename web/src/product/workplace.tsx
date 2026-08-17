@@ -17,6 +17,7 @@ import {
   HardDrive,
   Handshake,
   Landmark,
+  Megaphone,
   MessagesSquare,
   Receipt,
   Sigma,
@@ -48,6 +49,9 @@ const InsightsModule = lazy(() => import("../insights").then((m) => ({ default: 
 const InventoryModule = lazy(() => import("../inventory").then((m) => ({ default: m.InventoryModule })));
 const ProjectsModule = lazy(() => import("../projects").then((m) => ({ default: m.ProjectsModule })));
 const SitesModule = lazy(() => import("../sites").then((m) => ({ default: m.SitesModule })));
+const CampaignsModule = lazy(() =>
+  import("../campaigns").then((m) => ({ default: m.CampaignsModule })),
+);
 const ControlConsole = lazy(() => import("../control").then((m) => ({ default: m.ControlConsole })));
 
 function ModuleLoading() {
@@ -195,6 +199,24 @@ const suiteModules: ProductModule[] = [
     Icon: Globe,
     enabled: true,
     element: deferred(SitesModule),
+  },
+  // Campaigns is a workspace module only (ADR 0044): bulk email to a business's
+  // own customers belongs to the suite. The screen reads the audience and the
+  // question asked of it — nothing on it sends, because the sending identity
+  // needs a second IP that has to be bought, and the wave that builds it says so
+  // rather than shipping a button that would poison the invoices.
+  //
+  // Not in `module_access.rs`'s gated prefixes and deliberately so: an admin
+  // switch would need an `AppModule` variant and a CHECK migration on a table
+  // this track does not own. The routes are still tenant-scoped and
+  // authenticated; what is missing is only the per-user on/off toggle.
+  {
+    id: "campaigns",
+    path: "/campaigns",
+    label: strings.moduleCampaigns,
+    Icon: Megaphone,
+    enabled: true,
+    element: deferred(CampaignsModule),
   },
   // Chat is live as of ADR 0038 — built on alo's own store, not Matrix.
   {

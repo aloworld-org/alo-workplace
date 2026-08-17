@@ -10,6 +10,21 @@ contracts.
 
 ## Unreleased
 
+- **Campaigns: see who you could reach, and who you may not.** A new module
+  in the rail shows everybody this workspace knows an email address for —
+  your customers, the contacts on your deals, and the people who filled in a
+  form on your website — as one list, with each person appearing once however
+  many of those hold them. Narrow it by country and by whether somebody has
+  bought, and the count moves as you refine the question: *412 of 500 people
+  will be mailed*, with the rest named beside it — how many never agreed, how
+  many unsubscribed, how many bounced. A question worth keeping can be saved
+  under a name and opened again later. Nobody's personal address book is ever
+  a source. Nothing is sent from this screen: campaign mail needs its own
+  sending address, separate from your everyday mail, so that a newsletter can
+  never affect whether your invoices arrive.
+- **For operators: `/campaigns` is a new top-level route prefix** and needs
+  adding to the production Caddyfile at the next deploy. It needs no new
+  configuration otherwise, and it sends nothing.
 - **Website screens read better on a phone and through a screen reader.**
   Every button in the ticket box office and the shop shelf now says which
   event or product it acts on, so two events are no longer four identical

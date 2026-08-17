@@ -586,15 +586,204 @@ slow, this is why a prune can look like it ran and have done nothing.**
 
 ---
 
-## C1.5 (in progress) — the `/campaigns/*` API (2026-08-17)
+## C1.5 — the API, and the screen that shows the count with its exclusions (2026-08-17)
 
-**The API half is committed; the audience screen is the same item and follows
-in the next commit.** Recorded here rather than left implicit so an interrupted
-iteration finds a clean tree and a stated position rather than guessing from a
-half-checked queue. If this note is still the last entry, the routes below are
-on `main`, gated and tested, and `web/src/campaigns/**` does not exist yet.
+**Shipped in two commits, deliberately.** The API went out first
+(`abf1e6d2` → `4a18e185` after rebase) with a short in-progress note in its
+place here, because the item is large enough that an interrupted iteration
+would otherwise have found either a dirty tree or an unexplained half-checked
+queue. The screen followed. Nothing was cut.
+
+**Shipped.** `products/mail/alo-jmap/src/campaigns.rs` (the shared edge) plus
+`campaign_audience.rs`, `campaign_consent.rs`, `campaign_suppression.rs` and
+`campaign_segments.rs`; nine route templates registered in `server.rs`;
+`tests/campaigns_http.rs`; `web/src/campaigns/**` (the module, its client, the
+question bar, the tally line, the table and two read hooks); the module's rail
+entry in `web/src/product/workplace.tsx`; 50 strings in **all three** catalogs;
+the first campaigns CHANGELOG lines. No migration — this item adds no table, so
+`0503` is still free.
+
+**The routes.**
+
+| | |
+|---|---|
+| `GET /campaigns/audience` | one page of the people a question selects — everybody, mailable or not |
+| `GET /campaigns/audience/tally` | the count and every exclusion, by reason |
+| `POST /campaigns/consent` · `GET /campaigns/consent/{address}` | record evidence, read one person's provenance |
+| `GET`/`POST /campaigns/suppressions` · `GET /campaigns/suppressions/{address}` | who was lost and why |
+| `GET`/`POST /campaigns/segments` · `GET`/`PATCH`/`DELETE /campaigns/segments/{id}` | the saved question |
+
+**The shape, and why it is this shape.**
+
+- **The tally and the list take the conditions on the URL, not a saved id.**
+  This is C1.4's decision carried to the wire, and it is what makes the screen
+  possible: the count moves as the question is typed, before anything is saved.
+  A saved segment is *the same conditions read back* from
+  `GET /campaigns/segments/{id}`, so a draft and a stored segment are counted
+  by one code path. Two counting paths is how a segment comes to mean one thing
+  in the editor and another once it is saved.
+- **`/audience` returns the excluded people too, each carrying
+  `exclusionReason`.** Filtering them out at the edge would have been the
+  smaller answer and the wrong one: somebody who unsubscribed is usually still
+  a customer the tenant invoices, and a colleague who cannot see them cannot
+  check whether the number is right. `mailable` and `exclusionReason` are
+  computed once, server-side, from `ExclusionReason::for_member` — the same
+  precedence the tally's `CASE` applies — so the list and the count cannot
+  disagree about one person, and no browser re-derives the rule.
+- **`matched` is emitted although it is the sum of the parts.** The screen says
+  "412 of 500", and a client that computed its own denominator is a client that
+  can compute a different one. There is still no stored total:
+  `SegmentTally::matched()` adds the parts on every read.
+- **Suppression has no `DELETE` and consent has no `PATCH` — 405, not 403.**
+  The methods are *absent*, not guarded, and the store has no method to call
+  either. A route that exists is a route a bulk importer is eventually pointed
+  at, and "no import can bring them back" would then be true only until
+  somebody was in a hurry.
+- **`POST /campaigns/suppressions` for an already-suppressed address is `200`
+  with the record in force, not `409`.** The caller asked for a state and the
+  state holds. The answer carries the *first* reason, so a hard bounce three
+  months after an unsubscribe cannot rewrite "they asked to stop" into "their
+  mailbox was full" — which reads as a technical problem somebody might try to
+  fix.
+- **Every query parameter is read as text and judged by our own code.** A typed
+  `Query<T>` rejection answers in axum's shape rather than in our `Problem`, so
+  `limit=banana` and `limit=9000` would reach a caller as two different kinds
+  of error. Both are `422`, and both name the parameter.
+- **`countries` is comma-separated, not a repeated key**, because
+  `serde_urlencoded` keeps the last value of a repeated one — "Belgium and the
+  Netherlands" would silently become "the Netherlands", which is a wrong number
+  on a screen arrived at without an error. A unit test holds the split.
+- **`withinDays` with no `purchase` is refused rather than dropped.** Dropping
+  it answers a wider question than the one asked, and on this surface a wider
+  answer is a bigger send.
+- **The consent history is read per address and is never listed tenant-wide.**
+  A route that dumped every consent record would be an export of who the tenant
+  may mail. The audience already carries an evidence id beside each person,
+  which is the shape a screen needs.
+- **An address that is not one is a `422`, and an address the tenant has never
+  heard of is an empty list.** The `404` on `GET /campaigns/suppressions/{…}`
+  says only that *this* tenant holds no suppression, and it is the same answer a
+  neighbour's suppression gets — no existence oracle across tenants, and none
+  about a person either.
+- **The screen debounces the question and drops late answers.** Typing `B`,
+  `BE` starts two reads and the older can land second; every effect carries a
+  generation. A count that flickers back to the previous question is worse than
+  one that arrives a moment later, because it is a number somebody may act on.
+- **The rail entry is not gated by `module_access.rs`, deliberately.** An admin
+  on/off switch for Campaigns needs an `AppModule` variant and a CHECK migration
+  on `user_modules`, which is a table this track does not own. The routes are
+  still authenticated and tenant-scoped; what is missing is only the per-user
+  toggle, and it is a one-line addition to `MODULE_OF_PREFIX` on the day the
+  store learns the variant. Recorded because it is a decision, not an omission.
+
+**Who may not be mailed, quoted rather than summarised.**
+
+- `campaigns_http.rs::the_audience_names_everybody_and_says_which_of_them_will_not_be_mailed`
+  — the item, as a test. Four people in the four states the screen must
+  explain: mailable and a customer, mailable and a lead, known but never asked,
+  and gone for good. The list is asserted whole and in order; the excluded
+  customer is asserted to *still carry their consent record* alongside the
+  suppression, because the exclusion is not a claim they never agreed. Then the
+  arithmetic that makes the number auditable — `matched - mailable` equal to the
+  exclusions summed, read out of the same answer.
+- `a_condition_narrows_the_same_question_on_both_reads` — `countries=be` gives
+  the two Belgian customers on the list route and `mailable 1, matched 2` on the
+  tally route, so the two reads cannot drift; `countries=BE,NL` proves the comma
+  is not lost.
+- `nothing_on_this_surface_can_lift_a_suppression_or_rewrite_its_reason` — the
+  unsubscribe, then a hard bounce in different casing returning the same id,
+  same reason and same `sourceRef`; then `DELETE`/`PATCH` on both the
+  suppression and the consent routes asserted `405`; then an `Import` consent
+  record dated today from `newsletter-2026.csv`, accepted (an import claiming an
+  agreement is evidence worth keeping) and granting nothing — `mailable` stays
+  0 and the exclusion still reads `suppressed:unsubscribe`.
+- `a_record_that_is_not_evidence_is_refused_rather_than_stored` and
+  `a_suppression_that_could_never_be_applied…` (inside the suppression test) —
+  six and four malformed requests each, and after them the audience is re-read
+  to prove no half-write left a mailable customer or a phantom suppression
+  behind.
+- `a_neighbours_people_evidence_and_segments_are_unreachable_on_every_route` —
+  the mandatory wrong-tenant test, sharpened the way C1.1–C1.4 were. Two tenants
+  on one store hold the **same address**; the neighbour receives a complaint
+  about it. Their audience excludes them and ours does not (*unsubscribing from
+  one company is not unsubscribing from every company on the platform*), each
+  side asserted whole. Their consent is an empty list from our handle, their
+  suppression a `404`, their segment `404` on `GET`, `PATCH` and `DELETE` and
+  absent from our list — and then asserted still readable by its owner, because
+  a `404` that had deleted it would be worse than a leak.
+- `every_campaigns_route_refuses_a_caller_with_no_token` walks all **twelve**
+  verbs from one list, and the wrong-tenant test walks the same list, so a route
+  added later without a guard fails a test rather than shipping.
+- Unit tests in `campaigns.rs` hold the parsing: a blank parameter is absent
+  rather than "matches nobody"; a period with no condition fails; a purchase
+  token this build cannot name fails rather than widening; a cursor that is not
+  an address is refused rather than restarting the walk.
+
+**How verified.** `cargo fmt -p alo-jmap`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-jmap --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in
+`alo-store`'s `meet.rs`, untouched); test binaries built in 11 m 09 s via the
+sanctioned background+marker form; `DATABASE_URL=…5432/alo_loop cargo nextest
+run -p alo-jmap --no-fail-fast` → **1 264 tests, 1 263 passed, 1 failed** — the
+failure is not this change and is named below. The 10 new integration tests
+passed alone in 2.6 s. Web: `npx tsc --noEmit` clean, `npx eslint` clean on
+every changed file, `npm run build` clean, and `locale.test.ts` (65 tests) green
+with the new keys present in all three languages — `UNTRANSLATED` stays empty.
+`src/shell` and `App.test.tsx` re-run green, since a new rail module is exactly
+what an adoption test would notice.
+
+**The test database was pruned by hand first** (LOOP's own instruction, and the
+reason a gate goes mysteriously slow): 8 482 tenants → **1 717**, 103 MB. The
+suite then ran in 145 s.
+
+**Flag for the sites track — `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`
+fails on `main`, and it is not this change.** It fails **3/3 in isolation**,
+with no load and with the campaigns binary excluded, and the assertion is a
+timestamp comparison:
+
+```
+left: 2026-08-19 12:10:07.023978  +00:00:00
+right: 2026-08-19 12:10:07.0239789 +00:00:00
+```
+
+`tests/site_schedule_http.rs:193` compares `OffsetDateTime::now_utc() +
+2 days` — Windows gives it 100 ns ticks — against the same instant round-tripped
+through a Postgres `timestamptz`, which stores **microseconds**. So it passes
+only when the clock's sub-microsecond digit happens to be zero. It came in with
+`78781768` (08-12) and is a latent defect that surfaces on this machine, not a
+race. The fix is one line in their test — truncate `chosen` to microseconds
+before sending it — and `site_*` is the sites track's area, so this is a request
+for their queue rather than a race. **Nothing in this iteration touches
+`products/sites/**` or any `site_*` file.**
+
+**Flag, now for the fifth time and unchanged: `scripts/prune-test-db.sh` is
+hardcoded to database `alo`.** `psql_q()` passes `-d alo` literally, so
+`DATABASE_URL` does not help and the script cannot prune this checkout's
+`alo_loop` at all. This iteration ran the script's own statements by hand
+against `alo_loop`, which is where the 6 765 pruned tenants above came from. The
+fix is a one-line `-d "${ALO_PG_DB:-alo}"`. Five entries have now paid for this;
+it is recorded here rather than changed because `scripts/` is not this item's
+write scope, and a loop that starts widening its own scope on the fifth
+annoyance is a loop nobody can predict.
 
 **Note for the deploy the human runs: the production Caddyfile needs the
-`/campaigns` prefix added.** It is a new top-level route prefix, and `deploy/`
-is not this loop's to touch.
+`/campaigns` prefix added.** New top-level route prefix; `deploy/` is not this
+loop's to touch. It is also in the CHANGELOG under the operator line.
+
+- **Cuts:** none. Two smaller judgement calls worth naming. The country field is
+  a text box with a hint (`BE, NL`) rather than a picker, because there is no
+  country list on the web side and billing's own customer form is a text box
+  too — inventing a second convention here would be the larger change, and the
+  server's refusal is shown verbatim. And deleting a saved question is a
+  confirm rather than an undo, against the general preference in
+  `docs/design/ux-principles.md`: it matches Insights' board delete, and the
+  confirmation says the thing that actually matters — *nobody's agreement or
+  unsubscribe is touched, only the question goes.*
+- **Next:** C2s.1 — the per-recipient unsubscribe token: unguessable,
+  identifying the send and the recipient, revealing neither to whoever holds it.
+  Notes for it: read `alo-jmap`'s existing `unsubscribe.rs` first (it is the
+  *reader* half of RFC 8058 and already understands the standard), and the two
+  failures the item names both need a test — iterating identifiers to
+  unsubscribe other people, and confirming an address is live by watching what
+  the endpoint does. It takes migration `0503`.
 
