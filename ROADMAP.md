@@ -520,15 +520,37 @@ Before C2.1 can start:
 - [ ] C2.0b Reverse DNS `159.195.89.28 → news.alomails.com`, set at netcup once
       attached. Not in the domain's zone. Gmail and Outlook spam-file mail whose
       PTR does not match the sending host.
-- [ ] C2.0c Forward record `news.alomails.com → 159.195.89.28` at **Namecheap**,
-      where alomails.com is registered. Both directions must agree.
+- [x] C2.0c Forward record `news.alomails.com → 159.195.89.28` at **Namecheap** — added 2026-08-17, propagated and resolving at both Google and Cloudflare. Nothing else in the zone touched.
 - [ ] C2.0d **Begin warm-up as soon as it can send**, not when C2 starts. This is
       Phase 0's long-unchecked "IP warming begins now", and it is the only item
       in this track whose cost is calendar time that cannot be recovered later —
       a cold IP sending its first real campaign is filtered however correct the
       DKIM is.
 
-- [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and verified on the wire as the transactional trust stack was
+- [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and **verified on the wire together**, as the transactional trust stack was — never one record at a time, because a record nobody has tested is one everybody assumes is right.
+
+  **Why the parent SPF must not simply be widened.** `alomails.com` publishes
+  `v=spf1 mx -all` and `p=quarantine; adkim=s; aspf=s`. Strict alignment means an
+  envelope sender at `alomails.com` sent from the new IP **fails SPF and is
+  quarantined** — and the fix is emphatically not to add the campaign IP to the
+  parent's SPF. That would hand the marketing stream the transactional domain's
+  reputation, which is what buying a second IP was meant to prevent. The whole
+  point is a separate identity, so it gets separate records.
+
+  Worked example for our own domain, the shape every tenant's gets:
+
+  | record | value | why |
+  |---|---|---|
+  | `news.alomails.com` TXT | `v=spf1 ip4:159.195.89.28 -all` | authorises the campaign IP and nothing else |
+  | `<selector>._domainkey.news.alomails.com` TXT | the DKIM public key | generated **on the sending host**; the private half never leaves it |
+  | `_dmarc.news.alomails.com` TXT | `v=DMARC1; p=none; rua=…` | starts the new identity in report-only while the parent stays at `quarantine` |
+
+  That last row is load-bearing and easy to miss: `_dmarc.alomails.com` carries
+  **no `sp=` tag**, so subdomains inherit `p=quarantine` today. Warming a new
+  identity under an inherited enforcing policy means early misconfigurations are
+  quarantined instead of reported, which is the opposite of what a warm-up is
+  for. Publishing a subdomain policy is the only way to differ from the parent,
+  and it is tightened to `quarantine` once the reports come back clean.
 - [ ] C2.2 A separate queue and egress path, proven by a test that queues a campaign and sends a password reset behind it — the reset must not wait
 - [ ] C2.3 Per-tenant warm-up and rate limits, with the cap and its reason shown in the send flow
 - [ ] C2.4 `List-Unsubscribe` and `List-Unsubscribe-Post` on every campaign message — the **writer** half of what `unsubscribe.rs` already reads. This is the header the mail client turns into its own Unsubscribe button, and it must work with a single POST and no login.
