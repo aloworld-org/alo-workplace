@@ -514,12 +514,9 @@ reputation hides, which is why the check mattered rather than being a formality.
 
 Before C2.1 can start:
 
-- [ ] C2.0a Attach the IP to the server — netcup **SCP → server → Network →
-      select the ordered IPv4 → Save**. It is a separate CCP product until then
-      and has no rDNS field of its own.
-- [ ] C2.0b Reverse DNS `159.195.89.28 → news.alomails.com`, set at netcup once
-      attached. Not in the domain's zone. Gmail and Outlook spam-file mail whose
-      PTR does not match the sending host.
+- [x] C2.0a Attached 2026-08-17 — netcup routes it as `159.195.89.28/32` via the primary address, which is their normal arrangement for an extra IPv4. No reboot or network restart was needed, and the primary address, its gateway and its PTR were untouched.
+- [x] C2.0b Reverse DNS set 2026-08-17 and confirmed from outside: forward `news.alomails.com → 159.195.89.28` and reverse `159.195.89.28 → news.alomails.com` both resolve at Google. That is the forward-confirmed reverse DNS Gmail and Outlook check.
+- [x] C2.0e Bound inside the VM — netcup routing the address is not the same as the operating system holding it, and nothing can send from an address the kernel does not have. Added to `eth0` and persisted in `/etc/network/interfaces.d/50-cloud-init.cfg` as `up`/`down` commands appended to the existing stanza rather than a second `iface` block, so the primary address and gateway are never re-parsed to reach it; `|| true` on both so a failure there can never abort `ifup` at boot and cost the server its network. cloud-init's network management is disabled on this host (`99_nc_network_disable.cfg`), so the file is not regenerated. Verified: outbound traffic sourced from the new address works, the gateway is still reachable, and SMTP still answers.
 - [x] C2.0c Forward record `news.alomails.com → 159.195.89.28` at **Namecheap** — added 2026-08-17, propagated and resolving at both Google and Cloudflare. Nothing else in the zone touched.
 - [ ] C2.0d **Begin warm-up as soon as it can send**, not when C2 starts. This is
       Phase 0's long-unchecked "IP warming begins now", and it is the only item
