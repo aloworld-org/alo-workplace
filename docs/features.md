@@ -464,7 +464,6 @@ EU models, suggest-only where the EU AI Act calls a use high-risk.
 - [B1] Quote lifecycle: draft → sent (as PDF via alo Mail) → accepted/declined/expired; accepted converts to invoice in one click
 - [B1] Invoice record: same line model + issue date, due date, payment terms
 - [B1] Legal sequential numbering: per-tenant, gapless, assigned at issue (drafts unnumbered), immutable once issued
-- [2] Confirm before issuing an invoice whose gross is **zero**, or whose line has zero quantity. Found by testing the live stack on 2026-08-17: mistyping a line field name (`quantityMilli` for `qtyMilli`) defaulted the quantity to zero and produced an issued, numbered, €0 invoice with no warning at any point. The API is right to tolerate the unknown field — public surfaces change additively, so `deny_unknown_fields` would be the wrong fix — and the store is right to let a €0 invoice exist, since fully-discounted ones are real. What is missing is the pause: numbering is gapless, so that invoice cannot be deleted, only credited. A confirmation at the moment of issue costs nothing and closes a path from one typo to a permanent legal document.
 - [B1] Credit notes: negative-total invoice referencing the original — the only legal way to "undo" an issued invoice
 - [B1] PDF rendering: clean invoice/quote PDF with tenant branding (logo, footer, bank details)
 - [B1] ★ **EN 16931 e-invoice**: Factur-X (PDF with embedded XML) + XRechnung/UBL output — the format German/French law requires; validated against the official schematrons
