@@ -66,6 +66,34 @@ propose/approve UI); each agent is a thin, product-scoped tool set + prompt.
 
 ---
 
+## alo Campaigns — bulk email that cannot poison the mailbox (ADR 0044)
+
+Mailchimp's weakness is that it is a separate company holding a copy of your
+customers, and charges rent on it. Ours is that our sending IPs have no history.
+The moves and the honest limits are in `docs/design/campaigns-gaps.md`; the
+differentiator is **the segment and the attribution**, and everything else —
+the editor included — is built to good enough rather than to better than theirs.
+
+**The audience is assembled from tenant-wide records only** — billing
+customers, CRM deal contacts, and site form submissions. Never the `contacts`
+table, which is a *per-user* address book: a company campaign drawn from it
+would mail people out of an individual's private contacts, which is a privacy
+boundary rather than a preference.
+
+- [2] ★ **The audience is a query, not a list** — "bought in the last 18 months but not the last 90 days, in Belgium" is a join across CRM, Billing and site events. Nothing to sync, because there is no list; no duplicate people, because there are no audiences to be in twice.
+- [2] ★ **Consent is a record** — when, from which form, from which address, shown on the person. A campaign cannot go to somebody without one, and an import must state where the addresses came from.
+- [2] ★ **Suppression is absolute and enforced in the store** — an unsubscribe, hard bounce or complaint removes somebody from every future send, and no segment, import or re-upload can bring them back. Enforced at send time in SQL rather than applied by the sender, or it is not absolute.
+- [2] ★ **A separate sending identity** — own subdomain, own DKIM selector, own IP or pool, own queue, so a marketing reputation can never reach the domain carrying invoices and password resets. Architecture, not a paid tier. **Blocked on a second IP: this is a purchase, not a decision.**
+- [2] ★ **Warm-up is visible in the send flow** — a new subdomain and IP mailing thousands on day one is filtered however correct the DKIM is. The cap and the reason are shown where the send happens, never in a footnote.
+- [2] ★ **One-click unsubscribe every time** (`List-Unsubscribe`, RFC 8058) — alo already implements the reader half in `unsubscribe.rs`; this is the same standard from the other end. A recipient who cannot find it presses "spam" instead, and that is the signal that ends a reputation.
+- [2] ★ **Bounces and complaints act on themselves** — hard bounce suppresses immediately, soft bounce retries then suppresses, a complaint suppresses and counts against the tenant's rate.
+- [2] ★ **The number reported is money, not opens** — delivered → clicked → visited → converted → **invoiced**, in euros, because the invoice is in the same database. No tracking pixel by default: a per-campaign choice, off unless chosen, and disclosed.
+- [2] **The composer reuses the Docs block model**, compiled to email-safe HTML — one content model and a second renderer, the same shape as Sites compiling sections to static HTML. Not a second editor.
+- [3] ★ **The Campaigns agent turns a sentence into a segment you can see and edit** — not writing the copy, which everyone ships. The query is the artefact.
+- [3] Automations: a send triggered by a CRM stage, an invoice going unpaid, or a form submission.
+
+---
+
 ## Mail
 
 - [L] Mailboxes, folders/labels, aliases, plus-addressing (`user+tag@`)

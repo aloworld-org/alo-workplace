@@ -463,6 +463,54 @@ abbreviations on an axis (BI1.08).
 Later waves (post-traction, unordered): manufacturing-lite, POS, subscriptions,
 e-signature (eIDAS), marketing sends, storefront, DATEV/PSD2 integrations.
 
+## Campaigns track — bulk email that cannot poison the mailbox (ADR 0044) ⇄ after the Agent track
+
+Ordered so that the half blocked on a purchase does not block the half that is
+not. **C1 needs no second IP and no sending at all** — it is the audience, the
+consent record and the suppression rule, which are the differentiator and the
+part nobody else can copy. C2 is the sending identity and cannot start until
+there is a second IP; C3 is the campaign itself.
+
+Migrations take the **`05xx`** block. The agent track holds `04xx` and the
+sites track `03xx`.
+
+### Wave C1 — the audience, and the two rules that make it safe
+
+- [ ] C1.1 The reachable audience: one tenant-scoped view over **billing customers, CRM deal contacts and site form submissions**, deduplicated by address. Explicitly **not** the `contacts` table — it is a per-user address book, and a company campaign drawn from it would mail somebody's private contacts. A test proves that table is never a source.
+- [ ] C1.2 Consent as a record: when, from which source, from which address, with the provenance stored rather than a boolean. A person with no consent record cannot be a recipient, proven by a test rather than by a filter in the caller.
+- [ ] C1.3 Suppression, absolute and global to the tenant: unsubscribe, hard bounce and complaint each suppress, and **the audience query itself excludes them in SQL**. A test proves an import cannot resurrect a suppressed address, because if the sender applies the rule it is not absolute.
+- [ ] C1.4 Segments: a saved query over the audience with the conditions ADR 0044 names — bought/not bought within a period, country, has/has not received a given campaign. The count and the exclusions are both readable, because a number without its exclusions is not auditable.
+- [ ] C1.5 The audience screen: the segment reading as a question with the count moving as it is refined, and the excluded people named with the reason. Wrong-tenant and wrong-user tests per surface.
+
+### Exit gate — C1 done when:
+
+- [ ] A segment answers "bought in the last 18 months but not the last 90 days, in Belgium" from real CRM and Billing rows, with its exclusions listed
+- [ ] A suppressed address cannot be returned by any segment, and re-importing it does not bring it back
+- [ ] No query in the module reads the per-user `contacts` table
+
+### Wave C2 — the sending identity *(blocked: needs a second IP — a purchase, not a decision)*
+
+- [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and verifiable on the wire like the transactional trust stack was
+- [ ] C2.2 A separate queue and egress path, so a campaign backlog cannot delay a password reset — proven by a test that queues a campaign and sends a transactional message behind it
+- [ ] C2.3 Per-tenant warm-up and rate limits, with the cap and its reason **shown in the send flow**
+- [ ] C2.4 `List-Unsubscribe` with one-click (RFC 8058) on every campaign message, working without a login — the writer half of what `unsubscribe.rs` already reads
+- [ ] C2.5 Bounce and complaint feedback acted on: hard suppresses, soft retries then suppresses, complaints count against the tenant's rate
+
+### Wave C3 — the campaign, and the number it reports
+
+- [ ] C3.1 The composer over the Docs block model, compiled to email-safe HTML — one content model, a second renderer
+- [ ] C3.2 Send: consent check, warm-up cap, test send, schedule — the safety screen, not a marketing screen
+- [ ] C3.3 Attribution: delivered → clicked → visited → converted → **invoiced**, in euros, joined to the invoice rather than estimated. No tracking pixel unless chosen per campaign, and disclosed when it is
+- [ ] C3.4 ★ The Campaigns agent: a sentence becomes a segment you can see and edit — the query is the artefact, never the copy
+
+### Exit gate — Campaigns done when:
+
+- [ ] A real campaign goes to a real segment from a dedicated subdomain, and the transactional domain's reputation is untouched — measured, not assumed
+- [ ] The campaign's row in the list shows money invoiced, traced to the invoices behind it
+- [ ] An unsubscribe from that campaign is honoured everywhere, immediately, and survives a re-import
+
+---
+
 ## Sites track — alo Sites, the AI-native website builder (ADR 0036) ⇄ parallel to the Business track
 
 Second autonomous loop (office PC): a no-code, **AI-first** website builder —
