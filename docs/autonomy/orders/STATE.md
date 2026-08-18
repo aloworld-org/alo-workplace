@@ -163,3 +163,74 @@ a header. **Read the module headers first — this repository writes its reasoni
 where the code is, and the answer to "does it do X" is usually stated outright
 rather than inferred from a grep.**
 
+---
+
+## 2026-08-18 — the successor ADR, and O1 re-cut to four items
+
+**Shipped:** `docs/decisions/0054-what-the-order-book-still-needs.md`, ADR 0053
+marked superseded, `QUEUE.md`'s wave O1 re-cut from seven items to four, and the
+ROADMAP's order track corrected. No code — this is the re-cut the halt asked a
+human for, and it is now unblocked in a checkout of its own.
+
+**Every claim in 0054 was read out of the module it describes.** The entry above
+records that the last two attempts both nearly wrote from memory of a search;
+this one names the file and line behind each statement so the next reader can
+check rather than trust.
+
+**Three questions the previous reads left open, now answered:**
+
+- **The quote link is absent, not "partly built".** Every occurrence of `quote`
+  in `inv_so.rs`, `inv_so_lines.rs`, `inv_so_confirm.rs` and `inv_so_invoice.rs`
+  is **prose in a comment** — one about a conversation, one listing states, one
+  about what a line was quoted at, one about not restating a price. There is no
+  column, no table and no code. The previous entry's "may be partly there" was
+  the right instinct and the wrong conclusion.
+- **The link should be a column, not a link table.** `billing_invoices.quote_id`
+  already exists (migration 0106) with a composite foreign key. An order comes
+  from at most one quote and the invoice side already answers the same question
+  the same way; a second shape for one relationship is a second thing to read.
+  This retires the halted iteration's drafted `0700_order_quote_links.sql`
+  outright — it was solving a problem the schema had already solved next door.
+- **The row lock at confirmation is not enough for the refusal.**
+  `confirm_inv_sales_order` takes `SELECT … FOR UPDATE` on the *order* row. Two
+  confirmations of two different orders for the same product lock different rows
+  and their folds interleave freely, so a refusal built on that lock alone would
+  pass every single-threaded test and fail exactly when it mattered — the failure
+  this journal's opening rule names.
+
+**The finding neither 0053 nor the two corrections mention: there are already
+three answers to "what can we promise", and none consults the others.**
+
+| answer | counts | for |
+|---|---|---|
+| `inv_reorder::available_qty_milli` | `on_hand + on_order − committed` | *do I need to buy?* |
+| `inv_stock_sale::stock_for_sale` | `on_hand` at `stock` locations `−` live shop holds | *can this buyer check out?* |
+| `record_move` | the ledger, which refuses to go negative | the physical floor |
+
+The first ignores shop holds; the second ignores confirmed sales orders — and
+`inv_stock_sale.rs` says so on purpose: *"a warehouse door that suddenly
+consulted a shop table would repeal [Inventory's decision] from the outside."*
+0054 §2 keeps that and writes down what follows: a hold and an order can both
+count on the same unit, whoever picks second finds it gone, and `record_move`
+keeps the ledger honest so it surfaces as scarcity rather than as an oversold
+shelf. Joining the two doors is a separate ADR, not a side effect of this wave —
+and `inv_stock_sale.rs` is not this track's file to change either way.
+
+**How the refusal is settled, decided rather than left to the item.** A
+transaction-scoped advisory lock per `(tenant, product)` — the pattern
+`inv_stock_sale.rs` already uses at line 164 for the same race, so the two paths
+that can promise a unit settle contention one way rather than two. Every stocked
+product on the order is locked **in ascending product-id order**, because an
+order has many lines where a hold has one, and two orders sharing two products
+locking them in opposite orders is a deadlock nobody would find in testing.
+
+**What the re-cut actually removed.** Three items were struck as built (O1.1,
+O1.4, O1.5) with the file that builds each; one (the Orders agent) was moved to
+O2 because it reads a screen that does not exist yet, and an item nobody can
+start is the `[ ]` this track already learned to write as `[~]` with a reason.
+Four remain: the refusal, the link, the routing, the read.
+
+**Next:** O1.a. Its test is the one that has to be written first and has to fail
+first — two concurrent confirmations for the last unit, against today's code,
+where today both succeed. A race test that has never failed proves nothing, and
+this wave's whole argument is that a fan cannot be promised twice.

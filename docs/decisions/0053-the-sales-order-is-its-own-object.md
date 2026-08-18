@@ -1,9 +1,15 @@
 # ADR 0053 — The sales order is its own object, reservation is soft, and invoices follow deliveries
 
-**Status:** **DISPUTED — do not build from this file.** Its central premise is
-false and two of its three decisions are affected. Accepted 2026-08-18, disputed
-the same day by the orders loop's first iteration, which read the code instead of
-trusting the ADR.
+**Status:** **SUPERSEDED by [ADR 0054](0054-what-the-order-book-still-needs.md) —
+do not build from this file.** Its central premise is false and two of its three
+decisions are affected. Accepted 2026-08-18, disputed the same day by the orders
+loop's first iteration, which read the code instead of trusting the ADR, and
+replaced later that day by a successor written from the code rather than from a
+search.
+
+It is kept rather than deleted because it is the record of how an entire wave
+came to be scoped on a grep, and that is worth more to whoever comes next than a
+tidy directory.
 
 > **What is wrong, so nobody rediscovers it.**
 >

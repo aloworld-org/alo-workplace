@@ -463,47 +463,47 @@ abbreviations on an axis (BI1.08).
 Later waves (post-traction, unordered): manufacturing-lite, POS, subscriptions,
 e-signature (eIDAS), marketing sends, storefront, DATEV/PSD2 integrations.
 
-## Order track — **SUSPENDED, re-cut needed** (ADR 0053 disputed) ⇄ after Campaigns C1
+## Order track — **re-cut 2026-08-18 to four items** (ADR 0054) ⇄ after Campaigns C1
 
-> **Do not run this wave as written.** Its premise is false: the sales order,
-> delivery notes and invoice-from-delivery were built in wave B5.06 (2026-08-10)
-> under `inv_so_*` names. O1.1 is ~90% built and O1.4 and O1.5 look built
-> outright. Building O1.1 literally would create the duplicate object ADR 0053
-> rejects in its own *Rejected* section.
+> **Read [ADR 0054](docs/decisions/0054-what-the-order-book-still-needs.md), not
+> 0053, which is superseded.** The old wave's premise was false: the sales order,
+> delivery notes and invoice-from-delivery were all built in wave B5.06
+> (2026-08-10) under `inv_so_*` names, and the absence was concluded from a
+> `sales_order` grep that missed the convention. **O1.1, O1.4 and O1.5 are
+> built**; building them again would create the duplicate object 0053 rejects in
+> its own *Rejected* section.
 >
-> The three real gaps: **reservation** (`inv_so.rs` says confirming reserves
-> nothing), the **quote-to-order link and routing**, and the **order book across
-> orders plus its agent**. Re-cut O1 around those, from a successor ADR written
-> by reading `inv_so*.rs` first.
->
-> Also outstanding: the orders track needs **its own checkout**. It halted on
-> 2026-08-18 because a second loop was writing the same tree, which makes every
-> gate meaningless in both directions.
+> What is genuinely missing is four things — a **refusal** at confirmation, the
+> **quote → order link**, **routing on acceptance**, and the **order book read** —
+> and they are the wave below. The queue is
+> `docs/autonomy/orders/QUEUE.md`; the track has its own checkout now
+> (`C:\dev\Ficina-orders`), which is what unblocked it.
 
-**What is missing, stated plainly.** alo has the money half of an ERP and not the
-goods half. Walking the live flow on 2026-08-17 with a fan manufacturer's data,
-a EUR 29,736.96 order went quote to invoice in one step: nothing was reserved,
-nothing was picked, and no stock moved. In Odoo or SAP that same acceptance
-would have created a sales order, reserved the parts and produced a delivery
-note.
+**What is missing, stated plainly — corrected 2026-08-18.** alo has more of the
+goods half than this section claimed. A quote still goes straight to an invoice
+draft, and that is real: nothing routes an acceptance to an order. But an
+accepted order, once raised, already reserves nothing *by design*, delivers in
+parts through `record_move`, and invoices what shipped.
 
 ```
 Odoo / SAP:  quote -> SALES ORDER -> production -> DELIVERY -> invoice
 alo today:   quote  ----------------------------------------> invoice
+             (and, raised by hand:  SALES ORDER -> DELIVERY -> invoice)
 ```
 
-The consequence is not cosmetic: there is no record of **ordered but not yet
-delivered**, which for a manufacturer is most of the business at any moment.
-The order book cannot be answered, a fan can be sold twice, and an invoice is
-raised for goods that may never have shipped.
+So the consequence is narrower and sharper than "there is no record of ordered
+but not delivered" — that record exists. **Nothing refuses an over-commitment**:
+`confirm_inv_sales_order` draws the number without asking whether the goods can
+exist, so two orders for the last fan both confirm. And **nothing connects the
+offer to the order**, so the flow a customer actually walks still ends at an
+invoice for goods that may never have shipped.
 
-**Prerequisite: an ADR, before any of O1.** It decides three things a queue must
-not decide for itself — whether the sales order is a new object or an invoice in
-another state; whether reservation is soft (a promise) or hard (stock moved into
-a holding location); and whether invoicing follows the *order* or the
-*delivery*, which is the difference between billing what was promised and
-billing what left the building. Write it first; the S2.15 domain build shipped
-without its ADR and the review had to be retrofitted.
+**The ADR is written and it is 0054.** The three questions the prerequisite named
+turned out to be already answered *in the build* rather than open: the sales
+order is its own object, reservation is a promise and not moved stock, and
+invoicing follows the delivery. 0054's job was different — to say what is left
+once you read that, and to settle the one thing the code genuinely leaves open
+(how a confirmation refuses an over-commitment without inventing a second ledger).
 
 **A quote for services must still become an invoice directly.** Products already
 carry `stocked`; a quote of consultancy days has nothing to reserve or deliver,
@@ -512,21 +512,24 @@ exists for the lines that move.
 
 Migrations take the **`07xx`** block (campaigns `05xx`, mail/platform `06xx`).
 
-### Wave O1 - order, reservation and delivery
+### Wave O1 - the refusal, the link, the routing and the read
 
-- [x] O1.0 **ADR 0053** — the sales order is its own object with its own numbering (an invoice is a legal document and the relationship is many-to-many); reservation is **soft**, with `reserved <= on_hand + on_order` enforced in SQL rather than by the caller; and invoices follow **deliveries** by default, with order-based invoicing kept for deposits — which the walkthrough proved is real, since that fan order took a EUR 10,000 deposit before anything shipped.
-- [ ] O1.1 The sales order: created from an accepted quote whose lines include stocked goods, carrying ordered quantity per line and what has been reserved, delivered and invoiced so far. The order is the thing that answers "where is this?" and every later item hangs off it.
-- [ ] O1.2 Accepting a quote routes by content - an order where lines are stocked, an invoice draft where they are not. Today's direct-to-invoice path stays exactly as it is for services, and a test pins that so the change cannot regress the flow that already works.
-- [ ] O1.3 Reservation against inventory: confirming an order reserves its stocked lines, and the reserved quantity is visible beside on-hand and on-order. **A fan promised twice is the failure this exists to prevent** - the wrong-tenant test has a sibling here, an over-commitment test.
-- [ ] O1.4 Delivery notes: goods leave against an order, stock moves through the existing `record_move`, partial deliveries are normal rather than exceptional, and the note is a document a driver can carry.
-- [ ] O1.5 Invoice from what was delivered, not from what was ordered - with the order line carrying the invoiced quantity so a part-delivered order bills correctly and the remainder stays visible.
-- [ ] O1.6 The order book: ordered, reserved, delivered, invoiced and outstanding, per order and in total. This is the screen a manufacturer opens first in the morning and the one alo cannot draw today.
-- [ ] O1.7 The Orders agent: answer where an order is, what is short, and what can ship today - reads, answering in the room, per ADR 0047.
+- [x] O1.0 **ADR 0054** — written from the code, superseding 0053. The sales order already exists, so extend `inv_so_*` rather than building a second one; `reserved` stays **computed** (`inv_reorder`'s `committed` fold) and what is missing is the **refusal** at confirmation; the quote link is one additive column mirroring `billing_invoices.quote_id`; and the three availability answers already in the build deliberately do not consult one another, which is now a named limitation rather than an inherited surprise.
+- [~] ~~O1.1 The sales order~~ — **built** in wave B5.06 (migration 0162, `inv_so.rs`, `inv_so_lines.rs`). Ordered, delivered and invoiced per line all exist.
+- [~] ~~O1.4 Delivery notes~~ — **built** (`inv_so_deliver.rs`): movements through `record_move`, partial delivery normal, over-delivery refused, notes numbered `SO-2026-00001/D1`.
+- [~] ~~O1.5 Invoice from what was delivered~~ — **built** (`inv_so_invoice.rs`, migration 0164).
+- [ ] O1.a The **refusal at confirmation**: an order whose stocked lines would push `committed` past `on_hand + on_order` is refused inside the transaction that draws the number, naming the product and the shortfall. Settled with a per-`(tenant, product)` advisory lock the way `inv_stock_sale.rs` settles the same race, locking every stocked product on the order in ascending id order so two orders sharing two products cannot deadlock. **A fan promised twice is the failure this exists to prevent**, and its test must fail against today's code before it passes.
+- [ ] O1.b The **quote → order link**: an additive `quote_id` on `inv_sales_orders` with a composite foreign key, exactly as migration 0106 gave the invoice its own. Not a link table.
+- [ ] O1.c **Accepting a quote routes by content** — an order when any line names a stocked product, a draft invoice when none does. Today's services path stays exactly as it is, pinned by a test written before the branch exists.
+- [ ] O1.d The **order book**: ordered, reserved, delivered, invoiced and outstanding, per order and in total, wrong-tenant tested per route. Smaller than it was, because the four numbers per line already exist.
+
+**Cut to O2:** the Orders agent (was O1.7). It reads what O1.d produces and cannot
+be specified before that screen exists.
 
 ### Exit gate - O1 done when:
 
-- [ ] The fan quote from the walkthrough becomes an order, reserves six AF-630s, ships four on one note and two on another, and bills each delivery - with the order book showing the remainder at every step
-- [ ] Stock cannot be committed twice, proven by a test rather than by care
+- [ ] The fan quote from the walkthrough becomes an order, ships four on one note and two on another, and bills each delivery - with the order book showing the remainder at every step
+- [ ] Two concurrent confirmations cannot both promise the last unit, proven by a test that failed before the refusal existed
 - [ ] A services quote still becomes an invoice directly, unchanged
 
 ### Wave O2 - making the thing *(not started; needs O1)*
