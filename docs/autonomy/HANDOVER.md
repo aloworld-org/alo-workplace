@@ -4,6 +4,10 @@ Where each thread stands, what blocks it, and the operational facts that cost
 time to learn. Written at the end of a long session so the next one starts from
 the state rather than from the search.
 
+**Updated later on 2026-08-18:** the campaign sending identity is done and
+warm-up has started — the item that had a clock on it. Section 1 records what it
+took; the backend is deployed. `orders` is now the top of the list.
+
 ## Running
 
 **`ds`** — started 13:16 on `C:\dev\Ficina-loop`, 12 items, taking
@@ -12,23 +16,41 @@ tsc/eslint/vitest/build and does not touch Rust. Needs nothing.
 
 ## In order of what blocks what
 
-### 1. The campaign identity, and warm-up — the only item with a clock
+### 1. ~~The campaign identity, and warm-up~~ — **done 2026-08-18**
 
-Everything else here can be done later at the same price. This cannot: warm-up
-is weeks of gentle sending and it has not started.
+Proved on the wire at an independent receiver, and warm-up started the same day.
 
-- Dual-sign landed (`7e331ced`): a domain may hold one active DKIM key **per
-  algorithm**, `sign_outbound` emits one signature per key, ARC still seals once.
-- What remains is wiring `news.alomails.com` to sign with the `camp` RSA key
-  (private half at `deploy/production/dkim/campaign.key`, public already
-  published) beside an Ed25519 one, then publishing the second DKIM record.
-- **Then send one message and read `Authentication-Results`.** It must say
-  `spf=pass dkim=pass dmarc=pass`. That is how the transactional stack was proved
-  and the only way to know the records are right rather than merely present.
-- Strict alignment (`adkim=s; aspf=s`) is live on `_dmarc.news`, so three things
-  must be exactly `news.alomails.com`: the From domain, the envelope-from, and
-  the DKIM `d=`. A bounce domain defaulting elsewhere fails DMARC while SPF and
-  DKIM each pass — two green checks and a red verdict.
+```
+Received-SPF: Pass (mailfrom) identity=mailfrom; client-ip=159.195.89.28
+dkim=pass (2048-bit key) header.d=news.alomails.com header.s=camp header.a=rsa-sha256
+dmarc=pass (p=none dis=none) header.from=news.alomails.com
+```
+
+The transactional identity was re-checked the same day and is untouched: 10/10
+from `152.53.179.142`, `d=alomails.com s=fic`. Two identities, neither borrowing
+the other's reputation.
+
+- `alo-smtp --install-dkim-key` is the operator door for a sending identity's
+  key (the `camp` RSA key is installed; the record in DNS was compared
+  byte-for-byte against what the stored key derives).
+- `ALO_SMTP_EGRESS_IPS` chooses the source address **and the greeting** by
+  envelope-from domain. On Docker it needs the compose `egress` network and
+  `ops/systemd/alo-campaign-egress.service` — a container cannot bind one of the
+  host's public addresses.
+- **Warm-up: `docs/design/sending-reputation-warm-up.md`** has the schedule, the
+  weekly checks and the log. The ramp is conditional on a clean week, not on the
+  calendar. Read the DMARC `rua` reports weekly; they are the only independent
+  evidence of how our mail authenticates where we cannot see.
+
+**Two things left, and one is the owner's:**
+
+- **Publish `news.alomails.com MX 10 mail.alomails.com` at Namecheap.** It is now
+  the only authentication deduction a receiver makes (−3 of 10): a sending domain
+  that cannot receive looks one-way. Land it with C2.10 so the return path
+  actually arrives rather than being refused.
+- The Ed25519 half of dual-signing is **not** installed yet, deliberately: its
+  record must be published *before* its key is installed, or every receiver that
+  reads it reports an unverifiable signature. RSA alone is signing today.
 
 ### 2. `orders` — one session, and smaller than it looks
 
@@ -66,12 +88,17 @@ by Codex's chat rebuild:
 
 ### 5. Deploy
 
-`main` has moved a long way since the 2026-08-17 deploy: campaigns, VAT
-treatment, dual-sign, and the corrections. Same procedure as the last one, which
-is recorded in that session: back up first, ship source with `git archive` (never
-rsync — `.localdev` must not travel), build on the server, migrations run on
-start, then web and Caddyfile together, and **restart Caddy rather than reload**
-(a reload exits 0 while doing nothing).
+**Backend deployed 2026-08-18** — `alo-smtp`, `alo-jmap` and `alo-imap` rebuilt
+from `main` and running; database backed up first (`/root/pre-egress-*.dump`,
+verified with `pg_restore --list` inside the container). All eleven services
+healthy.
+
+**The web bundle and the Caddyfile were not shipped**, so `/campaigns` still
+needs its prefix in the production Caddyfile at the next web deploy — new
+top-level route prefixes 404 through the SPA otherwise, which has cost two
+afternoons before. Same procedure as the last one: build locally, upload, **copy
+in place** (`cp -a web-new/. web/`) rather than swapping the directory, and
+**restart Caddy rather than reload** (a reload exits 0 while doing nothing).
 
 ## Owner-only
 
@@ -101,3 +128,19 @@ start, then web and Caddyfile together, and **restart Caddy rather than reload**
   repository states its reasoning in the first twenty lines of a file. ADR 0053
   was written on a filename grep that missed `inv_so_*`, and an entire wave was
   scoped on the answer.
+- **Docker outranks your iptables rule.** Creating a bridge network inserts a
+  MASQUERADE rule at the *top* of nat `POSTROUTING`. Campaign mail left by the
+  transactional IP for an hour while every log line correctly said the source was
+  pinned, and the only thing that named it was the receiver's own refusal. The
+  answer is to remove the competing rule
+  (`enable_ip_masquerade: "false"` on that bridge), never to try to outrank it.
+- **A failure that only reaches a DSN is a failure you cannot read.** A permanent
+  5xx logged nothing at all; when the DSN itself then failed — a null-sender
+  bounce to a return path with no mailbox — the reason was gone, leaving
+  `bounced=1` and no explanation. Fixed, but the general lesson stands: whatever
+  a diagnosis depends on must be in the log, not in an artefact that can be
+  discarded.
+- **A green suite says nothing about an identity.** Both of the real defects here
+  — the masquerade ordering and the greeting name — were invisible to every test
+  and visible in the first message actually sent. For anything a *receiver*
+  judges, send one and read what came back.
