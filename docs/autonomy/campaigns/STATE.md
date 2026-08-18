@@ -1837,3 +1837,159 @@ campaign meets immediately.
   `the_document_carries_no_stylesheet_because_a_mail_client_may_drop_one` pins
   that there is none — the dark-mode block is the one legitimate exception to
   that rule and the test has to be taught the difference, not deleted.
+
+## C3.5 — the letter as half the recipients actually see it (2026-08-18)
+
+**Shipped: the two thirds of C3.5 that stand alone today, exactly as the C3.4
+entry proposed.** The item asks for three things — alt text on every image,
+colour never the only carrier of meaning, and a dark-mode-safe palette — and
+the first of them is a question rather than a task, because **the block model
+has no image block at all**. C3.1 recorded that as a decision: a remote image
+is a fetch we can see, which is the open-tracking pixel ADR 0044 refused by
+default. Adding one is an ADR-shaped argument about who may fetch and what is
+logged, and a loop does not write that ADR alone. So the images half of the
+item shipped as the stronger promise the model can actually make today, and the
+question is journalled below rather than answered.
+
+**Images blocked is not a degraded reading of this letter — it is the same
+one.** No `<img>`, no `<svg>`, no `background-image`, no `url(`, no `src=`
+anywhere in the document, so there is nothing for a client to block and nothing
+for a blocked image to take with it.
+`a_letter_reads_the_same_with_images_blocked_because_it_has_none` pins the
+absence rather than trusting it, which is what turns "we have no image block"
+from a fact about today's model into a rule the next block has to answer to.
+
+**The dark palette is the design system's navy scale read the other way up, and
+nothing in it is invented.** `--navy-700` is the ground, `--navy-600` the card,
+`--navy-500` the recessed tint, cream and `--navy-100` the two inks,
+`--navy-400` the rule. That mattered more than it sounds: **the product has no
+dark theme at all** — `web/src/ds/tokens.css` has no `prefers-color-scheme`
+block and no dark token — so every value here had to be defensible on its own,
+and quoting an existing scale is the only way this palette is still the right
+one on the day the design system grows a dark mode. `LETTER_PALETTE` is the six
+rows to reconcile it against, and the module docs say so.
+
+**One thing is not a mirror and is worth knowing before the reconciliation:
+light sinks by darkening, dark sinks by lifting.** `--bg-sunken` is *darker*
+than the card in light mode; the dark sunken tint is *lighter* than the dark
+card. Both read as "set back", and inverting that literally would have put the
+code sample in a hole.
+
+**The rules are generated from the same table the renderer draws from, and they
+select on the declaration rather than on a hook.**
+`[style*="background-color:#f4f1ec"]{background-color:#0c2036!important;}` —
+six rules, one per colour, no `class` and no `data-` attribute added to the
+markup for the stylesheet to aim at. So an element written next year using
+`PAGE_BACKGROUND` is dark-correct the moment it is written, and
+`every_colour_the_letter_draws_with_has_a_dark_twin` fails on a colour drawn
+into the letter that the table does not know about — it scans the rendered
+document for hexes rather than reading the source. Two traps are pinned rather
+than commented: `background-color:#…` *contains* `color:#…`, so
+`a_colour_means_one_thing_in_this_letter` holds that no hex is used for two
+roles (which is what makes the substring match exact), and a light value and a
+dark value may legitimately be the same hex — `#102a43` is the light heading
+ink and the dark card — without interacting, because a selector reads the
+attribute the renderer wrote, never the colour the cascade computed.
+
+**The one stylesheet is the deliberate exception the C3.4 entry flagged, and it
+is bounded rather than opened.** `prefers-color-scheme` is a media query and a
+media query cannot live in a `style=` attribute, so it was a `<style>` element
+or no dark mode. What keeps it from being a retreat from *a compiler, not a
+stylesheet* is that **the letter is complete without it**: the block can only
+swap a colour already declared inline, never add one, so a client that drops
+the head draws the document it drew before this wave.
+`the_document_carries_no_stylesheet_because_a_mail_client_may_drop_one` was
+therefore taught the difference rather than deleted — it is now
+`the_only_stylesheet_is_the_dark_block_and_the_letter_is_whole_without_it`,
+and it holds four things: exactly one `<style>`, nothing in it but the media
+block, still no `<link>` and no `class`, and every light colour still present
+in the document with the stylesheet cut out.
+
+**A repaint, not an inversion.** `color-scheme`/`supported-color-schemes` go in
+the head *and* on the body, because Apple Mail and Outlook.com force their own
+transform on a document that does not claim to handle both schemes — and a
+forced inversion on top of our repaint is light text on a light card. Word
+ignores the whole element (it implements no media query), which is the intended
+outcome: Outlook on Windows draws the light letter.
+
+**"Colour never the only carrier of meaning" is proved by taking the colour
+away.** `nothing_in_the_letter_is_told_by_colour_alone` strips every colour
+declaration and `bgcolor` out of the rendered document and then reads what is
+left: the header row is still `<th scope="col">` in bold, the code sample is
+still monospace, still framed, and still labelled `bash` in words, the headings
+still have their own tags and sizes. The strip is asserted to have worked
+before anything else is checked, so the test cannot pass by stripping nothing.
+
+**The palette's contrast is measured in the test, not eyeballed.**
+`the_dark_palette_reads_at_least_as_well_as_the_light_one` implements the WCAG
+relative-luminance formula and holds every ink on every surface at 4.5:1 or
+better in *both* palettes — the letter is 16 px prose, so AA is the floor.
+Measured lowest: light 6.44:1 (slate on the sunken tint), dark 7.29:1. The
+border is the one thing under that in both palettes, as it is in the design
+system it was copied from and in every mail a recipient already receives, so
+the invariant it has to meet is *no worse in the dark than in the light*
+(1.75:1 against the card where light gives 1.42:1) — a table's grid line is
+decoration over a table that is already a `<th scope>` grid, not a carrier of
+meaning.
+
+**One change outside the palette:** header cells now carry `bgcolor` beside
+their CSS twin, which is the pattern every other tinted cell in the document
+already followed — Word honours the attribute when it ignores the CSS. Data
+cells are untouched, and the diff shows it.
+
+**How verified.** `cargo fmt -p alo-store`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in `meet.rs`,
+untouched, confirmed by line number). All four golden files re-blessed and
+**the diff read**: the three HTML goldens gain only the two metas, the style
+element, the body's `color-scheme` and the `bgcolor` on `<th>`; the MIME golden
+gains the same through quoted-printable, plus a new boundary — which is
+content-derived rather than random, and the golden test passing on the
+following run is what proves that. Test binaries built in **4 m 00 s**.
+`DATABASE_URL=…5432/alo_loop cargo nextest run -p alo-store --no-fail-fast` →
+**2 339 tests, 2 338 passed, 1 skipped, 80 s**, up from C3.4's 2 333 — 6 new
+tests. The one failure is `site_ticket_orders
+a_paid_sale_is_made_good_once_and_walled`, the **sites-owned flake flagged in
+four of the last five entries**: it passes on its own (re-run: 1 passed) and
+fails only under full parallel load, it is in another track's file, and nothing
+in this item is within reach of it. `alo-jmap` was deliberately not re-run and
+that is not a skipped gate: no file in it was touched and no signature changed
+— `render_campaign_html`'s output is not asserted anywhere in it (grepped), and
+the only consumer of the HTML is `campaign_mime`, whose golden is re-blessed
+here.
+
+**No i18n and no new route.** Nothing here is a string: the output is markup,
+the writer's own words, and six hex literals. The user-visible half of wave C3
+still arrives with C3.6, which is also where the dark letter first becomes
+*visible* to the person composing it — the preview frame is the only place we
+can honestly show what a dark-mode recipient gets. A CHANGELOG line was
+written: what a recipient sees changed.
+
+- **Cuts:** the images third of C3.5 — see below. No other scope was narrowed,
+  and nothing shipped at reduced depth.
+- **Flag for a human — the question this item did not answer.** *Should a
+  campaign be able to carry an image, and who may fetch it?* An image block
+  needs mandatory alt text (the part of C3.5 that has no home until the block
+  exists), but the block itself is an ADR: a remote `<img>` is a per-recipient
+  fetch of a URL we chose, which is the open-tracking pixel ADR 0044 refused by
+  default, and hosting it ourselves means our server learns when a letter was
+  opened whether we log it or not. The honest options are (i) no images ever,
+  which is what ships today and is a real position for a sovereignty product,
+  (ii) images embedded as `cid:` attachments — no fetch at all, at the cost of
+  message size, or (iii) remote images with an explicit statement about what is
+  and is not logged. This is an owner's decision, exactly as C5.4's read
+  duration was left out of this queue.
+- **Next:** C3.6 — preview and seed test send within the tenant: the rendered
+  HTML, the text part, and the merge fields resolved against a real record, with
+  the screen stating honestly that a preview is our renderer's opinion and not
+  proof of how Outlook 2016 will draw it. Notes for it: this is the **first
+  user-visible slice of wave C3**, so it is the first that goes through
+  `i18n/en.ts` and the first with a new route (`/campaigns/*` is already a
+  registered prefix, so no Caddyfile note is needed). `CampaignMergeField::ALL`
+  is public and unused precisely so this screen can render the vocabulary
+  instead of making a writer recall it (`ux-principles.md`, recognition over
+  recall), and C3.4 deferred `GET /campaigns/merge-fields` to here for the same
+  reason. The preview frame should be able to show the dark letter as well as
+  the light one — the palette landed by this item makes that a toggle over one
+  document rather than a second render — and a seed send inside the tenant uses
+  the existing transactional path and is not a campaign send.

@@ -25,6 +25,17 @@ contracts.
 - **For operators: `/campaigns` is a new top-level route prefix** and needs
   adding to the production Caddyfile at the next deploy. It needs no new
   configuration otherwise, and it sends nothing.
+- **A campaign now arrives readable in dark mode, and readable with images
+  off.** A recipient whose mail app is set to dark gets the letter repainted in
+  the alo navy rather than left as a white page or flipped into whatever colours
+  their client guesses — headings, prose, table lines and code samples all keep
+  their contrast, and a light-mode recipient receives exactly what they received
+  before. A campaign contains no images at all, so the half of recipients whose
+  client blocks images are reading the same letter as everybody else rather than
+  a version with holes in it. Nothing in a campaign is said with colour alone
+  either: a table's header row is a header row, and a code sample says which
+  language it is in words, so the letter still reads when the colours do not
+  arrive.
 - **A campaign that would arrive as "Hi ," can no longer be saved.** Personalise
   a campaign by writing `{{first_name|there}}` in the subject, the preview text
   or the body — the field to insert, then the words to use for the people who
