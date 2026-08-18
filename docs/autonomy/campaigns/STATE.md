@@ -1548,3 +1548,186 @@ this item's write scope.
   hand it to yet** — C2 waits on an IP — so expect to build the part and its
   headers and to journal that nothing posts it, exactly as C3.2 built the HTML
   part with no footer and no send.
+
+---
+
+## C3.3 — the other half of the letter, and the envelope that makes them one mail (2026-08-18)
+
+**What shipped.** Two siblings, not one function with a mode:
+`platform/alo-store/src/campaign_text.rs` (blocks → the `text/plain` part) and
+`campaign_mime.rs` (both parts → the `multipart/alternative` entity, encoded).
+`tests/campaign_text_golden.rs` pins three text parts and the whole assembled
+message under `tests/golden/campaign_text_v1_*.txt` and
+`campaign_mime_v1_letter.mime`. 28 unit tests, 7 golden tests. No migration, no
+route, no screen, no web file — the surface that shows this output is C3.6's
+preview, and the path that posts it is C2's.
+
+**The sentence the item is built on: *not optional*.** A `text/html`-only mail
+is scored before a human sees it, and the score is applied by filters older
+than this project. So `render_campaign_message` has no "with text" switch and
+no `Option<String>` anywhere: every campaign has both parts, including the
+empty draft somebody sends by accident, and
+`every_campaign_carries_both_parts_including_an_empty_one` walks both letters
+to say so.
+
+**The text part is not stripped HTML, and that is the whole design.** It reads
+the same `CampaignBlock` values `campaign_html.rs` does and answers a different
+question — *what does this letter say*, where the other answers *how does it
+look*. One function doing both would decide the second while thinking about the
+first. Concretely:
+
+- **Wrapped at 72 columns, on whitespace only.** A word wider than the column —
+  a URL, almost always — is left whole on its own line. A broken link cannot be
+  clicked *or* copied, and 72 rather than 78 because a reply quotes this part
+  with `> ` in front of every line.
+- **A table becomes something a monospace reader can follow**, which was the
+  item's real work. Two renderings, and the width picks: if the row fits, padded
+  columns with a dash rule under the header; if it does not, each row becomes a
+  short block of `Header: value` lines with a blank line between rows. Nothing
+  is ever truncated — a table squeezed into the column would lose the numbers it
+  exists to carry. `campaign_text_v1_wide.txt` pins the fallback, and the
+  padding counts **characters, not display cells**, so a CJK column aligns
+  loosely; that costs alignment and never a value, and a table that wide lands
+  in the fallback anyway.
+- **Headings are underlined** (`=` level 1, `-` level 2) rather than
+  upper-cased: upper-casing is shouting in every language that has cases and is
+  nothing at all in the ones that do not.
+- **Code is never wrapped**, indented four spaces under a `[bash]` label. A
+  wrapped command fails when it is pasted; a uniform indent is undone by a
+  dedent, and a wrap cannot be undone at all.
+- **A run of spaces collapses to one, exactly as HTML does it.** The two parts
+  are alternatives of *the same letter*, so where HTML has no choice the text
+  part follows rather than quietly saying something the other does not.
+- **No trailing whitespace anywhere**, code lines included — it is invisible to
+  the writer and becomes a visible `=20` in the encoding underneath.
+
+**Quoted-printable, and why not the two easier answers.** Both are worse and
+each fails differently. **8-bit as-is** would be an *invalid message*: RFC 5322
+§2.1.1 caps a line at 998 octets, a campaign paragraph is capped at 5 000
+characters, and the HTML part writes each block as one long line of markup and
+inline CSS — so the ordinary letter, not an edge case, produces a line no MTA is
+obliged to carry. **Base64** is line-safe and turns the letter into an opaque
+blob: a content filter scores what it cannot read, and the operator debugging a
+complaint cannot read it either — in bulk mail both of those are the point.
+Quoted-printable keeps `Genève` legible on the wire as `Gen=C3=A8ve` and bounds
+every line. The encoder is strict about the two rules a naive one gets wrong,
+because both corrupt a letter silently: **whitespace never sits at the end of an
+encoded line** (a decoder may strip it, so a trailing space is written `=20`),
+and a line beginning `From ` has its `F` encoded so an mbox on the path cannot
+rewrite it to `>From `. Both have a test, and the decoder those tests check
+against was written from RFC 2045 rather than by running the encoder backwards.
+
+**The boundary is the digest of the two encoded parts.** A random one would make
+the assembled message unpinnable, and a golden file is the only thing that
+catches an encoding regression before a recipient does. It cannot collide with
+content it was hashed from, and `=_` is not producible by quoted-printable at
+all — a `=` there is always followed by two hex digits or by the end of the
+line. `unique_boundary` walks it forward anyway and is tested directly, because
+RFC 2046 §5.1.1 makes a boundary inside a part into a message that ends early,
+and "unreachable" is not a thing to leave resting on an argument.
+
+**One decision the pinned file forced, and it is a real interop one.** The first
+blessing produced `Content-Type: multipart/alternative; boundary="…"` at **95
+octets** — past the 78 RFC 5322 §2.1.1 recommends, so every sender would have to
+fold a `boundary` parameter, which is exactly where the least forgiving MTAs
+stop agreeing about what the message is. The digest was cut to 24 hex characters
+(96 bits, far past what a token needs whose only job is to be absent from two
+strings it was hashed from) and the prefix to `=_alo_`, putting the header at
+**exactly 78**. `the_content_type_fits_a_header_line_nobody_has_to_fold` holds
+it, and `CAMPAIGN_HEADER_LINE_MAX` is exported so the sender that writes the
+header around it uses the same number.
+
+**Why the assembly is here and not in `alo-jmap`'s `mime.rs`.** That module is
+the transactional composer: it builds a whole RFC 5322 message from an
+`Outgoing` carrying a sender, recipients and a message id, and a campaign has
+none of the three. Reusing it would mean inventing all three at the wrong layer,
+and `alo-store` cannot depend on `alo-jmap` in any case. What is built here is
+the **entity** — a `Content-Type` value with its boundary and a body holding both
+parts — and the message headers a send adds around it (`From`, `To`, `Date`,
+`Message-ID`, `MIME-Version`, RFC 8058's `List-Unsubscribe`) belong to the
+sender, because every one of them is a fact about a send rather than about a
+letter.
+
+**Nothing posts it, and that is the queue's boundary rather than a gap.**
+`render_campaign_message` has no production caller yet: C3.6's preview reads its
+`text` and `html` fields (kept beside the entity so the preview cannot re-render
+a second opinion of one letter), and C2's sender takes the entity whole. Exactly
+the shape C3.2 shipped in — a complete, tested, pure function whose caller is a
+later item.
+
+**How verified.** `cargo fmt -p alo-store`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in `meet.rs`,
+untouched). Test binaries built in **4 m 10 s**. `DATABASE_URL=…5432/alo_loop
+cargo nextest run -p alo-store --no-fail-fast` → **2 315 tests, 2 314 passed,
+1 skipped, 80 s**, up from C3.2's 2 280 — 35 new tests, all green, and green
+again alone in 0.2 s. The one failure is sites-owned and diagnosed below.
+**`alo-jmap` was deliberately not re-run, and that is not a skipped gate**: no
+file in it was touched, nothing in it calls the new functions, and the only
+change to a shared file is additive `pub mod` / `pub use` lines whose names
+collide with nothing — checked, rather than assumed, with a grep for
+`use alo_store::*` (there is none anywhere) and for each new name outside this
+crate (none).
+
+**The golden files needed a `.gitattributes` line, and it is the one thing here
+that touches a shared file.** `* text=auto eol=lf` would have rewritten the
+CRLFs in `campaign_mime_v1_letter.mime`, and in a MIME body the line ending *is*
+the format — a normalised golden would pin a body no MTA would accept and still
+look correct in a diff. `platform/alo-store/tests/golden/*.mime -text` follows
+the precedent the file already sets for the MT940 and Windows-1252 bank
+fixtures, three lines above it. Verified with `git check-attr` (`text: unset`)
+and by reading the CRLFs back out of the staged blob, not by trusting the rule.
+`the_pinned_message_is_still_a_message` fails loudly if a future checkout
+normalises it anyway.
+
+**Flag for the sites track — `site_ticket_orders` fails on this database in a
+shape sharper than "flaky", and it is the fourth entry from this track to say
+so.** `the_ticket_mail_waits_for_fulfilment_claims_once_and_never_crosses_tenants`
+failed in the full run with *a paid order was never offered to the fulfilment
+sweep* (`tests/site_ticket_orders.rs:1104`), and at one point
+`a_paid_sale_is_made_good_once_and_walled` (`:808`) failed **in isolation**
+beside it. The mechanism is visible in their own SQL
+(`site_ticket_fulfil.rs:209-217`): the sweep is **global and cross-tenant**,
+ordered `o.paid_at, o.id` with a `LIMIT` and `FOR UPDATE … SKIP LOCKED`, so any
+other test writing paid orders in the same parallel suite can push the watched
+row outside the claimed window — and a run that does claim them drains the queue,
+which is why the next isolated run passes. Both passed alone afterwards, and the
+whole file passed 14/14. Nothing in this iteration touches `site_*`, and the two
+new modules hold no database access at all, so the only contribution possible is
+parallel load. It is a request for the sites queue: a claim-once test that
+depends on a global queue in a shared database is testing the environment.
+
+**Flag, now for the eleventh time and still one line of work:
+`scripts/prune-test-db.sh` is hardcoded to database `alo`.** `psql_q()` passes
+`-d alo` literally, so `DATABASE_URL` cannot reach this checkout's `alo_loop`.
+Its statements were run by hand again: 4 276 tenants → **2 341**, 101 MB, and the
+suite then ran in 80 s. The fix is `-d "${ALO_PG_DB:-alo}"`; `scripts/` is not
+this item's write scope.
+
+**Disk.** C: opened at 98 % with 14 GB free. 153 `.pdb` files were deleted to
+16 GB; stale duplicate binaries were **none this time** (247 binaries for 247
+distinct targets), so that sweep was skipped rather than run for form's sake.
+The test-binary build took it back to 15 GB.
+
+**No CHANGELOG line and no i18n, on purpose** — the sixth entry in a row for the
+same reason. No route, no screen, nothing a user or an operator can see, and the
+renderer emits no string of our own in any language: the underlines are
+punctuation and the table labels are the writer's own header cells, so a text
+part is in whatever language the letter was typed in. The user-visible half of
+wave C3 still arrives with C3.6's preview. No new route prefix, so the
+production Caddyfile needs nothing beyond the `/campaigns` prefix C1.5 flagged.
+
+- **Cuts:** none. No feature scope was narrowed.
+- **Next:** C3.4 — personalisation with a **visible fallback for every merge
+  field**, a field with no fallback being a validation error at save time rather
+  than a surprise at send time. Notes for it: C3.1 and C3.2 both deliberately
+  left merge fields as inert text and said so, so the rule lands in *one* place —
+  put it in `campaign_content.rs`'s write gate, not in the renderers, or the two
+  parts of one mail will eventually disagree about what a placeholder means.
+  Both renderers emit the writer's text verbatim (escaped in the HTML one), so a
+  substitution added later has to run **before** `esc_inline` or a fallback
+  containing an apostrophe becomes `&#39;` in the letter and stays an apostrophe
+  in the text part. The goldens are `v1` and pinned to
+  `CAMPAIGN_CONTENT_SCHEMA_VERSION`; if merge fields become a block field rather
+  than a text convention, that is a version bump and a new set of golden files
+  under a new name, never a re-blessing of these.

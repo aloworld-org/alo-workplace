@@ -80,7 +80,7 @@ kept the website agent out of the sites track's files.
 
 - [x] C3.1 A campaign record: subject, preheader, and content as the **Docs block model** — one editor, not a second one.
 - [x] C3.2 The renderer: blocks → **email-safe HTML**, table layout and inline CSS, because Outlook renders through Word. A compiler, not a stylesheet, and the wave's hard part. Golden-file tests: the same blocks must produce the same HTML, so a regression is visible rather than discovered by a customer's recipients.
-- [ ] C3.3 A plain-text alternative from the same blocks, assembled as `multipart/alternative`. Not optional — a campaign with no text part is scored as spam by filters older than this project.
+- [x] C3.3 A plain-text alternative from the same blocks, assembled as `multipart/alternative`. Not optional — a campaign with no text part is scored as spam by filters older than this project.
 - [ ] C3.4 Personalisation with a **visible fallback for every merge field**. "Hi ," is the classic bulk-mail failure and it comes from a field nobody defaulted; a field with no fallback is a validation error at save time, not a surprise at send time.
 - [ ] C3.5 The mail must read with **images blocked**: alt text on every image, colour never the only carrier of meaning, and a dark-mode-safe palette. Half of recipients see that version and they are not a degraded audience.
 - [ ] C3.6 Preview and seed test send within the tenant — the rendered HTML, the text part, and the merge fields resolved against a real record. The screen states honestly that a preview is our renderer's opinion and not proof of how Outlook 2016 will draw it. *(A seed send inside the tenant uses the existing transactional path and is not a campaign send; it does not touch C2.)*
