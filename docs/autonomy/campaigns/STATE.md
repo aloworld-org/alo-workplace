@@ -1351,3 +1351,200 @@ to 6.8 GB. The `.pdb` sweep is the routine now, not the emergency.
   plain-text alternative (C3.3) reads the same `CampaignBlock` values, which is
   why the table's rectangular rule is enforced at save time rather than in either
   renderer.
+
+---
+
+## C3.2 — the compiler that turns blocks into a mail Word can draw (2026-08-18)
+
+**What shipped.** `alo-store`'s `campaign_html.rs` — a pure function from a
+validated `CampaignContent` plus a subject and preheader to the complete
+`text/html` part of a mail — and `tests/campaign_html_golden.rs` with three
+pinned documents under `tests/golden/campaign_html_v1_*.html`. 16 unit tests in
+the module, 7 in the golden suite. No migration, no route, no screen, no web
+file: this item is the compiler, and the surface that shows its output is C3.6's
+preview.
+
+**The one sentence the design comes from: *a compiler, not a stylesheet.*** So
+the module emits **no `<style>` element, no `<link>` and no `class` attribute at
+all** — every declaration sits in the `style=` of the tag it governs, beside the
+presentational attribute (`width`, `align`, `bgcolor`, `cellpadding`) that Word
+honours when it ignores the CSS. That is a promise a test can hold rather than a
+paragraph asking to be believed, and
+`the_document_carries_no_stylesheet_because_a_mail_client_may_drop_one` holds it
+against the output. It is also why there is no media query: a media query lives
+in a stylesheet.
+
+**What email-safety actually cost, and how each cost was checked.**
+
+- **The layout is two nested tables and an Outlook-only ghost table.** Word has
+  no `float`, no `flex` and no reliable `max-width`, so the 600 px column is
+  stated twice: as a `width` attribute inside a `<!--[if mso]>` comment that
+  only Word reads, and as `max-width` on a `<div>` that everybody else reads.
+  **Measured rather than assumed** — both pinned letters were loaded in a real
+  360 px frame and `scrollWidth == clientWidth == 360`, with no element
+  overflowing, table and code block included.
+- **`mso-line-height-rule:exactly` on every text run.** Word otherwise treats
+  `line-height` as a minimum, so the same mail arrives differently spaced for
+  two recipients. `every_run_of_text_pins_its_line_height_for_word` counts the
+  `line-height:` declarations and requires a pin for each, so a run added later
+  without one fails rather than ships.
+- **Colours are hex literals copied from `web/src/ds/tokens.css`, each naming
+  the token it came from.** A mail cannot read a CSS custom property, so the
+  tokens can be quoted but never referenced; naming them is the only thing that
+  makes the drift findable when the palette moves.
+- **Fonts are the ones already on the machine.** The product's typeface is a
+  webfont, and a webfont in a mail is a blocked request.
+- **Newlines are `<br />` and indentation is rebuilt with `&#160;`.** HTML
+  collapses both, and a writer does not expect that. `\r\n` folds to `\n` first
+  (a body pasted from a Windows editor would otherwise double every break) and a
+  trailing newline is dropped rather than sent as a blank line. In code, a tab
+  becomes four spaces, every leading space becomes `&#160;`, and an interior run
+  of two or more keeps all but its last — so aligned comments stay aligned and
+  the line still has somewhere to wrap.
+
+**Three decisions worth the words.**
+
+- **The writer's table is a *data* table and the layout ones are not.** Every
+  layout table says `role="presentation"`; the table the writer typed
+  deliberately does not, and its first row is `<th scope="col">`. Marking it
+  presentational is the copy-paste this file is most exposed to, and it would
+  read a price list to a screen reader as unrelated runs of text.
+  `the_writers_table_is_a_data_table_and_the_layout_ones_are_not` pins the
+  distinction and the count.
+- **An empty paragraph renders `&#160;`, not nothing.** The Docs editor opens a
+  body with one empty paragraph and writers use more of them as deliberate blank
+  lines; an empty `<p></p>` collapses to no height in Word, so the spacing the
+  writer put in would disappear silently between the composer and the inbox.
+- **The code block's language is a *visible* label, not a `class`.**
+  `campaign_content.rs` holds the language token to a plain name because "C3.2
+  puts it in the rendered markup" — and in a document with no stylesheet a class
+  is invisible metadata. A caption above the sample survives image blocking and
+  means monospace is not the only thing saying "this is code". Nothing here is
+  translatable: a language token is `bash` in every locale, and the renderer
+  emits no string of our own in any language, so no i18n key was owed.
+
+**What the renderer refuses rather than draws.** `CampaignContent`'s fields are
+public, so a body can reach the renderer without ever having passed the write
+gate — and drawing one would produce a letter no writer could have saved.
+`render_campaign_html` therefore validates first:
+`a_body_written_in_another_model_is_refused_rather_than_half_drawn` (the whole
+point of C3.1's envelope — a golden is only meaningful against one version) and
+`a_body_that_never_passed_the_write_gate_is_refused_rather_than_drawn` (a ragged
+table built by hand). The block match is total over the four variants with no
+fallback arm, so a fifth block is a compile error here rather than a block that
+vanishes from the mail — the failure a golden could never catch, since a golden
+only pins what *was* rendered.
+
+**Nothing a writer types can become markup, and the proof is a whole document
+rather than a substring.** `campaign_html_v1_hostile.html` pins a letter whose
+heading is `<script>alert('x')</script> & Co`, whose table cells are
+`</th></tr></table>` and `<img src=x onerror=alert(1)>`, and whose code sample
+tries to close the layout table it sits inside. All five of `&<>"'` are escaped
+in every position; C0 control characters are dropped rather than escaped,
+because they are not valid in an HTML document and a client that meets one may
+stop parsing mid-letter. **Verified twice over**: by the pinned diff, and
+independently by Python's `html.parser` and `ElementTree` over all three
+goldens — no nesting fault, no live markup in text, and each document is
+well-formed XML once the doctype and conditional comments are stripped. The
+suite carries its own tree-walker
+(`every_pinned_document_opens_and_closes_its_elements_in_order`) so that check
+does not depend on a Python being present.
+
+**A golden cannot notice what stopped being rendered**, so
+`the_pinned_letter_exercises_every_block_the_model_has` asserts the fixture
+still contains all four; and
+`the_goldens_are_pinned_to_the_model_they_were_blessed_against` fails the day
+`CAMPAIGN_CONTENT_SCHEMA_VERSION` moves, because a bump gets new files under a
+new name rather than a re-blessing of the `v1` ones — the old files still
+describe what the old model produced, which is what somebody debugging a
+two-year-old mail needs.
+
+**One measurement corrected mid-item, recorded because the wrong version was
+believed for twenty minutes.** Screenshots at `--window-size=360` showed the
+letter overflowing badly, and two variants were built to find which block was at
+fault. Neither was: **Chrome headless on Windows will not lay out below about
+489 px**, whatever `--window-size` says, so the screenshot was a clipped 489 px
+page rather than a 360 px one. Measuring `document.documentElement.clientWidth`
+inside the page said `489` and ended the theory. Loading the letter in a real
+360 px `<iframe>` and reading `scrollWidth` is the honest instrument, and by it
+nothing overflows at all. `table-layout:fixed` on the code frame was added
+during the wrong theory and **kept on a right one**: a 106-character URL
+overflows nothing in Chrome with or without it, because Chrome acts on
+`word-break` — but Word implements neither `word-break` nor `overflow-wrap`, and
+`table-layout:fixed` is the one declaration it does act on. The comment at the
+line says exactly that, including the measurement showing it does nothing in
+Chrome, so nobody removes it for the reason it appears removable.
+
+**What this item deliberately does not do**, so the next one inherits a question
+rather than a guess:
+
+- **No unsubscribe footer.** RFC 8058's link is per recipient: it needs a token
+  from `campaign_unsubscribe` and an absolute base URL, and both belong to the
+  send that has neither yet (C2 waits on an IP). A footer parameter that is
+  `None` at every call site today would be pinned empty by all three goldens,
+  which is worse than absent. Additive on the day a send can fill it in.
+- **No personalisation.** `{{first_name}}` is text here, escaped and therefore
+  inert. Merge fields and their mandatory fallback are C3.4, in one place.
+- **No images**, because the model has no image block and C3.1 recorded why.
+- **No plain-text part.** C3.3 reads the same `CampaignBlock` values, which is
+  why the table's rectangular rule is enforced at save time rather than in
+  either renderer.
+
+**How verified.** `cargo fmt -p alo-store`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in `meet.rs`,
+untouched). Test binaries built in **4 m 25 s**. `DATABASE_URL=…5432/alo_loop
+cargo nextest run -p alo-store --no-fail-fast` → **2 280 tests, 2 280 passed,
+1 skipped, 77.5 s**, up from C3.1's 2 257. All 23 new tests pass, and pass again
+alone in 0.3 s. An earlier full run in this iteration hit the sites-owned
+concurrency flake
+(`site_ticket_orders::the_ticket_mail_waits_for_fulfilment_claims_once_and_never_crosses_tenants`,
+which passed alone and passed in the final full run) — the same test this track
+flagged in the C1.1 and C2s.1 entries. **`alo-jmap` was deliberately not re-run
+and that is not a skipped gate**: no file in it was touched, and it does not yet
+call the renderer.
+
+**No CHANGELOG line and no i18n, on purpose** — the fifth entry in a row for the
+same reason, and it still holds: no route, no screen, nothing a user or an
+operator can see. The user-visible half of wave C3 arrives with C3.6's preview,
+which is also where the first campaigns composer strings will be owed. No new
+route prefix, so the production Caddyfile needs nothing beyond the `/campaigns`
+prefix C1.5 already flagged.
+
+**Disk, checked first per LOOP's rule, and it was the tightest opening yet.** C:
+started at **99 %, 5.2 GB free**. 405 `.pdb` files in `target/debug/deps` were
+**9 GB** — deleted, to 15 GB — and 159 stale duplicate `.exe`s (404 binaries for
+245 distinct targets) another 2 GB, to 17 GB. Two full test-binary builds took it
+back to 14 GB. Both sweeps are the routine now; neither invalidates anything
+cargo will not relink anyway.
+
+**A note on the sanctioned background+marker form, because it half-failed here.**
+The second build's marker was never written: the `(… ; echo "BUILD_EXIT=$?" >>
+log) &` job did not survive the harness call that started it, although the build
+itself finished (the log's own `Finished … in 4m 25s` line proves it). The poll
+then spun to the ceiling twice against a marker that would never arrive. The
+recovery is cheap and worth writing down: **re-run `cargo nextest run --no-run`
+in the foreground** — it returned in 10.6 s, which both proved the binaries were
+current and made the missing marker irrelevant. Start the background job in a
+call that returns immediately, and poll in the *next* call, as the first build in
+this iteration did successfully.
+
+**Flag, now for the tenth time and still one line of work:
+`scripts/prune-test-db.sh` is hardcoded to database `alo`.** `psql_q()` passes
+`-d alo` literally, so `DATABASE_URL` cannot reach this checkout's `alo_loop`.
+Its statements were run by hand again: 3 929 tenants → **2 507**, 98 MB, and the
+suite then ran in 77 s. The fix is `-d "${ALO_PG_DB:-alo}"`; `scripts/` is not
+this item's write scope.
+
+- **Cuts:** none. No feature scope was narrowed.
+- **Next:** C3.3 — a plain-text alternative from the same blocks, assembled as
+  `multipart/alternative`. Notes for it: it reads the same `CampaignBlock` values
+  `campaign_html.rs` does, so the two renderers should stay siblings
+  (`campaign_text.rs`) rather than one growing a second mode; the golden-file
+  harness and the `v1` naming rule already exist in
+  `tests/campaign_html_golden.rs` and are worth copying rather than reinventing;
+  a table has to become something a monospace reader can follow, which is the
+  item's real work; and **the `multipart/alternative` assembly has no sender to
+  hand it to yet** — C2 waits on an IP — so expect to build the part and its
+  headers and to journal that nothing posts it, exactly as C3.2 built the HTML
+  part with no footer and no send.
