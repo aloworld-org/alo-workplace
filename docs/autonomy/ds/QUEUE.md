@@ -111,7 +111,7 @@ item, opened and read, plus `npx vitest run src` green and
   `Toolbar` is behaviour and stays. Done when: `Table.test.tsx` and
   `Toolbar.test.tsx` are unedited and green, and a dense screen (Inventory
   stock by location) is screenshotted and read.
-- [ ] D1.54 Restyle the **small** primitives — `Button`, `IconButton`, `Badge`,
+- [x] D1.54 Restyle the **small** primitives — `Button`, `IconButton`, `Badge`,
   `Chip`, `Avatar`, `Spinner`, `Menu`, `DatePicker`, `ResizeHandle`. Several
   are a handful of rules each; keep them one commit so the shared button
   proportions are reconciled once. Done when: `Chip.test.tsx` is unedited and

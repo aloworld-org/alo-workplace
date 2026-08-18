@@ -1443,3 +1443,135 @@ still not on `ds/Button`.
 **Next:** D1.54, restyle the small primitives — `Button`, `IconButton`, `Badge`,
 `Chip`, `Avatar`, `Spinner`, `Menu`, `DatePicker`, `ResizeHandle`. All nine
 `.module.css` files that remain under `ds/` are theirs.
+
+## D1.54 — the small primitives restyled to Tailwind, 2026-08-18
+
+`Button`, `IconButton`, `Badge`, `Chip`, `Avatar`, `Spinner`, `Menu`,
+`DatePicker` and `ResizeHandle` carry Tailwind utilities, and the **last nine
+`.module.css` files under `ds/` are gone** (710 lines of CSS deleted). Net
+**−188 lines** across 21 files (+522 −710). The shipped CSS is **950 167 bytes
+across 23 files**, down from 953 922 across 27 — four chunks that existed only
+to carry a `ds/` stylesheet no longer exist at all.
+
+`Chip.test.tsx` is **unedited** and green, as the item required; so is every
+other test in `ds/`. No test in the repository read a hashed class name off one
+of these nine, so nothing had to be respelled — the D1.52 and D1.53 situation
+did not repeat.
+
+**The cascade these nine leaned on, written down.** This is the third restyle
+to find that the interesting part is not the values but the source order, and
+this set had the most of it, because a small primitive is mostly states:
+
+- **`IconButton`'s `tone="rail"` sets its own box.** `.rail` declared 44px and
+  a larger radius and beat `.md`/`.sm` only by being written after them. Tone
+  and geometry are now chosen together.
+- **`IconButton`'s `active` suppresses its hover.** `.default.active` and
+  `.default:hover` are both two classes; the later won, so an active toolbar
+  button kept its tint under the pointer. In utilities a `hover:` variant would
+  have won instead and it would have flashed back to the plain fill, so the
+  active string carries no hover at all.
+- **`Button`'s disabled treatment belongs to the variant.** `.button:disabled`
+  set `opacity: .5` and `.primary:disabled` reset it to 1 — order again. Each
+  variant now carries either the dim or the clean neutral, never both.
+- **`Menu`'s placement is one string.** `.up` reset `top` to `auto`; the
+  popover is now pinned to one edge and offset from it by a margin.
+- **`Menu`'s danger item replaces the ink** rather than layering over it
+  (`.danger` and `.item`, one class each).
+- **`DatePicker`'s day cell** resolved ink, weight *and* hover by source order
+  through `.dayOther` → `.dayToday` → `.daySelected`, and `.daySelected:hover`
+  existed only to win back the fill a `hover:` utility would take. The state is
+  one exclusive string now and the selected day carries no hover; the 55%
+  dimming of an out-of-month day stays separate, because nothing overrode it
+  there either — a selected day borrowed from the next month is dimmed in both
+  builds.
+
+**A defect found, preserved, and not fixed here: a pressable chip loses its
+tone under the pointer.** `Chip.module.css` said in a comment that "a toned
+chip already carries a fill; darkening it would change what the tone says, so
+the hover is the ring of the surface under it" — and then never stopped the
+fill changing: `.pressable:hover` is a class and a pseudo-class, `.accent` is
+one class, so an accent or danger chip took `--border-default` on hover *and*
+got the ring. mail's follow-up control is the only pressable chip in the
+product and it is neutral, accent or danger by its due date, so this is what it
+does today. A `hover:` utility outranks its unvariant form by exactly the same
+margin, which is why the restyle draws it identically. Fixing it means deciding
+what a toned chip should do under the pointer and moving pixels on a live
+control — flagged for D1.55, like `<Th numeric>` before it.
+
+**Five tokens added, and one raw-scale reference closed.** The policy this item
+settled, because nine small components are where it comes up: *a literal that
+names a decision of the system becomes a token; a literal that is one drawing's
+own proportion stays a literal* — the call `Toggle` already made for its knob.
+
+- `--border-track: var(--warm-300)` — `Spinner` reached straight into the raw
+  scale for its track, the **last raw-scale reference in `ds/`**, and the
+  semantic layer had no name for it. Same value, said in the layer components
+  are allowed to read. The only one of the five that reaches the theme (74
+  utilities, was 73).
+- `--button-height-sm` / `--button-height-md` (30px, 38px) — every text button
+  in the product is drawn at one of these. Spelled `h-7.5`/`h-9.5` in a class
+  string, nothing would connect them to `--control-height`, and the fact that a
+  38px button sits beside a 40px field would stop being visible as a decision
+  anybody has to make.
+- `--focus-ring-faint` — `DatePicker`'s trigger ring, a 13% wash of the accent.
+  There are now three focus rings in tokens.css, at 13%, 22% and opaque.
+- `--animation-spinner: 0.7s linear infinite` — with its keyframes moved to
+  `global.css` as `alo-spin`, the move `Dialog`'s entrance made in D1.52.
+  Tailwind's built-in `animate-spin` turns in 1s, so matching it would have
+  been a restyle.
+
+Left as literals, each documented where it is written: the avatar's four
+box-and-type pairs (an initial has to sit optically centred in a circle at
+every size, which is why the type does not step with the box), the chip's 18px
+remove button, the button icon's `1.125em` (so it scales with the button's own
+type rather than being a second size to keep in step), `Menu`'s 7px trigger
+padding, and `DatePicker`'s 264px calendar and 0.66rem column heads.
+
+**Cut: no screenshot** — the same cut as every item since D2.01, for the same
+reason: no browser and no screenshot tool in this environment (no Playwright,
+no Puppeteer under `web/`, checked again). What replaced it, as in D1.53: a
+probe that takes every utility these nine files spell, finds its compiled rule
+in `dist/assets/*.css` and prints it — **168/168 found**, the eleven
+non-matches being prose and prop values (`aria-haspopup`, `lucide-react`, the
+avatar's `var(--copper-500)` tints). Then the values a deleted literal depended
+on were read individually out of the built CSS: `size-control` →
+`var(--control-height)`, `border-track` → `var(--border-track)`,
+`animate-[alo-spin_var(--animation-spinner)]` → `alo-spin
+var(--animation-spinner)`, `brightness-94` → `brightness(94%)` for the
+`.danger:hover` filter, `[&_svg]:size-[1.125em]` → `1.125em`,
+`before:-inset-x-1` → `inset-inline: calc(var(--space-1) * -1)` for the resize
+handle's invisible 9px grab area, and the chip's two `color-mix` values — which
+Tailwind emits twice, a raw `var(--chip-color)` fallback and the real mix
+inside `@supports (color: color-mix(…))`, so a browser without `color-mix` now
+gets the untinted colour where the stylesheet gave it nothing at all.
+
+Verified: `node scripts/gen-tailwind-theme.mjs --check` (74 utilities), `npx
+tsc --noEmit`, `npx eslint src/ds --max-warnings 0`, `npx prettier --check` on
+every changed file, `npm run build` clean, no arbitrary hex under `src/ds`, and
+`npx vitest run src` at **103 files, 958 tests** with one failure:
+`sites/SectionMove.test.tsx`, one of the two flakes D1.51 recorded, which
+passes on its own (13/13). It is in `web/src/sites/**`, which this track does
+not touch.
+
+**No CHANGELOG line, deliberately** — fourth time, same reason. A restyle whose
+contract is "the props, the behaviour and the drawn result do not change" has
+nothing a user would notice. The wave's line belongs to D1.55.
+
+**Carried forward for D1.55**, now the whole list the wave check has to close:
+the pressable chip's hover (above); `<Th numeric>` never reaching the header
+(D1.53); `Dialog`'s hand-rolled prompt field, still a second `.input` inside
+`ds/`; Tailwind's default colour palette still reachable (`bg-red-500`
+compiles — only the type scale is cleared); **no `--success-tint` token**, so
+`Badge`'s success tone fills with `bg-raised` through a fallback that has never
+resolved to anything else; **four control heights** — the field's 40, the
+button's 30 and 38, and `DatePicker`'s trigger at 44, with `Menu`'s text
+trigger a fifth at 7px of padding; **three focus rings** at 13%, 22% and
+opaque, plus `Input`'s outline, which is a fourth treatment of the same idea.
+**For D2.06:** `billing/billingStyles.ts` (D1.53). **For D3.01:** no multi-line
+text control in the design system; admin's own button rules (`.primary`,
+`.ghost`, `.iconBtn`, `.textBtn`, 39 call sites) are still not on `ds/Button`.
+
+**Next:** D1.55, the wave check — `ds/` declares no `.module.css` (true as of
+this item), the generated theme is current, no arbitrary values, `npm run
+build` clean, and the three screenshots the item asks for, which this
+environment still cannot take.
