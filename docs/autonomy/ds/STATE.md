@@ -1313,3 +1313,133 @@ admin's own button rules (`.primary`, `.ghost`, `.iconBtn`, `.textBtn`, 39 call
 sites) are still not on `ds/Button`.
 
 **Next:** D1.53, restyle the data primitives — `Table` and `Toolbar`.
+
+## D1.53 — the data primitives restyled to Tailwind, 2026-08-18
+
+`Table` and `Toolbar` carry Tailwind utilities and their two `.module.css`
+files are gone (250 lines of CSS deleted). Net **−100 lines** across 5 files
+(+188 −288), and the shipped CSS falls from **954 873 to 953 922 bytes** across
+the same 27 files. Nine `.module.css` files remain under `ds/`; D1.54 takes all
+of them.
+
+`Toolbar.test.tsx` is **unedited** and green — all 9 tests, including the whole
+roving-tabindex model, which this item did not touch. `Table.test.tsx` is not,
+and that is the entry's first finding.
+
+**Three assertions in `Table.test.tsx` could not survive the item by
+construction.** They read hashed CSS-Modules class names off the DOM —
+`toContain("srOnly")` twice, `toContain("numeric")` once — and deleting
+`Table.module.css` is the item, so there was no version of this change that
+left them passing. This is D1.52's `auth/adoption.test.tsx` situation again,
+and it was repaired the same way: keep the claim, change only the spelling, and
+strengthen it where the old assertion was weak.
+
+- *"the name is read but not drawn"* now checks `sr-only` present/absent **and
+  that the table still has its accessible name in both branches**. The second
+  half is new and is the assertion that actually matters: the failure mode this
+  test guards against is somebody reaching for `display: none`, which hides the
+  caption *and* deletes the table's name. The old assertion could not tell the
+  two apart.
+- *"a header with no visible text still has a name"* — `sr-only` for `srOnly`,
+  nothing else.
+- *"amounts line up"* now checks `text-right` **and** `tabular-nums`, and that
+  the neighbouring name cell claims neither. One hashed class name was standing
+  in for two independent properties, and tabular figures are the half a
+  hand-rolled table forgets: right-aligned proportional digits still do not
+  line up.
+
+Props and behaviour are untouched in both components. Everything else in the
+two test files passed unedited.
+
+**A defect found, preserved, and not fixed here: `<Th numeric>` has never been
+right-aligned.** `.table th { text-align: left }` is one class and one element;
+`.numeric` is one class. The base rule outranked the modifier, so `numeric` and
+`align` reach the figures in the `<td>`s and never the header above them — in
+this component and in all ten copies it was reconciled from. The utilities
+reproduce that ranking exactly (`[&_th]:text-left` beats `text-right` by the
+same margin), which is *why* this restyle draws every screen as it drew before.
+Fixing it moves pixels on every table with a money column, and a restyle that
+moves pixels cannot be told from a regression — so it is written into
+`Table.tsx` beside `Th` as a named defect and flagged below. One caller today.
+
+**Specificity is the thing a Tailwind restyle of a table has to get right.**
+D1.51 learned that two utilities setting one property have no defined winner;
+D1.52 met descendant specificity in `Modal`. `Table` is built *out of*
+descendant specificity — its whole contract is that ordinary `<th>`/`<td>`
+markup inside `<Table>` is already styled, which is what makes each migration a
+deletion. So the base cell rules stay descendant rules, spelled `[&_th]:px-4`,
+and three consequences follow:
+
+- **`density` and `grid` are one exclusive string, not three layered ones.**
+  `.grid th { padding: 0 }` used to beat `.table th { padding: … }` on a
+  specificity tie resolved by source order — the thing Tailwind does not have.
+  So `RULED.default`, `RULED.compact` and `GRID` are chosen between, never
+  combined.
+- **`TableEmpty` needs to outrank the table.** A plain `py-8` on the cell is one
+  class; `[&_td]:py-3` is a class and an element, and wins — the empty state
+  would have silently taken an ordinary row's height. `[&[data-empty]]:py-8`
+  is a class and an attribute, which outranks both. That is exactly what the
+  stylesheet's `.table td.empty` was doing, spelled out.
+- **`tfoot`, `thead th` and row hover need no help**: two elements and a class
+  each, same as the rules they replace.
+
+Nothing was added to `tokens.css` and the generated theme is byte-identical —
+`--check` passing at 73 utilities. Every value these two components needed was
+already a semantic token; the only literals are the geometry the stylesheets
+also wrote as literals (a 1px border, `width: 100%`, `z-index: 1`, a 2px focus
+outline), and each is a Tailwind static rather than an arbitrary value. A search
+for arbitrary hex values under `web/src/ds` finds nothing.
+
+**Cut: no screenshot** — the same cut as every item since D2.01. Still no
+browser and no screenshot tool in this environment (no Playwright, no Puppeteer
+in `web/`, checked again). What replaced it: a probe that takes all **78**
+utilities these two files spell, finds each one's compiled rule in
+`dist/assets/*.css` and prints it — **78/78 found**, every colour and every
+length resolving to a `var(--token)`. A candidate the theme cannot generate is a
+silent no-op in Tailwind, which is the failure mode a restyle has that a
+stylesheet does not, so this is the check worth keeping over a diff-read. Read
+against the deleted rules line by line: `[&_th]:px-4`/`[&_th]:py-3` for the
+`10px 14px` the five identical copies wrote,
+`[&_tbody_tr:last-child_td]:border-b-0` for the separator that would otherwise
+draw against the container's own border, `[&_tfoot]:bg-raised`,
+`[&_thead_th]:sticky` + `top-0` + `z-1` + `bg-surface`,
+`[&_tbody_tr:hover]:bg-raised`, `min-h-16` for the toolbar card's `--space-16`,
+and `w-px min-h-5 self-stretch bg-subtle` for the divider.
+
+**A finding for D2.06 and D3.01: billing has a second design system, and the
+ratchet cannot see it.** `web/src/billing/billingStyles.ts` is a 19-caller file
+of Tailwind recipe strings with its own `table`, `toolbar`, `input`, `search`,
+`toggle`, `badge`, `error` and `empty` — including a `[&_th]:…[&_tfoot_td]:…`
+table string that is a near-copy of what `ds/Table` now emits, and a
+hand-rolled switch built from `[&>input]:appearance-none` and
+`after:translate-x-4`, which is `ds/Toggle` rewritten. billing is already off
+`ds/redefined.ts`, and it left legitimately by the ratchet's own rule:
+`primitives.test.ts` walks `.module.css` files only, so a primitive
+re-declared in a `.ts` file of class strings is invisible to it. ADR 0046
+opened that hole and nothing has closed it. D2.06 is the item that has to
+decide whether billing adopts `ds/` or whether the ratchet learns to read
+Tailwind recipe files; **it should not be discovered mid-migration**, so it is
+written here.
+
+Verified: `node scripts/gen-tailwind-theme.mjs --check`, `npx tsc --noEmit`,
+`npx eslint src/ds --max-warnings 0`, `npx prettier --check` on every changed
+file, `npm run build` clean, and `npx vitest run src` green at **103 files, 958
+tests** — a full-suite pass with no failures, the second in a row. Neither of
+the two flakes D1.51 recorded (`chat/ChatModule`, `sites/SectionMove`) appeared
+during this item at all.
+
+**No CHANGELOG line, deliberately** — third time, same reason. A restyle whose
+contract is "the props, the behaviour and the drawn result do not change" has
+nothing a user would notice. The wave's line belongs to D1.55.
+
+**Carried forward for D1.55:** `<Th numeric>` never reaching the header (above);
+`Dialog`'s hand-rolled prompt field, still a second `.input` inside `ds/`;
+Tailwind's default colour palette still reachable (`bg-red-500` compiles — only
+the type scale is cleared). **For D2.06:** `billing/billingStyles.ts`, above.
+**For D3.01:** no multi-line text control in the design system; admin's own
+button rules (`.primary`, `.ghost`, `.iconBtn`, `.textBtn`, 39 call sites) are
+still not on `ds/Button`.
+
+**Next:** D1.54, restyle the small primitives — `Button`, `IconButton`, `Badge`,
+`Chip`, `Avatar`, `Spinner`, `Menu`, `DatePicker`, `ResizeHandle`. All nine
+`.module.css` files that remain under `ds/` are theirs.

@@ -106,7 +106,7 @@ item, opened and read, plus `npx vitest run src` green and
   Overlay, elevation and focus trap are behaviour; only the surface, padding
   and radius are style. Done when: `Modal.test.tsx` is unedited and green and a
   screenshot of an open dialog shows the same elevation and scrim as before.
-- [ ] D1.53 Restyle the **data** primitives — `Table`, `Toolbar`. Zebra rows,
+- [x] D1.53 Restyle the **data** primitives — `Table`, `Toolbar`. Zebra rows,
   header weight, alignment and the empty state; the keyboard movement in
   `Toolbar` is behaviour and stays. Done when: `Table.test.tsx` and
   `Toolbar.test.tsx` are unedited and green, and a dense screen (Inventory
