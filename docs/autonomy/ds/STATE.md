@@ -1210,3 +1210,106 @@ argues for, and it was left out of this item because `bg-transparent` and
 that blast radius belongs in the wave check, not in a restyle.
 
 **Next:** D1.52, restyle the container primitives — `Card`, `Modal`, `Dialog`.
+
+## D1.52 — the container primitives restyled to Tailwind, 2026-08-18
+
+`Card`, `Modal` and `Dialog` carry Tailwind utilities and their three
+`.module.css` files are gone (237 lines of CSS deleted). Net **−43 lines**
+across 9 files (+220 −263), and the shipped CSS falls from **956 447 to
+954 873 bytes** across the same 27 files. Eleven `.module.css` files remain
+under `ds/`; D1.53 and D1.54 take the rest.
+
+`Modal.test.tsx` is **unedited** and green, as the item required. Props and
+behaviour are untouched: the focus trap, the Escape handler, the
+backdrop-versus-panel mousedown test, the promise plumbing in `DialogProvider`
+and the `as` / `pad` / `flat` / `interactive` / `wide` / `tall` surfaces are all
+the same code.
+
+**One test outside the item did have to change, and it is the honest kind.**
+`auth/adoption.test.tsx` asserted `form.className` contains `"card"` — the
+hashed `.card` from `Card.module.css`. Deleting that stylesheet is the item, so
+the assertion could not survive it by construction. Its *claim* survives intact
+and is what the repair now checks: the sign-in `<form>` **is** the card, not a
+box drawn around one. So it now asserts the surface itself — `bg-surface`,
+`border-subtle` and the `lg` padding `p-8` — is on the `<form>`, **and that no
+other element in the tree carries any of them**. That second half is new and is
+the stronger test: the old one would have passed had a card `<div>` been added
+around the form as well. (`getAttribute("class")`, not `.className`: on an SVG
+that property is an `SVGAnimatedString` that stringifies to its own type name,
+so the emblem inside the card would have been silently skipped.)
+
+**What Tailwind cannot do that a stylesheet did, again.** D1.51 learned that two
+utilities setting one property have no defined winner. `Modal` is the sharper
+case: its stylesheet resolved `.page .body` over `.body` by *descendant
+specificity*, which has no utility equivalent at all. So the panel's height and
+the body's padding, gap and overflow are each chosen once from a small map
+(`HEIGHT`, `BODY`, keyed `auto` | `tall` | `page`) rather than layered. The
+`hover:` and `focus-visible:` rules on `Card` still layer, because a variant
+utility does reliably beat its own unvariant form.
+
+**Nine tokens added, none of them a new value** — every one was a literal inside
+one of the three stylesheets, and a utility must not carry a literal:
+
+- `--modal-width: 30rem` / `--modal-width-wide: 45rem` (480 / 720px),
+  `--modal-height-tall: 38.75rem` (620px),
+  `--modal-height-page: min(45rem, 86vh)`, `--dialog-width: 26.25rem` (420px).
+  Nothing sets a root `font-size`, so the rem conversions are exact at 16px.
+- `--modal-max-height: calc(100vh - var(--space-6) * 2)` — named rather than
+  written inline because the `--space-6` in it is the overlay's own padding, and
+  the two must move together.
+- `--focus-ring-soft: 0 0 0 3px var(--accent-soft)` — the prompt field's ring.
+  Not `--focus-ring`: that one is the accent at 22% alpha, and this field sits
+  on `--bg-app` where a wash all but disappears. Two rings, two grounds.
+- `--animation-dialog-scrim` / `--animation-dialog-panel` — duration and easing
+  together, the shape `--animation-skeleton` already established, because a
+  Tailwind `animate-` utility takes the shorthand and cannot compose one.
+
+None of the nine is exposed as a utility: `theme.css` is byte-identical at 73
+utilities, `--check` passing. That is the generator's `SEMANTIC` filter doing
+its job — component geometry is not a public spelling.
+
+**The two `@keyframes` moved to `global.css`.** A keyframe name is global;
+CSS Modules used to scope them per file and `ds/` no longer has a file to scope
+them in. They are prefixed `alo-` so none of the fifteen module stylesheets that
+declare their own `@keyframes` can collide (two already both declare `spin`).
+The reduced-motion rule already in `global.css` cuts both to 0.01ms.
+
+**Flagged, not fixed: `Dialog` contains a second `.input` inside `ds/`.** The
+prompt's field is hand-rolled — it sits on `--bg-app` and shows focus as a
+border plus a ring, where `ds/Input` sits on a panel and shows focus as an
+outline. Adopting `Input` there would change how every `prompt()` in the product
+looks, which is a restyle, and this item was contracted not to do one. The rules
+were carried across verbatim and a `NOTE` in the file records it for D1.55.
+
+**Cut: no screenshot** — the same cut as every item since D2.01; there is still
+no browser and no screenshot tool in this environment (no Playwright, no
+Puppeteer in `web/`). What replaced it: every utility the three components use
+was matched in `dist/assets/*.css` and read against the rule it replaces.
+`p-5{padding:var(--space-5)}`, `px-5`/`py-4` as the head and foot's two-value
+padding, `rounded-xl{border-radius:var(--radius-xl)}`,
+`shadow-lg{--tw-shadow:var(--shadow-lg)}`,
+`bg-overlay{background-color:var(--bg-overlay)}`,
+`z-[var(--z-modal)]{z-index:var(--z-modal)}`,
+`transition-[border-color,box-shadow]{transition-property:border-color,box-shadow}`
+— the exact property list the `.interactive` rule had —
+`h-[var(--modal-height-page)]`, `max-h-[var(--modal-max-height)]`,
+`focus:shadow-[var(--focus-ring-soft)]`, and both
+`animate-[alo-dialog-*_var(--animation-dialog-*)]` alongside the two
+`@keyframes` themselves. Every one resolves to a token; `rg "\[#" src/ds` finds
+nothing.
+
+Verified: `node scripts/gen-tailwind-theme.mjs --check`, `npx tsc --noEmit`,
+`npx eslint src/ds src/auth --max-warnings 0`, `npx prettier --check` on every
+changed file, `npm run build` clean, and `npx vitest run src` green at **103
+files, 958 tests** — a full-suite pass with no failures at all, which is worth
+recording given D1.51's note on the flaky pair. Both flakes appeared once
+during this item (`sites/SectionMove`, and `auth/adoption` before it was
+repaired) and both passed alone; the clean full run came after the repair.
+
+**Carried forward for D1.55:** the `Dialog` field above; Tailwind's default
+colour palette is still reachable (`bg-red-500` compiles — only the type scale
+is cleared). **For D3.01:** no multi-line text control in the design system;
+admin's own button rules (`.primary`, `.ghost`, `.iconBtn`, `.textBtn`, 39 call
+sites) are still not on `ds/Button`.
+
+**Next:** D1.53, restyle the data primitives — `Table` and `Toolbar`.

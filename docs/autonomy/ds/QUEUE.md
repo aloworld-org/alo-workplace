@@ -102,7 +102,7 @@ item, opened and read, plus `npx vitest run src` green and
   visual regression is most obvious. Done when: their `.module.css` files are
   gone, `Select.test.tsx` and `Toggle.test.tsx` are unedited and green, and a
   screenshot of a real form (Billing customer dialog) is read and reported.
-- [ ] D1.52 Restyle the **container** primitives — `Card`, `Modal`, `Dialog`.
+- [x] D1.52 Restyle the **container** primitives — `Card`, `Modal`, `Dialog`.
   Overlay, elevation and focus trap are behaviour; only the surface, padding
   and radius are style. Done when: `Modal.test.tsx` is unedited and green and a
   screenshot of an open dialog shows the same elevation and scrim as before.
