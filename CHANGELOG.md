@@ -25,6 +25,18 @@ contracts.
 - **For operators: `/campaigns` is a new top-level route prefix** and needs
   adding to the production Caddyfile at the next deploy. It needs no new
   configuration otherwise, and it sends nothing.
+- **A campaign that would arrive as "Hi ," can no longer be saved.** Personalise
+  a campaign by writing `{{first_name|there}}` in the subject, the preview text
+  or the body — the field to insert, then the words to use for the people who
+  have no value for it. The words after the bar are not optional: a campaign
+  saved with `{{first_name}}` and nothing behind it is refused there and then,
+  naming the field and the block it is in, because the recipients with no first
+  name recorded are exactly the ones who would have received a letter that
+  greeted nobody. Field names are checked too, so a typo is caught while you
+  are writing instead of quietly greeting your whole audience the same way.
+  A campaign can insert `first_name`, `name`, `email` and `country`; code
+  samples keep their braces, so a letter can still show a template. The same
+  words go into both the formatted and the plain-text version of the mail.
 - **An unsubscribe link now offers "fewer" as well as "none".** The page at
   the end of a campaign's unsubscribe link opens with no account and no
   sign-in, and offers two plain buttons the same size: stop this kind of mail,

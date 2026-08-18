@@ -1731,3 +1731,109 @@ production Caddyfile needs nothing beyond the `/campaigns` prefix C1.5 flagged.
   `CAMPAIGN_CONTENT_SCHEMA_VERSION`; if merge fields become a block field rather
   than a text convention, that is a version bump and a new set of golden files
   under a new name, never a re-blessing of these.
+
+## C3.4 — the fallback that makes a letter safe to personalise (2026-08-18)
+
+**What shipped.** `platform/alo-store/src/campaign_merge.rs`, and the rule wired
+into the two gates that already existed. The grammar is
+`{{field|fallback}}`; the fallback is **mandatory, non-blank and bounded**
+(`CAMPAIGN_MERGE_FALLBACK_MAX = 80`), and the field names are a **closed
+vocabulary** — `first_name`, `name`, `email`, `country`, which is exactly what
+`CampaignRecipient` holds. Validation is applied at the write gate:
+`campaign_content.rs` checks a heading, a paragraph and every table cell, and
+`campaign_record.rs` checks the subject and the preview text, so
+`POST /campaigns/campaigns` refuses `Hi {{first_name}},` with the field named
+and the block named. Resolution is `personalise_campaign(&CampaignLetter,
+&CampaignMergeValues) -> PersonalisedLetter`, applied **once, before either
+renderer**; neither renderer was changed and no golden file moved.
+
+**The closed vocabulary is the part that is not obvious, and it is the whole
+safety of the item.** Once every field must carry a fallback, an *unknown* field
+becomes invisible: `{{frist_name|there}}` resolves to "there" for every
+recipient, in the preview and in the seed send, and reads as a letter that was
+merely not personalised. Nobody would ever find it. A mandatory fallback without
+a closed vocabulary is therefore not a safety rule at all — it is a way of
+hiding typos. Both halves ship together or neither is worth having.
+
+**Three decisions worth the sentence they cost.**
+
+- **Resolution happens on the `CampaignContent`, not inside a renderer.** The
+  note left by C3.3 said a substitution has to run *before* `esc_inline` or a
+  fallback containing an apostrophe becomes `&#39;` in the HTML part and stays
+  an apostrophe in the text part. Producing a resolved *body* and handing it to
+  both existing renderers satisfies that by construction rather than by
+  discipline: they each escape for their own part, from the same words.
+  `both_parts_of_one_mail_personalise_identically_including_the_punctuation`
+  pins it with `O'Brien & Sons`.
+- **A code block is literal.** `{{ … }}` is Handlebars, Vue, Angular, Jinja and
+  Go, so a code sample is the one place in a letter where those braces are
+  plausibly the subject matter. Personalising them would rewrite somebody's
+  documentation; refusing them would make a code sample unsendable. Left
+  literal, tested at both ends (the gate accepts `<p>{{ user.name }}</p>`, the
+  resolver returns the block unchanged), and it doubles as the answer to "how do
+  I write `{{` in a campaign".
+- **A topic refuses merge syntax outright.** Not in the item, and it is a leak
+  the item would otherwise have opened: C2s.2's unsubscribe page draws the topic
+  verbatim to a recipient who is leaving, and nothing resolves it on the way
+  there. `reject_merge_fields` is one check in `validate_topic`, tested.
+
+**One name had to change and the collision is worth recording.**
+`hr_letters::MergeField` already exists and is re-exported at the crate root, so
+the new enum is `CampaignMergeField` and its carrier `CampaignMergeValues` —
+which is the prefix the rest of this track's exports use anyway. They are
+different vocabularies over different facts (an employment letter about a
+colleague vs. a bulk mail to an audience) and share nothing; the module docs say
+so, in case a later reader tries to unify them.
+
+**How verified.** `cargo fmt -p alo-store`; `SQLX_OFFLINE=true
+CARGO_PROFILE_TEST_DEBUG=0 cargo clippy -p alo-store --all-targets` — clean for
+this change (the same two pre-existing `type_complexity` warnings in `meet.rs`,
+untouched). Test binaries built in **4 m 02 s**. `DATABASE_URL=…5432/alo_loop
+cargo nextest run -p alo-store --no-fail-fast` → **2 333 tests, 2 333 passed,
+1 skipped, 80 s**, up from C3.3's 2 315 — 18 new tests, all green, and the
+sites-owned `site_ticket_orders` flake flagged in the last three entries did
+**not** reproduce this run. `alo-jmap` was deliberately not re-run and that is
+not a skipped gate: no file in it was touched, no signature changed (only the
+*behaviour* of `validate_subject`/`validate_preheader`/`validate_topic`, which
+it calls through `create_campaign`), and its campaign routes were grepped for
+`{{` — there is none, so no test in it can meet the new rule.
+
+**No new route, and that is a deliberate deferral rather than an omission.** A
+composer needs to *offer* the vocabulary rather than have it recalled
+(`ux-principles.md`, recognition over recall), which points at a
+`GET /campaigns/merge-fields` or the list embedded in the composer's payload.
+That belongs with C3.6's preview screen, which is the first thing that can draw
+it; shipping the route now would mean wire-verifying an endpoint with no
+caller. What lands instead is the cheap half: the rejection message **names the
+whole vocabulary**, so a writer who guesses wrong is told the real names on the
+spot. `CampaignMergeField::ALL` is public for C3.6 to render.
+
+**No i18n, and the reason is the same as the last six entries with one
+addition.** No screen and no new route, so nothing goes through `i18n/en.ts`;
+and a *fallback* is the writer's own words, so a personalised letter is in
+whatever language it was typed in. The store's validation strings are English
+for the same reason every other module's are — they are the store's, not the
+interface's. The user-visible half of wave C3 still arrives with C3.6.
+**A CHANGELOG line was written this time**, unlike the previous six: the rule
+changes what `POST /campaigns/campaigns` accepts, which somebody composing a
+campaign meets immediately.
+
+- **Cuts:** none. No feature scope was narrowed.
+- **Next:** C3.5 — the mail must read with **images blocked**: alt text on every
+  image, colour never the only carrier of meaning, and a dark-mode-safe palette.
+  Notes for it, because the first of those three is not where it looks: **the
+  block model has no image block at all**, and C3.1 recorded that as a decision
+  rather than an omission — a remote image is a fetch we can see, which is the
+  open-tracking pixel ADR 0044 refused by default. So C3.5 is either (a) the
+  item that answers that question and adds the block *with* its mandatory alt
+  text, which is an ADR-shaped argument about who may fetch and what is logged,
+  or (b) the two thirds of the item that stand alone today — colour and
+  dark mode in `campaign_html.rs`, where the palette is seven hex literals
+  copied from `web/src/ds/tokens.css` and there is currently no
+  `prefers-color-scheme` block at all, so an Apple Mail reader in dark mode gets
+  a light card the client inverts unpredictably. (b) is buildable now and (a) is
+  not a loop's to decide alone; take (b), and journal (a) as the question it is.
+  Note also that a `<style>` element is what `prefers-color-scheme` needs, and
+  `the_document_carries_no_stylesheet_because_a_mail_client_may_drop_one` pins
+  that there is none — the dark-mode block is the one legitimate exception to
+  that rule and the test has to be taught the difference, not deleted.
