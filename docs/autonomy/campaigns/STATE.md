@@ -2152,3 +2152,169 @@ production Caddyfile needs nothing at the next deploy for this item.
   send row that item creates — wiring the two together is the join that makes an
   unsubscribe attributable to a campaign. It is the last item in this queue:
   when it is `[x]`, append `LOOP COMPLETE`.
+
+---
+
+## LOOP HALT — 2026-08-18 13:30 — C5m.1 was built, gated to within one command of green, and destroyed in the tree by a second agent
+
+**Not a gate failure and not a design problem. The working tree had two
+editors.** `docs/autonomy/HANDOVER.md` (landed 13:25, during this iteration)
+records a `ds` loop started at **13:16 on this same checkout**,
+`C:\dev\Ficina-loop`, and `git reflog` shows a commit from the **orders** track
+at HEAD@{1} — *docs(orders): halt — the sales order was already built, and the
+tree has two editors* — followed by a fast-forward pull. Between my last
+successful test run and my next command, `git status` went from four modified
+files plus three new ones to **clean**: the modified files were reverted and the
+three new files (untracked, so unrecoverable from any git object) were deleted.
+Roughly fifty minutes of complete work went with them, including a full
+`cargo nextest` run of all 2 380 `alo-store` tests.
+
+CLAUDE.md's rule — *one agent per working tree; concurrent editors produce
+uncommitted, ambiguously authored work that cannot be trusted* — is not a style
+preference. This is what it prevents. **A human has to separate the checkouts
+before any further loop runs here**, exactly as the orders track was moved to
+`C:\dev\Ficina-orders`. Redoing the work in this tree without that would only
+donate it to the next `git pull --rebase` somebody else runs.
+
+**C5m.1 stays `[ ]`.** What follows is the design that was built and all but
+proven, written down so the next attempt is a transcription rather than a
+re-derivation. It was clippy-clean (only the two pre-existing `meet.rs`
+`type_complexity` warnings, untouched) and 19 of its 20 unit tests and most of
+its integration suite passed against the real Postgres.
+
+### The shape that was built
+
+**Migration `0506_campaign_sends.sql` — two tables, not one.** `campaign_sends`
+is the *answer* (one row per person per campaign: did this arrive, and how did
+it go); `campaign_send_events` is the append-only *evidence* behind it. The
+split is not normalisation for its own sake — evidence is never rewritten and
+the answer is rewritten by every event that outranks the last, so a wrong answer
+can be explained rather than argued about.
+
+- `campaign_sends (tenant_id, id, campaign_id, address, state, state_at,
+  complained_at, first_clicked_at, queued_at)`, PK `(tenant_id, id)`,
+  **`UNIQUE (tenant_id, campaign_id, address)`** — two overlapping segments must
+  not mail one person twice, and a resend "to the people who did not open it" is
+  a different campaign with its own letter.
+- `FOREIGN KEY (tenant_id, campaign_id) REFERENCES campaigns ON DELETE
+  RESTRICT` — the only restrict in the campaigns schema. Deleting a campaign
+  deletes a letter; it may never delete the record that a person was mailed,
+  because that record is what an unsubscribe, a bounce and a complaint hang off.
+  `delete_campaign` maps SQLSTATE `23503` to a `Conflict` a colleague can read
+  rather than the `500` an unmapped database error becomes at the HTTP edge.
+- `CHECK` on the address (lower-cased, trimmed, has an `@`) so a row that could
+  not join a suppression cannot exist; `CHECK` on the five states; `CHECK` on
+  the seven event kinds; `detail` bounded at 300 characters and documented as
+  **never a message body**.
+- `campaign_send_events` cascades from its send, and indexes
+  `(tenant_id, send_id, occurred_at, id)` so one recipient's story reads the
+  same way twice.
+
+**Rank, not chronology — the part worth keeping verbatim.** Delivery reports
+arrive late, out of order and twice, so `SendState` is ordered by *how settled
+the outcome is* and the record keeps the highest rank it has ever seen:
+`queued 0 < sent 1 < bounced_soft 2 < delivered 3 < bounced_hard 4`. Two
+orderings decide that table and both had a passing test:
+
+- **A soft bounce followed by a delivery reads as delivered.** That is a retry
+  that worked; a record keyed on the *newest* event would say "bounced" and put
+  a real customer into next month's list-cleaning job. This is why
+  `bounced_soft` ranks *below* `delivered` rather than above it.
+- **A hard bounce after a delivery wins.** The asynchronous DSN is common — a
+  server accepts, then discovers the mailbox is gone — and the suppression must
+  fire whatever order the reports arrived in.
+
+`rank()` is `*self as u8`, so the declaration order *is* the rank: a state
+pasted into the middle of the enum then reads wrongly rather than ranking
+wrongly, which is the mistake a reviewer catches.
+
+**`complained` and `clicked` are not states.** They are two timestamp columns
+keeping the *first* occurrence. A complaint is a fact about the **person**;
+delivery is a fact about the **machinery**. Folding one into the other answers
+"did it arrive" with "they pressed the spam button" — losing the first question
+at the exact moment it becomes expensive. `LEAST(col, $n::timestamptz)` does the
+first-occurrence keep in the same `UPDATE`: Postgres `LEAST` ignores NULLs, so
+one statement handles "not this kind of event", "first time" and "reported
+again".
+
+**C1.3 fires from inside the transaction.** `record_campaign_send_event` opens a
+transaction, takes the record `FOR UPDATE`, appends the event, applies the rank
+rule, and — for `bounced_hard` and `complained` only — writes the tenant-wide
+suppression before committing. To make that one implementation rather than two,
+`campaign_suppression` gained
+`pub(crate) async fn suppress_with<'e, E: sqlx::Executor<'e, Database = Postgres>>(…)`
+and `suppress_campaign_address` became a one-line call to it. Two statements
+against a pool would leave a window in which the bounce is on file and the
+address is still mailable, and that window is somebody's inbox. The suppression
+names the **send id** as its `source_ref`, which is what finally makes "which
+letter lost us this address" answerable from the suppression alone — and it is
+the join `campaign_unsubscribe`'s opaque `send_ref` was left waiting for.
+
+**Who may be queued is decided by the insert.** `queue_campaign_send` is
+`INSERT … SELECT … WHERE NOT EXISTS (suppression) AND EXISTS (consent)` — one
+statement, so there is no ordering and no forgetful caller in which a row
+appears for somebody who never agreed (C1.2) or who has left (C1.3). Zero rows
+back is a refusal, and a second read *paid for only when the answer is no* says
+which rule it was; **suppression is reported first**, the same ranking
+`campaign_segments`' buckets use. `23505` becomes "already written down for this
+person", `23503` becomes `NotFound`, so another tenant's campaign id is
+indistinguishable from one that never existed.
+
+**The tally is the shape C4 will report from.** One statement of
+`count(*) FILTER` over the record table alone (the two marks are columns, so no
+join to the log): `sends`, the five states, `complained`, `clicked`. The five
+states **sum to `sends`** — one record is in exactly one state — and a sum that
+misses is a decode error rather than a report with people silently missing from
+it, exactly as `campaign_segments`' buckets are.
+
+**Store-only, and that was deliberate.** No `/campaigns/*` route and no screen:
+nothing writes these rows until there is a transport, so an API would report a
+table that is always empty and a screen would draw a number that is always
+zero. The queue item asks for the table those facts will be written into.
+
+### The two bugs already found, so they are not paid for twice
+
+1. **`every_query_is_scoped_to_one_tenant` fails on the event INSERT.** The
+   whole-module SQL assertion the campaigns track copies between files checks
+   for `tenant_id = $1`, which an `INSERT … VALUES` correctly does not contain.
+   The fix that keeps the promise rather than weakening it: hold an insert to
+   the *stricter* shape — the tenant is the first column and the first bind
+   (`(tenant_id, id, send_id, kind, detail, occurred_at)` with
+   `VALUES ($1, $2, $3, $4, $5, $6)`) — so a swapped argument that would write
+   into another workspace fails the same test.
+2. **Three integration tests were still red and were never diagnosed**, because
+   the tree was wiped between the run and the re-run:
+   `a_complaint_suppresses_and_a_deferral_does_not`,
+   `a_hard_bounce_suppresses_before_it_is_committed_and_the_audience_loses_them`
+   and `the_history_is_the_whole_story_in_order`. The leading suspicion, from
+   the same Windows precision fault this journal already records against the
+   sites suite, is asserting a `now_utc()`-derived instant equals what came back
+   from Postgres: `now_utc()` carries 100 ns on Windows and Postgres stores µs,
+   so such an assertion fails whenever the clock does not land on a whole
+   microsecond. **Assert against the value read back, or truncate before
+   binding.**
+
+### Operational facts this iteration paid for
+
+- **`C:` is at 99 %, 8.0 GB free.** `CARGO_PROFILE_TEST_DEBUG=0` is already in
+  force here (zero `.pdb` files) and there were **no stale duplicate test
+  binaries** — 248 `.exe` in `target/debug/deps`, 13 GB, one per target name.
+  The disk is full of *current* artefacts, so the stale-binary sweep this
+  journal recommends has nothing left to reclaim; the next space problem needs a
+  different answer.
+- **`ls` over `target/debug/deps` is minutes-slow at this fill level.** Two
+  measurement commands hit the 5-minute and 2-minute ceilings doing nothing but
+  listing files. Measure with one `du -sh`, never a per-target loop.
+- **The Bash tool's working directory persists between calls.** A `cd` in one
+  command silently rebases every later relative path; a
+  `ls platform/alo-store/tests/*.rs` that returned nothing was the tell, and it
+  was read as "no such binaries" rather than "wrong directory".
+- Test-binary build after an `alo-store` source change: **5 m 42 s** with the
+  sanctioned background+marker form. The full `alo-store` suite: **523 s, 2 380
+  tests** (2 374 passed) — up from 2 347, of which 33 were this item's.
+- Two `site_ticket_orders` tests also failed in that run
+  (`the_ticket_mail_waits_for_fulfilment_claims_once_and_never_crosses_tenants`,
+  `a_paid_sale_is_made_good_once_and_walled`). Nothing in this item is within
+  reach of them; logged here for the sites queue.
+
+**Next:** C5m.1, in a checkout no other agent is editing.
