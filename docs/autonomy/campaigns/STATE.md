@@ -1993,3 +1993,162 @@ written: what a recipient sees changed.
   the light one — the palette landed by this item makes that a toggle over one
   document rather than a second render — and a seed send inside the tenant uses
   the existing transactional path and is not a campaign send.
+
+## C3.6 — the letter as one person will receive it, and a copy in your own Drafts (2026-08-18)
+
+**Shipped.** The first user-visible slice of wave C3, and the item that finally
+makes everything C3.1–C3.5 compiled *readable* by the person writing it:
+`alo-store`'s `campaign_preview.rs` (a stored letter meeting a stored person),
+three routes on `alo-jmap` (`GET /campaigns/merge-fields`, `GET
+/campaigns/campaigns/{id}/preview`, `POST /campaigns/campaigns/{id}/test`), and
+a **Letters** tab beside the audience screen.
+
+**A preview is against a real record, or it says it is not.** The tempting
+shape was a sample recipient — a *Jane Doe, Belgium* the module invents so the
+screen always has something to draw — and it is C3.4's failure one layer up: an
+invented record makes every preview look personalised, *including the previews
+of the letters that will arrive at half an audience as "Hi ,"*. So there is no
+sample. `PreviewAs` is `AnyRecipient` / `Recipient(address)` / `Fallbacks`, and
+the answer carries `PreviewAgainst::Recipient{…}` or
+`PreviewAgainst::Fallbacks(FallbackReason)` — a tagged value the screen draws a
+sentence from, never a `null` it has to interpret. The two fallback reasons are
+kept apart on purpose: *you asked for this copy* is a choice a writer made,
+*there is nobody to mail yet* is a fact about the workspace, and saying the
+first when the second is true would claim a preview is representative when it is
+only all there is.
+
+**Resolving against nobody is offered by name, not merely fallen back to.** It
+is the copy every recipient with nothing recorded receives, which on an audience
+built from web forms is most of them — a writer who has read only the
+personalised preview has not read the mail most people get. One press on the
+screen, and `?as=fallbacks` on the wire (an address always contains an `@`, so
+the literal cannot collide with one).
+
+**The person previewed is a person we could actually mail.** The new
+`AccountStore::campaign_recipient` reads at `Reach::Mailable` and is
+deliberately not offered at any other reach: the only callers who want one
+person by address want to render a letter to them, and rendering a letter to
+somebody who unsubscribed is the rehearsal for sending them one. A suppressed
+address, an address with no consent record and an address this tenant has never
+held are **one answer** (`NotFound` → `404`), so the refusal is not an oracle
+for which of the three is true. `campaign_preview_tenancy` carries the failing
+case this queue requires of anything touching who is mailed, including that a
+re-stated consent does not resurrect a suppressed address for a *preview* any
+more than it does for a send, and that one address held by two tenants previews
+as each tenant's own record.
+
+**The merge-field report is the third deliverable, and it is not decoration.**
+On screen "Hi Jean," and "Hi there," read identically — as a letter that
+worked — and only one of them means the personalisation did anything. So
+`personalise_campaign` now collects `ResolvedMergeField { field, value,
+fell_back }` in the *same single pass* that resolves (no second walk of the
+blocks, no second parser), and the table names whose words each value is.
+Distinct *results* rather than distinct fields: one letter greeting with
+`{{first_name|there}}` in the subject and `{{first_name|friend}}` in the body is
+two rows, because the second is the one nobody proof-read.
+
+**The seed test is a draft, and that is the whole design.** `POST …/test`
+renders exactly what the preview renders and hands it to `drafts::save` — the
+same path `billing_send` and every agent-composed message take (ADR 0034):
+anything alo writes on a user's behalf lands where they can read it, change it,
+and send it themselves through the one submission path that signs and is
+audited. Two refusals are deliberate. **There is no `to` on the route** — a
+field naming the recipient of a rendered campaign is the first half of a sending
+API, and it would arrive without any of what a campaign send owes a recipient
+(consent checked at send time, `List-Unsubscribe`, a suppression pass); "within
+the tenant" at its strictest is *to yourself*, and the draft is editable by the
+person who asked. And **the subject is not marked `[TEST]`** — it would be the
+one thing on the screen that is not what a recipient gets, and the subject is
+what a filter scores and an inbox truncates. A test whose subject differs from
+the real one does not test the subject.
+
+**`GET /campaigns/merge-fields` answers names and nothing else.** C3.4 deferred
+it here, and the split it forces is the point: the *vocabulary* is the server's
+(a field added to `CampaignMergeField::ALL` appears in the composer without a
+web release), the *words describing each field* are the catalogues' (a Rust
+literal would arrive in English whatever the reader set).
+
+**The screen.** A tab strip over the existing audience screen — two views
+because they answer two questions, *who would this reach* and *what would they
+actually get*, and tabs rather than two rail entries because a colleague moves
+between them while deciding one thing. The HTML part is drawn in an
+`iframe sandbox=""` with `srcDoc` (the established pattern in Sites and Mail:
+runs nothing, reaches nothing, navigates nothing), the text part as `<pre>` so a
+line the renderer wrapped badly is visible here rather than in somebody's
+terminal client. The frame carries its own white background rather than a
+surface token, because an email is drawn on whatever the client gives it and
+tinting it with our theme would be a claim about a background nobody controls.
+
+**How verified.** `cargo fmt`; `SQLX_OFFLINE=true CARGO_PROFILE_TEST_DEBUG=0
+cargo clippy -p alo-store -p alo-jmap --all-targets` — clean for this change
+(the same two pre-existing `type_complexity` warnings in `meet.rs`, untouched,
+confirmed by line). Test binaries built in **4 m 30 s**.
+`DATABASE_URL=…5432/alo_loop cargo nextest run -p alo-store --no-fail-fast` →
+**2 347 tests, 2 347 passed, 1 skipped, 81 s** (up from 2 339 — 8 new). `cargo
+nextest run -p alo-jmap` → **1 294 tests, 1 293 passed, 247 s**; the one failure
+is `site_schedule_http a_publish_is_scheduled_moved_and_called_off`, a
+**sites-owned** test comparing `OffsetDateTime::now_utc()` (100 ns on Windows)
+with the same instant round-tripped through Postgres (µs), so it fails whenever
+`now_utc()` does not land on a whole microsecond — `left: …09.47261, right:
+…09.4726104`. It is a precision bug in that test rather than in any code, it is
+in another track's file, and nothing in this item is within reach of it; logged
+here for the sites queue.
+
+**Wire-verified with real curl against a real server and real rows**, on
+`127.0.0.1:8099` rather than 8080 because another checkout (`C:\dev\Ficina`) had
+a server up on the default and killing a live agent's stack is not a gate step.
+`GET /campaigns/merge-fields` → the four names; preview with no `as` → *Spring
+prices for Jean*, `against.kind = recipient`, three fields all `fellBack:false`,
+3 425 bytes of HTML and 72 of text; `?as=fallbacks` → *Spring prices for you*,
+`reason: asked`, four rows all `fellBack:true` including the two different
+`first_name` fallbacks; `?as=stranger@…` → `404`; `?as=everyone` → `422`; no
+token → `401`; `POST …/send` → `404`. `POST …/test` → one row in `messages`
+joined through `mailbox_messages` to the `drafts` mailbox, keyword `$draft`,
+`from`/`to` both the caller, subject `Spring prices for Jean`; the stored
+message on disk carries `multipart/alternative` with one `text/plain` and one
+`text/html`. Server stopped afterwards; the other checkout's left running.
+
+**Web gate:** `npx tsc --noEmit` clean, `npx eslint src/campaigns src/i18n`
+clean, `npm run build` clean, `npx vitest run src/i18n/locale.test.ts` **65
+passed**. No new route prefix: `/campaigns/*` is already registered, so the
+production Caddyfile needs nothing at the next deploy for this item.
+
+- **A pre-existing break in this track's own work, fixed here.** The locale
+  parity test was **red on `main`**: C2s.2 landed the 17 `campaignUnsubscribe*`
+  strings in English only, and nothing on that iteration ran `locale.test.ts`.
+  Since the unsubscribe page is the one screen in this product a *stranger*
+  reads, English-only there is exactly the bug the rule exists for, so the Dutch
+  and French were written rather than added to `UNTRANSLATED`. Two lint traps
+  paid for while doing it, worth writing down: `no-irregular-whitespace` skips
+  **strings** but not **comments** and not **template literals**, so French
+  typography (a no-break space inside guillemets, or before a colon) is fine
+  inside a plain double-quoted string and an error inside a backtick or a `//`
+  comment.
+- **Cuts:** two, both recorded rather than quietly dropped. (i) **No dark-mode
+  toggle on the preview**, which the C3.5 entry suggested: the dark letter is a
+  `prefers-color-scheme` media block, and an iframe inherits the *viewer's* OS
+  scheme — forcing it would mean injecting our own override into the document,
+  which is a second rendering opinion and the one thing a preview must not be.
+  An honest dark preview needs the frame's own scheme forced by the browser, and
+  that is a separate item. (ii) **No composer.** There is still no screen that
+  *writes* a campaign; this one reads letters written through the API. The
+  Letters tab is where a composer will land, and it now has the vocabulary list,
+  the preview and the test copy waiting for it.
+- **Flag for a human — unchanged from C3.5 and still the wave's open question:**
+  *should a campaign be able to carry an image, and who may fetch it?* Nothing
+  in this item answered it, and the preview screen makes it slightly more
+  visible: a writer looking at a letter with no images is looking at a real
+  limitation, not a rendering gap.
+- **Next:** C5m.1 — the per-recipient send record and its event model (queued,
+  sent, delivered, bounced hard/soft, complained, clicked), with C1.3's
+  suppression rules firing off the events that warrant it. **No sending and no
+  tracking is built there**; it is the table those facts will be written into,
+  and building it now keeps C4 from inventing a schema under time pressure.
+  Notes for it: migrations are `05xx` and `0505` is taken, so it is `0506`;
+  `campaign_suppression`'s `SuppressionReason` already names `HardBounce` and
+  `Complaint`, so the event model should produce those rows rather than invent a
+  parallel vocabulary; and `campaign_unsubscribe`'s token carries a *send
+  reference* (`UNSUBSCRIBE_SEND_REF_MAX`) which is exactly the per-recipient
+  send row that item creates — wiring the two together is the join that makes an
+  unsubscribe attributable to a campaign. It is the last item in this queue:
+  when it is `[x]`, append `LOOP COMPLETE`.

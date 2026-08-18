@@ -36,6 +36,21 @@ contracts.
   either: a table's header row is a header row, and a code sample says which
   language it is in words, so the letter still reads when the colours do not
   arrive.
+- **Read a campaign as one of your recipients will, before anybody sends it.**
+  A new *Letters* tab in Campaigns draws each letter exactly as it will arrive:
+  the formatted version, the plain-text one that some people and every spam
+  filter read, and the subject and preview text as they land in an inbox list.
+  It is rendered against a real person from your audience — someone you may
+  actually mail, never somebody who unsubscribed — and one press switches to
+  the copy that goes to everybody with no name on file, which on an audience
+  built from web forms is most of it. A table underneath says what each
+  personalised value became and, crucially, whose words it is: *Jean*, from
+  their record, or *there*, your own fallback. The screen says plainly that
+  this is our renderer's opinion and not proof — Outlook on Windows draws mail
+  with Word's engine — so a **test copy goes into your own Drafts** with one
+  press, both versions included, for you to read in your real mail app. Nothing
+  is sent: the copy is a draft addressed to you, and you send it yourself if
+  you want to.
 - **A campaign that would arrive as "Hi ," can no longer be saved.** Personalise
   a campaign by writing `{{first_name|there}}` in the subject, the preview text
   or the body — the field to insert, then the words to use for the people who
