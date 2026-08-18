@@ -33,6 +33,17 @@ the likeliest source of a conflict. Treat their area as owned by them for as
 long as they are in it, and keep your own commits small enough that a rebase
 over their work stays trivial.
 
+**`[ ]` is an instruction to keep trying, so an item that will never be built
+here is marked `[~]` with its reason.** The iteration rule picks the first item
+that is neither `[x]` nor `[!]`, and it does that whether or not `LOOP COMPLETE`
+has already been written. On 2026-08-18 the campaigns queue left one item `[ ]`
+after completing: the wrapper kept invoking, and iteration 17 took it up and
+began building the sending path the queue was written to exclude. Nothing
+reached `main`, but a loop spent an hour outside its own boundary. The agents
+queue got this right with `A2.2b` — dropped, not deferred — and stopped cleanly.
+Three marks, three meanings: `[x]` done, `[!]` blocked and retryable, `[~]` not
+this queue's to build, with the reason beside it.
+
 **A prerequisite that is not in the queue item does not exist.** `features.md`
 and a guide both said in bold that an ADR had to be written before the
 domain-selling build; no S2.15 item mentioned it, so five items shipped the

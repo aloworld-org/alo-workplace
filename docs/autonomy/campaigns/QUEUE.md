@@ -87,7 +87,7 @@ kept the website agent out of the sites track's files.
 
 ## Wave C5m — the shape the numbers will land in *(model only, nothing measured)*
 
-- [ ] C5m.1 The per-recipient send record and its event model — queued, sent, delivered, bounced (hard/soft), complained, clicked — with the suppression rules of C1.3 firing off the events that warrant it. **No sending and no tracking is built here**; this is the table those facts will be written into, and building it now keeps C4 from inventing a schema under time pressure.
+- [~] C5m.1 **not built here — the event model belongs with the sender.** Left unchecked it became an instruction to keep trying: `LOOP COMPLETE` was already recorded and iteration 17 picked this item up anyway, and building it led straight into `campaign_send.rs` and a `0506` migration — the sending path this queue exists to stay out of. None of it reached `main`. The table is only worth building beside the code that writes rows into it, so it moves to C4 with the sending path, behind the second IP and the signing identity.
 
 ---
 
