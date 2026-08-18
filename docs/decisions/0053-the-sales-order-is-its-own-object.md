@@ -1,6 +1,45 @@
 # ADR 0053 — The sales order is its own object, reservation is soft, and invoices follow deliveries
 
-**Status:** accepted (2026-08-18)
+**Status:** **DISPUTED — do not build from this file.** Its central premise is
+false and two of its three decisions are affected. Accepted 2026-08-18, disputed
+the same day by the orders loop's first iteration, which read the code instead of
+trusting the ADR.
+
+> **What is wrong, so nobody rediscovers it.**
+>
+> This ADR opens "alo bills well and ships nothing". **It ships.** Wave B5.06
+> (2026-08-10) already built the sales order as its own object with its own
+> `SO-YYYY-NNNNN` series (`inv_sales_orders`, migration 0162), ordered/delivered
+> /invoiced per line, delivery notes with partial delivery and over-delivery
+> refused (`inv_so_deliver.rs`, 834 lines), invoicing that follows deliveries
+> (`inv_so_invoice.rs`, 707 lines, migration 0164), eight `/inventory/sales-orders*`
+> routes and two web views.
+>
+> The error was a search, not a judgement: `sales_order` was grepped and the
+> convention is `inv_so_*`. An absence was concluded from a filename pattern and
+> an ADR, a roadmap wave and a queue were built on it. **Decision 1 therefore
+> describes something that already exists**, and O1.1, O1.4 and O1.5 are largely
+> or wholly built.
+>
+> **Decision 2 is also contradicted by the code.** It makes `reserved` a stored
+> quantity; `inv_reorder.rs` (B5.07) already *computes* `committed` — the
+> undelivered remainder of confirmed order lines — and says in its own words why
+> it is not a table. A stored figure beside it is a third number meaning what the
+> second means, and the first day they disagree the order book and the shortage
+> report can each cite the database. Computed also gets the lifecycle free:
+> delivering releases, cancelling releases, with no hook to forget.
+>
+> **What survives:** decision 3 (invoices follow deliveries) — which the build
+> already implements for the reason given here — and the hard rule that
+> `reserved <= on_hand + on_order` is refused inside the confirming transaction
+> rather than by the caller. That rule holds whether the figure is stored or
+> computed.
+>
+> **The real gaps** are smaller and sharper than this ADR imagines: reservation
+> (`inv_so.rs` says confirming reserves nothing), the quote-to-order link and
+> routing (a quote can only become an invoice today), and the order book across
+> orders plus its agent. A successor ADR should be written from the code, and
+> wave O1 re-cut around those three.
 **Context:** roadmap Order track O1, `billing_quotes`, `billing_invoices`,
 `inv_*` inventory modules, ADR 0035 (the Work OS), ADR 0047 (reads answer)
 **Decides** the three questions O1.0 named, before any of O1 is built.

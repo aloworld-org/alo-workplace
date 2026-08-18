@@ -463,7 +463,22 @@ abbreviations on an axis (BI1.08).
 Later waves (post-traction, unordered): manufacturing-lite, POS, subscriptions,
 e-signature (eIDAS), marketing sends, storefront, DATEV/PSD2 integrations.
 
-## Order track — the goods half of the business (ADR to write) ⇄ after Campaigns C1
+## Order track — **SUSPENDED, re-cut needed** (ADR 0053 disputed) ⇄ after Campaigns C1
+
+> **Do not run this wave as written.** Its premise is false: the sales order,
+> delivery notes and invoice-from-delivery were built in wave B5.06 (2026-08-10)
+> under `inv_so_*` names. O1.1 is ~90% built and O1.4 and O1.5 look built
+> outright. Building O1.1 literally would create the duplicate object ADR 0053
+> rejects in its own *Rejected* section.
+>
+> The three real gaps: **reservation** (`inv_so.rs` says confirming reserves
+> nothing), the **quote-to-order link and routing**, and the **order book across
+> orders plus its agent**. Re-cut O1 around those, from a successor ADR written
+> by reading `inv_so*.rs` first.
+>
+> Also outstanding: the orders track needs **its own checkout**. It halted on
+> 2026-08-18 because a second loop was writing the same tree, which makes every
+> gate meaningless in both directions.
 
 **What is missing, stated plainly.** alo has the money half of an ERP and not the
 goods half. Walking the live flow on 2026-08-17 with a fan manufacturer's data,
