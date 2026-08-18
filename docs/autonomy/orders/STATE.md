@@ -129,3 +129,37 @@ settle §2.
 
 LOOP HALT: a second agent (the campaigns loop) is editing this working tree; no
 gate run here can be trusted and nothing may be committed from it.
+
+---
+
+## 2026-08-18 — read before the successor ADR, so it is not written from memory either
+
+Three claims checked against the code rather than against the disputed ADR. Two
+shrink the wave further; one corrects something I asserted without looking.
+
+**Reservation is not a missing number — it is a missing refusal.**
+`inv_reorder.rs` states in its own header that `available = on_hand + on_order −
+committed`, and that **`on_order` and `committed` are computed, never stored**,
+`committed` being the undelivered remainder of every confirmed sales-order line.
+So the quantity ADR 0053 §2 wanted to add already exists, is already correct, and
+already has the lifecycle for free. `inv_so.rs` says equally plainly that
+**"confirming reserves nothing… therefore no reserved quantity anywhere in this
+module to drift out of step"** — which is a deliberate choice, not an oversight.
+
+What is actually absent is the **check at confirmation**: nothing refuses a
+confirmation that would push `committed` past `on_hand + on_order`. That is one
+guarded transaction, not a schema change, and it is the whole of the
+over-commitment protection the wave was built around.
+
+**The quote link may be partly there.** `quote` already appears in `inv_so.rs`
+and `inv_so_confirm.rs`. I claimed it absent without reading them; the successor
+ADR must establish what those references do before deciding anything about
+O1.2.
+
+**The lesson this file should keep.** ADR 0053 was written from a filename
+search, and its correction was nearly written from memory of that search. Both
+times the code said something different and said it in the first twenty lines of
+a header. **Read the module headers first — this repository writes its reasoning
+where the code is, and the answer to "does it do X" is usually stated outright
+rather than inferred from a grep.**
+
