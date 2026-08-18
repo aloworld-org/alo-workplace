@@ -2318,3 +2318,111 @@ zero. The queue item asks for the table those facts will be written into.
   reach of them; logged here for the sites queue.
 
 **Next:** C5m.1, in a checkout no other agent is editing.
+
+---
+
+## C2.1 / C2.1a / C2.1b — the sending identity, proved by sending (2026-08-18)
+
+**Not a loop iteration.** This is the wave the queue was written to stay out of:
+it needed the second IP, which was a purchase. The IP was bought, attached and
+given reverse DNS on 2026-08-17, so the block was gone and this was done by hand.
+
+**Shipped.** `platform/alo-auth-mail/src/dkim/rsa_public.rs` (the DER the
+published record actually carries), `txt_record_for` and `ed25519_key_from_pkcs8`
+in the keystore, `products/mail/alo-smtp/src/dkim_install.rs` (the operator
+door), `products/mail/alo-smtp/src/egress.rs` (which address a domain leaves by),
+the plumbing through `queue.rs`/`config.rs`/`alo-smtp-client`, `dkimRecords` on
+`GET /admin/domains`, and the compose/systemd half of the egress lane. Design
+note: `docs/design/campaign-sending-identity.md`. No migration — `7e331ced`
+already took `0600`.
+
+**The decision C2.1a asked for was already answered by code, and the answer was
+the expensive one: dual-sign.** What the ROADMAP could not know is that the
+decision had no way to be carried out. Three gaps, each found by reading rather
+than by design:
+
+- **Nothing could put an RSA key into `dkim_keys`.** `ensure_dkim_key` and the
+  rotate route both generate Ed25519, and ADR 0014 deliberately refuses to
+  generate RSA in-process, saying an operator supplies it out of band — where
+  there was no band. The published `camp` record had been sitting in DNS since
+  2026-08-17 for a key nothing would ever sign with.
+- **`dkim_record_json` rendered every stored key as `k=ed25519`** and returned
+  only the first. After dual-sign a domain has two records to publish and one of
+  them is RSA, so the Domains screen would have handed an operator a record with
+  the wrong `k=` and silently omitted the other.
+- **Outbound never chose a source address.** `TcpStream::connect` takes what the
+  kernel picks. A message `From: @news.alomails.com` would have left by the
+  transactional IP and failed SPF against a record ending in `-all` while its
+  DKIM passed — the two-green-checks-and-a-red-verdict failure C2.1 warns about,
+  arriving as quiet filtering rather than as an error.
+
+**What the wire found that no test could.** Both of these were live on a build
+whose suite was green:
+
+- **Docker outranks you.** Creating a bridge network inserts a MASQUERADE rule at
+  the *top* of nat `POSTROUTING`, above the SNAT rule that picks the campaign
+  address. The mail left by the primary IP while every log line correctly said
+  `egress="172.19.0.10"`. The fix is not ordering — a rule that must win a race
+  against Docker's rule ordering is a rule that silently stops working — but
+  `enable_ip_masquerade: "false"` on that bridge, so there is no competing rule
+  at all.
+- **The greeting is part of the identity.** The message left by the campaign
+  address and then said `EHLO mail.alomails.com`. The receiver compares that
+  against the connecting address's reverse DNS and deducted **3 of 10** for the
+  mismatch — the only authentication deduction left once all three checks passed.
+  The greeting now follows the egress selection, taken from the configured
+  domain rather than from the envelope.
+
+**And one thing that cost most of an hour on its own: a permanent delivery
+failure logged nothing.** The receiver was refusing our mail with the exact
+sentence needed to diagnose it — `550 5.7.23 … SPF fail … ip=152.53.179.142` —
+and that sentence existed only inside a DSN, which then failed to deliver to a
+campaign return path with no mailbox and was discarded. What an operator saw was
+`bounced=1`. It is now a warning line carrying the stage, the code and the
+receiver's own words. The transient branch had always logged; the permanent one,
+which is the more serious event, never had.
+
+**How it was verified, and why the verification is the item.** Not by a suite —
+by sending. An independent receiver, on the real wire:
+
+```
+Received-SPF: Pass (mailfrom) identity=mailfrom; client-ip=159.195.89.28
+dkim=pass (2048-bit key) header.d=news.alomails.com header.s=camp header.a=rsa-sha256
+dmarc=pass (p=none dis=none) header.from=news.alomails.com
+```
+
+All three, together, under `adkim=s; aspf=s`. The derived DKIM record was also
+compared byte-for-byte against the one published in DNS on 2026-08-17 — a
+hand-written SPKI encoder that merely *looks* right produces a record that fails
+at every receiver and nowhere else.
+
+**Tests** (all green; `cargo fmt`, clippy clean for these crates): the egress
+map's parsing and lookup, including that the parent domain does not inherit the
+campaign address and that a bounce takes the default route; the client actually
+applying a pinned source, proved by pinning an address the host does not hold
+and requiring failure beside a control that succeeds without it; the queue
+choosing address *and greeting* by envelope sender end to end; the install
+path's wrong-tenant refusal, asserting the neighbour's key still signs
+afterwards rather than only that a refusal happened; and the DER encoder pinned
+byte-for-byte.
+
+**Flag for whoever owns the mail suite: `submission_tls` fails on `main`, and it
+is a test-isolation defect rather than a code one.** Six tests in that binary
+share the fixed credential `alice@alo.test`, and nextest gives each its own
+process against one database. The file's comment says they "reuse one user
+rather than racing to create it" because the login username has a global unique
+index — but the guard is in `create_user`, and `users` is unique on
+`(tenant_id, email)`, which is *per tenant*. So each test happily creates its own
+tenant with the same email, and they collide later on `credentials.username`,
+which is global. It fails on a clean database too. Not touched here: it is
+pre-existing, it is a test-harness refactor rather than a fix, and today's item
+had a clock on it. `dmarc_report`'s two tests also fail on `main` in this
+environment (36 s each, DNS-dependent).
+
+**Not built, deliberately:** the separate queue (C2.2 — this is the egress half
+only), per-tenant warm-up caps (C2.3), per-tenant subdomain provisioning (needs
+the DNS automation), and the Domains screen showing both records — the API
+returns them, the screen still renders one, and the web surface has an owner.
+
+**Next:** C2.4/C2.5 give a campaign the two unsubscribe doors, which are also
+the two largest remaining deductions at a receiver. C4 is the send path.

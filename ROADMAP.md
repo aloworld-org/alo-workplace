@@ -32,7 +32,7 @@ Rules of this file:
 - [ ] EU hosting partner selected (Open Decisions closes); first server live
 - [x] `deploy/` composes the engine set (Synapse, LiveKit, Collabora, Garage, Postgres, Rspamd) at pinned versions
 - [ ] Test domain configured: DNS, rDNS, first DKIM/SPF records (BLOCKED until constant-time credential compare lands — no public 587 with a timing oracle)
-- [ ] IP warming begins now — sending reputation is grown for launch, not at launch. *(The campaign IP `159.195.89.28` was bought 2026-08-17 and is clean; warm-up starts once it is attached and has reverse DNS — Campaigns track, C2.0.)*
+- [x] IP warming begins now — sending reputation is grown for launch, not at launch. *(Started 2026-08-18 on `159.195.89.28`, once the identity could sign and its first mail authenticated at a receiver: `spf=pass dkim=pass dmarc=pass`. Schedule and log in `docs/design/sending-reputation-warm-up.md`; Campaigns track, C2.0d.)*
 
 ### Exit gate — Phase 0 done when:
 
@@ -593,13 +593,48 @@ Before C2.1 can start:
 - [x] C2.0b Reverse DNS set 2026-08-17 and confirmed from outside: forward `news.alomails.com → 159.195.89.28` and reverse `159.195.89.28 → news.alomails.com` both resolve at Google. That is the forward-confirmed reverse DNS Gmail and Outlook check.
 - [x] C2.0e Bound inside the VM — netcup routing the address is not the same as the operating system holding it, and nothing can send from an address the kernel does not have. Added to `eth0` and persisted in `/etc/network/interfaces.d/50-cloud-init.cfg` as `up`/`down` commands appended to the existing stanza rather than a second `iface` block, so the primary address and gateway are never re-parsed to reach it; `|| true` on both so a failure there can never abort `ifup` at boot and cost the server its network. cloud-init's network management is disabled on this host (`99_nc_network_disable.cfg`), so the file is not regenerated. Verified: outbound traffic sourced from the new address works, the gateway is still reachable, and SMTP still answers.
 - [x] C2.0c Forward record `news.alomails.com → 159.195.89.28` at **Namecheap** — added 2026-08-17, propagated and resolving at both Google and Cloudflare. Nothing else in the zone touched.
-- [ ] C2.0d **Begin warm-up as soon as it can send**, not when C2 starts. This is
+- [x] C2.0d **Begin warm-up as soon as it can send**, not when C2 starts. This is
       Phase 0's long-unchecked "IP warming begins now", and it is the only item
       in this track whose cost is calendar time that cannot be recovered later —
       a cold IP sending its first real campaign is filtered however correct the
       DKIM is.
 
-- [ ] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and **verified on the wire together**, as the transactional trust stack was — never one record at a time, because a record nobody has tested is one everybody assumes is right.
+      **Started 2026-08-18**, the day the identity could first sign and send.
+      The schedule, what is watched each week, and the day-by-day log live in
+      `docs/design/sending-reputation-warm-up.md`. The ramp is conditional on a
+      clean week rather than on the calendar, and the first fortnight is
+      honestly seed sends — there is no send path (C4) and no consenting
+      audience yet, which is precisely why the clock had to start anyway.
+
+- [x] C2.1 A dedicated sending subdomain per tenant with its own SPF, DKIM selector and DMARC alignment, provisioned and **verified on the wire together**, as the transactional trust stack was — never one record at a time, because a record nobody has tested is one everybody assumes is right.
+
+  **Verified 2026-08-18 for `news.alomails.com`, at an independent receiver, on
+  the real wire** — the three records and the egress judged together, which is
+  the only reading that means anything:
+
+  ```
+  Received-SPF: Pass (mailfrom) identity=mailfrom; client-ip=159.195.89.28
+  dkim=pass (2048-bit key) header.d=news.alomails.com header.s=camp header.a=rsa-sha256
+  dmarc=pass (p=none dis=none) header.from=news.alomails.com
+  ```
+
+  Two failures were found by sending rather than by reading, and neither would
+  have shown up in a test: Docker's per-bridge masquerade rule outranked the
+  SNAT rule that selects the campaign address, so the mail left by the
+  transactional IP while every log line said it was pinned; and the greeting
+  still named the transactional host, which the receiver scored down by 3 of 10
+  because it did not match the campaign address's reverse DNS. Both fixed.
+
+  **Per-tenant provisioning is still manual.** This proves the shape end to end
+  for our own identity; the self-service half needs the DNS automation in
+  `docs/design/dns-onboarding.md` and is not claimed here.
+
+  **One record short, and it needs the registrar:** `news.alomails.com` publishes
+  no MX, which is now the only authentication deduction a receiver makes
+  (−3 of 10). A sending domain that cannot receive looks one-way. Owner action:
+  `news.alomails.com MX 10 mail.alomails.com` at Namecheap — best landed
+  together with C2.10, which needs that return path to actually arrive rather
+  than be refused.
 
   **Why the parent SPF must not simply be widened.** `alomails.com` publishes
   `v=spf1 mx -all` and `p=quarantine; adkim=s; aspf=s`. Strict alignment means an

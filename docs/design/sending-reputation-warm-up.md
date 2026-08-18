@@ -95,4 +95,32 @@ nobody can prove.
 
 | Date | Sent | To | Notes |
 |---|---|---|---|
-| 2026-08-18 | see below | authentication verifiers and seed mailboxes | Day 1. The identity's first mail; the point of these is the `Authentication-Results` they come back with. |
+| 2026-08-18 | 6 | authentication verifiers | **Day 1** — the identity's first mail. Four were rejected or lost while the egress was wrong (Docker's masquerade rule outranked ours, so they left by the transactional IP and were refused for SPF); the last two authenticated cleanly: `spf=pass` from `159.195.89.28`, `dkim=pass` `d=news.alomails.com s=camp`, `dmarc=pass` under strict alignment. A refused message is not a reputation event — the receiver never accepted it — so day 1 counts as two delivered. |
+
+**Day 1's other findings.** The receiver scored the identity down 3 of 10 for
+greeting as `mail.alomails.com` while connecting from an address whose reverse
+DNS says `news.alomails.com`; fixed the same day, and the reverse-DNS check now
+reads `IP: 159.195.89.28  HELO: news.alomails.com  rDNS: news.alomails.com`.
+
+**What is left, and one of it needs the registrar:**
+
+- **`news.alomails.com` publishes no MX record**, and that is now the only
+  authentication deduction (−3): *"We didn't find a mail server (MX Record)
+  behind your domain name."* A sending domain that cannot receive looks
+  one-way, and some filters weigh it. Today a bounce to
+  `bounces@news.alomails.com` falls back to the A record, reaches our MX, and is
+  refused cleanly — a refusal rather than a black hole, but not a return path.
+  **Owner action at Namecheap:** `news.alomails.com MX 10 mail.alomails.com`.
+  It pairs with C2.10's bounce handling, which needs that return path to
+  actually arrive, so publishing the record and accepting mail for the domain
+  should land together rather than the record alone.
+- The other deductions are content rather than identity, and both are queued
+  ahead of any real send: no `List-Unsubscribe` (C2.4/C2.5) and no HTML part
+  (C3's renderer exists; the day-1 probes were hand-written plain text).
+
+**The transactional identity was re-checked the same day and is untouched:**
+10/10, leaving by `152.53.179.142`, greeting as `mail.alomails.com`, signing
+`d=alomails.com s=fic`, passing SPF, DKIM and DMARC under `p=quarantine`. That
+comparison is the point of the whole arrangement — two identities, neither
+borrowing the other's reputation — so it is worth re-running whenever the
+egress configuration changes.
