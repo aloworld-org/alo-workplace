@@ -1198,3 +1198,156 @@ this item's write scope.
   caller: the exclusion belongs in `campaign_audience`'s `Reach` predicate
   beside consent and suppression on the day a send can say which kind of mail it
   is.
+
+## C3.1 — the letter itself, in the blocks a document is written in (2026-08-18)
+
+**What shipped.** The first table in alo Campaigns that holds a *message*:
+migration `0505_campaigns.sql`, `alo-store`'s `campaign_content.rs` (the block
+model and its rules, no database in it) and `campaign_record.rs` (the CRUD),
+`alo-jmap`'s `campaign_record.rs` behind five routes at `/campaigns/campaigns`,
+and two suites — `campaign_record_tenancy` (8 tests) and `campaign_record_http`
+(10 tests) — plus 16 unit tests in the two store modules. Nothing sends: there
+is no `/send`, no schedule, no segment link and no status column, and the HTTP
+suite asserts the absence rather than assuming it
+(`nothing_on_this_surface_sends` asks for three plausible send routes and
+requires a `404`/`405`, never a `403` — a route that exists is a route somebody
+eventually points at a list).
+
+**The Docs block model, taken literally — and the one block refused.** The
+queue item is one sentence about the product: *content as the Docs block model
+— one editor, not a second one.* So the wire shape is
+`web/src/authoring/document.ts`'s shape, tag for tag: a
+`{"type":"paragraph","id":…,"text":…}` written by the Docs editor is a campaign
+paragraph with no translation, and the round trip is asserted against the exact
+JSON in both suites. Four of the five Docs blocks are accepted. **`equation` is
+refused, by name, at save time**, and that is the item's one real decision:
+KaTeX renders in a browser and a mail client is not one, so the only way to
+send a formula is as a picture — and a picture is what half of recipients have
+blocked (C3.5). Dropping the block silently would send a mail with a hole in
+the argument; rendering the LaTeX source would send `\frac{a}{b}` to a
+customer. The refusal is worded for the person composing ("say it in words, or
+link to the page that shows it"), it is checked before serde sees the payload so
+the answer names the formula rather than an unknown serde variant, and it is
+asserted on the wire.
+
+**Two things the queue item does not name, and why each is here.**
+
+- **A required `topic`.** C2s.2 built a page that offers a recipient *fewer
+  rather than only none* — this kind of mail, or all of it — and the "kind" has
+  to come from the campaign that mailed them. A campaign with no topic can
+  offer nothing but all-or-nothing, which is the exact thing ADR 0044 §3 says
+  ends a sending reputation. So `topic` is `NOT NULL` and non-blank rather than
+  a default some future sending code has to remember, stored **as the sender
+  wrote it** (whitespace collapsed, case kept, held to what `normalise_topic`
+  can fold) because a human reads it on that page — while
+  `campaign_topic_optouts` keeps the fold, because a query compares it. One
+  rule, applied at both ends, exactly as the address fold is. The rows C2s.2
+  writes now have a source for the label they decline.
+- **A versioned envelope** (`{"schema_version": 1, "blocks": […]}`) where a
+  document stores a bare array. C3.2 compiles these blocks into email-safe HTML
+  against golden files, and a golden file is only meaningful against one
+  version; a body written by a newer build has to be refused by name rather than
+  half-read by an older renderer. The envelope is this module's; everything
+  inside it is Docs'.
+
+**What was deliberately left out, so C3.5 inherits a question rather than a
+guess: there is no image block.** An image in an email is a URL the
+*recipient's client* fetches from us, and a fetch we can see is the
+open-tracking pixel ADR 0044 refused to ship by default. Who may fetch, what is
+logged, and what a blocked image leaves behind is the same question as the
+pixel, and it is answered by the item that draws images (C3.5) or by an owner —
+not by the item that defines a record. A new block variant is additive on the
+day it is answered. Merge fields and `{{ref:…}}` cross-references are likewise
+stored as written and ruled on by C3.4, which is where personalisation and its
+mandatory fallback live; a half-rule guessed at here would be a second place
+that rule could disagree with itself.
+
+**Where the rules live, and why in two places.** The migration keeps the ones
+SQL can keep truthfully — subject non-blank and bounded, preheader `NULL` or
+non-blank (a preheader of spaces is not a third state), topic non-blank inside
+`TOPIC_MAX`, and the envelope an object with a numeric version and an array of
+blocks. Everything else — the block vocabulary, the caps, the ragged-table
+refusal, the duplicate-id refusal — is `campaign_content.rs`, because a database
+cannot usefully constrain a block list.
+`the_database_keeps_the_rules_too_rather_than_trusting_the_validator` writes
+past the validator with raw SQL to prove those `CHECK`s are a real second lock.
+And a stored body that fails validation on the way *out* is a decode error
+rather than an empty campaign: a column holding something no writer here could
+have written must not be answered as a blank mail.
+
+**A campaign is the tenant's letter, not its author's.** `documents` is
+`(tenant_id, owner_id)`-scoped; `campaigns` is tenant-scoped with `created_by`
+recorded, so a colleague can finish the draft a colleague started — and the test
+says so, then immediately proves that the only wall left standing is the tenant
+one, from both sides, on every statement that takes an id, with both lists
+asserted whole.
+
+**How verified.** `cargo fmt`; `SQLX_OFFLINE=true CARGO_PROFILE_TEST_DEBUG=0
+cargo clippy -p alo-store -p alo-jmap --all-targets` — clean for this change
+(the same two pre-existing `type_complexity` warnings in `alo-store`'s
+`meet.rs`, untouched). Test binaries built in **10 m 41 s** through the
+sanctioned marker poll. `alo-store`: **2 257 tests, 2 256 passed, 79 s**;
+`alo-jmap`: **1 288 tests, 1 287 passed, 210 s**. Both failures are sites-owned
+and neither is ours: `site_schedule_http::a_publish_is_scheduled_moved_and_called_off`
+is the Postgres-microseconds-against-Rust's-100 ns defect this track has now
+flagged in five consecutive entries, and
+`site_ticket_orders::the_ticket_mail_waits_for_fulfilment_claims_once_and_never_crosses_tenants`
+**failed in the full run and passes on its own** — a concurrency-flaky test in
+another track's file, recorded here because a flake that only shows under load
+is exactly the kind nobody writes down. All 18 new tests pass.
+
+**Wire-verified for real this time, not waived.** A stale `alo-jmap.exe` was
+found squatting the port from an earlier iteration and killed first (LOOP's own
+rule, and it was live). The debug binary was run against `alo_loop` with the
+local blob dir; `identityctl bootstrap-admin` created a tenant, and a full OAuth
+authorization-code + PKCE S256 flow through `/oauth/authorize` → `/oauth/token`
+produced a real bearer token. Over TCP: `401` on all five routes without a token
+and `404` for an unregistered sibling (so the routes are genuinely registered
+rather than swallowed by a prefix); create → the subject trimmed, the body
+returned block for block; `GET` one and the list (no `content` key in the list,
+`blocks: 3`); `PATCH {"preheader": null}` cleared it and left every block;
+`PATCH` with a body replaced it whole and left the subject; the `campaigns` rows
+read back out of Postgres by hand; `DELETE` → `200`, then `404`, then `404`. The
+formula refusal was checked on the wire too and came back `422` with the
+sentence verbatim. **A `€` in a table cell survives the whole round trip** —
+worth stating, because the first attempt to send one failed with a `400` that
+looked like a bug and was the Windows shell mangling the character before curl
+ever saw it; written from a file it is byte-perfect.
+
+**No CHANGELOG line and no i18n, on purpose.** Nothing a user can see changed:
+there is no composer screen yet, and a changelog entry saying "you can now write
+a campaign" would describe a screen that does not exist. The user-visible half
+arrives with C3.6's preview. **No new top-level route prefix either** —
+`/campaigns/campaigns` sits under the `/campaigns` prefix the C1.5 entry already
+flagged for the production Caddyfile, so the deploy needs nothing new.
+
+**Why the path says `campaigns` twice.** Every sibling under `/campaigns/*` is a
+static prefix (`audience`, `consent`, `segments`, `suppressions`). Hanging the
+record on `/campaigns/{id}` would make the day somebody adds `/campaigns/reports`
+the day one campaign silently becomes unreachable — a static segment wins the
+match, and the collision would produce no error anywhere. The clumsy path is the
+honest one.
+
+**Flag, now for the ninth time and still one line of work:
+`scripts/prune-test-db.sh` is hardcoded to database `alo`.** `psql_q()` passes
+`-d alo` literally, so `DATABASE_URL` cannot reach this checkout's `alo_loop`.
+Its statements were run by hand again and nothing was old enough to delete
+(2 435 tenants, 89 MB — healthy). The fix is `-d "${ALO_PG_DB:-alo}"`;
+`scripts/` is not this item's write scope.
+
+**Disk.** C: opened at 98 % with 14 GB free; 97 `.pdb` files were deleted to
+20 GB, and stale duplicate binaries were only 7 of 249 so they were left alone.
+The test build took it to 8.4 GB, and building `identityctl` for the wire verify
+to 6.8 GB. The `.pdb` sweep is the routine now, not the emergency.
+
+- **Cuts:** no feature scope. No web slice: this item is the record and its API,
+  and the composer screen is C3.6's, where a preview exists to put beside it.
+- **Next:** C3.2 — the renderer: blocks → email-safe HTML, table layout and
+  inline CSS, with golden-file tests. Notes for it: the vocabulary is
+  `CampaignBlock` and it is closed, so the renderer is a total `match` with no
+  fallback arm to hide a missed variant; the envelope's `schema_version` is what
+  a golden file is pinned to, so each golden should name it; there is no image
+  block yet and the reason is above, so C3.2 needs no image pipeline; and the
+  plain-text alternative (C3.3) reads the same `CampaignBlock` values, which is
+  why the table's rectangular rule is enforced at save time rather than in either
+  renderer.
