@@ -10,6 +10,14 @@ contracts.
 
 ## Unreleased
 
+- **Four small things across the product now look like what they mean.** A
+  "Paid" or "Delivered" badge sits on a green ground instead of the same grey as
+  a badge that says nothing in particular; the heading of a column of amounts is
+  right-aligned over its figures rather than over the column beside it; a chip
+  you can press — an overdue follow-up date, say — keeps its colour when you
+  point at it instead of going grey; and a date field is now the same height and
+  shows focus the same way as every other field in the form around it. The
+  prompt that asks you to name something uses that same field.
 - **Campaign mail can now be sent under its own name, from its own address.**
   A workspace's newsletters go out signed as their own sending domain and
   leaving by their own IP, so a marketing reputation can never reach the domain

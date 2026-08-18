@@ -117,7 +117,7 @@ item, opened and read, plus `npx vitest run src` green and
   proportions are reconciled once. Done when: `Chip.test.tsx` is unedited and
   green, no `.module.css` remains under `ds/`, and a screenshot of the shell
   (rail, header, a menu open) is read.
-- [ ] D1.55 Wave check: `ds/` declares no `.module.css` at all; the generated
+- [x] D1.55 Wave check: `ds/` declares no `.module.css` at all; the generated
   theme is current (`--check`); `rg "\[#" web/src/ds` finds no arbitrary
   values; `npm run build` clean; and one screenshot each of a form, a dialog
   and a table sit in the journal with what was looked at written down.

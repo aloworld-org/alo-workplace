@@ -1575,3 +1575,139 @@ text control in the design system; admin's own button rules (`.primary`,
 this item), the generated theme is current, no arbitrary values, `npm run
 build` clean, and the three screenshots the item asks for, which this
 environment still cannot take.
+
+## D1.55 — the wave check, and the six defects it was holding, 2026-08-18
+
+**The five checks the item names, all passing.** `ds/` declares no
+`.module.css` at all (0 files); `node scripts/gen-tailwind-theme.mjs --check`
+is current at **75 utilities**, one more than D1.54 left; `rg "\[#" web/src/ds`
+finds nothing; `npm run build` is clean (2 m 13 s, only the pre-existing
+chunk-size advisory). The main stylesheet the app loads is now **197 KB**
+(`dist/assets/index-*.css`, 201 843 bytes) against the 252 KB D3.01 is asked to
+compare with — recorded here so that item has a measurement rather than a
+memory.
+
+**Two of them are no longer greps.** A check that only runs when somebody
+remembers to run it is a convention, and the whole point of `redefined.ts` was
+that a convention does not hold. `primitives.test.ts` gained a second `describe`
+— *the design system draws with tokens* — asserting that `ds/` contains no
+`.module.css` and that no component writes a colour literal into a utility. Both
+were bullets in this queue item; they are now two of the suite's tests.
+
+**What the wave check was really for: the six defects the four restyles found
+and deliberately did not fix.** Each restyle was contracted to change no drawn
+rule, so each one that found a defect wrote it down and left it. Closing them is
+this item, and five of the six moved.
+
+1. **A numeric column's heading now sits over its figures.** `<Th numeric>` had
+   never been right-aligned — not in this build, not in the ten hand-rolled
+   tables it replaced (D1.53). `.table th { text-align: left }` is a class and
+   an element (0,1,1) and `.numeric` was one class (0,1,0), so the base rule won
+   everywhere and every column of amounts hung its heading over the column to
+   its left. `Th` now marks itself `data-align` and matches on it —
+   `.\[\&\[data-align\]\]\:text-right[data-align]` at (0,2,0), which is the same
+   move `TableEmpty` already made and the same one the stylesheet made with
+   `.table td.empty`. A `<Th>` nobody aligned carries no marker and still reads
+   left. Two assertions added to `Table.test.tsx`.
+2. **A toned chip keeps its colour under the pointer.** `Chip.module.css` said
+   in a comment that "a toned chip already carries a fill; darkening it would
+   change what the tone says" and then never stopped it: `.pressable:hover` beat
+   `.accent`, so an overdue follow-up chip went grey at the exact moment
+   somebody was about to act on it (D1.54). The fill is now the untoned chip's
+   only; a toned one answers with the ring in its own ink, which is what the
+   comment always described. Mail's follow-up control is the one pressable chip
+   in the product and it is neutral, accent or danger by its due date, so this
+   is visible on a real screen. One test added.
+3. **The prompt dialog stopped hand-rolling an input.** It was a second
+   `.input` inside `ds/` itself (D1.52) — the exact duplication this design
+   system exists to end, kept only because a restyle may not change how anything
+   looks. It adopts `ds/Input` now, which changes three things and they are all
+   the point: the field sits on the panel's own surface rather than on the app
+   ground, it shows focus as the outline every other `ds/` control shows, and it
+   is 40px tall like every other field. `Input` was widened rather than copied —
+   `ComponentPropsWithRef<"input">` in place of `InputHTMLAttributes`, so a
+   caller that must focus and select the field the moment it opens can, which is
+   why the dialog had rolled its own in the first place. Props, behaviour and
+   every existing call site are untouched.
+4. **Tailwind's default palette no longer compiles.** `bg-red-500`,
+   `text-slate-400` and 22 families of them were reachable in every file in the
+   product: "semantic utilities only" was a rule nothing checked, and the
+   hard-coded colours this wave spent four items removing had a *shorter* way
+   back in than the tokens that replaced them. The generator now emits
+   `--color-*: initial` beside the `--text-*: initial` D1.51 added. Verified
+   both ways through Tailwind's own compiler: `bg-red-500`, `text-slate-400`,
+   `border-blue-600` and `bg-emerald-100` **refuse to compile**, while
+   `bg-surface`, `text-primary`, `bg-transparent` and `text-current` still do —
+   `transparent`/`current`/`inherit` are built into the v4 utilities rather than
+   being theme values, which is what makes this safe. Nothing in `src` used one
+   (checked before changing it: zero matches across every `.ts`/`.tsx`).
+5. **`--success-tint` exists, so a success badge fills like one.** Eight
+   stylesheets wrote `var(--success-tint, var(--bg-raised))` and the token had
+   never existed, so every one of them drew the fallback: "Paid" and "nothing in
+   particular" sat on the same grey and only the ink told them apart — the one
+   signal somebody who cannot separate green from grey does not get. `#e7f1eb`,
+   mixed at the same 12% of white that `--danger-tint` is of `--danger`, so the
+   two states read as a pair. This is the 75th utility.
+6. **Four control heights are three, and four focus treatments are one.**
+   `DatePicker`'s trigger was 44px where every other field is 40, and drew focus
+   as an accent border plus a 13% ring of its own where `ds/Input` draws an
+   outline — a date field in a form was visibly a different control from the
+   text field above it. It is `h-control` with the field's outline now. With the
+   prompt dialog's field gone (3), both extra rings — `--focus-ring-soft` at
+   full opacity and `--focus-ring-faint` at 13% — had no callers left and are
+   deleted: `ds/` draws focus one way, and `--focus-ring` stays because the
+   stylesheets outside `ds/` still use it.
+
+**Not changed, and why.** The button's 30/38 beside the field's 40 and the
+sign-in screens' 46 stay: a button is shorter than the field next to it because
+it is pressed rather than typed into, and a larger sign-in target is a decision
+somebody made. `Menu`'s text trigger keeps its 7px padding — it is not a form
+control, and pinning it to a button height would shrink a live control to settle
+a tidiness argument. Both are written into `tokens.css` where the next person
+will look, rather than left as an open flag.
+
+**Cut: no screenshot, for the sixth time and the last time in this wave.** There
+is no browser in this environment — checked again: no Playwright, no Puppeteer,
+`jsdom` only. What the item asks to look at was read out of the CSS that
+actually shipped instead, screen by screen, which is the substitute D1.53 and
+D1.54 established:
+
+- **a form** — `Input`, `Field`, `Select`, `Checkbox`, `Toggle`, `DatePicker`:
+  **241 utilities resolved** in `dist/assets/*.css`, 68 unmatched and every one
+  of them prose or a prop value (`aria-describedby`, `combo`, `box,`, `lg`).
+- **a dialog** — `Dialog`, `Modal`, `Card`, `Button`: **133 resolved**, 34
+  unmatched, same shape (`presentation`, `dialog-value`, `ghost`).
+- **a table** — `Table`, `Toolbar`, `Badge`, `Chip`: **155 resolved**, 64
+  unmatched (`roving`, `aria-haspopup`, `--chip-color`).
+
+And the five rules this item changed were read individually rather than counted:
+`.bg-success-tint{background-color:var(--success-tint)}` with
+`--success-tint:#e7f1eb` present in the shipped file;
+`.h-control{height:var(--control-height)}` at `2.5rem`;
+`.\[\&\[data-align\]\]\:text-right[data-align]{text-align:right}` — the
+attribute is in the selector, which is the whole fix;
+`.hover\:bg-default:hover{background-color:var(--border-default)}` present but
+now only on the untoned chip; and neither `--focus-ring-soft` nor
+`--focus-ring-faint` appears anywhere in the shipped CSS.
+
+Verified: `npx tsc --noEmit`, `npx eslint src/ds scripts/gen-tailwind-theme.mjs
+--max-warnings 0`, `npx prettier --write` on every changed file,
+`gen-tailwind-theme.mjs --check`, `npm run build` clean, `npx vitest run src/ds`
+at 9 files / 55 tests green, and `npx vitest run src` across all 103 files. The
+full suite ran twice under load: the first run timed out workers (390 s,
+"Timeout calling onTaskUpdate"), the second failed two tests —
+`chat/ChatModule` and `sites/Heatmap` — and both pass on their own (32/32 in
+18 s), which is the same load flake D1.51 and D1.54 recorded. Neither file is
+this track's.
+
+**A CHANGELOG line this time**, unlike the four restyles: this item moved pixels
+on purpose, and four of the changes are things a user sees — the green success
+badge, the aligned amount heading, the chip that keeps its colour, the date
+field that matches its neighbours.
+
+**Carried forward to D3.01**, all that is left of the list D1.51–D1.54 built:
+`billing/billingStyles.ts` (for D2.06); no multi-line text control in the design
+system; admin's own button rules (`.primary`, `.ghost`, `.iconBtn`, `.textBtn`,
+39 call sites) still not on `ds/Button`; and the shipped-CSS measurement above.
+
+**Next:** D2.06 — migrate **billing** and **contacts** (chat is already done).
