@@ -97,7 +97,7 @@ the literal.
 item, opened and read, plus `npx vitest run src` green and
 `node scripts/gen-tailwind-theme.mjs --check` passing.
 
-- [ ] D1.51 Restyle the **form** primitives — `Input`, `Field`, `Select`,
+- [x] D1.51 Restyle the **form** primitives — `Input`, `Field`, `Select`,
   `Checkbox`, `Toggle`. The set a form is built from, and the one where a
   visual regression is most obvious. Done when: their `.module.css` files are
   gone, `Select.test.tsx` and `Toggle.test.tsx` are unedited and green, and a

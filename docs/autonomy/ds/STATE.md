@@ -1061,3 +1061,152 @@ the vendor CSS separated out.
 system has no multi-line text control.
 
 **Next:** D2.06, migrate billing, chat and contacts in one commit.
+
+## D1.51 — the form primitives restyled to Tailwind, 2026-08-18
+
+`Input`, `Field`, `Select`, `Checkbox` and `Toggle` now carry Tailwind
+utilities and their five `.module.css` files are gone (447 lines of CSS
+deleted). The change is a net deletion of **77 lines** across 13 files
+(+459 −536), and the shipped CSS falls from **959 115 to 956 447 bytes**
+across the same 27 files — measured by building HEAD and this tree back to
+back on this machine, because the 930 952 recorded at D2.05 is five days and
+several other tracks old and cannot be compared to anything.
+
+`Select.test.tsx`, `Toggle.test.tsx` and every other test are **unedited**.
+
+**The item's real work was the theme, not the five components.** Four of alo's
+token families are spelled exactly like the Tailwind namespace they belong to
+— `--radius-*`, `--shadow-*`, `--font-*`, and the `--text-*` type scale — so
+the generated theme was emitting `--radius-sm: var(--radius-sm)`: a custom
+property that references itself, which is invalid at computed-value time and
+resolves to nothing rather than falling back. Twenty-three such declarations
+were in the shipped CSS.
+
+I first read that as a live outage — every radius, shadow and font-family in
+the product computing from a dead variable — and it is not one. **Tailwind
+emits its theme inside `@layer theme`, and an unlayered declaration beats any
+layer, so `tokens.css` (which is in no layer) kept winning.** It has been
+correct by luck since ADR 0046 landed. Worth stating plainly because the luck
+is not visible from either side of the collision: wrap `tokens.css` in a layer
+of its own, or have Tailwind change where it puts the theme, and the whole
+product loses its corners, its elevation and its typeface at once, with both
+files still reading correctly.
+
+The generator now emits `@theme inline reference`: `inline` points each utility
+straight at the token (`.h-control { height: var(--control-height) }`) and
+`reference` stops the block declaring any variable of its own. Verified in
+`dist/assets/*.css` rather than in the source — a regex for `--x: var(--x)`
+over the built CSS now returns nothing, where it returned 23 declarations
+before. That check is worth keeping for D1.52–D1.55.
+
+Four other defects in the same mapping, all of which would have bitten the
+first component to use them:
+
+- The **type scale went into the colour namespace** (`--color-sm:
+  var(--text-sm)`), so `text-sm` was a colour utility set to `0.8125rem` and no
+  font-size utility existed at all. Sizes are told from colours by their value
+  now (a length is a size), so `--text-primary` and `--text-sm` land in the two
+  different namespaces they belong to.
+- **`--accent-hover` became `--color--hover`** — the prefix was sliced off a
+  name that has no prefix — and with it every accent state. The accent family
+  keeps its name whole.
+- **`--border-width: 1px` became a colour.** Border widths have no Tailwind
+  theme namespace; geometry under a colour prefix is now dropped.
+- `--danger`, `--success`, `--warning` and `--unread` **were not in the theme
+  at all**, so an error state could not be expressed without an arbitrary
+  value. They are in it.
+
+Tailwind's own type scale is cleared (`--text-*: initial`) rather than
+partially overridden: its sizes ship paired line-heights, and those survive a
+redefinition of the size alone, so `text-base` would have quietly set a
+line-height no stylesheet here asked for. Confirmed in the built CSS:
+`.text-base{font-size:var(--text-base)}` and nothing else.
+
+Two collisions are now loud instead of silent: the generator **exits non-zero**
+if two tokens map onto one utility, and `--check` still guards drift.
+
+Five tokens added to `tokens.css`, none of them a new value:
+
+- `--control-height-lg: 2.875rem` — the 46px `Input` and `Select` had each
+  written as a literal so their `lg` sizes would match. Now named once, and
+  `h-control` / `h-control-lg` are the two heights.
+- `--leading-snug: 1.4` — the line height `Field`'s hint and error both used.
+- `--duration-fast` / `--duration-base` / `--ease-standard`, with
+  `--transition-fast` and `--transition-base` recomposed from them. A utility
+  cannot take the `120ms ease` shorthand: duration and easing are set
+  separately, and a second literal `120ms` written beside the first is exactly
+  the drift the token layer exists to prevent.
+
+**The one thing a restyle had to learn.** With CSS Modules, `.invalid` after
+`.input` in the file won. Tailwind emits utilities in *its* order, not the
+order they appear in `class`, so two utilities setting the same property have
+no defined winner — `bg-surface` and `bg-transparent` on one element is a coin
+toss decided by the build. Every such choice is therefore computed as a whole
+exclusive string in the component (border colour once, background once, the
+track's two fills as a pair) rather than layered and hoped over. A `variant:`
+utility does reliably beat its own unvariant form, so the `focus-visible:` and
+`disabled:` rules still layer, which is what keeps this readable.
+
+**One assertion is weaker than it was, and it is unedited.** `Toggle.test.tsx`
+and the `Checkbox` half of it assert that a disabled control's root `className`
+contains `"disabled"` — with CSS Modules that was the hashed `.disabled`
+modifier. The disabled treatment is now driven by the control's own state
+(`has-[:disabled]:text-tertiary`, `group-has-[:disabled]:…`), which is strictly
+more correct — a prop and the rendered `disabled` attribute can no longer
+disagree — but those classes are on the element whether or not it is disabled,
+so that one `toContain` now passes either way. The assertion beside it
+(`input.disabled === true`) still carries the real weight. Flagged rather than
+fixed, because fixing it means editing a test this item was told not to edit;
+the honest repair is an assertion on the *computed* treatment, and that needs a
+browser this environment does not have.
+
+**Cut: no screenshot** — the same cut as every item since D2.01. No browser and
+no screenshot tool here (no Playwright or Puppeteer in `web/`, checked again).
+What replaced it: every utility the five components use was matched literally
+in `dist/assets/*.css` and read — `h-control{height:var(--control-height)}`,
+`accent-accent{accent-color:var(--accent)}`, the knob's `after:top-[3px]` and
+`after:w-[18px]`, `peer-checked:after:translate-x-4`,
+`has-[:disabled]:cursor-not-allowed`, `placeholder:text-tertiary`,
+`hover:enabled:bg-raised`, `focus-visible:-outline-offset-2` — plus a
+compile-time probe that fails on any candidate the theme cannot generate. Every
+one resolves to a token, and a search for arbitrary hex values under
+`web/src/ds` finds nothing.
+
+**No CHANGELOG line, deliberately.** A restyle whose whole contract is "the
+props, the behaviour and the tests do not change" has nothing a user would
+notice, and inventing a line for it would be the first false entry in the file.
+The wave's line belongs to D1.55.
+
+**One difference worth naming, small and intended.** `font: inherit` on `Input`
+and `Select` becomes `font-[inherit]`, which is the family only — the shorthand
+also inherited weight and style. Both controls set their size explicitly, and a
+form control inside bold text is not a case that exists here, but it is a
+behaviour change rather than a rename and it is recorded as one.
+
+Verified: `node scripts/gen-tailwind-theme.mjs --check` passing, `npx tsc
+--noEmit`, `npx eslint src/ds --max-warnings 0`, `npm run build`, and `npx
+vitest run src` green at **103 files, 958 tests**.
+
+**A flaky suite, confirmed rather than assumed.** Three of five full runs on
+this tree failed one test — and *not the same one*: twice
+`chat/ChatModule.test.tsx` (a `findByText` on a server-driven message), once
+`sites/SectionMove.test.tsx` (a live-region announcement). Both pass alone,
+both are in areas this item never opened, and no test in either reads a class
+name. The sites journal already records the chat one as a pre-existing load
+flake reproduced on a clean stash. Two full runs of this tree were 958/958
+green, and so were three runs of HEAD. Recording the failure rate because a
+later iteration seeing one red test should not spend an hour on it: run it
+alone first.
+
+**Still flagged for D3.01, carried forward:** the design system has no
+multi-line text control; admin's own button rules (`.primary`, `.ghost`,
+`.iconBtn`, `.textBtn`, 39 call sites) are still not on `ds/Button`.
+
+**New, flagged for D1.55:** Tailwind's default colour palette is still
+reachable — `bg-red-500` compiles, because only the type scale is cleared.
+Clearing `--color-*` would close the last hole the generator's own comment
+argues for, and it was left out of this item because `bg-transparent` and
+`border-transparent` are load-bearing in three of these five components and
+that blast radius belongs in the wave check, not in a restyle.
+
+**Next:** D1.52, restyle the container primitives — `Card`, `Modal`, `Dialog`.
