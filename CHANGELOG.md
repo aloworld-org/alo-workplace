@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **The address book can be used from a keyboard.** Opening Contacts now puts
+  the caret on the first control instead of leaving it on the page behind, Tab
+  stays inside the dialog rather than walking out onto the mail list under it,
+  and closing it hands focus back to whatever you were doing. In a contact with
+  several addresses, each row's Remove button and each row's kind picker are now
+  announced by the address they belong to — "Remove ada@example.test", "Kind of
+  ada@example.test" — where before a screen reader read out four identical
+  commands. The dialog itself now looks like Settings, because it is the same
+  dialog underneath.
 - **Four small things across the product now look like what they mean.** A
   "Paid" or "Delivered" badge sits on a green ground instead of the same grey as
   a badge that says nothing in particular; the heading of a column of amounts is

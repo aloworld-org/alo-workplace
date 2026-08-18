@@ -1711,3 +1711,95 @@ system; admin's own button rules (`.primary`, `.ghost`, `.iconBtn`, `.textBtn`,
 39 call sites) still not on `ds/Button`; and the shipped-CSS measurement above.
 
 **Next:** D2.06 — migrate **billing** and **contacts** (chat is already done).
+
+## D2.06 — the address book adopts `ds/`, 2026-08-18
+
+**Shipped:** `contacts/ContactsModal.module.css` is gone — 331 lines, the last
+`.modal`/`.field`/`.select` outside the migration list's remaining areas — and
+`contacts/ContactsModal.module.css` is off `ds/redefined.ts`, which is now
+twelve lines. The screen is `ds/Modal` (`wide`, `tall="page"`, the same shape
+Settings takes), `ds/Field` + `ds/Input` for the six text fields, `ds/Select`
+for each row's kind, `ds/IconButton` for each row's remove and the close, and
+`ds/Button` for Import, Export, Save, Cancel and Delete. What is left in the
+`.tsx` is the two-pane arrangement, the list row and the three placeholders —
+this screen's own shape, not a primitive.
+
+**Three behaviours the address book did not have, and one it nearly lost.**
+This is the part of a migration worth writing down, because the styling was
+never what the sixteen hand-built dialogs were missing:
+
+1. **Tab stayed inside the dialog.** Before: nothing. Tab walked out of the
+   panel onto the mail list the scrim was covering, where a screen reader would
+   read out a page the user could no longer see. `ds/Modal`'s trap is inherited
+   whole.
+2. **Focus is returned to the opener** on close, which no version of this
+   screen did.
+3. **Each row of a multi-value group is named after its own value.** Every
+   remove button was "Remove" and every kind picker was announced "Other" —
+   the current value read out as though it were the question — so a contact
+   with a work email, a home email and two phones gave four identical commands
+   and four identical combo boxes. They are now `Remove ada@example.test` and
+   `Kind of ada@example.test`, falling back to the group's name ("Email",
+   "Phone") for a row still blank. Two new keys, written in all three
+   languages; `contactRemoveField` is deleted, being its only caller's.
+4. **Escape was the one thing it already had** — a `document` keydown listener,
+   one of only two in the codebase — and it is `ds/Modal`'s now. The adoption
+   test holds it, because that is exactly the behaviour a migration drops
+   without anybody noticing.
+
+**A defect in `ds/Modal`, found by being the first dialog with a hidden
+control.** The opening focus took `querySelector(FOCUSABLE)` unfiltered while
+the Tab trap filtered `hidden` and `aria-hidden`. Contacts' first element is the
+`hidden` file input the Import button clicks; it matches the selector, cannot
+take focus, and `focus()` on it is a silent no-op — so the dialog opened with
+the caret still on the page behind, and nothing said so. Both walks now share
+`focusableIn()`. Held by a new case in `Modal.test.tsx` (the existing five are
+unedited) and by the contacts adoption test.
+
+**What changed on screen, and why it is not a restyle.** The panel is 720px
+wide where the hand-built one was 860 — `--modal-width-wide`, the width
+Settings takes — and the fields are the system's 40px rather than the ~34px
+this file's padding produced. Both are the adoption, not a redesign: the queue's
+rule is that adopting a shared component already changes how a screen looks, and
+mixing a deliberate restyle into the same commit makes an intended change
+indistinguishable from a regression. Nothing here was redesigned.
+
+**Cut, and recorded: billing is now D2.06b.** The item named billing, chat and
+contacts. Chat was already done. Billing turned out not to be a stylesheet
+migration at all — it has no `.module.css`, and `ds/redefined.ts` never listed
+it — but a nineteen-file adoption off `billingStyles.ts`, which declares
+`input`, `select`, `chip`, `badge`, `table`, `toolbar` and `toggle` as Tailwind
+recipes that `primitives.test.ts` cannot see. That is an item of its own rather
+than half of this one, so it is queued as D2.06b with its prerequisite copied
+into it. This is why the wave check carried `billingStyles.ts` forward as a
+leftover rather than a finished area.
+
+**Also carried forward to D3.01:** still no multi-line control in `ds/`. The
+notes box is `ds/Input`'s box written out for a `<textarea>` in this file —
+same border, radius, focus ring — and bound to its label through `ds/Field`'s
+render prop, so the wiring is the system's even where the styling is local.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint src/contacts src/ds/Modal.tsx
+src/ds/Modal.test.tsx src/ds/redefined.ts src/i18n --max-warnings 0` clean;
+`npx prettier --write` on every changed file; `npm run build` clean; `npx vitest
+run src` **105 files / 970 tests green** with no flake this time (the load flake
+D1.51/D1.54/D1.55 recorded did not appear). `primitives.test.ts` is green with
+contacts off the list, which is what proves step 2 and step 3 of the migration
+loop were both complete.
+
+**Cut for the seventh time: no screenshot.** There is no browser here — no
+Playwright, no Puppeteer, `jsdom` only. The substitute is the one D1.53–D1.55
+established, and it was run on this file: every class token in
+`ContactsModal.tsx` resolved against the CSS that actually shipped —
+**80 resolved, 27 unmatched and every one of the 27 prose or a prop value**
+(`aria-describedby`, `ghost`, `submit`, `text/vcard`, `lucide-react`). The five
+rules this screen depends on most were read individually rather than counted:
+`.grid-cols-\[300px_1fr\]{grid-template-columns:300px 1fr}` and
+`.max-sm\:grid-cols-1{...}` — the two panes and their one media query;
+`.bg-selected{background-color:var(--bg-selected)}` with
+`--bg-selected: var(--verdigris-100)` present, which is the selected row;
+`.\[\&\>svg\]\:-translate-y-1\/2>svg{...}` — the magnifier centred over the
+search field's trailing end; and `.max-sm\:border-r-0{...}`, the divider that
+becomes a rule under the list when the panes stack.
+
+**Next:** D2.06b — migrate billing off `billingStyles.ts`.
