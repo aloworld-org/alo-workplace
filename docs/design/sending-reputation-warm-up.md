@@ -104,16 +104,28 @@ reads `IP: 159.195.89.28  HELO: news.alomails.com  rDNS: news.alomails.com`.
 
 **What is left, and one of it needs the registrar:**
 
-- **`news.alomails.com` publishes no MX record**, and that is now the only
-  authentication deduction (−3): *"We didn't find a mail server (MX Record)
-  behind your domain name."* A sending domain that cannot receive looks
-  one-way, and some filters weigh it. Today a bounce to
-  `bounces@news.alomails.com` falls back to the A record, reaches our MX, and is
-  refused cleanly — a refusal rather than a black hole, but not a return path.
-  **Owner action at Namecheap:** `news.alomails.com MX 10 mail.alomails.com`.
-  It pairs with C2.10's bounce handling, which needs that return path to
-  actually arrive, so publishing the record and accepting mail for the domain
-  should land together rather than the record alone.
+- **`news.alomails.com MX 10 mail.alomails.com` — published 2026-08-18** at
+  Namecheap and resolving at Google, Cloudflare and the authoritative servers;
+  the apex `MX` and everything else in the zone were left untouched. It was the
+  last authentication deduction a receiver made (−3): *"We didn't find a mail
+  server (MX Record) behind your domain name"*, because a sending domain that
+  cannot receive looks one-way.
+
+  **What it does and does not do, stated exactly.** The domain now answers for
+  mail, and a message to `bounces@news.alomails.com` reaches our MX and gets
+  `550 5.7.1 Relaying denied: recipient not local` — the anti-open-relay guard,
+  since the domain is not in `ALO_SMTP_LOCAL_DOMAINS`. That is a clean permanent
+  refusal the sending server reports back to its own user, not a black hole and
+  not an open door. **It is still not a working return path**: nothing of ours
+  reads a bounce. Making them arrive and act is C2.10, and it needs the domain
+  accepted for delivery, which is a deliberate second step rather than an
+  oversight.
+
+  *Not re-measured at the receiver:* the free tier of the verifier used all day
+  was exhausted by the time the record propagated, so the score was not read
+  again. The deduction was a statement about a DNS record, and that record now
+  demonstrably exists; the authentication result itself was already proved twice
+  and nothing in this change touches it.
 - The other deductions are content rather than identity, and both are queued
   ahead of any real send: no `List-Unsubscribe` (C2.4/C2.5) and no HTML part
   (C3's renderer exists; the day-1 probes were hand-written plain text).

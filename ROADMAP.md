@@ -629,12 +629,16 @@ Before C2.1 can start:
   for our own identity; the self-service half needs the DNS automation in
   `docs/design/dns-onboarding.md` and is not claimed here.
 
-  **One record short, and it needs the registrar:** `news.alomails.com` publishes
-  no MX, which is now the only authentication deduction a receiver makes
-  (−3 of 10). A sending domain that cannot receive looks one-way. Owner action:
-  `news.alomails.com MX 10 mail.alomails.com` at Namecheap — best landed
-  together with C2.10, which needs that return path to actually arrive rather
-  than be refused.
+  **The last record landed the same day:** `news.alomails.com MX 10
+  mail.alomails.com`, published at Namecheap and resolving at Google, Cloudflare
+  and the authoritative servers, with the apex MX and the rest of the zone
+  untouched. It was the only authentication deduction left (−3), because a
+  sending domain that cannot receive looks one-way. Mail to
+  `bounces@news.alomails.com` now reaches our MX and is refused with
+  `550 5.7.1 Relaying denied: recipient not local` — a clean permanent refusal
+  rather than a black hole or an open door. **A working return path is still
+  C2.10**, which needs the domain accepted for delivery and something that reads
+  what arrives.
 
   **Why the parent SPF must not simply be widened.** `alomails.com` publishes
   `v=spf1 mx -all` and `p=quarantine; adkim=s; aspf=s`. Strict alignment means an

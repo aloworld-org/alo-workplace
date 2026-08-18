@@ -42,15 +42,17 @@ the other's reputation.
   calendar. Read the DMARC `rua` reports weekly; they are the only independent
   evidence of how our mail authenticates where we cannot see.
 
-**Two things left, and one is the owner's:**
+**The DNS is complete.** `news.alomails.com MX 10 mail.alomails.com` was
+published the same day, closing the last authentication deduction; SPF, the RSA
+DKIM key, DMARC and now MX all resolve, and the apex zone was untouched. Mail to
+`bounces@news.alomails.com` reaches our MX and is refused with `550 5.7.1
+Relaying denied: recipient not local` — clean, and **not yet a return path**:
+C2.10 needs the domain accepted for delivery and something that reads a bounce.
 
-- **Publish `news.alomails.com MX 10 mail.alomails.com` at Namecheap.** It is now
-  the only authentication deduction a receiver makes (−3 of 10): a sending domain
-  that cannot receive looks one-way. Land it with C2.10 so the return path
-  actually arrives rather than being refused.
-- The Ed25519 half of dual-signing is **not** installed yet, deliberately: its
-  record must be published *before* its key is installed, or every receiver that
-  reads it reports an unverifiable signature. RSA alone is signing today.
+**One thing deliberately left undone:** the Ed25519 half of dual-signing is not
+installed. Its record must be published *before* its key, or every receiver that
+reads it reports an unverifiable signature. RSA alone is signing today, which is
+the safe order rather than an omission.
 
 ### 2. `orders` — one session, and smaller than it looks
 
