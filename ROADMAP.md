@@ -652,11 +652,25 @@ Before C2.1 can start:
   quarantined instead of reported, which is the opposite of what a warm-up is
   for. Publishing a subdomain policy is the only way to differ from the parent,
   and it is tightened to `quarantine` once the reports come back clean.
-- [ ] C2.1a **Decide how the campaign identity signs — a fork found by reading the code, not by design.** Per-domain DKIM already exists (ADR 0014): `authmail` resolves a signing key by the `From` domain from `dkim_keys` and falls back to the one configured file key. But the store path is **ed25519 only** — `authmail`'s own comment says the stored seed is consumed as Ed25519 — while the file-key fallback does RSA and signs for a single domain, the transactional one. The RSA key published by hand at `camp._domainkey.news` therefore fits neither path, and would be ignored rather than used. Three ways out, and the choice is a deliverability judgement rather than a coding one:
+- [x] C2.1a **Decide how the campaign identity signs — a fork found by reading the code, not by design.** Per-domain DKIM already exists (ADR 0014): `authmail` resolves a signing key by the `From` domain from `dkim_keys` and falls back to the one configured file key. But the store path is **ed25519 only** — `authmail`'s own comment says the stored seed is consumed as Ed25519 — while the file-key fallback does RSA and signs for a single domain, the transactional one. The RSA key published by hand at `camp._domainkey.news` therefore fits neither path, and would be ignored rather than used. Three ways out, and the choice is a deliverability judgement rather than a coding one:
   1. **Use the product's own path.** Register `news.alomails.com` as a domain, let `ensure_dkim_key` generate and store its key, publish that record instead. Cleanest — rotation already has a route (`/admin/domains/dkim/rotate`) and no private key sits in a file. But it signs **ed25519 only**, and RFC 8463 support among receivers is still patchy — which matters more for bulk mail than anywhere else in the product.
   2. **Teach the store path RSA.** The `dkim_keys` table already carries an `algorithm` column and `DkimSigningMaterial` already returns it; what is missing is the signer honouring it. Keeps the published RSA record and the automatic per-domain resolution.
   3. **Dual-sign, RSA and ed25519.** What large senders do, and the most work. Worth it only if 2 proves insufficient in the aggregate reports.
   Recommendation: **2**, because bulk mail is exactly where a verifier that cannot check ed25519 costs real delivery, and the column that makes it possible is already there. Whatever is chosen, the DNS published on 2026-08-17 must be reconciled with it — the record is currently for a key nothing will sign with.
+
+  **Decided 2026-08-18: 3, dual-sign** — which is 2 plus one more row, since
+  teaching the store path RSA was the bulk of the work either way. `7e331ced`
+  moved the store's constraint to one active key per domain **per algorithm**
+  and made `sign_outbound` emit one signature per active key, RSA first.
+  Following the decision through the code found three things it needed and did
+  not have, all built here (`docs/design/campaign-sending-identity.md`): nothing
+  could put an RSA key into `dkim_keys` at all, so the published `camp` record
+  was still for a key nothing would sign with (now `alo-smtp
+  --install-dkim-key`); the admin API rendered every stored key as `k=ed25519`
+  and returned only the first of them; and outbound never chose a source
+  address, so a `news.` message would have left by the transactional IP and
+  failed SPF against `-all` while its DKIM passed.
+- [x] C2.1b **Egress: a message leaves by the address its own identity authorises.** `ALO_SMTP_EGRESS_IPS` maps a sending domain to a source address, matched on the **envelope-from** because that is the identity SPF is evaluated for; the outbound client binds it, and a pinned address of the wrong family fails the attempt rather than falling back to the kernel's choice — mail deferred with a reason is recoverable, mail delivered under a failing identity is not. On Docker this needs a lane of its own: a container cannot bind one of the host's public addresses, so alo-smtp binds a private address on a fixed compose network and the host source-NATs it (`ops/systemd/alo-campaign-egress.service`). Proved on the server before anything was built on it — the pinned path reports `159.195.89.28` to an outside observer while the default path reports `152.53.179.142`.
 - [ ] C2.2 A separate queue and egress path, proven by a test that queues a campaign and sends a password reset behind it — the reset must not wait
 - [ ] C2.3 Per-tenant warm-up and rate limits, with the cap and its reason shown in the send flow
 - [ ] C2.4 `List-Unsubscribe` and `List-Unsubscribe-Post` on every campaign message — the **writer** half of what `unsubscribe.rs` already reads. This is the header the mail client turns into its own Unsubscribe button, and it must work with a single POST and no login.

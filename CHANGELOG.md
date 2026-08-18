@@ -10,6 +10,34 @@ contracts.
 
 ## Unreleased
 
+- **Campaign mail can now be sent under its own name, from its own address.**
+  A workspace's newsletters go out signed as their own sending domain and
+  leaving by their own IP, so a marketing reputation can never reach the domain
+  that carries your invoices, password resets and meeting invitations. Nothing
+  about everyday mail changes.
+- **For operators: a sending identity's DKIM key is installed with
+  `alo-smtp --install-dkim-key`.** It takes a tenant, a sending domain, and
+  either a PKCS#8 PEM key you already hold (`--key`, with the `--selector` its
+  record is published under) or nothing at all, in which case it generates one.
+  It reads the algorithm from the key rather than trusting a flag, refuses a
+  domain registered to another tenant, and prints the DNS record to publish —
+  never the key. A domain may hold one active key per algorithm and sign with
+  both at once, which is what a campaign identity wants: RSA for the receivers
+  that cannot verify Ed25519, Ed25519 for the rest.
+- **For operators: `ALO_SMTP_EGRESS_IPS` chooses which source address a sending
+  domain's mail leaves by**, as `domain=ip`, matched on the envelope sender.
+  Unset — the default — the kernel chooses, exactly as before. An unparseable
+  value refuses to start rather than quietly sending campaign mail from the
+  transactional address. On a Docker host it pairs with the compose `egress`
+  network and `ops/systemd/alo-campaign-egress.service`, because a container
+  cannot bind one of the host's public addresses;
+  `deploy/production/ops/README.md` has the procedure and the two commands that
+  prove it works.
+- **For operators: `GET /admin/domains` now also returns `dkimRecords`** —
+  every active DKIM record for a domain rather than only the first, each
+  carrying its own `k=` tag. The existing `dkim` field is unchanged. A domain
+  that signs with two algorithms has two records to publish, and the old field
+  could show only one of them, labelling an RSA key `k=ed25519`.
 - **Campaigns: see who you could reach, and who you may not.** A new module
   in the rail shows everybody this workspace knows an email address for —
   your customers, the contacts on your deals, and the people who filled in a
