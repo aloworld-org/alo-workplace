@@ -540,3 +540,86 @@ on a quote line naming a product it has never named. Each time the answer was
 written down in the schema or the module header, and each time reading it first
 was what stopped a wave being built on it. **Read the migration before designing
 against the table.**
+
+---
+
+## 2026-08-19 — O1.d: the order book, folded at the moment of asking
+
+**Shipped.** `platform/alo-store/src/inv_so_book.rs`,
+`products/mail/alo-jmap/src/inventory_order_book.rs`,
+`GET /inventory/order-book?scope=open|all`, and eleven tests — seven pure ones
+on the arithmetic, four over the real router. **No migration**: nothing here is
+stored.
+
+**Its own path rather than `/inventory/sales-orders/book`**, which would have sat
+under that route's `{id}` and quietly made `book` a reserved order id.
+
+### Three decisions, each of which is a bug avoided
+
+- **Delivered and invoiced value are not a share of the order's total.** Each is
+  `billing_totals::line_net_cents` — the same function the order, the invoice and
+  the quote all use — applied to the same line at the quantity that actually
+  moved. Splitting a rounded total by a ratio produces cents belonging to
+  nothing, and the parts stop adding up to the whole. The unit test asserts
+  `delivered + outstanding == ordered` exactly, which a proportional split would
+  fail.
+- **A charge in words is money and never goods.** Assembly has a value and never
+  leaves on a pallet — `inv_so_deliver` refuses to move it — so counting it in an
+  outstanding *quantity* would hold an order open for ever. It counts in the
+  cents, where it is real, and not in the milli-units, where it is not.
+- **`reserved` is the undelivered remainder while the order is open**, and
+  nothing else. There is no column, per ADR 0054 §3; this is the same fold
+  `inv_reorder`'s `committed` performs across all orders, seen one order at a
+  time. A draft reserves nothing because nobody was promised anything; a
+  delivered or cancelled order reserves nothing because there is nothing left to
+  send. `outstanding` stays a fact about the order in every state — only what it
+  *holds against the warehouse* depends on being open, and the test asserts both
+  halves of that distinction.
+
+### Two things the tests caught that review would not have
+
+- **A discount would have vanished from the book.** `outstanding_qty` clamped at
+  zero to stop an over-delivered line printing a negative that reads as a credit
+  — and that clamp also silently deleted a **negative quantity**, which is how
+  `billing_line` expresses a discount. The book would have overstated what every
+  discounted customer owed. The clamp is now sign-aware: it can never overshoot
+  *past zero*, in whichever direction the line runs. Written as a test before the
+  code, and it failed on the first run for exactly this.
+- **`invoiced_qty_milli` is not a column.** It is a correlated sum over
+  `inv_so_invoice_lines` that counts only documents still standing, and selecting
+  it produced a `500` from the new route. The fix was not to write the subquery
+  again: it is now `inv_so_lines::INVOICED_QTY_SQL`, spliced into both readers.
+  **A second reading of what has been billed would have let the order book and
+  the order document disagree about one line** — which is the two-truths failure
+  this wave has now avoided three times (the `committed` fold in O1.a, on-hand in
+  `inv_so_commit`, and this).
+
+### Who could not see what
+
+- `one_tenants_book_never_contains_another_tenants_orders` — the mandatory
+  wrong-tenant test on the surface where it would be worst, since this is the
+  screen somebody reads to decide what their business is owed. Asserted from both
+  sides so a leak would have to appear as a named row rather than a number nobody
+  checked: our book holds exactly our order and our total is exactly ours, theirs
+  likewise, and a caller with no token gets `401`.
+- `the_scope_is_strict_and_a_draft_is_not_open_business` — a draft is absent from
+  the morning's book and present under `scope=all`, a scope this build cannot
+  name is a `422` rather than a silent widening, and the case-insensitivity
+  matches the sales-order list's own filter rather than inventing a second rule.
+- `a_book_with_nothing_in_it_is_a_shape_and_not_a_null` — zeros and an empty
+  list, never a null a screen has to special-case.
+
+**How verified.** `cargo fmt`; clippy clean for both crates; the store's unit
+tests **7/7**; the HTTP suite **4/4**; every `inv_*` and `billing_*` binary
+**174/174**.
+
+**Not built, and named rather than left implicit:** there is **no screen**. The
+route answers, and `web/src/inventory/` has no order-book view — the web surface
+has an owner and this track does not take web work without asking. The item's
+words are "the screen a manufacturer opens first", so it is honest to say the
+half that exists is the half a client can call.
+
+**Next:** wave O1 is now O1.a, O1.b and O1.d done, with O1.c blocked on the
+billing schema request. The exit gate's walkthrough — a quote becoming an order,
+shipping in two consignments, billing each — cannot be walked end to end until
+that request lands, because its first step is the blocked one.

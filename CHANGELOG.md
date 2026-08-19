@@ -114,6 +114,16 @@ contracts.
   ada@example.test" — where before a screen reader read out four identical
   commands. The dialog itself now looks like Settings, because it is the same
   dialog underneath.
+- **The order book: what is promised, what has gone, what is billed and what is
+  still owed.** One screen's worth of answer across every open order at once —
+  per order and in total, in money and in goods. A confirmed order shows the
+  whole of itself as held against the warehouse; a part-delivered one shows only
+  what is left; a draft holds nothing, because nobody has been promised anything
+  yet. Drafts and finished business are out of the way by default and one
+  parameter away when you are looking for a particular order. Every figure is
+  worked out at the moment you ask, from the lines themselves, so a total can
+  never drift from the orders under it — and what has been delivered plus what is
+  still outstanding adds back up to what was ordered, to the cent.
 - **An order now remembers the offer it came from.** A sales order raised from an
   accepted quote carries that quote, so "where did this order come from?" and
   "what became of that offer?" are both answerable from the record rather than
