@@ -49,10 +49,14 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    are reserved for secondary actions and must never make the next step look
    optional. Screens do not invent local CTA colours. Touch targets ≥40px.
    *Verify:* squint test — the blurred screen still shows what to press.
-   Button labels and icons always keep a protected horizontal inset: at least
-   the spacing scale's `space-5` on compact buttons and `space-6` on standard
-   calls to action. A screen must never reduce the shared `Button` primitive's
-   padding or place an icon outside it. Longer labels expand the control; they
+   Button labels and icons must never touch or visually crowd a button border.
+   Measure from the outermost text or icon edge to the inside of the border:
+   compact buttons keep at least `space-5` (20px) horizontally and `space-2`
+   (8px) vertically; standard calls to action keep at least `space-6` (24px)
+   horizontally and 10px vertically. These are minimums, not targets that a
+   screen may compress. CSS resets, table cells, and layout constraints must
+   never reduce the shared `Button` primitive's computed padding or place an
+   icon outside it. Longer labels expand the control; they
    never touch its border, clip, or force a sibling action out of shape.
    Flex rows, tables, and action clusters must preserve the button's intrinsic
    width instead of compressing it; surrounding content reflows or scrolls
