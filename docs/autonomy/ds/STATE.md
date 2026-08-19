@@ -1803,3 +1803,155 @@ search field's trailing end; and `.max-sm\:border-r-0{...}`, the divider that
 becomes a rule under the list when the panes stack.
 
 **Next:** D2.06b — migrate billing off `billingStyles.ts`.
+
+## D2.06b — billing stops reimplementing the primitives, 2026-08-19
+
+**Shipped:** `billing/billingStyles.ts` no longer declares a control. The seven
+keys the item named — `input`, `select`, `chip`, `badge`, `table`, `toolbar`,
+`toggle` — are gone, and with them `search`, `tableWrap`, `chip_neutral/_info/
+_good/_warn/_muted`, `inputNarrow` and `srOnly`: **69 keys down to 46**, and the
+file's header now says what may live in it and what may not. Thirteen `.tsx`
+files adopted `ds/` instead: `Input` (39 call sites), `Table`/`Th`/`Td` (8
+tables), `Select` (5), `Toolbar` (5 bars), `Badge` (3), `Toggle` (2).
+
+**Why this area survived the whole wave, written down where the next reader will
+look.** `ds/redefined.ts` lists *stylesheets* and `primitives.test.ts` reads
+`.module.css`. A Tailwind recipe in a `.ts` file is invisible to both, so
+billing kept a seventh-through-thirteenth copy of the primitives through D1.01
+to D2.06 with a green build the whole way. The list only ever shrank because it
+could only ever see one shape of the problem. `billingStyles.ts`'s new header is
+the rule the build cannot keep for it.
+
+**A fourteenth copy, found while migrating.** `DocumentEditor` declared a
+`fieldControl` string of its own — `min-h-11 … focus:ring-2` — for the three
+controls on the create-a-document form, beside the `billingStyles` recipes and
+invisible to the same tests. It is gone; those three are `ds/Input`, `ds/Select`
+and the textarea below.
+
+**Where a component could not say what billing meant, and what was done about
+it.** Nothing was widened; two things were reconciled, and both are stated in
+the file that makes the choice:
+
+1. **A status label is a `Badge`, not a `Chip`.** The design system's line is
+   that a badge is read and a chip is acted on; nothing in `status.tsx` is
+   pressable. `StatusChip` keeps its name — it is what three files call it —
+   and `ChipTone`'s five meanings map onto `Badge`'s four tones.
+2. **`neutral` and `muted` land on the same tone.** Billing drew them one step
+   apart — `--text-secondary` against `--text-tertiary` on the same grey pill —
+   which nobody reads, and `Badge`'s own rule is that a tone is never the only
+   signal: a draft says "Draft" and a cancelled document says "Void". The two
+   names stay because the meaning is still two things, and `statusTone` is where
+   that distinction is stated.
+
+**The queue's prerequisite kept `textarea` local, and it is now complete rather
+than composed.** There is still no multi-line control in `ds/`, so the key
+stays — but it used to be `styles.input` plus four rules, and `styles.input` is
+gone. It is now `ds/Input`'s box written out for a `<textarea>` in one key, with
+a comment saying it goes the moment the component exists. Three callers:
+`FxRatesPanel`, `SettingsView`, `DocumentEditor` (twice).
+
+**Behaviour the eight billing tables did not have.** The styling was never the
+missing part:
+
+- **A name.** All eight were a bare `<table>` inside a bare `<div>`; a screen
+  reader announced "table, 8 columns" and nothing about what was in it. Each now
+  carries the list it shows as its caption.
+- **A scroll region a keyboard can reach.** `tableWrap` was `overflow: auto` on
+  a plain `<div>` — scrollable by mouse, unreachable by keyboard (WCAG 2.1.1).
+- **The action columns have headers again.** Five tables drew an empty `<th>`
+  with an `sr-only` span inside; that is `<Th hideLabel>` now, which is the same
+  thing said once.
+- **The sticky header stopped sticking the footer.** billing's rule was
+  `[&_th]:sticky`, which caught `<tfoot>`'s `th` as well; `ds/Table`'s is
+  `[&_thead_th]`.
+- **A row that responds to a click is the only row that says so.** The old
+  recipe tinted every `tbody tr` on hover, including the line grid you type into
+  and the read-only rates table. `interactiveRows` is on the five lists whose
+  first cell opens the record and off the three that are inert — which is what
+  `ds/Table` documents, and the hover was a promise the other three did not keep.
+- **The narrow columns are narrow at the column, not at the control.**
+  `min-w-[8ch] w-[8ch]` sat on the input, against `ds/Input`'s `w-full`; two
+  utilities setting one property have no defined winner. The width is on the
+  `<Th>` now (`narrowCol`) and the control fills it.
+
+**And the archived switch is a switch.** `styles.toggle` drew one out of
+`[&>input]:appearance-none` and an `::after` knob on a bare checkbox with no
+`role`, so it was announced as a checkbox and its state was carried entirely by
+a colour. It is `ds/Toggle`: `role="switch"`, label bound by `htmlFor`, state
+announced.
+
+**One test edited, and why.** `Payments.test.tsx` asserted
+`getByText(strings.billingPayments)`; the payments ledger is a `ds/Table` now,
+so "Payments" is on the page twice — as the section heading and as the table's
+caption — and the query became ambiguous. It is
+`getByRole("heading", { name: … })`, which is what the assertion always meant.
+No other test changed; the 91 billing tests are otherwise untouched.
+
+**What changed on screen, and why it is not a restyle.** Fields are the system's
+40px rather than the ~36px billing's padding produced, and carry the outline
+focus ring rather than a 2px accent shadow; table headers are `--text-tertiary`
+at medium weight on `--bg-surface` rather than semibold on `--bg-sunken`; the
+row hover is `--bg-raised` rather than a 28% accent mix; the scroll region is
+`--radius-lg` rather than `--radius-xl`; and a "Paid" badge is filled green
+rather than green ink on grey. Every one of those is the adoption. Nothing was
+redesigned, and the item's own rule is why: mixing a deliberate restyle into a
+migration makes an intended change indistinguishable from a regression.
+
+**It is a net deletion, and the diff does not look like one.** `prettier --write`
+reflowed every file it touched — these were written with long single lines and
+had never been formatted — so the raw diff reads +1,556/−959. Measured against
+the same files run through prettier first, which is the only fair comparison:
+**4,602 lines to 4,582**, and the three files that grew are `status.tsx` (+20),
+`billingStyles.ts` (+13) and `parts.tsx` (+7), all of it the reasoning written
+into them. The thirteen files carrying the actual markup all shrank or held.
+Only the files this item changed were formatted; the rest of `src/billing` was
+left alone rather than swept into the same commit.
+
+**Cut, and recorded: `VatReportView.tsx` is not migrated.** It hand-rolls a
+table from local `tableClass`/`headCell`/`numberCell` strings inside the file,
+reads nothing from `billingStyles.ts`, and is not named by this item. Two report
+tables; it is D3.01's to pick up, or a queue item of its own. Said here rather
+than done quietly, because a copy found and left unsaid is exactly what created
+this item.
+
+**A defect found by looking, not fixed here.** `bg--soft` is not a class — it
+generates nothing — and it appears eight times across `billing/SettingsView`,
+`home/HomeModule` (five) and `projects/ProjectsModule` (three), where an accent
+tint was meant. `z-sticky` in `SettingsView` is the same. Both predate this item
+and two of the three files belong to areas another agent is working in, so they
+are reported for D3.01 rather than swept up mid-migration. An `rg` for classes
+the built CSS never emitted would find the rest.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint src/billing --max-warnings
+0` clean; `npx prettier --write` on every changed file; `node
+scripts/gen-tailwind-theme.mjs --check` current (75 utilities); `npm run build`
+clean; `npx vitest run src/billing` **91 tests green**; `npx vitest run src`
+**105 files / 970 tests green**, with no load flake this time.
+
+**Cut for the eighth time: no screenshot.** No browser here — `jsdom` only. The
+substitute D1.53 established was run over all thirteen changed files: every
+class token resolved against the CSS that actually shipped — **209 resolved, 123
+unmatched and every one of the 123 prose, a module path, a prop value or a form
+key**, apart from the two dead classes reported above. The rules this migration
+turns on were read individually rather than counted:
+`.min-h-11{min-height:calc(var(--spacing) * 11)}`;
+`.max-\[52rem\]\:items-stretch{align-items:stretch}` inside
+`@media not all and (min-width:52rem)`, which is the toolbar wrapping at a
+narrow width; `.w-\[8ch\]{width:8ch}`, the quantity column;
+`.\[\&_thead_th\]\:sticky thead th{position:sticky}` — `thead` is in the
+selector, which is the whole of the footer fix;
+`.\[\&_tbody_tr\:hover\]\:bg-raised tbody tr:hover{…}`, the row hover that is
+now opt-in; and `.bg-success-tint{background-color:var(--success-tint)}`, the
+filled "Paid" badge. The rule billing's own table used to ship —
+`bg-[color-mix(in_srgb,var(--accent-tint)_28%,var(--bg-surface))]` — is **not in
+the bundle at all**, which is what proves the recipes left rather than merely
+stopped being referenced.
+
+**Carried forward to D3.01:** `VatReportView`'s local table; the dead `bg--soft`
+and `z-sticky` classes above; still no multi-line control in `ds/`, with three
+callers waiting for it; admin's own button rules (`.primary`, `.ghost`,
+`.iconBtn`, `.textBtn`, 39 call sites) still not on `ds/Button`; and the
+shipped-CSS measurement — the bundle carrying the app's utilities is
+`dist/assets/index-*.css` at **193 KB**, against the 252 KB D1.55 recorded.
+
+**Next:** D2.07 — migrate **crm**, **finance**, **home**.

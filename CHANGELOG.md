@@ -10,6 +10,20 @@ contracts.
 
 ## Unreleased
 
+- **The billing tables and forms can now be used from a keyboard, and say what
+  they are.** Every list in Billing — invoices, quotes, customers, the price
+  list, recurring invoices, the payments on a document and its lines — is now
+  the same table the rest of the product uses: a screen reader announces what
+  each one lists instead of "table, 8 columns", the long ones can be scrolled
+  from the keyboard rather than only with a mouse or a trackpad, and the action
+  columns that showed no heading now carry one for anyone who cannot see the
+  buttons in them. The "Show archived" switch is a real switch, announced as on
+  or off; the search boxes, pickers and text fields are the same height and show
+  focus the same way as everywhere else; and each row of controls above a list
+  is now announced as the set it is rather than as loose buttons. A "Paid" or
+  "Accepted" label sits on a green ground instead of green text on the same grey
+  every other state uses. Nothing about what the figures say has changed — they
+  are still the server's, to the cent.
 - **The address book can be used from a keyboard.** Opening Contacts now puts
   the caret on the first control instead of leaving it on the page behind, Tab
   stays inside the dialog rather than walking out onto the mail list under it,
