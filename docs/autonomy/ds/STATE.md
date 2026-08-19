@@ -2432,3 +2432,148 @@ this queue.
   every build.
 
 **Next:** D2.08b — migrate **hr**, the largest stylesheet left.
+
+## D2.08b — hr adopts the design system, 2026-08-19
+
+The largest stylesheet in the queue, and it shipped whole: **1,119 → 851 lines**
+(−268), thirteen `.tsx` rewritten, `hr/hr.module.css` off `ds/redefined.ts`.
+Nothing was cut.
+
+### What was adopted, and what each adoption actually fixed
+
+- **`ds/Modal`, through the module's own `DialogFrame`** — the same move D2.07
+  made in crm, and the same finding: `.scrim` + `.modal` had **no focus trap**,
+  and its `onKeyDown` sat on the `<form>`, so Escape only worked once you were
+  already inside the dialog. Five forms — the opening, the applicant, the hire,
+  the leave request and the letter template — Tab-walked straight out onto the
+  board behind them.
+- **`ds/Field` + `ds/Input` + `ds/Select`** — the module's own `Field` is gone
+  entirely. It drew `<label><span>…{children}` with the words *beside* the
+  control; `ds/Field` binds them by `htmlFor`, keeps the hint visible when an
+  error appears, and announces the error. `.input` was declared once and used
+  for text boxes **and** `<select>`s, so every picker in HR was a text field
+  wearing the browser's arrow.
+- **`ds/Table` + `Th`/`Td`** — the three lists (leave requests, the approvals
+  inbox, the people directory). Each had `overflow-x: auto` on a plain `<div>`:
+  a region a mouse can scroll and a keyboard cannot (WCAG 2.1.1). Each is a
+  named, reachable region now with a `<caption>`, and the three actions columns
+  that were `<th aria-label=… />` carry a real `sr-only` heading.
+- **`ds/Toolbar`** — the four control rows (hiring, leave, away, directory).
+  All four were bare `<div>`s; they are named groups now, which is the only
+  thing that tells a screen-reader user the filters above a screen belong
+  together.
+- **`ds/Card`** — three surfaces: the board's candidate cards (`pad="sm"`,
+  `interactive` — the prerequisite was right, `.card` was byte-identical to
+  crm's, hardcoded `rgba(40, 30, 20, 0.04)` included), the letter-template tiles
+  (`pad="none"`, which lets the delete control reach the corner) and the leave
+  balances (`flat`, `pad="none"`).
+- **`ds/Badge`, as the module's `StateBadge`** — `.chipGood` and `.chipBad` were
+  **hardcoded** (`#e3f3e9`/`#1f6b45`, `#fbe6e2`/`#9b3222`), so a refused leave
+  request in HR was a different red from a refused claim in Finance. They are
+  the success and danger tokens now. The tone vocabulary (`info`/`good`/`bad`)
+  stays the module's, because `leave.ts` maps eight leave states onto it and
+  `leave.test.ts` asserts those words; only the type's name changed
+  (`ChipTone` → `StateTone`).
+- **`ds/Checkbox`** ×3 (include closed rounds, include leavers, take the CV
+  off), **`ds/Chip`** for the letter editor's placeholder buttons — which are
+  genuinely pressed, so they are chips rather than words drawn to look like one
+  — and **`ds/IconButton`** for the template delete.
+
+### One widening, argued in its own file
+
+**`ds/DatePicker` gains `id` and `aria-describedby`.** Its trigger is a
+`<button>`, so a hand-rolled wrapping `<label>` did name it — and `ds/Field`,
+which names by `htmlFor`, had nothing to point at. The leave dialog's two date
+fields are the first `DatePicker`s inside a `Field` in the product, and without
+this they would have been two labelled boxes whose labels named nothing. No
+behaviour, no test and no other call site changed.
+
+### One test helper changed, and the assertions did not
+
+`Hire.test.tsx`'s `field()` walked from a label's words up to the `<label>`
+wrapping them and back down to whatever control was inside. That is the
+hand-rolled structure this item deletes, so it stopped resolving. It is
+`getByLabelText` now — which two calls in the same file were already using,
+because the binding is what makes it work. Every assertion in the four affected
+tests is untouched.
+
+### Kept local, with the reason
+
+`.textarea` and `.templateBody` (**`ds/` still has no multi-line control** — hr
+is the sixth area waiting, after billing ×3, crm and finance), `.search` (the
+icon sits *inside* the field; `ds/Input` has no slot for one, and inventing one
+for a single caller is the drift this queue is undoing), `.segmented` (a
+`role="group"` of `aria-pressed` buttons — the same argument importer's provider
+picker made in D2.08), and the module's genuine layout: the board columns, the
+drawer, the calendar grid, the org chart, the empty state and the error banner.
+`ApprovalsWidget.module.css` was read as the item said to: it declares the rail
+badge and no primitive, and is untouched.
+
+### It is a net deletion
+
+Measured against the same files run through prettier first, which is the only
+fair comparison: the thirteen `.tsx` go **3,321 → 3,446** (+125, all of it
+reasoning written into the files and the render-prop form `ds/Field` takes)
+against a stylesheet that goes **1,119 → 851** (−268), plus 18 lines in
+`ds/DatePicker` and one line off `redefined.ts` — **−126 overall**. Seven i18n
+keys were added (four toolbar names, three table names) in **all three
+languages**: `UNTRANSLATED` is empty and `locale.test.ts`'s B6.11 block requires
+every `hr*` key in fr and nl.
+
+### Verified
+
+`npx tsc --noEmit` clean; `npx eslint src/hr src/ds --max-warnings 0` clean;
+`npx prettier --write` on every changed file; `node
+scripts/gen-tailwind-theme.mjs --check` current (75 utilities); `npm run build`
+clean; `npx vitest run src` **106 files / 972 tests green**, `primitives.test.ts`
+included — which is what proves the `redefined.ts` line was really earned.
+
+**A formatting-only diff was reverted rather than shipped.** Running prettier
+across `src/hr` reflowed four test files, `OrgChart`, `ApprovalsWidget` and
+`leave.ts` for no reason of this item's; those were restored and only the two
+intended lines in `leave.ts` and the one helper in `Hire.test.tsx` re-applied.
+A migration diff nobody can read is a migration nobody reviews.
+
+**One test failed in the full run and passes alone:**
+`sites/SectionMove.test.tsx > a section dropped at the end is one move, undoable
+and announced` failed once under full-suite load and passed on its own and in
+the clean re-run (972/972). It is another track's area and nothing here touches
+it — recorded as flaky under load rather than fixed from outside.
+
+**Cut for the twelfth time: no screenshot.** No browser here — no `playwright`,
+`puppeteer` or headless-chrome package in `web/`, and vitest runs on jsdom. The
+D1.53 substitute was run in its strong form. hr's own chunk is
+`dist/assets/index-BULL5X77.css` (module hash `1phzd`): **all thirty deleted
+class names are absent from the whole shipped bundle** — `_toolbar_1phzd`,
+`_filterSelect_1phzd`, `_toggle_1phzd`, `_card_1phzd`, `_cards_1phzd`,
+`_chip_1phzd` and its three tones, `_scrim_1phzd`, `_modal_1phzd` and its six
+parts, `_field_1phzd`, `_label_1phzd`, `_input_1phzd`, `_hint_1phzd`,
+`_fileInput_1phzd`, `_fieldError_1phzd`, `_table_1phzd`, `_tableWrap_1phzd`,
+`_numeric_1phzd`, `_stagePicker_1phzd`, `_templateCard_1phzd`,
+`_templateDelete_1phzd`, `_balanceCard_1phzd` — while **all twenty-five the
+module still owns are present**. Each utility the migration turns on was then
+read out of the bundle individually: `min-h-2`, `min-w-[200px]`, `gap-0.5`,
+`px-5`, `pt-4`, `top-3`, `right-3`, `items-end`, `flex-wrap` and `tabular-nums`.
+
+### Carried forward to D3.01
+
+- **The multi-line control is now six areas deep** (billing ×3, crm, finance,
+  hr ×2 — the leave note and the letter body). Every one keeps a local
+  `.textarea` because `ds/` has none. It is the single most-repeated finding of
+  this wave and should be an item, not a footnote.
+- `bg--soft` (15, of which 10 are `projects/**`, still edited outside the
+  loops), `billing/SettingsView`'s `z-sticky`, and the four undefined
+  `--success-bg`/`--danger-text` names in `audit/` and `campaigns/` are all
+  untouched by this item; the sweep D2.07b proposed is still unwritten.
+- The shipped CSS is **924,875 bytes across 23 files**; hr's own chunk is
+  **13.6 KB**. D3.01 still has to re-derive the total with a stated method
+  rather than trusting a chunk name that changes every build.
+- **The disk is the standing risk, not a passing one.** C: reached **229 MB
+  free** at the top of this iteration; the two sweeps LOOP prescribes found
+  nothing left to take (no `.pdb` at all, and 249 `.exe` for 249 distinct target
+  names — so `CARGO_PROFILE_TEST_DEBUG=0` is holding and the 12 GB in
+  `target/debug/deps` is the current set rather than debris). The build passed
+  with 473 MB free. Flagged for a human again: nothing left to delete belongs to
+  this queue.
+
+**Next:** D2.09 — migrate **inventory**, **invite** and **meet** in one commit.

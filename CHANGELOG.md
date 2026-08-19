@@ -10,6 +10,25 @@ contracts.
 
 ## Unreleased
 
+- **The People module can now be worked from a keyboard, and its screens say
+  what they are.** Every form in HR — writing down a role, recording somebody
+  who applied, asking for time off, adding a new colleague to the directory and
+  editing a letter template — now keeps the caret inside it: Tab no longer walks
+  out onto the board behind, Escape closes the form wherever the caret is, and
+  closing hands focus back to whatever you were doing. None of the five did any
+  of that before. Every label is bound to its own box, so a screen reader says
+  which field you are in and reads the note under it with the field rather than
+  leaving it to be found. The three lists — the leave requests, the approvals
+  inbox and the people directory — are the table the rest of the product uses:
+  each one announces what it lists instead of "table, seven columns", they can
+  be scrolled with the keyboard rather than only with a mouse, and the columns
+  of buttons that showed no heading now carry one. The row of controls above
+  each screen is a named group, so somebody who cannot see it is told the
+  filters belong together, and the placeholders you press to build a letter are
+  real buttons. Refused leave and a candidate past their retention date are the
+  same red as a refused claim in Finance, and every box, button and card in HR
+  is now the size and shape it is everywhere else.
+
 - **The mail-import wizard and the Insights dialogs now keep the caret inside
   them.** Importing mail from Gmail, Outlook or your own IMAP server, picking a
   ready-made chart, and asking a question of your own each open a dialog that
