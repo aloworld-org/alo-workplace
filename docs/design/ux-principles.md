@@ -44,7 +44,10 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    ≤1 per screen.
 4. **The primary action is unmissable** *(Fitts's law)* — biggest, closest,
    highest-contrast thing in reach; destructive actions are farther and
-   quieter. Touch targets ≥40px.
+   quieter. Every call to action uses the shared `Button` primitive's
+   **brand-orange primary treatment**; neutral, outline, and text treatments
+   are reserved for secondary actions and must never make the next step look
+   optional. Screens do not invent local CTA colours. Touch targets ≥40px.
    *Verify:* squint test — the blurred screen still shows what to press.
 5. **Empty states are the onboarding** — a new module's first screen is not
    blank; it teaches the ONE next step and often does it for the user
