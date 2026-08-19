@@ -48,6 +48,14 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    **brand-orange primary treatment**; neutral, outline, and text treatments
    are reserved for secondary actions and must never make the next step look
    optional. Screens do not invent local CTA colours. Touch targets ≥40px.
+   Secondary action buttons use the shared quiet neutral treatment: token
+   `bg-raised`, `text-primary`, and no underline, with `bg-default` on hover.
+   Their icons inherit the same primary text colour. They must not use brand
+   orange, an accent-tinted fill, or arbitrary local colours; orange is
+   reserved for the one primary call to action and selected state. A secondary
+   action placed beside a primary remains visibly quieter while retaining the
+   same control height, protected inset, radius role, focus visibility, and
+   minimum touch target.
    *Verify:* squint test — the blurred screen still shows what to press.
    Button labels and icons must never touch or visually crowd a button border.
    Measure from the outermost text or icon edge to the inside of the border:
