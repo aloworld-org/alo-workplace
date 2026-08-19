@@ -50,10 +50,13 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    optional. Screens do not invent local CTA colours. Touch targets ≥40px.
    *Verify:* squint test — the blurred screen still shows what to press.
    Button labels and icons always keep a protected horizontal inset: at least
-   the spacing scale's `space-4` on compact buttons and `space-5` on standard
+   the spacing scale's `space-5` on compact buttons and `space-6` on standard
    calls to action. A screen must never reduce the shared `Button` primitive's
    padding or place an icon outside it. Longer labels expand the control; they
    never touch its border, clip, or force a sibling action out of shape.
+   Flex rows, tables, and action clusters must preserve the button's intrinsic
+   width instead of compressing it; surrounding content reflows or scrolls
+   before a call-to-action loses its protected inset.
    *Verify:* every button remains legible with its longest translated label;
    the shared Button test mechanically guards the minimum inset and target.
 5. **Empty states are the onboarding** — a new module's first screen is not
