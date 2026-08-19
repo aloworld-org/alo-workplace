@@ -456,3 +456,87 @@ first, and here the answer was the symbols.
 services path is written **before** the branch exists: `accept_billing_quote` is
 in daily use and raising an invoice from a services quote must stay byte for byte
 what it is.
+
+---
+
+## 2026-08-19 — O1.c halted: a quote has no idea what it is selling
+
+**Nothing shipped, and nothing should have been.** O1.c says acceptance routes by
+content — *an order when any line names a stocked product, an invoice when none
+does*. **A quote line does not name a product, and cannot.** This was read out of
+the schema before a line of routing was written, which is the only reason it cost
+an hour rather than a wave.
+
+### What a quote line actually is
+
+`billing_quote_lines` (migration 0105) is `description, unit, qty_milli,
+unit_price_cents, vat_rate_bp` — and the migration states why there is no more:
+
+> Lines SNAPSHOT the price list, exactly as invoice lines do: **no foreign key
+> back to `billing_products`**, so a later price change never rewrites an offer
+> already made.
+
+`billing_invoice_lines` is the same. Only the inventory documents —
+`inv_sales_order_lines`, `inv_purchase_order_lines` — carry `product_id`, because
+they are the ones that move goods. The boundary is deliberate and it is drawn in
+the right place: **billing documents are money, inventory documents are goods.**
+
+So the routing signal the item asks for does not exist. There is no field on a
+quote, or on any of its lines, that says which catalog item a line is.
+
+### The part that settles it: a manual route would be no better
+
+The obvious fallback is to stop guessing and let the seller say which one they
+want — the idiom this repository already uses twice for decisions the system
+cannot infer (`short_close`, and `allow_backorder` from O1.a). **That does not
+work either, and the reason is worth writing down:**
+
+An order raised from a quote would copy the quote's lines, and every one of them
+would carry `product_id: None`. `inv_so_deliver.rs:365` refuses exactly that:
+
+> `line {position} is a charge in words, not goods; nothing leaves against it`
+
+Every line would be a charge in words. Nothing could ever be delivered against
+the order, `inv_so_commit` would find no stocked line to check, and the document
+would sit at `confirmed` for ever. It would look like the feature and be an
+ornament — which is worse than not having it, because somebody would trust it.
+
+**There is therefore no version of "a quote becomes an order" that works today,
+automatic or manual.** The blocker is not the routing rule; it is that a quote
+cannot say what it is selling.
+
+### What unblocks it, and whose it is
+
+One additive column: `billing_quote_lines.product_id TEXT NULL`, composite
+foreign key to `billing_products`, `ON DELETE SET NULL` — **exactly the shape
+`inv_sales_order_lines` already uses** (migration 0162, lines 129 and 152). It
+does not weaken 0105's reasoning: the line keeps snapshotting description, unit,
+price and rate, so a price change still cannot rewrite an offer. The product id
+is *provenance*, which is the same distinction O1.b just settled for the
+order-to-quote link.
+
+**That is a change to `billing_*`, and this track does not make those.** The
+queue's own rule: *"A join that seems to need a change in someone else's module
+is a request to put in their queue, not a change to make here."* It is filed
+below as a request for the business track, with the shape it should take, so
+whoever picks it up does not have to rediscover any of this.
+
+It is a bigger change than one column, and the request says so honestly: the
+quote editor has to let somebody pick a catalog item on a line, and the copy into
+an invoice draft should carry the product across too, or the same gap simply
+moves one document downstream.
+
+### O1.c is `[~]`, not `[ ]`
+
+Per this repository's own rule — *`[ ]` is an instruction to keep trying* — the
+item is marked blocked with its reason rather than left open for the next
+iteration to walk into. The wave is not stuck: **O1.d, the order book, is
+unblocked and is the next item.**
+
+**The lesson, which is now three for three in this wave.** ADR 0053 was scoped on
+a grep that missed `inv_so_*`; O1.a's refusal was scoped on "refuse" until
+`inv_reorder`'s own test said over-commitment is legitimate; and O1.c was scoped
+on a quote line naming a product it has never named. Each time the answer was
+written down in the schema or the module header, and each time reading it first
+was what stopped a wave being built on it. **Read the migration before designing
+against the table.**

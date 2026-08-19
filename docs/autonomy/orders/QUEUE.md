@@ -65,13 +65,36 @@ and the read.
 
 - [x] O1.a **The refusal at confirmation.** Confirming an order whose stocked lines would push `committed` past `on_hand + on_order` is refused, inside the transaction that draws the number, with a `Conflict` naming the product and the shortfall — a salesperson has to know what to tell the customer. Settled with a transaction-scoped advisory lock per `(tenant, product)` the way `inv_stock_sale.rs` already settles the same race, **locking every stocked product on the order in ascending product-id order** so two orders sharing two products cannot deadlock. `reserved` stays computed (ADR 0054 §3); no new column and no new table. **This wave's mandatory test is two concurrent confirmations for the last unit where exactly one wins** — written to fail first against today's code, because a race test that never failed proves nothing. **Done 2026-08-19**: the eight tests were written first and seven failed against `main`, the race one because both orders confirmed (`SO-2026-00001` and `SO-2026-00002` for one fan). Building it amended the ADR — see the STATE entry: an unconditional refusal contradicted `inv_reorder`'s own stated position, so the rule became "never over-promise **by accident**", with `allow_backorder` in the same shape as `short_close`.
 - [x] O1.b **The quote → order link.** An additive `quote_id` on `inv_sales_orders` with a composite foreign key, mirroring `billing_invoices.quote_id` (migration 0106) exactly. Not a link table. Migration `07xx`. **Done 2026-08-19** as migration `0700`, with the partial unique index that makes one offer yield at most one order, and `quoteId` on the API read-only — provenance is written by the acceptance that produced it and no request may restate it.
-- [ ] O1.c **Accepting a quote routes by content** — an order when any line names a stocked product, a draft invoice when none does. **The test that pins today's services path unchanged is written before the branch exists**: a quote of consultancy days must still become an invoice directly. This is the item most able to break something in daily use.
+- [~] O1.c **Accepting a quote routes by content** — **blocked on a `billing_*` schema change, which is not this track's to make.** A quote line is `description, unit, qty, price, vat` and nothing else: `billing_quote_lines` (migration 0105) deliberately holds **no `product_id`**, so that a price change can never rewrite an offer already made. There is therefore no signal to route on. Letting the seller choose instead does not rescue it either — an order copied from quote lines would carry `product_id: None` on every line, and `inv_so_deliver.rs:365` refuses those as *"a charge in words, not goods"*, so nothing could ever be delivered against it. It would look like the feature and be an ornament. **The unblocking change is filed as a request below.** Reason recorded in STATE (2026-08-19); marked `[~]` rather than `[ ]` so no iteration walks into it again.
 - [ ] O1.d **The order book across orders**: ordered, reserved, delivered, invoiced and outstanding, per order and in total, wrong-tenant tested per route. Smaller than it was — the four numbers per line already exist, so this is a read and a screen rather than a model.
 
 **Cut from this wave, deliberately:** the Orders agent (was O1.7). ADR 0047's
 read-only agent over the order book is worth building, but it reads what O1.d
 produces and cannot be specified before that screen's shape exists. It moves to
 O2 rather than being carried as an item nobody can start.
+
+## Requests for other queues
+
+**For the business track (billing owns `01xx–02xx`): a quote line needs to be
+able to name a catalog item.** Without it, an accepted quote can never become an
+order anybody can deliver, and O1.c stays blocked however it is written.
+
+The shape, so it does not have to be rediscovered:
+
+- `billing_quote_lines.product_id TEXT NULL`, composite foreign key to
+  `billing_products (tenant_id, id)`, `ON DELETE SET NULL` — **exactly what
+  `inv_sales_order_lines` already does** (migration 0162, lines 129 and 152).
+- **It does not weaken migration 0105's reasoning.** The line goes on
+  snapshotting description, unit, price and rate, so a later price change still
+  cannot rewrite an offer already made. The product id is *provenance*, which is
+  the same distinction O1.b settled for the order-to-quote link.
+- It is more than one column, and pretending otherwise would waste their time:
+  the quote editor has to let somebody pick a catalog item on a line, and the
+  copy an accepted quote makes into an **invoice** draft should carry the product
+  across as well — otherwise the same gap simply moves one document downstream.
+
+Until that lands, a goods quote is typed into an order by hand, which is what
+happens today.
 
 ## Exit gate
 
