@@ -10,6 +10,23 @@ contracts.
 
 ## Unreleased
 
+- **Finance can now be worked from a keyboard, and its screens say what they
+  are.** Every list in the module — your claims, the two approval queues, the
+  chart of accounts, the imported statements, the matched and set-aside bank
+  lines, the sample of a file you are importing and all four reports — is now
+  the table the rest of the product uses: a screen reader announces what each
+  one lists instead of "table, eight columns", the wide ones can be scrolled
+  with the keyboard rather than only with a mouse, and the columns of buttons
+  that showed no heading now carry one. The five forms — a claim, an account, a
+  payback, a statement import and picking the invoice a payment settled — keep
+  the caret inside them: Tab no longer walks out onto the screen behind, Escape
+  closes them wherever the caret is, and closing gives focus back to whatever
+  you were doing. Every label is bound to its own field, an error is announced
+  rather than only shown, and the date boxes, dropdowns and text fields are the
+  same height and show focus the same way as everywhere else in the product. A
+  state word — "Approved", "Set aside" — now sits on its own coloured ground
+  instead of being told apart only by the colour of its text. Nothing about what
+  any figure says has changed.
 - **CRM now says out loud what its screens are.** The deal list and the two
   report tables announce what they list instead of "table, six columns", can be
   scrolled from the keyboard rather than only with a mouse, and put "No deal
