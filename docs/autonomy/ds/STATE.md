@@ -2295,3 +2295,140 @@ never did anything.
   D2.04 found, again.
 
 **Next:** D2.08 — migrate **hr**, **importer** and **insights** in one commit.
+
+## D2.08 — importer and insights adopt the design system, 2026-08-19
+
+**Cut, and the cut is the D2.07 one again.** The item said "hr, importer,
+insights". `hr/hr.module.css` is **1,119 lines across thirteen `.tsx`**,
+declaring eight of the twelve primitives; that is a whole item on the scale crm
+turned out to be, and pairing it with two smaller areas would have meant one of
+the three done badly. importer and insights shipped in full; hr is D2.08b, with
+its prerequisites copied into the item rather than left here.
+
+### importer (`web/src/importer`)
+
+**The stylesheet is gone entirely** — 148 lines, the first whole-file deletion
+of the wave. What it drew was a dialog: a scrim, a panel, a head with a close
+button, a body, a footer, and four labelled boxes. All of that is `ds/Modal`,
+`ds/Field` and `ds/Input` now.
+
+What the module was missing is what every hand-rolled dialog in this codebase
+was missing: **no focus trap, no Escape, no return of focus.** Tab walked
+straight out of the import wizard onto the page behind it. `ds/Modal` brings all
+three. `ds/Field` binds each label to its control — the file's
+`<label><span>…<input>` put the words *beside* the box without ever telling a
+screen reader they belonged to it.
+
+One adoption is also a small correction: `strings.importAppPasswordHint` was a
+paragraph floating under the form with a negative top margin pulling it back up
+toward the password box. It is that box's `hint` now — read out with the field
+instead of left for somebody to find.
+
+**Kept local, with the argument in the file:** the three provider buttons. They
+are a `role="radio"` group — exactly one chosen, choosing another unchooses this
+one — which is not what `ds/Chip`'s `pressed` says (a toggle button, announced
+as pressed or not). `ds/` has no segmented control, and inventing one for a
+single caller is how the drift this queue is undoing started.
+
+### insights (`web/src/insights`)
+
+Adopted: `ds/Modal` for both dialogs (gallery and ask), `ds/Table` for the
+figures, `ds/Card` for the tile, `ds/Field` + `ds/Input` for the ask box, and
+Tailwind's own `sr-only` for the copy of the figures behind every chart — which
+was `.srOnly`, the same declaration word for word. The stylesheet goes **478 →
+332** and keeps what is genuinely the module's: the four-column grid and its two
+breakpoints, the tab strip, the tile's three regions, the gallery list, the
+number figure and the empty state.
+
+Both dialogs handled Escape with an `onKeyDown` on the panel, so the key only
+worked once focus was already inside — and nothing stopped Tab leaving. Same
+finding as importer, twice.
+
+**Two widenings, both argued in their own files:**
+
+- **`ds/Card` gains `pad="none"`.** The tile lays out its own head, body and
+  foot, each with padding of its own; a padding on the surface would be a second
+  inset inside the first and the menu button would stop reaching the corner. It
+  has to be a variant rather than a `className` of `p-0`, for the reason
+  `Card`'s header already gives twice: two utilities setting one property have
+  no defined winner. `none` emits no padding utility at all.
+- **`ds/Table` gains `scrollable`.** This one is not styling. Every chart on a
+  board carries the same figures as a table for a screen reader, inside an
+  `sr-only` container — and `ds/Table`'s wrapper is a **tab stop**, because a
+  region that scrolls has to be reachable by keyboard. Put through the component
+  unchanged, a board of nine charts would have become nine invisible tab stops
+  that show nothing when they are reached. `scrollable={false}` drops the
+  overflow, the tab stop, the role and the name together; the `<caption>` still
+  names the table, so a screen reader loses nothing. One new test in
+  `Table.test.tsx` covers it — **added, not edited**: the existing nine are
+  untouched and green.
+
+The table also gains the thing it never had. `TableFigure` now takes a required
+`label` — the tile's title, or the question that was asked — so the figures
+behind a chart are announced by name instead of as "table, three columns", nine
+times over on one board.
+
+### It is a net deletion
+
+Measured against the same files run through prettier first, which is the only
+fair comparison (prettier reflowed five of the seven `.tsx`): the seven `.tsx`
+go **906 → 966** (+60, all of it reasoning written into the files) against
+stylesheets that go **626 → 332** (−294) — so **−234 across the two areas**.
+`ds/` itself grows by ~60: a variant, a prop and a test. No i18n key was added
+or changed; every string on both screens already existed.
+
+### Verified
+
+`npx tsc --noEmit` clean; `npx eslint src/importer src/insights src/ds
+--max-warnings 0` clean; `npx prettier --write` on every changed file; `node
+scripts/gen-tailwind-theme.mjs --check` current (75 utilities); `npm run build`
+clean; `npx vitest run src` **106 files / 972 tests green** (971 before, plus
+the one new `Table` test). The 20 `InsightsModule.test.tsx` tests pass unedited,
+through both rewritten dialogs.
+
+**Cut for the eleventh time: no screenshot.** No browser here — no `playwright`,
+`puppeteer` or headless-chrome package in `web/`, and vitest runs on jsdom. The
+D1.53 substitute was run in its strong form over both areas. insights' own chunk
+is `dist/assets/index-xom_GFDs.css` (module hash `zplnb`, **5.0 KB**): **all
+eighteen deleted class names are absent from it** — `_tile_zplnb`,
+`_table_zplnb`, `_tableWrap_zplnb`, `_tableCaption_zplnb`, `_srOnly_zplnb`,
+`_numeric_zplnb`, `_scrim_zplnb`, `_modal_zplnb` and its five parts,
+`_askForm_zplnb`, `_askLabel_zplnb`, `_askRow_zplnb`, `_askInput_zplnb` — while
+**all forty-two the module still owns are present**. For importer, the whole
+stylesheet is gone from the bundle: `_providers_`, `_provider…`, `_portField_`,
+`_serverRow_` and its `_overlay_` generate nothing anywhere in the shipped CSS
+(the `_provider_gsmoy` and three `_overlay_*` that remain belong to admin and
+the three editors). And each utility the migration turns on was read out of the
+bundle individually: `max-h-[320px]`, `min-h-[220px]`, `grid-cols-[1fr_88px]`,
+`items-end`, `min-w-0` and `sr-only`.
+
+### The disk was full, and it is the documented failure
+
+`npm run build` died with an esbuild stack trace and "The service was stopped".
+`df -h` first, as LOOP says: **C: at 100%, 6.4 MB free.** In this checkout,
+`target/debug/deps` held 1.3 GB of `.pdb` across 127 files; deleting them freed
+it and invalidated nothing. The stale-binary sweep found **nothing to take** —
+249 `.exe` across 248 distinct target names, so one each, which means
+`CARGO_PROFILE_TEST_DEBUG=0` and the earlier sweeps are holding and the 6.7 GB
+of test binaries is simply the current set rather than accumulated debris. The
+build passed on the retry with 1.4 GB free. **The box is still within a gigabyte
+of full** and the next Rust iteration will meet this again with less to reclaim
+than this one had — flagged for a human, since nothing left to delete belongs to
+this queue.
+
+### Carried forward to D3.01, on top of what D2.06b, D2.07 and D2.07b left
+
+- **The multi-line control is now six areas deep** (billing ×3, crm, finance,
+  hr). Every one of them keeps a local `.textarea` because `ds/` has none, and
+  hr's is in the way of D2.08b.
+- The `bg--soft` sweep and the four undefined `--*-bg`/`--*-text` names from
+  D2.07b are untouched here; neither area used them.
+- The shipped CSS is **949 KB across 23 files**; the bundle carrying the app's
+  utilities is `dist/assets/index-CPee_33b.css` at **187 KB**, against the 194 KB
+  D2.07b measured, the 193 KB of D2.06b and the 252 KB D1.55 recorded. A
+  294-line stylesheet deletion moved it by ~7 KB, which is the first per-item
+  movement in this wave big enough to see — but D3.01 still has to re-derive the
+  total with a stated method rather than trusting a chunk name that changes
+  every build.
+
+**Next:** D2.08b — migrate **hr**, the largest stylesheet left.

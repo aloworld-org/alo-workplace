@@ -10,6 +10,22 @@ contracts.
 
 ## Unreleased
 
+- **The mail-import wizard and the Insights dialogs now keep the caret inside
+  them.** Importing mail from Gmail, Outlook or your own IMAP server, picking a
+  ready-made chart, and asking a question of your own each open a dialog that
+  Tab can no longer walk out of; Escape closes it wherever the caret is, and
+  closing hands focus back to whatever you were doing. None of the three did any
+  of that before — the two Insights dialogs answered Escape only once you had
+  already clicked inside them, and the import wizard did not answer it at all.
+  Every label in the import form is now bound to its own box, so a screen reader
+  says which field you are in, and the note about needing an app password for
+  Gmail and Outlook is read out with the password box rather than left below the
+  form. The figures behind every chart on a board — the table a screen reader is
+  given, because a drawing has no rows — now carry the chart's own name instead
+  of being announced as "table, three columns", and they no longer stop the
+  keyboard on their way past: a board of nine charts had nine invisible tab
+  stops, and has none. The boxes, buttons and tables on these screens are the
+  same height and show focus the same way as everywhere else in the product.
 - **Finance can now be worked from a keyboard, and its screens say what they
   are.** Every list in the module — your claims, the two approval queues, the
   chart of accounts, the imported statements, the matched and set-aside bank
