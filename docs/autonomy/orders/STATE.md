@@ -429,8 +429,18 @@ accepted, so no linked quote can vanish under a standing order.
   single read **and in the list**, and surviving an ordinary header edit.
 
 **How verified.** `cargo fmt`; clippy clean for both crates; `inv_so*` +
-`inv_reorder` + `billing_quote*` binaries **50/50**; the new suite **4/4**; the
-`alo-jmap` inventory unit tests **14/14**.
+`inv_reorder` + `billing_quote*` binaries **50/50**; every `inv_*` and
+`billing_*` binary **174/174**; the new suite **4/4**; the `alo-jmap` inventory
+unit tests **14/14**; and the full `alo-store` suite **2 365 tests, 2 363 passed,
+1 skipped, 437 s** — up from 2 361, by this item's four.
+
+The two failures are `site_ticket_orders` again, down from six in O1.a's run,
+which is what load variance looks like rather than a defect converging. The
+reasoning is not repeated: that file holds no reference to `inv_`, `sales_order`
+or `confirm`, and it passes 14/14 alone with this change in the tree. **It has
+now failed under load in two consecutive full runs from this track and was
+flagged three times from campaigns — it is past being worth a note each time and
+is a request the sites queue should take.**
 
 **The disk filled mid-gate and the handover's note was half right.** `rustc`
 died with `IO failure on output stream: no space on device` at 100% of 474 GB.
