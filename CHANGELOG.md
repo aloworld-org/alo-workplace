@@ -114,6 +114,14 @@ contracts.
   ada@example.test" — where before a screen reader read out four identical
   commands. The dialog itself now looks like Settings, because it is the same
   dialog underneath.
+- **An order now remembers the offer it came from.** A sales order raised from an
+  accepted quote carries that quote, so "where did this order come from?" and
+  "what became of that offer?" are both answerable from the record rather than
+  from memory — the same link an invoice raised from a quote has carried since
+  Billing shipped. An offer can be taken up as an order once; orders taken over a
+  counter or a telephone have nothing behind them, which is most of them. Where
+  an order came from cannot be edited afterwards, because it is a fact about how
+  the order came to exist rather than a field.
 - **The same goods can no longer be promised to two customers by accident.**
   Confirming a sales order now checks that the goods can exist at all — what is
   on the shelf, plus what is already on its way from a supplier, minus what other

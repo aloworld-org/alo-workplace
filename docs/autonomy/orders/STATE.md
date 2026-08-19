@@ -369,3 +369,80 @@ decision.
 **Next:** O1.b, the `quote_id` column mirroring `billing_invoices.quote_id`
 (migration 0106). It takes migration `07xx` — check the directory immediately
 before rebasing, not once at the start.
+
+---
+
+## 2026-08-19 — O1.b: the offer an order came from, in one column
+
+**Shipped.** Migration `0700_inv_sales_order_quote_link.sql`, `quote_id` through
+`NewSalesOrder`/`SalesOrder`/`SO_COLS`/`normalize_sales_order`, `quoteId` on the
+order JSON, and `tests/inv_so_quote_link.rs` — four tests. The `07xx` block was
+checked immediately before writing, not once at the start: `0700` was free.
+
+**A column, not a link table**, and the evidence was next door.
+`billing_invoices.quote_id` (migration 0106) has answered the identical question
+for the other branch of an acceptance since B1.12, with the same composite
+foreign key and the same partial unique index. An order comes from at most one
+quote, so a second shape for one relationship would be a second thing to read.
+**This retires the `0700_order_quote_links.sql` a halted iteration drafted** — it
+was solving a problem the schema had already solved, and the draft is now
+superseded rather than merely unused.
+
+0106's reasoning transferred whole and is quoted in the migration where the next
+reader will be standing: the column lives on the **order** because that is the
+newer document and the one that knows its own origin, and a column on the quote
+would have to be written into a row that is frozen the moment it is sent — the
+very property that makes a sent quote trustworthy. `NO ACTION` rather than
+`CASCADE`, because only a draft quote is ever deleted and a draft has never been
+accepted, so no linked quote can vanish under a standing order.
+
+**Two decisions that are this item's own.**
+
+- **The tenant check is in Rust as well as in the key.** The composite foreign
+  key would refuse a stranger's quote id on its own — but as a database error,
+  where every other cross-tenant reference in this module answers with a clean
+  `NotFound`. A foreign id must be indistinguishable from one that never existed,
+  so the quote is resolved through the account door first and the key is the
+  second line rather than the first.
+- **`quoteId` is read-only on the wire.** It is absent from `OrderBody`
+  entirely, so sending one is an unknown field and ignored, and `editable()`
+  carries the stored value through a `PATCH` rather than re-stating it. An order
+  that could be told it came from an offer it did not come from would make the
+  link worthless in exactly the case it exists for. The unit test
+  `no_request_can_state_or_clear_where_an_order_came_from` holds it: a stated id
+  is ignored, a `null` does not clear it, the rest of the body still merges, and
+  a body naming only `quoteId` states no header at all.
+
+**Who could not claim what, quoted rather than summarised.**
+
+- `another_tenants_quote_can_never_be_the_origin_of_our_order` — the mandatory
+  wrong-tenant test. A neighbour's offer is a `NotFound` from our handle;
+  **nothing of ours was written for it** (our order list is asserted empty);
+  their offer is untouched, still unclaimed, and still becomes *their* order
+  afterwards; and an id that never existed answers identically, so ours discloses
+  nothing about whether theirs is real.
+- `an_offer_can_be_taken_up_as_an_order_only_once` — the second attempt is a
+  `Conflict` saying so, from the partial unique index rather than from a check
+  that could be raced past; and two orders from no offer at all are still
+  perfectly ordinary, because the index is partial.
+- `an_order_remembers_the_offer_it_was_taken_from` — written, read back on the
+  single read **and in the list**, and surviving an ordinary header edit.
+
+**How verified.** `cargo fmt`; clippy clean for both crates; `inv_so*` +
+`inv_reorder` + `billing_quote*` binaries **50/50**; the new suite **4/4**; the
+`alo-jmap` inventory unit tests **14/14**.
+
+**The disk filled mid-gate and the handover's note was half right.** `rustc`
+died with `IO failure on output stream: no space on device` at 100% of 474 GB.
+The stale-binary sweep it recommends had nothing to reclaim here — 176 test
+binaries against 172 distinct targets, so almost nothing was stale — but **1.9 GB
+of `.pdb` files** were sitting in this checkout's `deps` alone despite
+`[profile.test] debug = 0`, and removing them plus one `cargo clean -p` freed
+6.4 GB. Three checkouts' `target` directories hold 24 GB between them. Recorded
+because the existing note sends the next person looking for stale `.exe` files
+first, and here the answer was the symbols.
+
+**Next:** O1.c — accepting a quote routes by content. The test that pins today's
+services path is written **before** the branch exists: `accept_billing_quote` is
+in daily use and raising an invoice from a services quote must stay byte for byte
+what it is.
