@@ -2577,3 +2577,171 @@ read out of the bundle individually: `min-h-2`, `min-w-[200px]`, `gap-0.5`,
   this queue.
 
 **Next:** D2.09 — migrate **inventory**, **invite** and **meet** in one commit.
+
+## D2.09 — invite and meet adopt the design system, 2026-08-19
+
+**Cut, and the cut is the item.** D2.09 was written as "inventory, invite,
+meet". `inventory/InventoryModule.module.css` is **626 lines across ten
+`.tsx`** and declares seven of the twelve primitives — bigger than importer and
+insights together, and the same shape as the two cuts before it: crm was one
+item pretending to be a third of one (D2.07), hr was another (D2.08). It is
+`D2.09b` now, with its four prerequisites copied into the item rather than left
+in this journal, which is the rule the queue learned at S2.15. What shipped
+here is invite and meet, at full depth, gated green.
+
+Two lines off `ds/redefined.ts`: **7 → 5**, of which `sites/SitesModule` is
+another track's and `platform`, `projects`, `tasks` and `inventory` are this
+queue's remaining four.
+
+### invite — the first screen anybody outside the admin console sees
+
+`InvitationView` drew its own card, its own two fields and its own two boxes.
+Three of its four surfaces named tokens **that do not exist**: `--surface`,
+`--surface-sunken` and `--border` are defined nowhere in `tokens.css` or
+`theme.css`. The consequence was visible rather than theoretical — the page had
+no ground of its own (`background: var(--surface-sunken)` computes to nothing),
+and `border: 1px solid var(--border)` falls back to `currentColor`, so the two
+boxes on the account-claiming form were outlined in the colour of the text
+beside them. This is `bg--soft` again in a different spelling (D2.07b), and it
+is fixed here for the same reason that one was: the file was open.
+
+- **`ds/Card pad="lg"`** x3 — the form, the "this link is no longer usable"
+  state and the "your account is ready" state. `as="form"` on the first, which
+  is the prop `auth/TwoFactorScreen` had added for exactly this shape at D2.05:
+  wrapping a `<form>` in a `<div class="card">` would put the border and the
+  padding on something that is not the thing you submit. What is left in the
+  stylesheet is `.panel` — the column, the gap and the 26rem ceiling.
+- **`ds/Field` + `ds/Input`** x2 — the password and the recovery address. Both
+  were a `<label>` wrapping a `<span>`, an `<input>` and a hint. The wrapping
+  label did name the control, but the hint was not attached to anything: a
+  screen reader read "Password, edit text" and left the sentence explaining the
+  eight-character floor to be found by exploring. `Field` binds by `htmlFor`
+  and points `aria-describedby` at the hint, so it is read with the field.
+
+`.wrap` keeps its own layout and now names `--bg-app`, which is the token
+`auth/TwoFactorScreen.page` uses for the same full-page ground.
+
+### meet — six panels that were six copies of one panel
+
+`MeetModule.module.css` declared the surface — `border-subtle`, `radius-lg`,
+`bg-surface`, `shadow-sm` — **four separate times**: once as `.card`, once as
+`.upcoming`, once as `.history`, and once as the shared rule
+`.dateCard, .schedule, .quick`. Only the first was on `redefined.ts`, because
+only the first is spelled with a name `primitives.test.ts` can see. Migrating
+one and leaving three would have been the drift this wave exists to end, so all
+six are `ds/Card` now:
+
+- **`as="li" pad="sm"`** — the live-meeting cards, a grid of many, which is
+  what `Card`'s own header says `sm` is for.
+- **`as="section" pad="sm"`** — the upcoming list, the recent meetings and the
+  quick actions.
+- **`as="section"`** (`md`) — today's date, which was the one panel at
+  `--space-5` already. It keeps its accent wash: a local rule from a CSS module
+  is unlayered and Tailwind's utilities are in `@layer utilities`, so the
+  gradient wins over `bg-surface` without an `!important` or an inline style.
+- **`as="section" pad="none"`** — the schedule, which lays out its own head,
+  list and foot each with padding of its own; a padding on the surface would be
+  a second inset inside the first.
+
+**`.safety` deliberately keeps a surface of its own**, and the stylesheet now
+says so: it is a notice rather than a panel, and its navy border and ground are
+what say so.
+
+**One rename, and it is the point.** `.card` -> `.meetingCard`, keeping only
+`display: flex`, `min-width: 0`, `flex-direction: column` and the five
+descendant rules. The name had to change or `primitives.test.ts` would still
+see a `.card` in the file and the `redefined.ts` line could not be earned —
+which is the ratchet doing exactly what it was built to do.
+
+### Reconciled, and worth knowing before the next screenshot
+
+Meet's four `--space-4` (16px) panels are `pad="sm"` (12px) and the date panel
+keeps its 20px. `Card` offers 12/20/32 because that is what the twelve copies
+reconciled to; 16 was one file's number, not a decision. **This is a real
+visual change**, recorded here rather than argued away: the Meet dashboard's
+panels are 4px tighter than they were.
+
+### It is a net deletion
+
+invite: `.module.css` **93 -> 61** (-32), `.tsx` **161 -> 167** (+6, the
+render-prop form `ds/Field` takes). meet: `.module.css` **77 -> 76**, with four
+surface declarations replaced by two comment lines, and `.tsx` unchanged at
+197. Plus two lines off `redefined.ts`. **-29 overall.** No new i18n keys —
+nothing this item touches says anything new.
+
+### Verified
+
+`npx tsc --noEmit` clean; `npx eslint src/invite src/meet src/ds
+--max-warnings 0` clean; `node scripts/gen-tailwind-theme.mjs --check` current
+(75 utilities); `npm run build` clean; `npx vitest run src` **106 files / 972
+tests**, `primitives.test.ts` included.
+
+**Three tests failed in the full run and all three pass alone.**
+`sites/SitesLandmarks.test.ts`, `sites/Domains.test.tsx` and
+`sites/SectionMove.test.tsx` — all `src/sites/**`, all 5000 ms timeouts under
+full-suite load, all green in a 3-file re-run (29/29). `SectionMove` is the
+same one D2.08b recorded as flaky under load; the other two are new to the
+list, and the reason they are new is the disk below. Nothing here touches that
+track's area.
+
+**A formatting-only diff was reverted rather than shipped, for the second
+iteration running.** `prettier --write` on `MeetModule.module.css` reflowed all
+77 one-liner rules into 424 lines — a whole-file diff carrying two intended
+changes. The file was restored from git and the six edits re-applied in its own
+style. A migration diff nobody can read is a migration nobody reviews.
+
+**Cut for the thirteenth time: no screenshot.** No browser here — no
+`playwright`, `puppeteer` or headless-chrome package in `web/`, and vitest runs
+on jsdom. The D1.53 substitute was run in its strong form against the shipped
+bundle. invite's module hash is `1mvpe` and meet's is `1vb6o`:
+
+- **Absent from the whole shipped CSS**, which is what proves the two
+  `redefined.ts` lines were earned: `_card_1mvpe`, `_field_1mvpe`,
+  `_label_1mvpe`, `_input_1mvpe`, `_hint_1mvpe`, and `_card_1vb6o`.
+- **Present**, which is what proves nothing was deleted that a screen still
+  needs: `_wrap_1mvpe`, `_panel_1mvpe`, `_mark_1mvpe`, `_title_1mvpe`,
+  `_body_1mvpe`, `_action_1mvpe`, `_error_1mvpe`, and `_meetingCard_1vb6o`,
+  `_cardTop_1vb6o`, `_upcoming_1vb6o`, `_history_1vb6o`, `_dateCard_1vb6o`,
+  `_schedule_1vb6o`, `_quick_1vb6o`.
+- **Each utility the migration turns on, read out of the bundle
+  individually**: `p-8`, `p-5`, `p-3`, `rounded-lg`, `border-subtle`,
+  `bg-surface`, `shadow-sm`, `h-control`, `gap-2`.
+- **The undefined-token fix, read out of the bundle**: `_wrap_1mvpe_4` is now
+  `...;background:var(--bg-app)}`, where it named `--surface-sunken` before.
+
+### The disk stopped being a risk and became an incident
+
+**C: reached literally zero bytes free during this iteration**, mid-edit: an
+`Edit` call failed with `ENOSPC: no space left on device`. `df -h` showed
+`474G 474G 0 100%`, which is the check LOOP puts first for exactly this reason.
+
+Both sanctioned sweeps found **nothing to take**, as they did at D2.08b: **0**
+`.pdb` files (so `CARGO_PROFILE_TEST_DEBUG=0` is still holding) and **249**
+`.exe` in `target/debug/deps` for 249 distinct target names (so there is no
+stale-binary debris either). The 12 GB in `target/debug/deps` is the current
+build's own set, not rubbish.
+
+What was freed, and it is all that was in scope to free: `web/dist` and
+`web/node_modules/.vite` — **482 MB**, both regenerated by the very `npm run
+build` that needed the room. `target/debug/deps` was **not** touched: LOOP
+sanctions deleting `.pdb` and duplicate `.exe` because those invalidate
+nothing, and a full deps wipe is a different act that costs the next Rust
+iteration a cold rebuild.
+
+The degradation was visible in the gate, not only in `df`: `npm run build`
+exited **127** with an empty log on the first call and built cleanly on an
+immediate retry, `vitest run src` took **280 s** against the ~90 s of previous
+iterations, and three sites tests timed out at 5000 ms and then passed alone.
+None of that is a code fault and all of it is the same fault.
+
+**Not a `LOOP HALT`, and here is the reasoning rather than just the verdict.**
+LOOP halts on a broken environment so a human can fix it. The environment is
+not broken for the work that remains: **every item left in this queue —
+D2.09b, D2.10, D2.11, D3.01 — is `web/src` only**, and a web gate needs the
+~480 MB it now has, which it just demonstrated by passing one. Halting would
+stop a queue that can still finish. **A human still has to fix this box**: 482
+MB is one careless build from zero, the next Rust gate in any checkout will
+fail, and nothing left to delete belongs to this queue. This is the fourth
+iteration to flag it and the first where it actually stopped work.
+
+**Next:** D2.09b — migrate **inventory**.

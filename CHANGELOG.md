@@ -10,6 +10,20 @@ contracts.
 
 ## Unreleased
 
+- **The invitation page and the Meet dashboard now use the same panels and
+  fields as the rest of the workspace.** Claiming an account from an invitation
+  link is the first screen of alo anybody outside the admin console ever sees,
+  and until now it drew its own card and its own two boxes: the card named a
+  colour that does not exist, so the page had no background of its own and the
+  boxes were outlined in the colour of the text beside them. It is the same
+  card, the same fields and the same focus ring as every other form in the
+  product now, and each label is bound to its own box so a screen reader says
+  which field you are in and reads the note under it with the field. On Meet,
+  the six panels of the dashboard — each live meeting, the upcoming list, the
+  recent meetings, today's date, the schedule and the quick actions — are the
+  one card the workspace uses everywhere, so they sit at the same corner,
+  border and shadow as the panels on Home and in Finance.
+
 - **The People module can now be worked from a keyboard, and its screens say
   what they are.** Every form in HR — writing down a role, recording somebody
   who applied, asking for time off, adding a new colleague to the directory and
