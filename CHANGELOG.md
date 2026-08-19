@@ -48,6 +48,26 @@ contracts.
   ada@example.test" — where before a screen reader read out four identical
   commands. The dialog itself now looks like Settings, because it is the same
   dialog underneath.
+- **The same goods can no longer be promised to two customers by accident.**
+  Confirming a sales order now checks that the goods can exist at all — what is
+  on the shelf, plus what is already on its way from a supplier, minus what other
+  confirmed orders are still waiting to send. If they cannot, the confirmation is
+  refused in words you can repeat to the customer: *"AF-630 axial fan is short by
+  2: the order asks for 6 and 4 can be promised (on hand 4, on order 0, already
+  promised 2)."* Two people confirming in the same second for the last one now
+  settle it between them, and exactly one wins.
+  **Taking an order you intend to buy stock for is still your call** — the
+  confirmation goes ahead when you say so, and the shortage report then shows
+  what you are short, which is what that report is for. What is prevented is
+  over-promising nobody chose. Orders for services are untouched: there is no
+  shelf behind a consultancy day, so nothing is checked against one. Nothing is
+  reserved and no stock moves — an order is still a promise, and goods still
+  leave when they are picked.
+- **For operators: `POST /inventory/sales-orders/{id}/confirm` gains an optional
+  body**, `{"allowBackorder": true}`, mirroring `shortClose` on the cancel route.
+  Absent means `false` and an empty body is still accepted, so existing callers
+  keep working and simply gain the protection; a refusal is a `409` naming the
+  product and the shortfall.
 - **Four small things across the product now look like what they mean.** A
   "Paid" or "Delivered" badge sits on a green ground instead of the same grey as
   a badge that says nothing in particular; the heading of a column of amounts is

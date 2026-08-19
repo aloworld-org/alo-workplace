@@ -234,3 +234,138 @@ Four remain: the refusal, the link, the routing, the read.
 first — two concurrent confirmations for the last unit, against today's code,
 where today both succeed. A race test that has never failed proves nothing, and
 this wave's whole argument is that a fan cannot be promised twice.
+
+---
+
+## 2026-08-19 — O1.a: the refusal, and the ADR it amended within the hour
+
+**Shipped.** `platform/alo-store/src/inv_so_commit.rs` (the question),
+`inv_so_confirm.rs` (which now asks it), `ON_ORDER_SQL`/`COMMITTED_SQL` opened to
+the crate so the fold is re-used rather than restated, the `allowBackorder` body
+on `POST /inventory/sales-orders/{id}/confirm`, and
+`tests/inv_so_commit.rs` — nine tests. **No migration**: `reserved` stays
+computed, so `07xx` is still untouched.
+
+**The test was written first and it failed first, which is the only reason it
+means anything.** Seven of the eight original tests failed against `main`. The
+one that matters failed like this:
+
+```
+exactly one of two confirmations for the last fan may be allowed to promise it;
+got first=Ok(… number: Some("SO-2026-00001") …) second=Ok(… number: Some("SO-2026-00002") …)
+```
+
+Two numbered orders, one fan. That is the failure this wave is named after,
+demonstrated rather than described.
+
+**Why the order's own row lock was not enough**, which is what makes this more
+than an `if`: `confirm_inv_sales_order` already held `SELECT … FOR UPDATE` on the
+order. That serialises two confirmations *of the same order* and nothing else —
+two different orders for one product lock different rows and their counts
+interleave. A refusal built on it would have passed every single-threaded test
+here and failed in production. The count and the decision are made one act by a
+transaction-scoped advisory lock per `(tenant, product)`, which is the instrument
+`inv_stock_sale.rs` already uses for the same race, so the two paths that can
+promise a unit contend one way instead of two. Every stocked product on the order
+is locked in **ascending product-id order**: an order has many lines where a shop
+hold has one, and two orders sharing two products, each locking in the order the
+lines happened to appear, deadlock.
+
+### The ADR was amended by building it, and this is the part worth keeping
+
+ADR 0054 §3, written this morning, said "refuse" without qualification. Three
+`inv_reorder` tests then failed, and one of them said this:
+
+```rust
+assert_eq!(
+    promised.available_qty_milli, -2_000,
+    "more promised than exists is legitimately negative"
+);
+```
+
+**The module that owns the number states that over-commitment is legitimate.** It
+is the state its shortage report exists to report. An unconditional refusal makes
+that state unreachable and hollows out the report — and the way I would have
+found out is by deleting another module's assertion to make my own feature pass,
+which is the exact move this repository's history says goes wrong.
+
+So the rule is not *never over-promise*, it is **never over-promise by
+accident**. `confirm_inv_sales_order` takes `allow_backorder`, defaulting to
+refuse. The shape is not invented: cancelling a part-delivered order already
+needs `short_close` because, in `inv_so.rs`'s own words, *"that is a decision
+rather than a slip"* — so the caller says it out loud. The HTTP surface mirrors
+`shortClose` exactly, down to absent-means-false on a body that may be empty.
+
+Three failing tests in a module this track does not own were the signal. Bending
+them would have been a fixture edit that quietly changed a product decision; the
+right reading was that two features contradicted, and one of them was mine.
+
+**The guarantee, stated at its true width:** two people cannot each sell the last
+fan *without either of them choosing to*. A tenant who backorders on purpose sees
+it in the shortage report, where they asked to see it.
+
+**Who could not be over-promised, quoted rather than summarised.**
+
+- `two_confirmations_for_the_last_fan_leave_exactly_one_promise` — two separate
+  orders, `tokio::join!`, exactly one `Ok`; the loser's refusal must name the
+  product, and the shelf is asserted untouched afterwards because confirming
+  promises and never moves goods. Deliberately two orders rather than one
+  confirmed twice: the row lock already stops the second, and a test passing on
+  that lock would prove nothing about the shelf.
+- `an_order_beyond_the_shelf_is_refused_with_what_is_short` — six against four
+  refuses and says "short by 2"; then four fits **exactly**, because `available`
+  is a quantity that may be promised in full rather than one to stay under; then
+  one more is refused, since the shelf is now spoken for.
+- `nothing_a_refused_confirmation_asked_for_reaches_the_order` — still a draft,
+  no number drawn, no day stamped, still deletable. A refusal that half-wrote
+  would leave a hole in a sequence a customer's bookkeeping can see.
+- `what_is_already_on_order_from_a_supplier_may_be_promised` — nothing on hand
+  and six on order confirms; the seventh does not. A business that could not
+  promise what it has already bought could not take an order at all.
+- `a_service_promises_nothing_and_never_blocks_an_order` — an empty warehouse
+  must never stop a quote of consultancy days.
+- `delivering_releases_the_promise_for_the_next_order` and
+  `cancelling_releases_the_promise_for_the_next_order` — the lifecycle that comes
+  free with the fold, proved rather than asserted: no hook anywhere to forget.
+- `a_seller_who_says_so_may_promise_goods_they_will_buy` — refused at ten against
+  one, taken when said out loud, and then the shortage is **visible** as
+  `available = −9`; and the next order is refused again, because a backorder is a
+  decision about one order and never a setting.
+- `another_tenants_stock_can_never_back_our_promise` — the mandatory wrong-tenant
+  test in the shape this module could break it: a neighbour's fifty fans do not
+  make our empty warehouse look stocked, they may still promise all fifty, and
+  their promises do not make ours any shorter.
+
+**How verified.** `cargo fmt`; `SQLX_OFFLINE=true cargo clippy -p alo-store
+-p alo-jmap --all-targets` — clean for this change (the two pre-existing
+`type_complexity` warnings in `meet.rs`, untouched); the four affected inventory
+binaries **35/35 green**; the new suite **9/9**; the full `alo-store` suite
+**2 361 tests, 2 355 passed, 1 skipped, 314 s**.
+
+**The six that failed are the sites track's load-flaky sweepers, and the
+reasoning is recorded rather than asserted** — `site_ticket_orders` ×2,
+`site_bookings_public`, `snooze`, `site_publish_schedule_tenancy` ×2. Three
+things say so together: they are the *same* tests the campaigns journal has
+flagged three times (they claim from a global cross-tenant sweep with a fixed
+round budget, so added concurrency starves the watched row); `site_ticket_orders`
+passes **14/14 alone** with this change in the tree, exactly as it does on
+`main`; and — the decisive one — **none of the four files contains a single
+reference to `inv_`, `sales_order` or `confirm`**, so there is no path by which a
+change to `inv_so_confirm`, `inv_so_commit`, two `pub(crate)` consts and one
+route handler could reach them.
+
+A stash-and-compare was attempted for completeness and abandoned as a poor
+instrument: `git stash` leaves untracked files behind, so the first attempt
+compiled this item's own test file against a tree with no module behind it, and
+matching a full suite's parallel load inside a subset is guesswork either way.
+Code-path reachability is the fair test and it is above.
+
+**Cuts:** none. One thing deliberately not built: the shop's own availability
+still ignores confirmed sales orders and this refusal still ignores live shop
+holds — ADR 0054 §2's named limitation, unchanged here because
+`inv_stock_sale.rs` is not this track's file and joining the two doors is its own
+decision.
+
+**Next:** O1.b, the `quote_id` column mirroring `billing_invoices.quote_id`
+(migration 0106). It takes migration `07xx` — check the directory immediately
+before rebasing, not once at the start.

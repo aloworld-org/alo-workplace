@@ -125,6 +125,42 @@ The refusal is `StoreError::Conflict` naming the product and the shortfall,
 because a confirmation that fails must tell a salesperson what to say to the
 customer.
 
+### Amendment, the same day, from building it: the refusal has a door
+
+**As first written this section said "refuse", full stop. Implementing it proved
+that wrong within the hour, and the evidence was another module's test:**
+
+```rust
+// platform/alo-store/tests/inv_reorder.rs
+assert_eq!(
+    promised.available_qty_milli, -2_000,
+    "more promised than exists is legitimately negative"
+);
+```
+
+`inv_reorder` — the module that owns the number — states in an assertion message
+that over-commitment is a **legitimate** state. It is the state its shortage
+report exists to report. An unconditional refusal would have made that state
+unreachable and quietly hollowed out the report, and I would have discovered it
+by deleting somebody else's assertion to make my own feature pass. Three of that
+module's tests failed, which is the system saying two features contradict rather
+than a fixture being stale.
+
+**So the rule is not "never over-promise". It is "never over-promise by
+accident."** `confirm_inv_sales_order` takes `allow_backorder`; the default
+refuses, and a seller who means it says so. Taking an order for goods you intend
+to buy is ordinary trade, and it is the tenant's call rather than ours.
+
+This is the shape the same module family already uses for a deliberate act:
+cancelling a part-delivered order needs `short_close`, because — in `inv_so.rs`'s
+own words — *"that is a decision rather than a slip"*, so the caller has to say it
+out loud. The HTTP surface mirrors `shortClose` exactly: `allowBackorder`,
+absent-means-false, on a body that may be empty.
+
+What the guarantee narrows to, stated honestly: **two people cannot each sell the
+last fan without either of them choosing to.** A tenant who deliberately
+backorders sees it in the shortage report, which is where they asked to see it.
+
 ## 4. The quote → order link does not exist, and is one column
 
 I checked, because the previous correction said it "may be partly built": every
