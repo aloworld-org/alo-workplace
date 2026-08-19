@@ -2112,3 +2112,186 @@ rather than done. And `.textarea` is still `ds/Input`'s box written out for a
 on a multi-line control in `ds/`, after billing's three.
 
 **Next:** D2.07b — migrate **finance** and **home**.
+
+## D2.07b — finance and home adopt the design system, 2026-08-19
+
+**Shipped, both halves of the item, in two commits.**
+
+### finance (`5e1e5a4a`)
+
+`finance/FinanceModule.module.css` is off `ds/redefined.ts` — the list is down
+to **ten** files, one of which (`sites/SitesModule.module.css`) is the other
+track's and stays. The stylesheet went **601 lines to 404**, with every
+primitive it declared gone: `.toolbar`/`.toolbarSpacer`, `.table` and its four
+descendant rules and `.tableWrap` and `.numeric`, `.chip` and its four tones,
+`.scrim`/`.modal` and its nine header, body and footer rules, `.field`/
+`.fieldLabel`/`.label`/`.fieldError`, `.input`/`.select`, `.periodInput`,
+`.srOnly`, `.linkAction` and `.table .sectionTitle`. Sixteen `.tsx` adopted
+`ds/` instead: `Table`/`Th`/`Td` (eleven tables), `Modal` (five dialogs),
+`Field` + `Input` (nineteen controls), `Select` (eleven), `Toolbar` +
+`ToolbarSpacer` (six rows), `Badge` (two status words), `Checkbox` and `Button`.
+
+**The commit message says "601 lines to 316" and that number is wrong** — it was
+written before the file was formatted and before the replacement comments were
+counted. 404 is the measured figure. Recorded here rather than rewritten,
+because the commit was already made and this journal is the record.
+
+**A table that repeats the heading above it breaks nothing and reads badly, and
+two tests found it.** `Chart.test.tsx` and `Bank.test.tsx` both do
+`getByText(<a section heading>)`, and both failed the moment a `ds/Table`
+caption carried the same words. The lazy fix would have been `getAllByText`; the
+right one is that **a heading and a table name answer different questions**. The
+heading says which part of the screen this is ("Waiting for a decision", "The
+first transactions, as we read them"); the caption says what the rows are
+("Claims to decide on", "Sample transactions"). Six names were added for that,
+plus `financeChartTableOf(kind)` for the five chart tables, whose `<h2>` is the
+kind and whose caption is now "Accounts — what we own". Two tables on one screen
+announced identically are the defect `Toolbar`'s own header describes; this is
+the same defect one layer down, and it would have shipped unnoticed if the tests
+had been widened instead.
+
+**What the five dialogs did not have**, and now inherit from `ds/Modal`: a focus
+trap, focus restored to the opener, and an Escape that works wherever the caret
+is. `parts.DialogFrame`'s handler was `onKeyDown` on the `<form>` — so the one
+case it could not cover (focus outside the form) was exactly the case the
+missing trap created. Body and footer are siblings under `ds/Modal`, so the
+submit is tied to the form by id, which is also what keeps Enter in any field
+working. Every label is bound by `htmlFor` rather than by containment, and an
+error now carries `role="alert"` instead of being a `<span>` that is shown and
+never announced.
+
+**What the eleven tables did not have**, the same three `ds/Table` documents: a
+name, a scroll region a keyboard can reach (`overflow-x: auto` on a bare
+`<div>`, WCAG 2.1.1), and a heading on the actions column — six of the eleven
+wrote `<th scope="col" aria-label={…} />`, an empty cell named by an attribute,
+which is now `<Th hideLabel>` and is really in the document.
+
+**One widening, and it is not in `ds/`.** The report tables divide into sides
+with a heading row, and `ds/Table` styles its cells with descendant utilities
+(`[&_th]:text-tertiary`) that are one class *and* one element — so a plain
+utility on the cell loses, which is the specificity fact `Th`'s own `TH_ALIGN`
+had to answer. `reportParts.SectionHeading` says its five rules through
+`[&[data-section]]:`, one class and one attribute, which beats both. Verified in
+the shipped CSS: all five emit as `.…[data-section]{…}`.
+
+**Visible changes, recorded rather than softened.** Date boxes and dropdowns
+move from the ~33px that `padding: 8px 12px` produced to the shared 40px and
+gain a real outline focus ring (the D1.05 change, arriving here). The quiet
+verbs — "Edit" in a chart row, "This quarter" in a report toolbar — become
+outlined `ghost` buttons where they were bare text, the same change mail took at
+D2.02 and shell at D2.03. A state word is a filled `Badge` rather than an
+outlined pill with a border in its own colour. Report footers read in
+`--text-primary` where `.table th` had made every header tertiary, totals
+included. `ds/Table`'s own reconciliations arrive too: no row hover (it was on,
+and it was not opt-in), and a numeric column's header right-aligned over its own
+figures for the first time.
+
+**Kept local, with the argument in the stylesheet:** `.textarea` (there is still
+no multi-line control in `ds/` — the fifth area waiting on one), `.hint` (the
+paragraph that belongs to a *form* rather than to a control, which `ds/Field`
+does not own), and `.periodField` — a control named beside itself rather than
+above itself, because a stacked `ds/Field` in a toolbar doubles the row's height
+and pushes the list it filters off the first screen.
+
+**No test was edited.** All 46 finance tests pass unchanged.
+
+### home (`87be4354`)
+
+**The item's own prerequisite was the finding.** `bg--soft` is not a class and
+generates nothing; the queue copied that in from D2.06b, and reading the file
+found **five more of the same defect**: `bg--hover` twice, and
+`bg-[var(--success-bg)]`, `text-[var(--success-text)]`,
+`bg-[var(--danger-bg)]`, `text-[var(--danger-text)]` — four `var()` references
+to tokens that are not in `ds/tokens.css`. An accent tint behind five icons, the
+hover of two accent buttons, a green tool tile and the overdue badge were each
+drawing nothing at all. All six are now real utilities or a `ds/` component.
+Home declares no stylesheet, so `primitives.test.ts` cannot see it and
+`redefined.ts` never listed it: billing's problem in miniature, exactly as the
+queue item predicted.
+
+Adopted: `ds/Card` for the five sections and the four stat tiles, `ds/Badge` for
+a task's due date, `ds/Button` for Compose, the four "View all" links and the
+two empty-state actions. Left local, with the argument written into the file's
+header: the search row, the Ask box, the tab strip, the tool tiles and the rows
+of the mail and task lists — each is a composite where a bordered control would
+draw a second box inside the first, the same argument as
+`shell/SearchOverlay.query` (D2.03) and `mail/RecipientInput.entry` (D2.02).
+
+**One widening, stated in `ds/Card.tsx`: `as="button"`.** The four stat tiles
+are cards that *are* the control, which is what `interactive` was built for, and
+the component now writes `type="button"` itself — for the reason `ds/Button`
+does, and the reason D2.03 recorded: a bare `<button>` inside a form submits it,
+and a card is not where anybody would look for that.
+
+Visible changes: the cards are `--radius-lg` rather than `--radius-xl` and the
+stat tiles take `Card`'s padding rather than a hand-set `!px-6 !py-5`; the
+header links and empty-state actions are outlined ghost buttons where they were
+bare text; and everything that was drawing nothing now draws its colour.
+
+### It is a net deletion
+
+`prettier --write` reflowed both areas — `HomeModule.tsx` had never been
+formatted and was written at a very wide effective column — so the raw diffs
+read larger than the change. Measured against the same files run through
+prettier first, which is the only fair comparison: finance's sixteen `.tsx` go
+**4,092 → 4,121** (+29, all of it reasoning written into the files) against a
+stylesheet that goes **601 → 404** (−197), so **−168 across the item**; home
+goes **756 → 760**, of which the new fifteen-line file header is more than the
+whole difference. Only the files this item changed were formatted: the four
+finance test files, `FinanceModule.tsx` and `ReportsView.tsx` were reverted
+after prettier swept them, and the three i18n catalogs were left alone —
+reformatting a file three tracks push to would turn every rebase into a
+conflict. The i18n diff is **additive only**: eleven new keys in en, ten in fr
+and nl (en carries a four-line comment), so nothing joins `UNTRANSLATED`.
+
+### Verified
+
+`npx tsc --noEmit` clean; `npx eslint src/finance src/home src/ds src/i18n
+--max-warnings 0` clean; `npx prettier --write` on every changed file; `node
+scripts/gen-tailwind-theme.mjs --check` current (75 utilities); `npm run build`
+clean; `npx vitest run src` **106 files / 971 tests green** — no chat flake this
+time, unlike D1.51, D1.54, D1.55 and D2.07.
+
+**Cut for the tenth time: no screenshot.** No browser here — checked again this
+iteration: no `playwright`, `puppeteer` or headless-chrome package in `web/`,
+and vitest runs on jsdom. The substitute D1.53 established was run over both
+areas. For finance, in its strong form: finance's own chunk is
+`dist/assets/index-EfhHRF01.css` (module hash `kfkoi`, **5.7 KB**), and **all
+twenty-eight deleted class names are absent from it** — `_table_kfkoi`,
+`_modal_kfkoi`, `_input_kfkoi`, `_chip_kfkoi`, `_toolbar_kfkoi`, `_field_kfkoi`,
+`_periodInput_kfkoi`, `_srOnly_kfkoi`, `_linkAction_kfkoi` and the rest generate
+nothing — while **all thirty-six the module still owns are present**. A rule
+that left the source and stayed in the bundle would have shown up here; none
+did. For home, every utility the migration turns on was read out of the shipped
+CSS individually: `bg-accent-soft`, `bg-success-tint`, `text-success`,
+`bg-accent-secondary-tint`, `text-accent-secondary`, `fill-warning`,
+`text-warning`, `bg-unread`, `focus-within:ring-accent-tint` and
+`enabled:hover:!bg-accent-hover` — and `bg--soft`, `bg--hover`, `--success-bg`
+and `--danger-bg` appear nowhere in the bundle at all, which is the proof they
+never did anything.
+
+### Carried forward to D3.01, on top of what D2.06b and D2.07 left
+
+- **`bg--soft` is not five occurrences, it is fifteen.** Home's five are fixed;
+  the rest are `billing/SettingsView` (1), `chat/ChatComposer` (`bg--hover`, 1)
+  and **`projects/**` (10 — `ProjectsModule` ×5, `ProjectsView` ×3,
+  `TemplateDialog` ×2)**. Projects is being edited by somebody outside the loops
+  right now — four commits to `web/src/projects` on 2026-08-19 between 07:58 and
+  08:51, in an area no journal claims — so it was left alone rather than swept
+  up under another editor. `billing/SettingsView`'s `z-sticky` is the same class
+  of defect and is still there.
+- **`--success-bg`, `--success-text`, `--danger-bg` and `--danger-text` are not
+  tokens.** Home's four references are gone; `audit/RecordHistory.module.css`
+  and `campaigns/CampaignsModule.module.css` still name `--danger-text`, the
+  first with a fallback and the second without. A sweep for `var(--…)` names
+  that `tokens.css` does not define would find whatever else draws nothing.
+- Still no multi-line control in `ds/`, now with five areas waiting on one
+  (billing ×3, crm, finance).
+- The shipped CSS is **934,989 bytes across 23 files**; the bundle carrying the
+  app's utilities is `dist/assets/index-C9K6Mggz.css` at **194 KB**, against the
+  193 KB D2.06b measured and the 252 KB D1.55 recorded. D3.01 still has to
+  re-derive that figure with a stated method — a 197-line stylesheet deletion
+  moved the total by 447 bytes, which is the "not a usable per-item signal"
+  D2.04 found, again.
+
+**Next:** D2.08 — migrate **hr**, **importer** and **insights** in one commit.
