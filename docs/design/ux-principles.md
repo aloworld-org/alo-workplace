@@ -82,9 +82,14 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    token system is the single source of color/type/spacing; one accent per
    surface; information chunked in scannable groups; motion subtle and
    purposeful (reduced-motion respected). Beauty here is trust, not
-   decoration.
+   decoration. Sibling module navigation is one shared visual role and uses
+   one state system everywhere: inactive tabs are neutral secondary text on a
+   transparent surface; only the selected tab receives the soft brand-orange
+   background, orange text/icon, semibold weight, and orange bottom indicator.
+   Global link color must never leak into inactive navigation items.
    *Verify:* no hardcoded colors/spacings outside tokens; screens pass a
-   5-second "what is this page about" glance test.
+   5-second "what is this page about" glance test. Compare sibling module tabs
+   side by side and confirm their active and inactive states are identical.
 10. **End on a high** *(peak-end rule)* — completing something meaningful
     (site published, invoice issued, week approved) earns a small, fast
     moment of acknowledgment with the result's identity (the live URL, the
