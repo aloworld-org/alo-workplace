@@ -2745,3 +2745,17 @@ fail, and nothing left to delete belongs to this queue. This is the fourth
 iteration to flag it and the first where it actually stopped work.
 
 **Next:** D2.09b — migrate **inventory**.
+
+### Addendum to D2.09, written after the push
+
+The rebase that landed this item brought `c41851be refactor(projects): unify
+actions and migrate styles to Tailwind` with it, and that commit removes
+`projects/ProjectsModule.module.css` from `ds/redefined.ts` — half of D2.10,
+done by somebody outside the loops. `primitives.test.ts` was re-run after the
+rebase merged both sides' deletions and is green (5/5); the list is **4**:
+`inventory`, `platform`, `sites` (another track's) and `tasks`. D2.10 is
+narrowed to `platform` with a note to read `web/src/projects/**` rather than
+trust the list — an area that stops *declaring* a primitive has satisfied the
+ratchet, which is not the same as having adopted the components. This is the
+third time this queue has been taught to read the files rather than the list
+(billing, home, and now projects).
