@@ -1955,3 +1955,160 @@ shipped-CSS measurement — the bundle carrying the app's utilities is
 `dist/assets/index-*.css` at **193 KB**, against the 252 KB D1.55 recorded.
 
 **Next:** D2.07 — migrate **crm**, **finance**, **home**.
+
+## D2.07 — crm adopts the design system, 2026-08-19
+
+**Shipped:** `crm/CrmModule.module.css` is off `ds/redefined.ts` — **678 lines
+to 428**, with every primitive it declared gone: `.card`/`.cards`, `.table`/
+`.tableWrap`/`.numeric`, `.toolbar`/`.search`/`.filterSelect`/`.toggle`,
+`.scrim`/`.modal` and its six header and footer rules, `.field`/`.label`/
+`.input`/`.hint`/`.fieldError`, `.chip` and its three tones, `.pipelinePicker`,
+`.stagePicker`, `.iconAction`, `.noMatches`, `.reportCaption` and
+`.reasonPicker`/`.reasonChip`. Thirteen `.tsx` adopted `ds/` instead: `Modal`
+(4 dialogs), `Field` + `Input` (14 controls), `Select` (4), `Table`/`Th`/`Td`/
+`TableEmpty` (3 tables), `Toolbar` (2 rows), `Card` (the deal card), `Badge`,
+`Checkbox`, `Chip` and `IconButton` (3).
+
+**Cut, and recorded: this item named crm, finance and home; only crm shipped.**
+crm alone is thirteen `.tsx` and a 678-line stylesheet — the same size as the
+billing item that filled the last iteration — and `finance` is larger again
+(601-line stylesheet, ~20 `.tsx`). Doing all three at half depth would have been
+the one thing the loop rule forbids. The remainder is queued as **D2.07b** with
+what was learned about it written into the item: `home` has no stylesheet and is
+not on `redefined.ts`, so it is billing's problem in miniature — Tailwind
+recipes the test cannot see — and D2.06b's dead `bg--soft` (five occurrences in
+`HomeModule`) is copied into the item rather than left in this journal, because
+a gate recorded where the work is *described* and not where it is *ordered* is
+not a gate.
+
+**One component was widened, and it is stated in its own file.** `ds/Chip` had
+no way to say "this one is chosen". The six suggested lost reasons are a row of
+pressable chips where exactly one is picked, and the old markup carried
+`aria-pressed` by hand — so adopting `Chip` unchanged would have *removed* the
+only thing that tells a screen reader a button has a state, and left six chips
+that read identically while one of them looked different. `Chip` now takes
+`pressed`, drawn as a permanent ring in its own ink (`TONED_HOVER_RING` made
+permanent) rather than as a fill or a bold label: the fill belongs to `tone` and
+would have to say two things at once, and a second `font-weight` utility against
+`PRESSABLE`'s has no defined winner. `Chip.test.tsx` is unedited and green.
+
+**Behaviour the four CRM dialogs did not have.** `DialogFrame` was a hand-built
+scrim and panel, and the styling was the least of what was missing:
+
+- **No focus trap.** Tab walked straight out of the deal form onto the board
+  behind it, where a screen reader would happily read a form the user could no
+  longer see. `ds/Modal` traps it.
+- **No focus restore.** Closing dropped the caret at the top of the document.
+- **Escape only worked from inside.** The handler was `onKeyDown` on the
+  `<form>`, so it fired only while focus was in the form — which, with no trap,
+  is exactly the case that could not be relied on. `ds/Modal` listens on the
+  document.
+- **The label was not bound to the control.** crm's own `Field` wrapped both in
+  a `<label>`, which binds by containment and stops binding the moment a second
+  control appears in it; and its error was a plain `<span>` — shown, never
+  announced. `ds/Field` binds by `htmlFor` and gives the error `role="alert"`.
+- **The submit button was inside the form it submits, at the bottom of a
+  scrolling body.** Body and footer are siblings under `ds/Modal`, so the button
+  is tied to the form by id — which is also what keeps Enter in any field
+  working.
+
+**Behaviour the three CRM tables did not have**, the same three `ds/Table`
+documents: a name (a screen reader announced "table, six columns"), a scroll
+region a keyboard can reach (`overflow-x: auto` on a bare `<div>`, WCAG 2.1.1),
+and an empty state *inside* the table — "No deal matches what you typed" used to
+be a paragraph beside a table that was not rendered at all, which leaves anyone
+navigating by table with no explanation and no table. It is a `TableEmpty` row
+now. The value column's header is right-aligned over its figures for the first
+time (`<Th numeric>`; the old `.table th { text-align: left }` outranked
+`.numeric`, which is the defect D1.55 found and fixed in `ds/Table`).
+
+**Where a component could not say what crm meant, beyond the chip.** Two things
+were reconciled rather than widened:
+
+1. **A state word is a `Badge`, not a `Chip`.** Nothing about "Open", "Won" or
+   "Lost" is pressable. `StateChip` keeps its name — it is what two screens call
+   it — and its three tones map onto `Badge`'s: won → success, lost → danger,
+   open → accent. The tone is never the only signal; the word says it.
+2. **The report captions stay drawn.** `ds/Table`'s caption is `sr-only` unless
+   asked for, and the stylesheet's comment said out loud why crm's must be
+   visible: "the two tables of one currency answer two different questions and
+   have to say which". `showLabel` on both.
+
+**What changed on screen, and why it is not a restyle.** Fields are the system's
+40px rather than the ~34px crm's padding produced, and carry the outline focus
+ring rather than an inset one; the deal card is `--radius-lg` on `--shadow-sm`
+rather than `--radius-md` on a hand-mixed `rgba(40, 30, 20, 0.04)` — `ds/Card`'s
+own header names crm and hr as the two byte-identical copies of that; table
+headers move to `--text-tertiary` at medium weight; the report captions are
+`--text-xs` tertiary rather than `--text-sm` semibold primary; the "Won" badge
+is filled green rather than green ink on a hand-written `#e3f3e9`, which was one
+of the last hard-coded colours in this file; the dialog panel is 480px where the
+hand-built one was 560; the dialog's subtitle reads as the first line of the
+body rather than as a second line in the header, because `ds/Modal`'s header is
+the name and the controls; and the three icon actions in the drawer and the log
+are `ds/IconButton`'s 40px target rather than a 14px glyph with 2px of padding.
+Every one of those is the adoption. Nothing was redesigned, and the queue's own
+rule is why: mixing a deliberate restyle into a migration makes an intended
+change indistinguishable from a regression.
+
+**One behavioural change that is not styling, said plainly.** `ds/Field` draws
+its invalid state from `error`, so the VAT rate box in `RaiseDocumentDialog` —
+which used to set `aria-invalid` and show nothing — now shows
+`strings.crmNotAnAmount` under it. The string already existed and is the exact
+sentence for it; a control marked invalid with no reason given is the failure
+`ds/Field` was built to end.
+
+**No test was edited.** All 19 `CrmModule.test.tsx` cases pass unchanged,
+including the three that are load-bearing here: the lost dialog found by
+`getByRole("dialog", { name })` (`ds/Modal`'s `aria-label`), the two Cancels in
+it (header close and footer, in that DOM order — the test clicks the last), and
+the report tables found by `getByRole("table", { name: caption })`. The five
+`ds/` component tests this touched (`Chip`, `Modal`, `Table`, `Select`,
+`Toolbar`) are unedited and green.
+
+**It is a net deletion.** `prettier --write` reflowed the thirteen files —
+several were written at a wider effective width — so the raw diff reads
++578/−658 across the item. Measured against the same files run through prettier
+first, which is the only fair comparison: **2,860 lines to 2,622**, −238. Only
+the files this item changed were formatted; `crm/api.ts`, `crm/format.ts` and
+`CrmModule.test.tsx` were reverted after prettier swept them, and so were the
+three i18n catalogs — reformatting a file three tracks push to would turn every
+rebase into a conflict. The i18n diff is **nine added lines and nothing else**:
+`crmDealsTable`, `crmDealFilters` and `crmReportPeriod` — the accessible names
+`ds/Table` and `ds/Toolbar` require — in all three languages, so nothing joins
+`UNTRANSLATED`.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint src/crm src/ds/Chip.tsx
+src/ds/redefined.ts src/i18n --max-warnings 0` clean; `npx prettier --write` on
+every changed file; `node scripts/gen-tailwind-theme.mjs --check` current (75
+utilities); `npm run build` clean; `npx vitest run src/crm src/ds` **76 tests
+green**; `npx vitest run src` **105 of 106 files green, 970 of 971 tests** — the
+one failure is `chat/ChatModule.test.tsx`, which passes on its own (20 tests,
+5.0 s) and is the load flake this journal has now recorded at D1.51, D1.54,
+D1.55 and here, in a module this item does not touch.
+
+**Cut for the ninth time: no screenshot.** No browser here — `jsdom` only. The
+substitute D1.53 established was run over all thirteen files: every class token
+resolved against the CSS that actually shipped, including the four the first
+pass reported as unmatched, which were the extractor's escaping and not missing
+rules — `.basis-\[220px\]{flex-basis:220px}`, `.min-w-\[180px\]`,
+`.basis-\[200px\]` and `.gap-1\.5{gap:calc(var(--spacing) * 1.5)}` are all in
+the bundle. Then the stronger check, which is the one that proves step 2 was
+complete rather than merely unreferenced: crm's own chunk is
+`dist/assets/index-Cu4NA5yH.css` (module hash `vclfl`, **6.5 KB**), and **all
+thirty deleted class names are absent from it** — `_chip_vclfl`, `_input_vclfl`,
+`_modal_vclfl`, `_table_vclfl`, `_toolbar_vclfl`, `_card_vclfl`, `_field_vclfl`
+and the rest generate nothing at all — while the twelve the module still owns
+(`_drawerLost_`, `_rowName_`, `_reportBasis_`, `_textarea_`, `_entry_`,
+`_linkAction_`…) are all present. A rule that left the stylesheet but stayed in
+the bundle would have shown up here; none did.
+
+**Carried forward to D3.01, on top of what D2.06b left:**
+`crm/CrmModule.module.css` still writes `#fbe6e2`/`#9b3222` in `.error` and
+`#9b3222` in `.drawerLost` — `--danger-tint`/`--danger` are the tokens, but
+recolouring a banner is a restyle and this was a migration, so it is reported
+rather than done. And `.textarea` is still `ds/Input`'s box written out for a
+`<textarea>`, now with one caller (the log composer) — the fourth area waiting
+on a multi-line control in `ds/`, after billing's three.
+
+**Next:** D2.07b — migrate **finance** and **home**.

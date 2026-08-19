@@ -10,6 +10,21 @@ contracts.
 
 ## Unreleased
 
+- **CRM now says out loud what its screens are.** The deal list and the two
+  report tables announce what they list instead of "table, six columns", can be
+  scrolled from the keyboard rather than only with a mouse, and put "No deal
+  matches what you typed" inside the table where anyone reading by table will
+  find it. The filter row above the list, and the period row above the report,
+  are each announced as the set of controls they are. The New-deal, Edit-deal,
+  lost-reason and raise-a-document dialogs now keep the caret inside them: Tab
+  stays in the dialog instead of walking onto the board behind it, Escape closes
+  it wherever the caret is, and closing hands focus back to whatever you were
+  doing — none of which these four dialogs did before. Every label in them is
+  now bound to its own field, and a field that is wrong says what is wrong under
+  it: a VAT rate that is not a number now reads "That is not an amount." instead
+  of only turning red. The "Only mine" tick, every picker and every text field
+  in CRM are the same height and show focus the same way as everywhere else in
+  the product.
 - **The billing tables and forms can now be used from a keyboard, and say what
   they are.** Every list in Billing — invoices, quotes, customers, the price
   list, recurring invoices, the payments on a document and its lines — is now
