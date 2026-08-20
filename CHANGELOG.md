@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **A campaign send is now a durable record, and nobody can be mailed twice.**
+  Starting a send writes down every person it will reach, one row each, in a
+  table that survives a restart — so a send interrupted halfway is answered by
+  reading what already went out rather than by guessing. Somebody who asked not
+  to receive that kind of mail is written down as skipped with the reason, not
+  quietly left out, so the totals account for everybody. A send can be paused
+  and resumed, and stopping one is immediate and can be pressed twice without
+  complaint. Nothing sends yet: this is the record the sending will be done
+  from.
+
 - **The invitation page and the Meet dashboard now use the same panels and
   fields as the rest of the workspace.** Claiming an account from an invitation
   link is the first screen of alo anybody outside the admin console ever sees,
