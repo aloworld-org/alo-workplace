@@ -65,7 +65,7 @@ and the read.
 
 - [x] O1.a **The refusal at confirmation.** Confirming an order whose stocked lines would push `committed` past `on_hand + on_order` is refused, inside the transaction that draws the number, with a `Conflict` naming the product and the shortfall — a salesperson has to know what to tell the customer. Settled with a transaction-scoped advisory lock per `(tenant, product)` the way `inv_stock_sale.rs` already settles the same race, **locking every stocked product on the order in ascending product-id order** so two orders sharing two products cannot deadlock. `reserved` stays computed (ADR 0054 §3); no new column and no new table. **This wave's mandatory test is two concurrent confirmations for the last unit where exactly one wins** — written to fail first against today's code, because a race test that never failed proves nothing. **Done 2026-08-19**: the eight tests were written first and seven failed against `main`, the race one because both orders confirmed (`SO-2026-00001` and `SO-2026-00002` for one fan). Building it amended the ADR — see the STATE entry: an unconditional refusal contradicted `inv_reorder`'s own stated position, so the rule became "never over-promise **by accident**", with `allow_backorder` in the same shape as `short_close`.
 - [x] O1.b **The quote → order link.** An additive `quote_id` on `inv_sales_orders` with a composite foreign key, mirroring `billing_invoices.quote_id` (migration 0106) exactly. Not a link table. Migration `07xx`. **Done 2026-08-19** as migration `0700`, with the partial unique index that makes one offer yield at most one order, and `quoteId` on the API read-only — provenance is written by the acceptance that produced it and no request may restate it.
-- [~] O1.c **Accepting a quote routes by content** — **blocked on a `billing_*` schema change, which is not this track's to make.** A quote line is `description, unit, qty, price, vat` and nothing else: `billing_quote_lines` (migration 0105) deliberately holds **no `product_id`**, so that a price change can never rewrite an offer already made. There is therefore no signal to route on. Letting the seller choose instead does not rescue it either — an order copied from quote lines would carry `product_id: None` on every line, and `inv_so_deliver.rs:365` refuses those as *"a charge in words, not goods"*, so nothing could ever be delivered against it. It would look like the feature and be an ornament. **The unblocking change is filed as a request below.** Reason recorded in STATE (2026-08-19); marked `[~]` rather than `[ ]` so no iteration walks into it again.
+- [x] O1.c **Accepting a quote routes by content** — an order when any line names a stocked product, a draft invoice when none does. **Unblocked by the owner on 2026-08-20** and built: migration `0701` gives `billing_quote_lines` a nullable `product_id` (composite FK, `ON DELETE SET NULL`) — the shape `inv_sales_order_lines` has had since 0162, and no weakening of 0105's snapshot rule, since the line still freezes its own description, unit, price and rate. A quote line became `billing_quote_lines::QuoteLine`, mirroring `inv_so_lines`; invoices, bills and schedule templates are untouched. The order raised is a **draft**, so acceptance never commits stock — confirming is still where O1.a refuses an over-promise. **The services path is pinned and unchanged**: `billing_quote_to_invoice.rs` and `billing_quote_lifecycle.rs` pass untouched in substance.
 - [x] O1.d **The order book across orders**: ordered, reserved, delivered, invoiced and outstanding, per order and in total, wrong-tenant tested per route. Smaller than it was — the four numbers per line already exist, so this is a read and a screen rather than a model. **Done 2026-08-19**: `inv_so_book.rs` + `GET /inventory/order-book?scope=open|all`, every figure folded at the moment of asking with nothing stored, money computed by the document's own arithmetic at a different quantity rather than as a share of a rounded total.
 
 **Cut from this wave, deliberately:** the Orders agent (was O1.7). ADR 0047's
@@ -75,9 +75,10 @@ O2 rather than being carried as an item nobody can start.
 
 ## Requests for other queues
 
-**For the business track (billing owns `01xx–02xx`): a quote line needs to be
-able to name a catalog item.** Without it, an accepted quote can never become an
-order anybody can deliver, and O1.c stays blocked however it is written.
+**~~For the business track: a quote line needs to be able to name a catalog
+item.~~ Granted by the owner on 2026-08-20 and built here as migration `0701`.**
+Left in place because the reasoning is the record of why a billing table was
+changed from the orders track, with permission rather than by assumption.
 
 The shape, so it does not have to be rediscovered:
 
@@ -93,8 +94,14 @@ The shape, so it does not have to be rediscovered:
   copy an accepted quote makes into an **invoice** draft should carry the product
   across as well — otherwise the same gap simply moves one document downstream.
 
-Until that lands, a goods quote is typed into an order by hand, which is what
-happens today.
+**What is still owed, and it is web work this track does not take:** the quote
+editor has no product picker, so nothing can put a `product_id` on a line
+through the interface yet — which means the goods branch is reachable over the
+API and not from a screen. The accept handler in `web/src/billing/QuoteEditor.tsx`
+also still assumes an invoice comes back (`accepted.invoice.id`); it must follow
+`salesOrder` when that is what was raised. Nothing is broken today precisely
+because no UI can set a product, but the two changes belong together and belong
+to the web surface's owner.
 
 ## Exit gate
 

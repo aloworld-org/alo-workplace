@@ -623,3 +623,86 @@ half that exists is the half a client can call.
 billing schema request. The exit gate's walkthrough — a quote becoming an order,
 shipping in two consignments, billing each — cannot be walked end to end until
 that request lands, because its first step is the blocked one.
+
+---
+
+## 2026-08-20 — O1.c: unblocked by the owner, and built
+
+**The block was real and the owner lifted it.** Yesterday's entry halted this
+item because `billing_quote_lines` carries no `product_id` and a billing table
+is not this track's to change. The owner authorised the change; this is what it
+took.
+
+**Shipped.** Migration `0701_billing_quote_line_product.sql`,
+`platform/alo-store/src/billing_quote_lines.rs`, the routing inside
+`accept_billing_quote`, `AcceptedAs`, `quoteId` on the quote's HTTP lines, the
+`salesOrder` branch on `POST /billing/quotes/{id}/accept` and on the billing
+agent's `quote_to_invoice`, and `tests/billing_quote_routing.rs` — five tests.
+
+### The design, and the one that was rejected
+
+A quote line is now `QuoteLine { product_id, line }`, mirroring `inv_so_lines`
+exactly. **The rejected alternative was putting `product_id` on the shared
+`NewLine`/`Line`**, which is smaller to write and wrong: it would have spread a
+quote-only concept into invoices, bills and schedule templates, and — measured
+rather than guessed — broken **35 `NewLine` literals** across `sites`, `time`,
+`crm`, `bills` and `po_receive`, none of which has anything to do with an offer.
+The quote-specific type touched 7 readers in 2 files. The blast radius was the
+deciding evidence, not taste.
+
+0105's reasoning is intact and that was the bar: the line still snapshots its own
+description, unit, price and rate, and nothing reads the product to price
+anything. The product is provenance, the same distinction 0700 drew for the
+order-to-quote link.
+
+### What the tests caught
+
+- **The state must outrank the content, and I broke it.** I put the new line
+  validation *before* the lock, so a **sent** quote answered a malformed edit
+  with `Validation("line 1: description must not be empty")` instead of
+  `Conflict("… sent …")`. `billing_quote_lifecycle` failed with the assertion
+  message it was written with — *"a frozen quote refuses the edit whatever the
+  payload says: the state is the reason, so it outranks any complaint about
+  content"*. Validating first sends somebody to fix a document that cannot be
+  edited at all. The lock comes first again.
+- The services path is pinned and passes **untouched in substance**: 17/17 across
+  `billing_quote_to_invoice`, `billing_quote_lifecycle`, `billing_quotes_tenancy`,
+  `billing_by_number` and `crm_handoff_tenancy`. `offered_quote_lines()` in the
+  pin suite carries a comment saying that the day one of its lines grows a
+  `product_id` is the day that suite stops testing services.
+
+### Who could not reach what
+
+- `another_tenants_product_can_never_be_offered_by_us` — the wrong-tenant test at
+  the door this item opened, since a quote line naming a catalog item is a new
+  way to reach across a boundary. A neighbour's product is the clean `NotFound`,
+  **nothing is written** (the offer is re-read and asserted empty), and an id
+  that never existed answers identically.
+- `accepting_never_confirms_and_so_never_promises_stock` — the order is a draft
+  with no number, and confirming it against an empty warehouse is still refused,
+  which is the proof acceptance had not quietly done it.
+- `an_offer_of_goods_becomes_a_draft_order_that_can_be_delivered` asserts the
+  line **names the product**, which is the whole reason the column was needed.
+
+**How verified.** `cargo fmt`; clippy clean for both crates; the eight affected
+store binaries **35/35**.
+
+**Not done, and it is web work this track does not take.** The quote editor has
+no product picker, so nothing can put a product on a line through the interface —
+the goods branch is reachable over the API and not from a screen. And
+`web/src/billing/QuoteEditor.tsx` still assumes an invoice comes back
+(`accepted.invoice.id`); it has to follow `salesOrder` when that is what was
+raised. **I wrote both changes and then reverted them**: `node_modules` is not
+installed in this checkout, so a TypeScript change could not be gated here, and
+pushing an ungated one is worse than filing it. Nothing is broken meanwhile,
+precisely because no UI can set a product yet.
+
+**Operational note, third occurrence: the disk.** Two builds died with
+`no space on device` mid-item. `cargo nextest -E '…'` still **builds every test
+binary** before filtering, which is ~100 binaries and several GB; `--test <name>`
+builds only what is named and is what a targeted run should use. The reclaim that
+works here is `target/debug/deps/*.pdb` and `*.exe` — 1.8 GB of each, twice.
+
+**Next:** wave O1 is complete apart from its walkthrough. The exit gate can now
+be walked end to end for the first time: a goods quote becomes an order, which
+confirms, ships in two consignments and bills each.

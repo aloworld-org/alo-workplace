@@ -190,6 +190,45 @@ invoice directly. This is the item most able to break something that already
 works, so the test that pins the old path is written before the new branch
 exists, not after.
 
+### Amendment: this needed a billing column, and the owner authorised it
+
+**As written, §5 could not be built at all.** `billing_quote_lines` (migration
+0105) carries no `product_id` — lines snapshot the price list with no foreign key
+back to the catalog, so a price change can never rewrite an offer already made. A
+quote therefore could not say *what* it was selling, and there was nothing to
+route on.
+
+Letting the seller choose instead does not rescue it, which is the part that
+settled it: an order copied from such lines would name no product on any line,
+and `inv_so_deliver` refuses exactly those as *"a charge in words, not goods"* —
+the order could never deliver anything and would be an ornament.
+
+The item was therefore halted and filed as a request against the billing module,
+which this track does not change on its own. **The owner authorised it on
+2026-08-20**, and migration `0701` adds `billing_quote_lines.product_id`:
+nullable, composite-keyed to the tenant, `ON DELETE SET NULL` — the shape
+`inv_sales_order_lines` has carried since 0162.
+
+**It does not weaken 0105's reasoning, which was the test it had to pass.** The
+line goes on snapshotting description, unit, price and rate, and nothing reads
+the product to price anything. The product is *provenance* — which of our items
+this line is — the same distinction 0700 drew for the order-to-quote link.
+
+Three consequences worth stating:
+
+- **A quote's line is no longer a plain billing line.** It is
+  `billing_quote_lines::QuoteLine`, mirroring `inv_so_lines`: the shared line
+  plus a product. Invoices, bills and schedule templates are untouched — they are
+  money documents, and only the offer has to say what it sells, because only the
+  offer can become an order.
+- **The order an acceptance raises is a `draft`.** Confirming stays a separate
+  act, which is where O1.a refuses to promise goods that cannot exist. If
+  acceptance confirmed, a customer saying yes would silently commit stock nobody
+  had checked.
+- **`AcceptedAs` is an enum, not two nullable ids**, so a caller cannot read the
+  document that was not raised. On the wire it is `invoice` and `salesOrder`,
+  exactly one of which is ever present.
+
 ## 6. What this wave is not
 
 Bill of materials, works orders and capacity stay out (wave O2). An order book

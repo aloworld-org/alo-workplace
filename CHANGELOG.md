@@ -114,6 +114,19 @@ contracts.
   ada@example.test" — where before a screen reader read out four identical
   commands. The dialog itself now looks like Settings, because it is the same
   dialog underneath.
+- **Accepting a quote now raises the right document.** An offer for goods
+  becomes a sales order — because goods have to be reserved, picked and
+  delivered before anybody is billed for them — and an offer for services
+  becomes the draft invoice it always did. Nothing changes for a quote of
+  consultancy days: it goes straight to an invoice exactly as before. The order
+  arrives as a draft, so saying yes to a customer never quietly commits stock;
+  confirming it is still the separate step, and still the one that refuses to
+  promise goods that cannot exist.
+- **A quote line can now say which item it is selling.** That is what lets an
+  accepted offer become an order somebody can actually deliver against. It
+  changes nothing about the money: a line still records the description, unit,
+  price and VAT rate it was offered at, so a later price change can never rewrite
+  an offer already made.
 - **The order book: what is promised, what has gone, what is billed and what is
   still owed.** One screen's worth of answer across every open order at once —
   per order and in total, in money and in goods. A confirmed order shows the
