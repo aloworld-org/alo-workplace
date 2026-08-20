@@ -499,7 +499,7 @@ pub use id::{
     AttachmentId, BankLineId, BankMatchId, BankStatementId, BaseFieldId, BaseRecordId, BaseTableId,
     BaseViewId, BillingBillId, BillingCustomerId, BillingInvoiceId, BillingLineId,
     BillingPaymentId, BillingProductId, BillingQuoteId, BillingScheduleId, BlobId, CalendarId,
-    CampaignConsentId, CampaignId, CampaignSegmentId, CampaignSuppressionId,
+    CampaignConsentId, CampaignId, CampaignSegmentId, CampaignSendId, CampaignSuppressionId,
     CampaignUnsubscribeTokenId, CategoryId, ChatAgentId, ChatChannelId, ChatMessageId,
     ChatProposalId, ChatToolRunId, CommentId, ContactId, CrmActivityId, CrmDealId, CrmEventId,
     CrmPipelineId, CrmStageId, DriveNodeId, EventId, FinAccountId, FinCategoryId, FinEntryId,
