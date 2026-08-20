@@ -150,6 +150,12 @@ pub async fn verify_domain(
                     &tenant,
                     &record.domain,
                     &key.selector,
+                    // Stated rather than defaulted: a domain holds one active
+                    // key per algorithm (ADR 0014), and this generator makes
+                    // Ed25519 keys. Naming the wrong family here would store a
+                    // key under a `k=` no verifier could check, which reads as
+                    // a signing bug rather than the bookkeeping one it is.
+                    "ed25519",
                     key.seed.as_ref(),
                     &key.public_raw,
                 )
