@@ -2600,6 +2600,18 @@ export const fr: Partial<Catalog> = {
     "Ce que vous faisiez. Personne en dehors de cet espace de travail ne la lit.",
   projectsProposedEntry: "proposée",
   projectsBilledEntry: "sur une facture",
+  projectsReadyToInvoice: "Prêt à facturer",
+  projectsReadyToInvoiceBody: (duration: string) => `${duration} de temps approuvé n’a pas encore été facturé.`,
+  projectsCreateInvoice: "Créer une facture",
+  projectsCreateInvoiceSubtitle: "Choisissez le temps approuvé à ajouter à une nouvelle facture brouillon.",
+  projectsNothingToInvoice: "Rien à facturer",
+  projectsNothingToInvoiceBody: "Le temps approuvé apparaîtra ici après l’approbation de la semaine.",
+  projectsUnratedTime: "Aucun tarif horaire n’est défini pour ce temps",
+  projectsInvoiceRate: (rate: string) => `${rate} par heure`,
+  projectsBelgianVat: "Le taux de TVA belge standard est appliqué à ce brouillon.",
+  projectsCreateDraftInvoice: "Créer la facture brouillon",
+  projectsInvoiceLoadFailed: "Le temps approuvé n’a pas pu être chargé.",
+  projectsInvoiceCreateFailed: "La facture brouillon n’a pas pu être créée.",
   projectsCellLabel: (project: string, day: string, duration: string) =>
     `${project}, ${day} : ${duration}`,
   projectsDeleteEntry: "Supprimer",
@@ -2725,6 +2737,8 @@ export const fr: Partial<Catalog> = {
   // et ce qu’une heure nous coûte demande une comptabilité et un dossier
   // salarié qui n’existent ni l’une ni l’autre.
   projectsReportTitle: "Rentabilité",
+  projectsReportAllScope: "Totaux du portefeuille pour tous les projets auxquels vous avez accès.",
+  projectsReportProjectScope: (project: string) => `Rentabilité de ${project} uniquement.`,
   projectsReportFrom: "Du",
   projectsReportTo: "Au",
   projectsReportShow: "Afficher",
