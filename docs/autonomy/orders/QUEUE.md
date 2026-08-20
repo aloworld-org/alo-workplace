@@ -105,9 +105,9 @@ to the web surface's owner.
 
 ## Exit gate
 
-- [ ] The fan quote becomes an order, ships four on one note and two on another, bills each delivery, and the order book shows the correct remainder at every step — recorded in STATE.md as the actual requests and responses
-- [ ] Two concurrent confirmations cannot both promise the last unit, proven by a test that failed before the refusal existed
-- [ ] A services quote still becomes an invoice directly, unchanged
+- [x] The fan quote becomes an order, ships four on one note and two on another, bills each delivery, and the order book shows the correct remainder at every step — **walked 2026-08-20** over the real router (`products/mail/alo-jmap/tests/orders_walkthrough_http.rs`), with every figure recorded in STATE.md
+- [x] Two concurrent confirmations cannot both promise the last unit, proven by a test that failed before the refusal existed — O1.a
+- [x] A services quote still becomes an invoice directly, unchanged — pinned, 17/17
 
 **Not in this queue: bill of materials, works orders, capacity** (wave O2). An
 order book with no reservation is the more urgent absence, and taking an order
@@ -123,3 +123,22 @@ The implement skill's definition, plus one thing specific to this wave: **an ite
 that changes what can be promised is not done without a test proving what cannot
 be promised twice.** Stock is the one number in this product that two people can
 try to spend at once.
+
+---
+
+## Wave O1 is complete — 2026-08-20
+
+Every item and every exit-gate condition is `[x]`, and the walkthrough has been
+walked rather than assumed (`docs/autonomy/orders/STATE.md`, final entry).
+
+**Two things are deliberately not in it, and neither is a loose end left
+untied:**
+
+- **There is no screen.** The order book has no view and the quote editor has no
+  product picker, so the whole arc is reachable by a client over HTTP and not by
+  a person in a browser. That is web work and the web surface has an owner; it is
+  written up in *Requests* above with the exact files.
+- **The Orders agent** moved to O2 when the wave was re-cut, because it reads the
+  order-book screen that does not exist yet.
+
+LOOP COMPLETE

@@ -528,9 +528,9 @@ be specified before that screen exists.
 
 ### Exit gate - O1 done when:
 
-- [ ] The fan quote from the walkthrough becomes an order, ships four on one note and two on another, and bills each delivery - with the order book showing the remainder at every step
-- [ ] Two concurrent confirmations cannot both promise the last unit, proven by a test that failed before the refusal existed
-- [ ] A services quote still becomes an invoice directly, unchanged
+- [x] The fan quote from the walkthrough becomes an order, ships four on one note and two on another, and bills each delivery - with the order book showing the remainder at every step. **Walked end to end 2026-08-20** over the real HTTP surface; figures in `docs/autonomy/orders/STATE.md`.
+- [x] Two concurrent confirmations cannot both promise the last unit, proven by a test that failed before the refusal existed
+- [x] A services quote still becomes an invoice directly, unchanged
 
 ### Wave O2 - making the thing *(not started; needs O1)*
 

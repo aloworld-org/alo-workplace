@@ -706,3 +706,72 @@ works here is `target/debug/deps/*.pdb` and `*.exe` — 1.8 GB of each, twice.
 **Next:** wave O1 is complete apart from its walkthrough. The exit gate can now
 be walked end to end for the first time: a goods quote becomes an order, which
 confirms, ships in two consignments and bills each.
+
+---
+
+## 2026-08-20 — the exit gate, walked
+
+`products/mail/alo-jmap/tests/orders_walkthrough_http.rs` — one test, the whole
+arc, every call over the real HTTP router. **It passes.**
+
+It earns its place by joining things whose own suites already passed separately:
+the routing that raises the order (O1.c), the refusal that will not over-promise
+(O1.a), the link back to the offer (O1.b), delivery, invoicing, and the book
+(O1.d). A wave whose parts each pass and whose whole was never walked is a wave
+nobody has actually seen work.
+
+**The arc, with the numbers asserted at each step.** Six AF-630 fans at
+EUR 1 295.00 net, six on the shelf.
+
+| step | call | what came back |
+|---|---|---|
+| 1 | `POST /billing/quotes` | a line carrying `productId` — the fact the whole route turns on |
+| 2 | `POST /billing/quotes/{id}/send` | numbered and frozen |
+| 3 | `POST /billing/quotes/{id}/accept` | `invoice: null`, `salesOrder` **draft**, `quoteId` pointing back at the offer, `netCents 777000` |
+| 4 | `POST /inventory/sales-orders/{id}/confirm` | `confirmed`, number `SO-2026-00001` |
+| 5 | `GET /inventory/order-book` | ordered 6 000, **reserved 6 000**, delivered 0, outstanding EUR 7 770.00 |
+| 6 | `POST …/deliveries` (4) | `partially_delivered`; delivered 4 000, outstanding 2 000, **reserved 2 000**, invoiced 0 |
+| 7 | `POST …/invoice` | a draft for **EUR 5 180.00** — what shipped, not what was ordered |
+| 8 | `POST …/deliveries` (the rest) | `delivered`; outstanding 0, **reserved 0** |
+| 9 | `POST …/invoice` | a **second** draft for EUR 2 590.00 — the new quantity only |
+| 10 | `GET /inventory/order-book` | ordered = delivered = invoiced = EUR 7 770.00, outstanding 0; and `?scope=open` is empty again |
+
+Three assertions in there are the wave's own arguments, restated as facts:
+
+- **`reserved` follows delivery with no hook to forget** — 6 000 → 2 000 → 0,
+  because it is a fold over what is outstanding on an open order and never a
+  stored number somebody has to remember to decrement.
+- **Delivering is not billing.** After the first consignment the book reads
+  `delivered 518 000, invoiced 0`. They are different columns because they are
+  different events, and a system that conflated them would bill goods still on
+  the shelf.
+- **The second invoice is EUR 2 590.00, not EUR 7 770.00.** The first four are
+  not billed twice, which is `inv_so_invoice`'s own rule holding under a walk it
+  had not been put through before.
+
+And the physical half agrees: the warehouse reads **0 on hand** at the end. Six
+were promised, six left, six were billed.
+
+### The one thing that failed, and it was the test
+
+The walk reached step 7 first time and stopped there: I asserted
+`invoice.totals.netCents` on a route that answers with the **link** between the
+order and the billing document — `{invoiceId, invoiceStatus, lines:[{lineId,
+qtyMilli}]}` — not with the billing document itself. The fix was to assert the
+link's quantity *and* fetch `/billing/invoices/{invoiceId}` for the money, which
+is a better test than the one I meant to write: it now proves the two documents
+agree rather than trusting one of them.
+
+**Exit gate status.** All three conditions are met:
+
+- [x] the fan quote becomes an order, ships four and then two, bills each, and
+      the book shows the right remainder at every step — above;
+- [x] two concurrent confirmations cannot both promise the last unit — O1.a's
+      race test, which failed against `main` before the refusal existed;
+- [x] a services quote still becomes an invoice directly, unchanged — pinned by
+      `billing_quote_to_invoice` and `billing_quote_lifecycle`, 17/17.
+
+**What the gate does not cover, said plainly:** none of this has a screen. The
+order book has no view, and the quote editor has no product picker — so a person
+cannot walk this arc in a browser, only a client can walk it over HTTP. That is
+web work with an owner, and it is the honest remaining half of wave O1.
