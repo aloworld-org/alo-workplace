@@ -59,27 +59,37 @@ tenant binding, as everywhere else.
 The wrong-tenant test is mandatory and covers all six verbs: tenant B naming
 tenant A's campaign or send gets `NotFound`, never data and never a 500.
 
-## Idempotency: on the campaign, not on the send
+## Idempotency: on who was *mailed*
 
-C4.1 says *idempotency on (campaign, address)*, and that is stronger than the
-obvious reading. A unique key per `(send, address)` would only stop one send
-from mailing somebody twice; it would happily let a second send of the same
-campaign mail them again — which is precisely the accident that happens when
-somebody presses send, panics, stops it, and presses send again.
+C4.1 says *idempotency on (campaign, address)*. The state it is keyed on is the
+entire design, and two of the three candidates are wrong:
 
-So the recipient row carries `campaign_id` beside `send_id`, and the unique
-index is on `(tenant_id, campaign_id, address)`. A retry enrols the addresses
-that are missing and silently skips the ones already there, by
-`ON CONFLICT DO NOTHING` — which is also what makes enrolment **resumable after
-a crash rather than restarted**: re-running a page is a no-op for whatever it
-already wrote, so the caller may always safely repeat the last page it is
-unsure about.
+| Key | What it prevents | What it breaks |
+|---|---|---|
+| `(send, address)` | one send enrolling somebody twice | a *second* send of the same campaign re-mails everybody the first reached |
+| `(campaign, address)`, all rows | the double mail | enrolment writes everybody as `pending` seconds after the button is pressed, so **stopping a send that had mailed nobody leaves the campaign permanently unsendable** — the safety button kills the campaign |
+| `(campaign, address)` where `state = 'sent'` | the double mail | nothing |
 
-The consequence is deliberate and worth stating: **a campaign may be sent to a
-given person exactly once, ever.** A tenant who wants to mail the same people
-again writes a second campaign. That is the honest model for bulk mail, and the
-alternative — a "resend" that quietly re-enrols — is how people get mailed four
-times by a system that believes it is behaving.
+The third is what is built. A campaign reaches a given person at most once,
+ever, while somebody enrolled and never mailed stays reachable — so stopping a
+send halfway means the next one reaches exactly the people the first did not,
+which is what an operator means by "fix it and send it again".
+
+Enrolment therefore skips addresses with a `sent` row for the campaign, and
+reports them as `already_mailed` rather than silently. Within a single send the
+primary key `(tenant_id, send_id, address)` still makes a repeated page a no-op,
+which is what makes enrolment **resumable after a crash rather than restarted**.
+
+The consequence that *is* deliberate: mailing the same people the same campaign
+a second time is impossible, and doing it on purpose means writing a second
+campaign. That is the honest model for bulk mail — a "resend" that quietly
+re-enrols is how people get mailed four times by a system that believes it is
+behaving.
+
+Reaching the `sent` state at all needs
+`mark_campaign_recipient_sent`, which moves only a `pending` row. That is the
+seam the dispatcher (C4.2) will use, and without it the guarantee above would be
+unenforceable: a ledger with no way to record a send guarantees nothing.
 
 ## Who is enrolled
 
