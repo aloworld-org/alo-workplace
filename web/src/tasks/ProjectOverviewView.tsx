@@ -1,8 +1,8 @@
-import { CalendarDays, CheckCircle2, CircleAlert, Clock3, Flag, ListTodo, ReceiptText } from "lucide-react";
+import { CalendarDays, CheckCircle2, CircleAlert, Clock3, Flag, ListTodo, PencilLine, ReceiptText } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { strings } from "../i18n";
-import type { Task } from "../jmap";
+import type { Task, TaskDepEdgeDto } from "../jmap";
 import { durationLabel } from "../projects/format";
 import type { Project, ProjectPlan } from "../projects/types";
 
@@ -10,20 +10,24 @@ interface Props {
   project: Project;
   plan: ProjectPlan;
   tasks: Task[];
+  edges: TaskDepEdgeDto[];
   onAddTask: () => void;
   onOpenTask: (id: string) => void;
   onOpenTasks: () => void;
   onOpenTimeline: () => void;
+  onEditProject: () => void;
 }
 
 export function ProjectOverviewView({
   project,
   plan,
   tasks,
+  edges,
   onAddTask,
   onOpenTask,
   onOpenTasks,
   onOpenTimeline,
+  onEditProject,
 }: Props) {
   const done = tasks.filter((task) => task.status === "done").length;
   const open = tasks.length - done;
@@ -32,6 +36,24 @@ export function ProjectOverviewView({
   const overdue = tasks.filter((task) =>
     task.status !== "done" && task.dueAt !== null && new Date(task.dueAt) < today
   ).length;
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const blockedIds = new Set(
+    edges
+      .filter((edge) => taskById.get(edge.blockedBy)?.status !== "done")
+      .map((edge) => edge.blocked),
+  );
+  const blocked = tasks.filter((task) => task.status !== "done" && blockedIds.has(task.id)).length;
+  const targetMissed = project.targetOn !== null && new Date(`${project.targetOn}T23:59:59`) < today && open > 0;
+  const atRisk = overdue > 0 || blocked > 0 || targetMissed;
+  const workload = [...tasks
+    .filter((task) => task.status !== "done")
+    .reduce((counts, task) => {
+      const key = task.assignee ?? strings.taskUnassigned;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      return counts;
+    }, new Map<string, number>())]
+    .sort((a, b) => b[1] - a[1]);
+  const maxWorkload = Math.max(1, ...workload.map(([, count]) => count));
   const completion = tasks.length === 0 ? 0 : Math.round((done / tasks.length) * 100);
   const nextMilestone = [...plan.milestones]
     .filter((milestone) => !milestone.done)
@@ -46,6 +68,39 @@ export function ProjectOverviewView({
 
   return (
     <div className="mx-auto flex w-full max-w-[88rem] flex-col gap-5 px-6 py-6 lg:px-8">
+      <section className="flex flex-wrap items-start justify-between gap-5 rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+        <div className="min-w-0 max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
+              {{
+                planned: strings.projectsStatusPlanned,
+                active: strings.projectsStatusActive,
+                on_hold: strings.projectsStatusOnHold,
+                completed: strings.projectsStatusCompleted,
+                cancelled: strings.projectsStatusCancelled,
+              }[project.status]}
+            </span>
+            {project.targetOn !== null && (
+              <span className="inline-flex items-center gap-1.5 text-sm text-secondary">
+                <CalendarDays size={15} aria-hidden="true" />
+                {strings.projectsTargetOn}: {friendlyDate(project.targetOn)}
+              </span>
+            )}
+          </div>
+          <p className="mt-3 text-sm leading-6 text-secondary">
+            {project.description ?? strings.projectsDetailsSubtitle}
+          </p>
+        </div>
+        {project.kind === "team" && (
+          <button
+            type="button"
+            className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg bg-raised px-4 py-2 text-sm font-medium text-primary !no-underline transition-colors hover:bg-default hover:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            onClick={onEditProject}
+          >
+            <PencilLine size={16} aria-hidden="true" /> {strings.projectsEdit}
+          </button>
+        )}
+      </section>
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={strings.taskOverview}>
         <Metric
           icon={<ListTodo size={18} />}
@@ -127,6 +182,43 @@ export function ProjectOverviewView({
         <div className="flex flex-col gap-5">
           <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-primary">{strings.projectsHealth}</h2>
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${atRisk ? "bg-danger-tint text-danger" : "bg-success-tint text-success"}`}>
+                {atRisk ? strings.projectsHealthAtRisk : strings.projectsHealthOnTrack}
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <HealthDatum label={strings.projectsBlockedTasks(blocked)} value={blocked} warning={blocked > 0} />
+              <HealthDatum label={strings.projectsOverdueTasks(overdue)} value={overdue} warning={overdue > 0} />
+            </div>
+            {project.targetOn === null && (
+              <p className="mt-3 text-sm text-secondary">{strings.projectsHealthNeedsTarget}</p>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-primary">{strings.projectsWorkload}</h2>
+            {workload.length === 0 ? (
+              <p className="mt-4 text-sm text-secondary">{strings.projectsWorkloadEmpty}</p>
+            ) : (
+              <ul className="mt-4 space-y-4">
+                {workload.slice(0, 5).map(([assignee, count]) => (
+                  <li key={assignee}>
+                    <div className="flex items-center justify-between gap-4 text-sm">
+                      <span className="min-w-0 truncate font-medium text-primary">{assignee}</span>
+                      <span className="shrink-0 text-secondary">{strings.projectsOpenTasks(count)}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-raised">
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round((count / maxWorkload) * 100)}%` }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-primary">{strings.agentStatusMilestones}</h2>
               <button
                 type="button"
@@ -171,6 +263,15 @@ export function ProjectOverviewView({
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function HealthDatum({ label, value, warning }: { label: string; value: number; warning: boolean }) {
+  return (
+    <div className="rounded-xl bg-raised p-3">
+      <p className={`text-xl font-semibold tabular-nums ${warning ? "text-danger" : "text-primary"}`}>{value}</p>
+      <p className="mt-1 text-xs text-secondary">{label}</p>
     </div>
   );
 }
