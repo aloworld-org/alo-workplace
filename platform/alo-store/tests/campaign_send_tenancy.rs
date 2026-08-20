@@ -103,7 +103,10 @@ async fn a_second_send_of_one_campaign_cannot_reach_anybody_it_already_did() {
     assert_eq!(enrolled, 2, "both mailable people are enrolled once");
 
     // The operator spots the typo and stops the send.
-    let stopped = acc.stop_campaign_send(&first.id, Some("typo")).await.unwrap();
+    let stopped = acc
+        .stop_campaign_send(&first.id, Some("typo"))
+        .await
+        .unwrap();
     assert_eq!(stopped.state, SendState::Stopped);
 
     // They fix it and press send again. THIS is the accident the campaign-wide
@@ -272,7 +275,11 @@ async fn one_campaign_may_not_have_two_sends_running_at_once() {
     assert_ne!(second.id, first.id);
 
     let sends = acc.campaign_sends(&campaign.id).await.unwrap();
-    assert_eq!(sends.len(), 2, "both acts are kept — what happened, happened");
+    assert_eq!(
+        sends.len(),
+        2,
+        "both acts are kept — what happened, happened"
+    );
 }
 
 #[tokio::test]
@@ -297,8 +304,17 @@ async fn a_neighbouring_workspace_reaches_none_of_this() {
 
     // Reading it.
     assert_eq!(theirs.campaign_send(&send.id).await.unwrap(), None);
-    assert!(theirs.campaign_sends(&campaign.id).await.unwrap().is_empty());
-    assert_eq!(theirs.campaign_send_tally(&send.id).await.unwrap().total(), 0);
+    assert!(
+        theirs
+            .campaign_sends(&campaign.id)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        theirs.campaign_send_tally(&send.id).await.unwrap().total(),
+        0
+    );
 
     // Enrolling into it, and every control verb.
     let page = AudiencePage {
