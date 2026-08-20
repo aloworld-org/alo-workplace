@@ -64,6 +64,7 @@ pub mod campaign_mime;
 pub mod campaign_preview;
 pub mod campaign_record;
 pub mod campaign_segments;
+pub mod campaign_send;
 pub mod campaign_suppression;
 pub mod campaign_text;
 pub mod campaign_topic_optout;
