@@ -20,9 +20,8 @@
 // while Tasks also calls its boards projects. They are the same rows, which is
 // the point — so the copy here says *client project* wherever the distinction
 // carries weight, and the Tasks module's own strings are left alone.
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { FolderKanban } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { NavLink, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useCustomers } from "../billing";
 import { Spinner } from "../ds";
@@ -73,7 +72,6 @@ const projectTabClass = ({ isActive }: { isActive: boolean }) =>
 
 export function ProjectsModule() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const api = useProjectsApi();
   const client = useJmapClient();
@@ -91,14 +89,6 @@ export function ProjectsModule() {
   const [revision, setRevision] = useState(0);
   const [runningTimer, setRunningTimer] = useState<RunningTimer | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const workspaceProject = useMemo(() => {
-    const [, moduleName, candidate] = location.pathname.split("/");
-    if (moduleName !== "projects" || candidate === undefined) return undefined;
-    if (["list", "week", "plan", "reports", "approvals"].includes(candidate)) return undefined;
-    const id = decodeURIComponent(candidate);
-    return projects.find((project) => project.id === id);
-  }, [location.pathname, projects]);
 
   const bump = useCallback(() => setRevision((r) => r + 1), []);
 
@@ -249,15 +239,12 @@ export function ProjectsModule() {
           >
             {strings.projectsTabList}
           </NavLink>
-          {workspaceProject !== undefined && (
-            <NavLink
-              to={`/projects/${encodeURIComponent(workspaceProject.id)}/overview`}
-              className={projectTabClass}
-            >
-              <FolderKanban size={16} aria-hidden="true" />
-              <span className="ml-2 max-w-48 truncate">{workspaceProject.name}</span>
-            </NavLink>
-          )}
+          <NavLink
+            to="/projects/my-work"
+            className={projectTabClass}
+          >
+            {strings.projectsTabMyWork}
+          </NavLink>
           <NavLink
             to="/projects/week"
             className={projectTabClass}
@@ -265,7 +252,7 @@ export function ProjectsModule() {
             {strings.projectsTabWeek}
           </NavLink>
           <NavLink
-            to="/projects/plan"
+            to="/projects/timeline"
             className={projectTabClass}
           >
             {strings.projectsTabPlan}
@@ -311,14 +298,19 @@ export function ProjectsModule() {
           }
         />
         <Route
+          path="my-work"
+          element={<TasksModule projectsContext />}
+        />
+        <Route
           path="week"
           element={<WeekView projects={projects} revision={revision} onChanged={bump} />}
         />
         {/* The plan is a rendering of the board Tasks already shows — the same
             rows, grouped by the dates somebody planned them against — so it is
             everybody's tab too, and it names no person at all. */}
+        <Route path="plan" element={<Navigate to="/projects/timeline" replace />} />
         <Route
-          path="plan"
+          path="timeline"
           element={<PlanView projects={projects} revision={revision} onChanged={bump} />}
         />
         {/* Profitability is a PROJECT aggregate — engagements, minutes and
