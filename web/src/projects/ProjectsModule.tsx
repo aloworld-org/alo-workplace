@@ -21,7 +21,6 @@
 // the point — so the copy here says *client project* wherever the distinction
 // carries weight, and the Tasks module's own strings are left alone.
 import { useCallback, useEffect, useState } from "react";
-import { FolderKanban } from "lucide-react";
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useCustomers } from "../billing";
@@ -102,6 +101,17 @@ export function projectContextId(pathname: string, projectQuery: string | null):
   return null;
 }
 
+/** Builds the canonical route for a project-aware portfolio view. */
+export function projectScopedPath(
+  view: "week" | "timeline" | "reports",
+  projectId: string | null,
+): string {
+  const path = `/projects/${view}`;
+  return projectId === null
+    ? path
+    : `${path}?project=${encodeURIComponent(projectId)}`;
+}
+
 export function ProjectsModule() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -121,9 +131,6 @@ export function ProjectsModule() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const contextProjectId = projectContextId(location.pathname, searchParams.get("project"));
-  const contextProject = contextProjectId === null
-    ? null
-    : projects.find((project) => project.id === contextProjectId) ?? null;
   const [revision, setRevision] = useState(0);
   const [runningTimer, setRunningTimer] = useState<RunningTimer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -290,31 +297,20 @@ export function ProjectsModule() {
           >
             {strings.projectsTabMyWork}
           </NavLink>
-          {contextProject !== null && (
-            <NavLink
-              to={`/projects/${encodeURIComponent(contextProject.id)}/overview`}
-              className={({ isActive }) => projectTabClass({
-                isActive: isActive || location.pathname.startsWith(`/projects/${encodeURIComponent(contextProject.id)}/`),
-              })}
-            >
-              <FolderKanban className="mr-2" size={16} aria-hidden="true" />
-              <span className="max-w-48 truncate">{contextProject.name}</span>
-            </NavLink>
-          )}
           <NavLink
-            to="/projects/week"
+            to={projectScopedPath("week", contextProjectId)}
             className={projectTabClass}
           >
             {strings.projectsTabWeek}
           </NavLink>
           <NavLink
-            to="/projects/timeline"
+            to={projectScopedPath("timeline", contextProjectId)}
             className={projectTabClass}
           >
             {strings.projectsTabPlan}
           </NavLink>
           <NavLink
-            to="/projects/reports"
+            to={projectScopedPath("reports", contextProjectId)}
             className={projectTabClass}
           >
             {strings.projectsTabReports}
