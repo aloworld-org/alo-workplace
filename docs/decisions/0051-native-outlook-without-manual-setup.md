@@ -1,87 +1,102 @@
-# 0051 — Native Outlook without manual setup
+# 0051 — Native Outlook: do not build MAPI
 
 **Status:** proposed
 **Date:** 2026-08-21
-**Supersedes nothing.** Sequences the "edge translators to JMAP, year two"
-clause of [ADR 0001](0001-jmap-native-core.md) and the ROADMAP item
-*"MAPI-over-HTTP adapter: native Outlook — the last wall"*.
+**Amends** the "Exchange adapters (EAS/MAPI) become edge translators to JMAP,
+year two" clause of [ADR 0001](0001-jmap-native-core.md), and closes the ROADMAP
+item *"MAPI-over-HTTP adapter: native Outlook — the last wall"* as **will not
+build**.
 
 ## Context
 
-The goal stated: an Outlook user types their address and password and is
-working, with no manual server settings — what Exchange 2019 on-premise gives
-them over TCP 443. The exit gate already says it: *"An Outlook desktop user
-works a full week against alo without knowing Exchange is gone."*
+The goal: an Outlook user types an address and a password and is working, with
+no manual server settings — what Exchange 2019 on-premise gives them over 443.
+The exit gate says *"An Outlook desktop user works a full week against alo
+without knowing Exchange is gone."*
 
-Three protocols could deliver it, and they are not close in cost.
+That framing was written when classic Outlook was the client. It no longer is,
+and the two facts below change the answer rather than the schedule.
 
-### MAPI-over-HTTP — what Exchange 2019 actually uses
+### Fact 1 — the client MAPI serves is being retired
 
-Documented, not reverse-engineered: `[MS-OXCMAPIHTTP]` defines the transport.
-That is the easy part. The payload is ROP (`[MS-OXCROPS]`), and a working store
-needs `[MS-OXCSTOR]`, `[MS-OXCFOLD]`, `[MS-OXCMSG]`, `[MS-OXCTABL]`,
-`[MS-OXCFXICS]` for incremental sync, and `[MS-OXPROPS]` — roughly two thousand
-properties. Authentication is NTLM/Negotiate or OAuth2; modern Outlook refuses
-Basic.
+New Outlook for Windows became **the default in April 2026**. Classic Outlook
+keeps support "through at least 2029"; full retirement is announced but
+undated, and new installations will ship only the new client.
 
-**The evidence that matters:** OpenChange, the only serious open-source
-implementation, ran for about a decade with more people than we have and never
-reached dependable parity. Zentyal shipped it, then dropped it. Treating this as
-"months" is the mistake that kills the quarter — it is the hardest single thing
-in the product, and the one where failure is least visible until late.
+### Fact 2 — the replacement client will never speak MAPI to us
 
-### Exchange ActiveSync — smaller, but two traps
+New Outlook **is not MAPI-compliant** and **does not support on-premises,
+hybrid, or sovereign Exchange deployments** — with no published timeline. It
+supports Microsoft 365, Outlook.com and Gmail accounts.
 
-Far simpler: WBXML over HTTP, one spec family, and it carries mail, calendar and
-contacts together. Two problems, either of them disqualifying on its own:
+Taken together: a MAPI-over-HTTP adapter would work **only** with classic
+Outlook — a client that is no longer the default, is on a declared path to
+retirement, and whose successor cannot use the protocol at all. We would spend
+the most expensive engineering years we have to land on a shrinking install base
+with a hard ceiling and no forward path.
 
-1. **Licensing.** EAS is patent-licensed by Microsoft. A per-implementation
-   licence sits badly with AGPL ([ADR 0002](0002-agpl-dual-license.md)) and with
-   a sovereignty product whose pitch is not paying Microsoft.
-2. **Outlook for Windows does not use it.** EAS is a phone protocol. Outlook
-   2013/2016 tolerated EAS accounts; current Outlook does not offer it as a
-   store. It would buy us phones — which already work over IMAP/CalDAV/CardDAV.
+### What that costs, for completeness
 
-### IMAP + SMTP + Autodiscover — already built
+MAPI-over-HTTP is documented (`[MS-OXCMAPIHTTP]`), so this is not
+reverse-engineering — but the transport is the easy part. A working store pulls
+in ROP (`[MS-OXCROPS]`), `[MS-OXCSTOR]`, `[MS-OXCFOLD]`, `[MS-OXCMSG]`,
+`[MS-OXCTABL]`, `[MS-OXCFXICS]` for incremental sync, and `[MS-OXPROPS]` —
+roughly two thousand properties — plus NTLM/Negotiate or OAuth. OpenChange, the
+only serious open-source attempt, ran about a decade with more people than we
+have and never reached dependable parity; Zentyal shipped it and dropped it.
 
-Outlook self-configures an IMAP account from Autodiscover XML. Type address and
-password, done — no manual settings. That is **the literal goal for mail**, and
-the endpoints exist and are wire-verified on production today. What is missing
-is operator work already named in the ROADMAP: per-email-domain `autodiscover`
-DNS records and Caddy vhosts, so a real client resolves it from the *email*
-domain rather than the server FQDN.
+Even if we succeeded, Fact 2 caps the return.
 
-What it does not give: calendar and contacts inside Outlook natively, and
-server-side search//rules parity.
+### ActiveSync fails twice
+
+Smaller (WBXML over HTTP, mail + calendar + contacts together), but: it is
+patent-licensed by Microsoft, which sits badly with [AGPL](0002-agpl-dual-license.md)
+and with a product whose pitch is not paying Microsoft; and current Outlook for
+Windows does not use it as a store. It would buy phones, which already work over
+IMAP/CalDAV/CardDAV.
 
 ## Decision
 
-**Sequence, do not leap.**
+**Do not build MAPI-over-HTTP or ActiveSync.** Instead:
 
-1. **Finish Autodiscover per email-domain** (operator/deploy, already scoped).
-   Delivers "no manual setup" for mail in Outlook now.
-2. **Calendar and contacts** via CalDAV/CardDAV. Outlook needs an add-in for
-   this; that is a real gap, and honest to state rather than hide.
-3. **Re-evaluate MAPI-over-HTTP as its own funded project** with a spike before
-   any commitment: a read-only mailbox that Outlook can open, nothing more. If
-   the spike does not land in two weeks, the ten-year OpenChange lesson applies
-   and we stop.
+1. **alo's own clients are the answer.** Web and the Tauri desktop app over JMAP
+   on 443. This is where Exchange refugees land, and it is the only surface where
+   we control the experience end to end.
+2. **IMAP + SMTP + Autodiscover is the bridge for holdouts.** Outlook
+   self-configures an IMAP account from Autodiscover XML — address and password,
+   no manual settings. The endpoints are built and wire-verified on production;
+   what remains is per-email-domain DNS and vhosts, already scoped as operator
+   work. **Microsoft's own guidance to on-premises customers on new Outlook is
+   to use IMAP** — we are pointing where they point.
+3. **Calendar and contacts** via CalDAV/CardDAV. In classic Outlook this needs an
+   add-in; in new Outlook nothing native exists. State that plainly.
+4. **Revisit only on a funded contract** that names MAPI and pays for it, and
+   even then behind a two-week read-only spike gate.
 
-**Ports.** Nothing here needs SMTP or IMAP moved to 443. alo's own web and
-desktop clients already do everything over 443 via JMAP; only third-party
-clients use 587/465/993. If a customer's firewall is 443-only, that is a
-separate, smaller decision — TLS ALPN/SNI multiplexing in front of Caddy — and
-it should not be smuggled into this one.
+**Ports.** None of this needs SMTP or IMAP moved off 587/465. alo's own clients
+already run entirely over 443 via JMAP. A 443-only customer firewall is a
+separate and much smaller decision — TLS ALPN/SNI multiplexing ahead of Caddy —
+and must not be smuggled into this one.
 
 ## Consequences
 
-- Outlook users get working mail with no manual setup **without** a year-two
-  project starting now.
-- We state plainly that calendar/contacts in Outlook need an add-in until an
-  adapter exists. A sovereignty product does not win by implying parity it does
-  not have.
-- MAPI stays on the roadmap as the last wall, with a spike gate in front of it
-  so it cannot quietly consume a quarter.
-- If native Outlook calendar parity is required *sooner* than the sequence
-  allows, that is a product decision to fund the MAPI project explicitly — not
-  an engineering task to absorb.
+- We do not spend two years imitating a protocol whose client is being retired.
+- **The strategic read inverts.** New Outlook dropping on-premises Exchange means
+  Microsoft is pushing its own on-prem customers off the platform. Those
+  customers must move somewhere. That is alo's opening — and it is won by being
+  a better client than new Outlook, not by impersonating an Exchange server the
+  new client refuses to talk to anyway.
+- Honest gap, stated rather than implied: calendar and contacts inside classic
+  Outlook need an add-in, and inside new Outlook are not available at all. Our
+  answer is to make people want alo's own client, not to claim parity we do not
+  have.
+- If native Outlook calendar parity is ever contractually required, it is a
+  funded product decision with a spike gate — never an engineering task absorbed
+  into a sprint.
+
+## Sources
+
+- [Stages of migration to new Outlook for Windows — Microsoft Learn](https://learn.microsoft.com/en-us/microsoft-365-apps/outlook/get-started/guide-product-availability)
+- [New Outlook: MAPI / Exchange — Microsoft Community Hub](https://techcommunity.microsoft.com/discussions/outlookgeneral/new-outlook-mapi--exchange/4157034)
+- [Why the New Outlook for Windows Doesn't Support On-Premises Exchange (Yet)](https://en.ittrip.xyz/ms-office/outlook/new-outlook-onprem-exchange)
+- [Microsoft Sets New Deadline for Classic Outlook Retirement — TechRepublic](https://www.techrepublic.com/article/news-microsoft-extends-classic-outlook-retirement-deadline/)
