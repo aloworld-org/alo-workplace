@@ -520,11 +520,10 @@ EU models, suggest-only where the EU AI Act calls a use high-risk.
 
 > Wave B3 is built. `docs/design/projects.md` § "What B3 promised, and what
 > B3 shipped" reconciles every `[B3]` line below against the code: each is
-> shipped, or a cut with its reason. Two are named there. **Billable hours →
-> invoice has no screen**: the unbilled view and the draft-raising API are
-> complete and wire-verified, but a person selects and raises through the
-> API, not with a mouse — the profitability report's *To invoice* column is
-> where the money waiting is visible today. And **two of the agent's three
+> shipped, or a cut with its reason. **Billable hours → invoice is now a
+> complete browser flow**: project overview, profitability report and approval
+> completion all lead to one shared selector that raises the real draft and
+> opens it in Billing. **Two of the agent's three
 > example sentences are not tools**: setting a project up from a template
 > (one screen, and nobody asked a machine for it) and "what's over budget?"
 > across engagements (a portfolio question, which is a chart — Insights').

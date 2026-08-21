@@ -430,6 +430,7 @@ export const fr: Partial<Catalog> = {
   taskTimeTrackingHint: "Enregistrez cette tâche directement dans votre feuille de temps.",
   taskTimerRunningOnTask: "Le temps est suivi sur cette tâche.",
   taskTimerRunningElsewhere: "Un autre chronomètre est déjà en cours.",
+  taskSwitchTimer: "Changer de chronomètre",
   taskAssignee: "Responsable",
   taskAssigneePlaceholder: "nom@exemple.com",
   taskDue: "Échéance",
@@ -1670,6 +1671,7 @@ export const fr: Partial<Catalog> = {
   billingUnknownCustomer: "Client inconnu",
   billingDraftInvoice: "Facture en brouillon",
   billingBackToInvoices: "Toutes les factures",
+  billingBackToProject: (name: string) => `Retour à ${name}`,
   billingInvoiceGone: "Ce document n’existe plus.",
   billingFieldCustomer: "Client",
   billingChooseCustomer: "Choisissez un client…",
@@ -2655,6 +2657,8 @@ export const fr: Partial<Catalog> = {
   projectsChooseTimeProject: "Sur quoi avez-vous travaillé ?",
   projectsChooseTimeProjectHint: "Choisissez un projet pour ajouter une saisie de temps cette semaine.",
   projectsBillableOfWeek: (duration: string) => `dont ${duration} facturables`,
+  projectsCompleteWeek: "Semaine entière",
+  projectsCompleteWeekSubmission: "Semaine entière soumise pour approbation",
   projectsProposedInWeek: (duration: string) =>
     `${duration} proposées, pas encore acceptées`,
   // Décider d’une proposition (B3.10b). C’est l’acceptation qui en fait une

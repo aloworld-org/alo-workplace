@@ -150,13 +150,14 @@ button; it polls nothing when no timer runs.
 as a rendering rather than a tab), **Reports** and **Approvals**. Three
 differences worth a reader's time:
 
-- **The Unbilled screen is not built.** `GET /projects/unbilled` and
-  `POST /projects/invoices` exist, are wire-verified end to end and are
-  reachable by any client; what has no browser screen is the *selecting and
-  raising*. The report's **To invoice** column is where a person sees the
-  money waiting, and the draft is raised through the API. This is the wave's
-  one named feature cut — it is in the table at the end of this note, and in
-  `docs/features.md`.
+- **The invoice handoff is part of the browser flow.** Approved, billable,
+  unbilled work can be opened from a project's next-step card, the
+  profitability report, or a completed approval. The shared handoff dialog
+  loads the customer's real unbilled groups through a chosen cutoff, lets the
+  person select the work, raises one draft through `POST /projects/invoices`,
+  and opens that draft in Billing. There is deliberately no separate
+  "Unbilled" tab: invoicing is the next step of customer work, not another
+  destination a person has to discover.
 - **The timer widget lives in `web/src/projects/TimerWidget.tsx`**, declared
   by `product/workplace.tsx` as a rail widget, not in `web/src/shell`. Written
   the design's way, the shell would import `../projects` — and the shell is
@@ -854,7 +855,7 @@ wave.
 | Milestones + simple timeline view over existing task boards | Shipped (B3.09a) as the **Plan** tab: dates on an axis with the board's own tasks under them. `due_on` is required — see § Milestones. |
 | Time entry: start/stop timer + manual entry, per task/project, billable flag, hourly rate | Shipped (B3.03, B3.04). The rate is snapshotted onto the entry, so repricing tomorrow never rewrites yesterday. |
 | Approval flow: submitted → approved timesheets (weekly), locked after approval | Shipped (B3.05), with withdraw and an audited reopen — and the reopen refuses once hours are on an invoice. |
-| ★ Billable hours → invoice lines in one click (feeds B1); unbilled-work view | **API shipped, the click is a cut.** `GET /projects/unbilled` and `POST /projects/invoices` are complete and wire-verified: approved, billable, unbilled hours group the way an invoice groups them and raise a **draft** in Billing. What is missing is the browser screen that selects and raises — the report's *To invoice* column is where the money is visible today. The one feature of this wave a user cannot reach with a mouse. |
+| ★ Billable hours → invoice lines in one click (feeds B1); unbilled-work view | Shipped. `GET /projects/unbilled` and `POST /projects/invoices` are wire-verified, and one shared browser handoff is reachable from project overview, profitability report and approval completion. It selects real unbilled groups, raises a draft, and opens it in Billing. |
 | Project profitability: hours × rates vs budget, per project | Shipped (B3.08) with CSV, per currency, never converted. Value, never margin — cost rates need B4's ledger and B6's employees. |
 | Project templates (recurring engagement setup) | Shipped (B3.09b). A template *is* a project; instantiating copies the shape and shifts the dates, and copies nobody's assignees, comments, hours or finished cards. |
 | `[B+]` Gantt with dependencies; capacity planning; field-service work orders | Out of scope, unchanged. |

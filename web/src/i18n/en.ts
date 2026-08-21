@@ -470,6 +470,7 @@ export const en = {
   taskTimeTrackingHint: "Track this task directly into your timesheet.",
   taskTimerRunningOnTask: "Time is being tracked on this task.",
   taskTimerRunningElsewhere: "Another timer is already running.",
+  taskSwitchTimer: "Switch timer",
   taskAssignee: "Assignee",
   taskAssigneePlaceholder: "name@example.com",
   taskDue: "Due",
@@ -2602,6 +2603,7 @@ export const en = {
   billingUnknownCustomer: "Unknown customer",
   billingDraftInvoice: "Draft invoice",
   billingBackToInvoices: "All invoices",
+  billingBackToProject: (name: string) => `Back to ${name}`,
   billingInvoiceGone: "This document no longer exists.",
   billingFieldCustomer: "Customer",
   billingChooseCustomer: "Choose a customer…",
@@ -4488,6 +4490,8 @@ export const en = {
   projectsChooseTimeProject: "What did you work on?",
   projectsChooseTimeProjectHint: "Choose a project to add a time entry for this week.",
   projectsBillableOfWeek: (duration: string) => `${duration} billable`,
+  projectsCompleteWeek: "Entire week",
+  projectsCompleteWeekSubmission: "Entire week submitted for approval",
   projectsProposedInWeek: (duration: string) =>
     `${duration} suggested, not yet accepted`,
   // Deciding about a suggestion (B3.10b). Accepting is what makes it an hour —

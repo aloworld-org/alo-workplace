@@ -20,7 +20,12 @@ import { useCallback, useEffect, useState } from "react";
 import { PieChart } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { formatAmount, previousQuarterOf, quarterOf, type Period } from "../billing";
+import {
+  formatAmount,
+  previousQuarterOf,
+  quarterOf,
+  type Period,
+} from "../billing";
 import { Button, Spinner } from "../ds";
 import { strings, useLocale } from "../i18n";
 import { saveTextFile } from "../platform/download";
@@ -28,7 +33,13 @@ import { projectsMessage, useProjectsApi } from "./api";
 import { resolveProjectScope } from "./scope";
 import { dayLabel, durationLabel } from "./format";
 import { BudgetBar, EmptyState, ErrorBanner } from "./parts";
-import type { ProfitabilityCurrency, ProfitabilityReport, Project, ProjectProfitability } from "./types";
+import { ProjectScopePicker } from "./ProjectScopePicker";
+import type {
+  ProfitabilityCurrency,
+  ProfitabilityReport,
+  Project,
+  ProjectProfitability,
+} from "./types";
 
 interface Props {
   projects: Project[];
@@ -38,6 +49,8 @@ interface Props {
   customerName: (customerId: string) => string | null;
   /** Bumped when an hour was written anywhere, so the figures follow the work. */
   revision: number;
+  /** Continues from a report row into the approved-time invoice handoff. */
+  onCreateInvoice: (project: Project, cutoff: string) => void;
 }
 
 /** What a saved report is called: the server names the file in its own
@@ -48,14 +61,34 @@ function fileName(period: Period): string {
   return `profitability-${period.from}-to-${period.to}.csv`;
 }
 
-export function ReportView({ projects, projectsLoading, customerName, revision }: Props) {
+function isIsoDay(value: string | null): value is string {
+  return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+export function ReportView({
+  projects,
+  projectsLoading,
+  customerName,
+  revision,
+  onCreateInvoice,
+}: Props) {
   const api = useProjectsApi();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProjectId = searchParams.get("project");
-  const projectId = resolveProjectScope(requestedProjectId, projectsLoading, projects);
+  const projectId = resolveProjectScope(
+    requestedProjectId,
+    projectsLoading,
+    projects,
+  );
   // The form opens on the quarter being lived through; the one being reviewed
   // is one click away.
-  const [period, setPeriod] = useState<Period>(() => quarterOf(new Date()));
+  const [period, setPeriod] = useState<Period>(() => {
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
+    return isIsoDay(from) && isIsoDay(to) && from <= to
+      ? { from, to }
+      : quarterOf(new Date());
+  });
   const [form, setForm] = useState<Period>(period);
   const [report, setReport] = useState<ProfitabilityReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +99,9 @@ export function ReportView({ projects, projectsLoading, customerName, revision }
     if (projectsLoading) return;
     setLoading(true);
     try {
-      setReport(await api.profitability(period.from, period.to, projectId ?? undefined));
+      setReport(
+        await api.profitability(period.from, period.to, projectId ?? undefined),
+      );
       setError(null);
     } catch (err) {
       // The server's own sentence when it sent one — it names the rule that was
@@ -92,7 +127,11 @@ export function ReportView({ projects, projectsLoading, customerName, revision }
   async function download() {
     setDownloading(true);
     try {
-      const csv = await api.profitabilityCsv(period.from, period.to, projectId ?? undefined);
+      const csv = await api.profitabilityCsv(
+        period.from,
+        period.to,
+        projectId ?? undefined,
+      );
       saveTextFile(csv, fileName(period), "text/csv;charset=utf-8");
       setError(null);
     } catch (err) {
@@ -104,31 +143,25 @@ export function ReportView({ projects, projectsLoading, customerName, revision }
 
   return (
     <div className="flex min-h-0 flex-col gap-4 overflow-auto px-5 py-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-subtle bg-surface p-4">
-        <label className="flex min-w-64 flex-1 flex-col gap-1.5 text-sm font-medium text-primary">
-          {strings.projectsProject}
-          <select
-            className="min-h-10 w-full rounded-lg border border-default bg-surface px-3 py-2 text-sm text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            value={projectId ?? ""}
-            onChange={(event) => {
-              const next = new URLSearchParams(searchParams);
-              if (event.target.value === "") next.delete("project");
-              else next.set("project", event.target.value);
-              setSearchParams(next);
-            }}
-          >
-            <option value="">{strings.projectsAllProjects}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>{project.name}</option>
-            ))}
-          </select>
-        </label>
-        <p className="max-w-xl pb-2 text-sm text-secondary">
-          {projectId === null
+      <ProjectScopePicker
+        projects={projects}
+        value={projectId}
+        disabled={projectsLoading}
+        description={
+          projectId === null
             ? strings.projectsReportAllScope
-            : strings.projectsReportProjectScope(projects.find((project) => project.id === projectId)?.name ?? "")}
-        </p>
-      </div>
+            : strings.projectsReportProjectScope(
+                projects.find((project) => project.id === projectId)?.name ??
+                  "",
+              )
+        }
+        onChange={(nextProjectId) => {
+          const next = new URLSearchParams(searchParams);
+          if (nextProjectId === null) next.delete("project");
+          else next.set("project", nextProjectId);
+          setSearchParams(next);
+        }}
+      />
       <form
         className="flex flex-wrap items-center gap-3"
         onSubmit={(e) => {
@@ -191,12 +224,22 @@ export function ReportView({ projects, projectsLoading, customerName, revision }
           body={strings.projectsReportEmptyBody}
         />
       ) : (
-        report !== null && <ReportTable report={report} customerName={customerName} />
+        report !== null && (
+          <ReportTable
+            report={report}
+            projects={projects}
+            customerName={customerName}
+            onCreateInvoice={(project) => onCreateInvoice(project, report.to)}
+          />
+        )
       )}
 
       {report !== null && report.projects.length > 0 && (
         <p className="m-0 text-xs text-tertiary">
-          {strings.projectsReportBasis(dayLabel(report.from), dayLabel(report.to))}{" "}
+          {strings.projectsReportBasis(
+            dayLabel(report.from),
+            dayLabel(report.to),
+          )}{" "}
           {strings.projectsReportBudgetBasis(dayLabel(report.to))}
         </p>
       )}
@@ -207,10 +250,14 @@ export function ReportView({ projects, projectsLoading, customerName, revision }
 /** One engagement per row, with the whole report's totals under them. */
 function ReportTable({
   report,
+  projects,
   customerName,
+  onCreateInvoice,
 }: {
   report: ProfitabilityReport;
+  projects: Project[];
   customerName: (customerId: string) => string | null;
+  onCreateInvoice: (project: Project) => void;
 }) {
   const locale = useLocale();
   return (
@@ -220,22 +267,40 @@ function ReportTable({
           <tr>
             <th scope="col">{strings.projectsProject}</th>
             <th scope="col">{strings.projectsCustomer}</th>
-            <th scope="col" className="whitespace-nowrap text-right tabular-nums">
+            <th
+              scope="col"
+              className="whitespace-nowrap text-right tabular-nums"
+            >
               {strings.projectsHoursLogged}
             </th>
-            <th scope="col" className="whitespace-nowrap text-right tabular-nums">
+            <th
+              scope="col"
+              className="whitespace-nowrap text-right tabular-nums"
+            >
               {strings.projectsBillableHours}
             </th>
-            <th scope="col" className="whitespace-nowrap text-right tabular-nums">
+            <th
+              scope="col"
+              className="whitespace-nowrap text-right tabular-nums"
+            >
               {strings.projectsReportColValue}
             </th>
-            <th scope="col" className="whitespace-nowrap text-right tabular-nums">
+            <th
+              scope="col"
+              className="whitespace-nowrap text-right tabular-nums"
+            >
               {strings.projectsReportColInvoiced}
             </th>
-            <th scope="col" className="whitespace-nowrap text-right tabular-nums">
+            <th
+              scope="col"
+              className="whitespace-nowrap text-right tabular-nums"
+            >
               {strings.projectsReportColToInvoice}
             </th>
-            <th scope="col" className="whitespace-nowrap text-right tabular-nums">
+            <th
+              scope="col"
+              className="whitespace-nowrap text-right tabular-nums"
+            >
               {strings.projectsReportColToDate}
             </th>
             <th scope="col">{strings.projectsReportColBudget}</th>
@@ -246,8 +311,14 @@ function ReportTable({
             <ProjectRow
               key={project.projectId}
               project={project}
+              sourceProject={
+                projects.find(
+                  (candidate) => candidate.id === project.projectId,
+                ) ?? null
+              }
               customerName={customerName}
               locale={locale}
+              onCreateInvoice={onCreateInvoice}
             />
           ))}
         </tbody>
@@ -256,10 +327,18 @@ function ReportTable({
             <th scope="row" colSpan={2}>
               {strings.projectsReportTotals}
             </th>
-            <td className="whitespace-nowrap text-right tabular-nums">{durationLabel(report.totals.minutes)}</td>
-            <td className="whitespace-nowrap text-right tabular-nums">{durationLabel(report.totals.billableMinutes)}</td>
             <td className="whitespace-nowrap text-right tabular-nums">
-              <Money rows={report.totals.byCurrency} pick={(row) => row.netCents} locale={locale} />
+              {durationLabel(report.totals.minutes)}
+            </td>
+            <td className="whitespace-nowrap text-right tabular-nums">
+              {durationLabel(report.totals.billableMinutes)}
+            </td>
+            <td className="whitespace-nowrap text-right tabular-nums">
+              <Money
+                rows={report.totals.byCurrency}
+                pick={(row) => row.netCents}
+                locale={locale}
+              />
             </td>
             <td className="whitespace-nowrap text-right tabular-nums">
               <Money
@@ -289,15 +368,22 @@ function ReportTable({
 
 function ProjectRow({
   project,
+  sourceProject,
   customerName,
   locale,
+  onCreateInvoice,
 }: {
   project: ProjectProfitability;
+  sourceProject: Project | null;
   customerName: (customerId: string) => string | null;
   locale: string;
+  onCreateInvoice: (project: Project) => void;
 }) {
   const customer = customerName(project.customerId);
   const remaining = project.budgetRemainingCents;
+  const hasUnbilledValue = project.byCurrency.some(
+    (row) => row.unbilledNetCents > 0,
+  );
   return (
     <tr>
       <td>
@@ -306,29 +392,70 @@ function ProjectRow({
             worked, because that is where somebody can do something about
             them — never folded into a value of zero. */}
         {project.unratedMinutes > 0 && (
-          <span className="block text-xs text-tertiary" title={strings.projectsReportUnratedHint}>
-            {strings.projectsReportUnrated(durationLabel(project.unratedMinutes))}
+          <span
+            className="block text-xs text-tertiary"
+            title={strings.projectsReportUnratedHint}
+          >
+            {strings.projectsReportUnrated(
+              durationLabel(project.unratedMinutes),
+            )}
           </span>
         )}
       </td>
       <td className={customer === null ? "italic text-tertiary" : undefined}>
         {customer ?? strings.projectsCustomerUnknown}
       </td>
-      <td className="whitespace-nowrap text-right tabular-nums">{durationLabel(project.minutes)}</td>
-      <td className="whitespace-nowrap text-right tabular-nums">{durationLabel(project.billableMinutes)}</td>
       <td className="whitespace-nowrap text-right tabular-nums">
-        <Money rows={project.byCurrency} pick={(row) => row.netCents} locale={locale} />
+        {durationLabel(project.minutes)}
       </td>
       <td className="whitespace-nowrap text-right tabular-nums">
-        <Money rows={project.byCurrency} pick={(row) => row.billedNetCents} locale={locale} />
+        {durationLabel(project.billableMinutes)}
       </td>
       <td className="whitespace-nowrap text-right tabular-nums">
-        <Money rows={project.byCurrency} pick={(row) => row.unbilledNetCents} locale={locale} />
+        <Money
+          rows={project.byCurrency}
+          pick={(row) => row.netCents}
+          locale={locale}
+        />
       </td>
-      <td className="whitespace-nowrap text-right tabular-nums">{durationLabel(project.toDateMinutes)}</td>
+      <td className="whitespace-nowrap text-right tabular-nums">
+        <Money
+          rows={project.byCurrency}
+          pick={(row) => row.billedNetCents}
+          locale={locale}
+        />
+      </td>
+      <td className="whitespace-nowrap text-right tabular-nums">
+        {sourceProject !== null && hasUnbilledValue ? (
+          <button
+            type="button"
+            className="inline-flex min-h-9 items-center rounded-lg px-3 py-1.5 font-semibold text-accent !no-underline transition-colors hover:bg-[var(--accent-soft)] hover:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label={`${strings.projectsCreateInvoice}: ${project.projectName}`}
+            title={strings.projectsCreateInvoice}
+            onClick={() => onCreateInvoice(sourceProject)}
+          >
+            <Money
+              rows={project.byCurrency}
+              pick={(row) => row.unbilledNetCents}
+              locale={locale}
+            />
+          </button>
+        ) : (
+          <Money
+            rows={project.byCurrency}
+            pick={(row) => row.unbilledNetCents}
+            locale={locale}
+          />
+        )}
+      </td>
+      <td className="whitespace-nowrap text-right tabular-nums">
+        {durationLabel(project.toDateMinutes)}
+      </td>
       <td>
         <BudgetBar
-          consumptionBp={project.budgetConsumptionBp ?? project.hoursConsumptionBp}
+          consumptionBp={
+            project.budgetConsumptionBp ?? project.hoursConsumptionBp
+          }
           label={strings.projectsReportColBudget}
         />
         <span className="block text-xs text-tertiary">
@@ -359,7 +486,10 @@ function Money({
   pick: (row: ProfitabilityCurrency) => number;
   locale: string;
 }) {
-  if (rows.length === 0) return <span className="text-tertiary">{strings.projectsReportNoValue}</span>;
+  if (rows.length === 0)
+    return (
+      <span className="text-tertiary">{strings.projectsReportNoValue}</span>
+    );
   return (
     <>
       {rows.map((row) => (

@@ -422,6 +422,7 @@ export const nl: Partial<Catalog> = {
   taskTimeTrackingHint: "Registreer deze taak rechtstreeks in je urenstaat.",
   taskTimerRunningOnTask: "De tijd voor deze taak wordt bijgehouden.",
   taskTimerRunningElsewhere: "Er loopt al een andere timer.",
+  taskSwitchTimer: "Timer wisselen",
   taskAssignee: "Toegewezen aan",
   taskAssigneePlaceholder: "naam@voorbeeld.com",
   taskDue: "Vervaldatum",
@@ -1630,6 +1631,7 @@ export const nl: Partial<Catalog> = {
   billingUnknownCustomer: "Onbekende klant",
   billingDraftInvoice: "Conceptfactuur",
   billingBackToInvoices: "Alle facturen",
+  billingBackToProject: (name: string) => `Terug naar ${name}`,
   billingInvoiceGone: "Dit document bestaat niet meer.",
   billingFieldCustomer: "Klant",
   billingChooseCustomer: "Kies een klant…",
@@ -2614,6 +2616,8 @@ export const nl: Partial<Catalog> = {
   projectsChooseTimeProjectHint: "Kies een project om deze week een tijdregistratie toe te voegen.",
   projectsBillableOfWeek: (duration: string) =>
     `waarvan ${duration} factureerbaar`,
+  projectsCompleteWeek: "Volledige week",
+  projectsCompleteWeekSubmission: "Volledige week ingediend ter goedkeuring",
   projectsProposedInWeek: (duration: string) =>
     `${duration} voorgesteld, nog niet geaccepteerd`,
   // Beslissen over een voorstel (B3.10b). Pas door te accepteren wordt het een
