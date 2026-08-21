@@ -291,9 +291,12 @@ document or a formula.
     the `RopLogon` **success response** (166 bytes, every field pinned at its
     offset), and the dispatcher. `RopOpenFolder` and
     `RopGetHierarchyTable` now answer, so a client can log on, open a folder and
-    count its children in one buffer. Next: `RopSetColumns` and `RopQueryRows`,
-    which carry the folder *rows* — and the point at which the fixed special
-    folders must become the tenant's real mailboxes
+    count its children in one buffer. `RopSetColumns` and
+    `RopQueryRows` complete the chain: a client can log on, open a folder, take
+    its hierarchy table, set the columns and read the rows in one buffer.
+    **Remaining before this stage is honestly done:** the folders are the fixed
+    thirteen, not the tenant's own — message counts are refused rather than
+    invented, and a user's own folders are not listed at all
   - [ ] 4. Contents tables; Outlook lists messages in a folder
   - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead
   - [ ] 6. NSPI; the address book resolves recipients
