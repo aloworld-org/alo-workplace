@@ -282,7 +282,12 @@ document or a formula.
   behaviour and verified on the wire, never as "the spec is implemented":
   - [x] 1. Autodiscover returns a `mapiHttp` block; Outlook stops asking for manual settings
   - [x] 2. `Connect`/`Disconnect` envelopes, Basic auth, session contexts; verified on the wire against the real binary
-  - [ ] 3. `Logon` + folder hierarchy; Outlook draws the folder tree
+  - [~] 3. `Logon` + folder hierarchy; Outlook draws the folder tree. Done: the
+    `Execute` envelope, the `RPC_HEADER_EXT` chain, LZ77+DIRECT2 decompression,
+    the ROP buffer container and handle table, and the `RopLogon` **request**.
+    Next: the `RopLogon` success response — its byte layout ([MS-OXCROPS]
+    §2.2.3.1.2) is not yet read from the specification and **must not be
+    guessed**, because a wrong response is one Outlook ignores in silence
   - [ ] 4. Contents tables; Outlook lists messages in a folder
   - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead
   - [ ] 6. NSPI; the address book resolves recipients
