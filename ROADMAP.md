@@ -280,8 +280,8 @@ document or a formula.
   the store. Its own crate (`products/mail/alo-mapi`) so a half-built adapter
   cannot destabilise mail that works. Every stage is stated as observable Outlook
   behaviour and verified on the wire, never as "the spec is implemented":
-  - [ ] 1. Autodiscover returns a `mapiHttp` block; Outlook stops asking for manual settings
-  - [ ] 2. `Connect`/`Execute`/`Disconnect` envelopes; Outlook completes the handshake and authenticates
+  - [x] 1. Autodiscover returns a `mapiHttp` block; Outlook stops asking for manual settings
+  - [x] 2. `Connect`/`Disconnect` envelopes, Basic auth, session contexts; verified on the wire against the real binary
   - [ ] 3. `Logon` + folder hierarchy; Outlook draws the folder tree
   - [ ] 4. Contents tables; Outlook lists messages in a folder
   - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead

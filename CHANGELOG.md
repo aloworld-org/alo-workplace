@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- **Native Outlook: the MAPI-over-HTTP handshake now works.** With
+  `ALO_MAPI_HTTP_ENABLED` set, alo serves the mailbox endpoint Outlook connects
+  to (`/mapi/emsmdb`), authenticates with the same credential door SMTP and IMAP
+  use, and hands back a session. Reading mail through it is a later stage, and
+  the request types that carry mailbox work say so rather than pretending to
+  succeed. Still off by default. Second stage of ADR 0051.
+
 - **Groundwork for native Outlook: Autodiscover can now offer MAPI-over-HTTP.**
   When a deployment sets `ALO_MAPI_HTTP_ENABLED`, Autodiscover answers a
   MAPI-capable Outlook with a `mapiHttp` block pointing at the mailbox and
