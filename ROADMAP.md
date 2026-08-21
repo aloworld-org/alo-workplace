@@ -294,9 +294,10 @@ document or a formula.
     count its children in one buffer. `RopSetColumns` and
     `RopQueryRows` complete the chain: a client can log on, open a folder, take
     its hierarchy table, set the columns and read the rows in one buffer.
-    **Remaining before this stage is honestly done:** the folders are the fixed
-    thirteen, not the tenant's own — message counts are refused rather than
-    invented, and a user's own folders are not listed at all
+    **The store is now behind it**: the tree a
+    client draws is the tenant's own mailboxes, under the names they gave them,
+    with the message count each one holds. A mailbox with a JMAP role takes over
+    the matching MAPI special folder rather than appearing twice beside it
   - [ ] 4. Contents tables; Outlook lists messages in a folder
   - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead
   - [ ] 6. NSPI; the address book resolves recipients
