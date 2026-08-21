@@ -38,6 +38,13 @@ import { ErrorBanner } from "./parts";
 import { PlanView } from "./PlanView";
 import { ProjectsView } from "./ProjectsView";
 import { ReportView } from "./ReportView";
+import {
+  projectContextId,
+  projectScopedPath,
+  projectWorkspaceStatus,
+  resolveProjectScope,
+  shouldRemoveProjectScope,
+} from "./scope";
 import { TemplateDialog } from "./TemplateDialog";
 import { announceTimerChanged, onTimerChanged } from "./timerBus";
 import { WeekView } from "./WeekView";
@@ -53,12 +60,35 @@ function today(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-function ProjectWorkspaceRoute() {
+function ProjectWorkspaceRoute({
+  projects,
+  projectsLoading,
+  projectsLoadFailed,
+}: {
+  projects: Project[];
+  projectsLoading: boolean;
+  projectsLoadFailed: boolean;
+}) {
   const { projectId, workspaceView } = useParams<{
     projectId: string;
     workspaceView: string;
   }>();
   if (projectId === undefined) return <Navigate to="/projects/list" replace />;
+  const status = projectWorkspaceStatus(
+    projectId,
+    projectsLoading,
+    projectsLoadFailed,
+    projects,
+  );
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-[28rem] items-center justify-center" role="status">
+        <Spinner size={24} />
+      </div>
+    );
+  }
+  if (status === "missing") return <Navigate to="/projects/list" replace />;
+  if (status === "unavailable") return null;
   return workspaceView === undefined
     ? <TasksModule projectId={projectId} />
     : <TasksModule projectId={projectId} workspaceView={workspaceView} />;
@@ -70,47 +100,6 @@ const projectTabClass = ({ isActive }: { isActive: boolean }) =>
       ? "border-accent bg-[var(--accent-soft)] font-semibold !text-accent"
       : "border-transparent bg-transparent font-medium !text-secondary hover:bg-raised hover:!text-primary"
   }`;
-
-const TOP_LEVEL_PROJECT_ROUTES = new Set([
-  "list",
-  "my-work",
-  "week",
-  "plan",
-  "timeline",
-  "reports",
-  "approvals",
-]);
-
-/** Keep the engagement visible while somebody moves through its work, time,
- * plan, and financial views. The path owns workspace scope; the three
- * aggregate views carry the same scope in their `project` query parameter. */
-export function projectContextId(pathname: string, projectQuery: string | null): string | null {
-  const parts = pathname.split("/").filter(Boolean);
-  if (parts[0] !== "projects") return null;
-  const segment = parts[1];
-  if (segment !== undefined && !TOP_LEVEL_PROJECT_ROUTES.has(segment)) {
-    try {
-      return decodeURIComponent(segment);
-    } catch {
-      return segment;
-    }
-  }
-  if (segment === "week" || segment === "timeline" || segment === "reports") {
-    return projectQuery;
-  }
-  return null;
-}
-
-/** Builds the canonical route for a project-aware portfolio view. */
-export function projectScopedPath(
-  view: "week" | "timeline" | "reports",
-  projectId: string | null,
-): string {
-  const path = `/projects/${view}`;
-  return projectId === null
-    ? path
-    : `${path}?project=${encodeURIComponent(projectId)}`;
-}
 
 export function ProjectsModule() {
   const navigate = useNavigate();
@@ -130,7 +119,9 @@ export function ProjectsModule() {
   const [startingFromTemplate, setStartingFromTemplate] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const contextProjectId = projectContextId(location.pathname, searchParams.get("project"));
+  const [projectsLoadFailed, setProjectsLoadFailed] = useState(false);
+  const requestedContextProjectId = projectContextId(location.pathname, searchParams.get("project"));
+  const contextProjectId = resolveProjectScope(requestedContextProjectId, loading, projects);
   const [revision, setRevision] = useState(0);
   const [runningTimer, setRunningTimer] = useState<RunningTimer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -158,10 +149,14 @@ export function ProjectsModule() {
         const list = await api.projects();
         if (live) {
           setProjects(list);
+          setProjectsLoadFailed(false);
           setError(null);
         }
       } catch (err) {
-        if (live) setError(projectsMessage(err, strings.projectsLoadFailed));
+        if (live) {
+          setProjectsLoadFailed(true);
+          setError(projectsMessage(err, strings.projectsLoadFailed));
+        }
       } finally {
         if (live) setLoading(false);
       }
@@ -170,6 +165,22 @@ export function ProjectsModule() {
       live = false;
     };
   }, [api, revision]);
+
+  // A removed or inaccessible project is not a durable scope. Once the list is
+  // authoritative, clean the query instead of showing "All projects" under a
+  // URL that still claims otherwise and carrying that stale id to every tab.
+  useEffect(() => {
+    if (!searchParams.has("project")) return;
+    if (!shouldRemoveProjectScope(
+      requestedContextProjectId,
+      loading,
+      projectsLoadFailed,
+      contextProjectId,
+    )) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("project");
+    setSearchParams(next, { replace: true });
+  }, [contextProjectId, loading, projectsLoadFailed, requestedContextProjectId, searchParams, setSearchParams]);
 
   // The templates ride the same revision counter, because marking one, copying
   // one, or archiving a board all change what this list says.
@@ -364,7 +375,7 @@ export function ProjectsModule() {
         <Route path="plan" element={<Navigate to="/projects/timeline" replace />} />
         <Route
           path="timeline"
-          element={<PlanView projects={projects} revision={revision} onChanged={bump} />}
+          element={<PlanView projects={projects} projectsLoading={loading} revision={revision} onChanged={bump} />}
         />
         {/* Profitability is a PROJECT aggregate — engagements, minutes and
             money, and never who worked when — so it is everybody's tab, not
@@ -386,8 +397,26 @@ export function ProjectsModule() {
             />
           )}
         />
-        <Route path=":projectId" element={<ProjectWorkspaceRoute />} />
-        <Route path=":projectId/:workspaceView" element={<ProjectWorkspaceRoute />} />
+        <Route
+          path=":projectId"
+          element={(
+            <ProjectWorkspaceRoute
+              projects={projects}
+              projectsLoading={loading}
+              projectsLoadFailed={projectsLoadFailed}
+            />
+          )}
+        />
+        <Route
+          path=":projectId/:workspaceView"
+          element={(
+            <ProjectWorkspaceRoute
+              projects={projects}
+              projectsLoading={loading}
+              projectsLoadFailed={projectsLoadFailed}
+            />
+          )}
+        />
         {/* An unknown Projects path is a stale link, not an error page. */}
         <Route path="*" element={<Navigate to="/projects/list" replace />} />
       </Routes>
