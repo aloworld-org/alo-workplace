@@ -10,6 +10,14 @@ contracts.
 
 ## Unreleased
 
+- **Every campaign now carries a working way out of it.** The mail client's own
+  Unsubscribe button works with a single press and no login, and there is a
+  plain link in the footer for the clients that draw no button — in the
+  recipient's language, never disguised as "manage your preferences". A
+  campaign that has no way out of it can no longer be built at all, which is
+  what the law requires and what Gmail and Outlook have required of bulk
+  senders since 2024.
+
 - **A campaign send is now a durable record, and nobody can be mailed twice.**
   Starting a send writes down every person it will reach, one row each, in a
   table that survives a restart — so a send interrupted halfway is answered by
