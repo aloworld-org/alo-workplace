@@ -274,7 +274,21 @@ document or a formula.
 - [ ] Tauri desktop shell: tray, notifications, autostart
 - [ ] Offline-first local cache (design review first, per ADR 0005)
 - [ ] Mobile apps
-- [ ] MAPI-over-HTTP adapter: native Outlook — the last wall
+- [~] **MAPI-over-HTTP adapter: native Outlook — the last wall.** Decided and
+  specified in [ADR 0051](docs/decisions/0051-native-outlook-without-manual-setup.md):
+  server-side, in Rust, on 443, translating to the JMAP core rather than forking
+  the store. Its own crate (`products/mail/alo-mapi`) so a half-built adapter
+  cannot destabilise mail that works. Every stage is stated as observable Outlook
+  behaviour and verified on the wire, never as "the spec is implemented":
+  - [ ] 1. Autodiscover returns a `mapiHttp` block; Outlook stops asking for manual settings
+  - [ ] 2. `Connect`/`Execute`/`Disconnect` envelopes; Outlook completes the handshake and authenticates
+  - [ ] 3. `Logon` + folder hierarchy; Outlook draws the folder tree
+  - [ ] 4. Contents tables; Outlook lists messages in a folder
+  - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead
+  - [ ] 6. NSPI; the address book resolves recipients
+  - [ ] 7. Submission; Outlook sends
+  - [ ] 8. ICS/FastTransfer; cached mode and offline
+  - [ ] 9. Calendar, contacts and tasks as native MAPI classes
 - [ ] Remote support / screen control (AnyDesk/TeamViewer-class — the EU IT-management play: one sovereign suite instead of a bolted-on remote tool). **Integrate** a self-hostable engine (RustDesk primary candidate); never build the capture/stream/input-injection engine ourselves — the highest-CVE-density surface in the product (ADR 0009). alo owns the UI/UX, session brokering, auth, consent, and audit logging. Launches from **Chat** (primary: the 1:1 DM header + person-profile quick-actions, beside Meet/Call/Email — where "help me" conversations live) and **Meet** (secondary: an in-call control-bar button for take-over-while-talking); a dedicated Remote/Support **rail tab is deferred** until the feature needs its own session management, history, and audit views. Requirements: native per-device agent (browsers cannot grant OS-level control — a hard boundary), E2E-encrypted session, **explicit per-session consent before any input**, an audit-log entry in the controlled user's security log, instant termination by either party, and a self-hosted relay (no third-party cloud). Screen *share* (read-only) is already in Meet; this is remote *control*, correctly sequenced post-launch. UX source of truth: the Figma design (request access / consent prompt / active-control banner with stop-sharing)
 - [ ] Second developer hired and shipping independently (bus factor > 1 proven by a release the founder didn't cut)
 

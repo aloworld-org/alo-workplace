@@ -10,6 +10,17 @@ contracts.
 
 ## Unreleased
 
+- **Groundwork for native Outlook: Autodiscover can now offer MAPI-over-HTTP.**
+  When a deployment sets `ALO_MAPI_HTTP_ENABLED`, Autodiscover answers a
+  MAPI-capable Outlook with a `mapiHttp` block pointing at the mailbox and
+  address-book endpoints, alongside the existing IMAP and SMTP settings. It is
+  **off by default and should stay off until those endpoints answer** — an
+  Outlook told to speak MAPI/HTTP does not quietly fall back to the IMAP
+  settings beside it, so switching this on early stops Outlook configuring at
+  all. Only clients that ask (`X-MapiHttpCapability`) are offered it, and they
+  are answered with the lower of their version and ours. First stage of
+  ADR 0051; nothing else about mail changes.
+
 - **Every campaign now carries a working way out of it.** The mail client's own
   Unsubscribe button works with a single press and no login, and there is a
   plain link in the footer for the clients that draw no button — in the
