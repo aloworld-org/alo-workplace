@@ -1,102 +1,110 @@
-# 0051 — Native Outlook: do not build MAPI
+# 0051 — Native Outlook: a client-side connector, not a server-side MAPI stack
 
 **Status:** proposed
 **Date:** 2026-08-21
-**Amends** the "Exchange adapters (EAS/MAPI) become edge translators to JMAP,
-year two" clause of [ADR 0001](0001-jmap-native-core.md), and closes the ROADMAP
-item *"MAPI-over-HTTP adapter: native Outlook — the last wall"* as **will not
-build**.
+**Sequences** the "Exchange adapters become edge translators to JMAP" clause of
+[ADR 0001](0001-jmap-native-core.md) and replaces the ROADMAP item
+*"MAPI-over-HTTP adapter"* with a different shape of the same goal.
 
 ## Context
 
 The goal: an Outlook user types an address and a password and is working, with
-no manual server settings — what Exchange 2019 on-premise gives them over 443.
-The exit gate says *"An Outlook desktop user works a full week against alo
-without knowing Exchange is gone."*
+no manual server settings, keeping the client they already know.
 
-That framing was written when classic Outlook was the client. It no longer is,
-and the two facts below change the answer rather than the schedule.
+Two readings of the market were considered, and the second is correct.
 
-### Fact 1 — the client MAPI serves is being retired
+**The wrong reading** (recorded because it was mine first): new Outlook became
+the default in April 2026, classic Outlook retires "at least 2029", and new
+Outlook is not MAPI-compliant and does not support on-premises, hybrid or
+sovereign Exchange at all. Conclusion drawn: do not serve classic Outlook.
 
-New Outlook for Windows became **the default in April 2026**. Classic Outlook
-keeps support "through at least 2029"; full retirement is announced but
-undated, and new installations will ship only the new client.
+That conclusion follows Microsoft off a cliff. The same facts read properly say
+the opposite:
 
-### Fact 2 — the replacement client will never speak MAPI to us
+**The right reading.** Microsoft is evicting its own on-premises customers and
+handing them a client many of them dislike. Those customers are precisely who
+alo is for — a sovereign, self-hosted workspace. They want to keep classic
+Outlook, and classic Outlook is a desktop application: when Microsoft stops
+shipping it, it does not stop working. **Whoever keeps it working against a
+non-Microsoft server inherits those customers.** That is a differentiator
+Microsoft is handing us, not a legacy burden.
 
-New Outlook **is not MAPI-compliant** and **does not support on-premises,
-hybrid, or sovereign Exchange deployments** — with no published timeline. It
-supports Microsoft 365, Outlook.com and Gmail accounts.
+alo is an on-premises product. Copying the retirement schedule of a cloud vendor
+whose customers we are trying to take is strategy by imitation.
 
-Taken together: a MAPI-over-HTTP adapter would work **only** with classic
-Outlook — a client that is no longer the default, is on a declared path to
-retirement, and whose successor cannot use the protocol at all. We would spend
-the most expensive engineering years we have to land on a shrinking install base
-with a hard ceiling and no forward path.
+## The distinction that decides this
 
-### What that costs, for completeness
+"Support Outlook natively" has two implementations that differ by an order of
+magnitude, and conflating them is what made the first analysis wrong.
 
-MAPI-over-HTTP is documented (`[MS-OXCMAPIHTTP]`), so this is not
-reverse-engineering — but the transport is the easy part. A working store pulls
-in ROP (`[MS-OXCROPS]`), `[MS-OXCSTOR]`, `[MS-OXCFOLD]`, `[MS-OXCMSG]`,
-`[MS-OXCTABL]`, `[MS-OXCFXICS]` for incremental sync, and `[MS-OXPROPS]` —
-roughly two thousand properties — plus NTLM/Negotiate or OAuth. OpenChange, the
-only serious open-source attempt, ran about a decade with more people than we
-have and never reached dependable parity; Zentyal shipped it and dropped it.
+**Server-side MAPI-over-HTTP** — impersonate Exchange on the wire. Documented
+(`[MS-OXCMAPIHTTP]`), but the transport is the easy part: ROP (`[MS-OXCROPS]`),
+`[MS-OXCSTOR]`, `[MS-OXCFOLD]`, `[MS-OXCMSG]`, `[MS-OXCTABL]`, `[MS-OXCFXICS]`,
+and `[MS-OXPROPS]`'s ~2000 properties, plus NTLM/Negotiate. **OpenChange spent
+about a decade here and never reached dependable parity; Zentyal shipped it and
+dropped it.** This is the grave.
 
-Even if we succeeded, Fact 2 caps the return.
+**A client-side connector** — a MAPI service provider installed on the PC that
+translates Outlook's MAPI calls into calls *our own server* understands, with a
+local cache and a sync engine. This is what **Zimbra's ZCO** does, and it ships:
+mail, folders, tags, contacts, personal calendars, appointment reminders and
+tasks, with offline use via a local store. Kopano and Open-Xchange took the same
+route.
 
-### ActiveSync fails twice
-
-Smaller (WBXML over HTTP, mail + calendar + contacts together), but: it is
-patent-licensed by Microsoft, which sits badly with [AGPL](0002-agpl-dual-license.md)
-and with a product whose pitch is not paying Microsoft; and current Outlook for
-Windows does not use it as a store. It would buy phones, which already work over
-IMAP/CalDAV/CardDAV.
+The difference is not effort-in-degree, it is kind. Server-side means
+reimplementing Microsoft's protocol exactly, against a spec you do not control,
+where every deviation is a bug in *your* product. Client-side means implementing
+Outlook's client interfaces and translating to **JMAP, which we own** — both ends
+of the translation are ours, and the wire between connector and server is our
+API, over 443.
 
 ## Decision
 
-**Do not build MAPI-over-HTTP or ActiveSync.** Instead:
+**Build a client-side Outlook connector. Do not build server-side MAPI-over-HTTP
+or ActiveSync.**
 
-1. **alo's own clients are the answer.** Web and the Tauri desktop app over JMAP
-   on 443. This is where Exchange refugees land, and it is the only surface where
-   we control the experience end to end.
-2. **IMAP + SMTP + Autodiscover is the bridge for holdouts.** Outlook
-   self-configures an IMAP account from Autodiscover XML — address and password,
-   no manual settings. The endpoints are built and wire-verified on production;
-   what remains is per-email-domain DNS and vhosts, already scoped as operator
-   work. **Microsoft's own guidance to on-premises customers on new Outlook is
-   to use IMAP** — we are pointing where they point.
-3. **Calendar and contacts** via CalDAV/CardDAV. In classic Outlook this needs an
-   add-in; in new Outlook nothing native exists. State that plainly.
-4. **Revisit only on a funded contract** that names MAPI and pays for it, and
-   even then behind a two-week read-only spike gate.
+Sequenced so customers are served before the connector lands:
 
-**Ports.** None of this needs SMTP or IMAP moved off 587/465. alo's own clients
-already run entirely over 443 via JMAP. A 443-only customer firewall is a
-separate and much smaller decision — TLS ALPN/SNI multiplexing ahead of Caddy —
-and must not be smuggled into this one.
+1. **Now — IMAP + SMTP + Autodiscover.** Outlook self-configures from
+   Autodiscover XML: address and password, no manual settings. Endpoints are
+   built and wire-verified on production; what remains is per-email-domain DNS
+   and vhosts, already scoped as operator work. This makes classic *and* new
+   Outlook usable for mail today.
+2. **Next — CalDAV/CardDAV** for calendar and contacts, which in Outlook needs
+   an add-in until (3). State that gap plainly.
+3. **The project — the alo Connector for Outlook.** A MAPI service provider
+   translating to JMAP, with a local cache for offline use. Written in **Rust**
+   as a COM in-process server, so the two-language rule holds
+   ([ADR 0001](0001-jmap-native-core.md)); if that proves impossible the
+   exception needs its own ADR, not a quiet import of C++.
+   Staged: mail and folders → contacts → calendar → tasks/reminders → offline
+   cache. Each stage is independently shippable and independently useful.
+
+**ActiveSync stays rejected:** patent-licensed by Microsoft, which sits badly
+with [AGPL](0002-agpl-dual-license.md) and with a product whose pitch is not
+paying Microsoft; and current Outlook does not use it as a store.
+
+**Ports.** The connector talks HTTPS to alo, so it satisfies a 443-only firewall
+by construction — the question that started this. Nothing needs SMTP or IMAP
+moved off 587/465, and alo's own clients already run entirely over 443 via JMAP.
 
 ## Consequences
 
-- We do not spend two years imitating a protocol whose client is being retired.
-- **The strategic read inverts.** New Outlook dropping on-premises Exchange means
-  Microsoft is pushing its own on-prem customers off the platform. Those
-  customers must move somewhere. That is alo's opening — and it is won by being
-  a better client than new Outlook, not by impersonating an Exchange server the
-  new client refuses to talk to anyway.
-- Honest gap, stated rather than implied: calendar and contacts inside classic
-  Outlook need an add-in, and inside new Outlook are not available at all. Our
-  answer is to make people want alo's own client, not to claim parity we do not
-  have.
-- If native Outlook calendar parity is ever contractually required, it is a
-  funded product decision with a spike gate — never an engineering task absorbed
-  into a sprint.
+- The connector is still a large, multi-stage project. The difference from the
+  rejected option is that **this shape has shipped elsewhere and that one has
+  not** — we are taking a proven route, not attempting what OpenChange could not
+  finish.
+- It serves classic Outlook only. New Outlook supports neither MAPI nor
+  connectors. That is acceptable and deliberate: classic is where the customers
+  we want actually are, and it keeps running after Microsoft stops shipping it.
+- Every stage before the connector still pays off — Autodiscover and
+  CalDAV/CardDAV serve Thunderbird, Apple Mail, iOS and Android regardless.
+- We should say publicly what this is: **keep the Outlook you know, lose the
+  Microsoft server.** Microsoft is creating that demand for us.
 
 ## Sources
 
+- [Zimbra Connector for Outlook — Administration Guide](https://zimbra.github.io/zm-windows-comp/latest/ZCS_Connector_For_Outlook_Admin_Guide.html)
+- [Zimbra Connector for Outlook — User Guide](https://zimbra.github.io/zm-windows-comp/latest/ZCS_Connector_For_Outlook_User_Guide.html)
 - [Stages of migration to new Outlook for Windows — Microsoft Learn](https://learn.microsoft.com/en-us/microsoft-365-apps/outlook/get-started/guide-product-availability)
 - [New Outlook: MAPI / Exchange — Microsoft Community Hub](https://techcommunity.microsoft.com/discussions/outlookgeneral/new-outlook-mapi--exchange/4157034)
-- [Why the New Outlook for Windows Doesn't Support On-Premises Exchange (Yet)](https://en.ittrip.xyz/ms-office/outlook/new-outlook-onprem-exchange)
-- [Microsoft Sets New Deadline for Classic Outlook Retirement — TechRepublic](https://www.techrepublic.com/article/news-microsoft-extends-classic-outlook-retirement-deadline/)
