@@ -282,13 +282,15 @@ document or a formula.
   behaviour and verified on the wire, never as "the spec is implemented":
   - [x] 1. Autodiscover returns a `mapiHttp` block; Outlook stops asking for manual settings
   - [x] 2. `Connect`/`Disconnect` envelopes, Basic auth, session contexts; verified on the wire against the real binary
-  - [~] 3. `Logon` + folder hierarchy; Outlook draws the folder tree. Done: the
+  - [~] 3. `Logon` + folder hierarchy; Outlook draws the folder tree. **A logon
+    now completes end to end** — `Execute` carries a ROP buffer, the dispatcher
+    answers it, and the mailbox a caller may open is decided from the identity
+    they authenticated as. Done: the
     `Execute` envelope, the `RPC_HEADER_EXT` chain, LZ77+DIRECT2 decompression,
     the ROP buffer container and handle table, the `RopLogon` **request**,
-    and the `RopLogon` **success response** (166 bytes, every field pinned at
-    its offset). Next: dispatching a ROP list — walking the requests, resolving
-    handles, and answering `Execute` — then `RopOpenFolder` and the hierarchy
-    table
+    the `RopLogon` **success response** (166 bytes, every field pinned at its
+    offset), and the dispatcher. Next: `RopOpenFolder` and the hierarchy table,
+    which is where MAPI first has to read real mailbox data
   - [ ] 4. Contents tables; Outlook lists messages in a folder
   - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead
   - [ ] 6. NSPI; the address book resolves recipients
