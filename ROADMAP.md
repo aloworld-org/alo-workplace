@@ -289,8 +289,11 @@ document or a formula.
     `Execute` envelope, the `RPC_HEADER_EXT` chain, LZ77+DIRECT2 decompression,
     the ROP buffer container and handle table, the `RopLogon` **request**,
     the `RopLogon` **success response** (166 bytes, every field pinned at its
-    offset), and the dispatcher. Next: `RopOpenFolder` and the hierarchy table,
-    which is where MAPI first has to read real mailbox data
+    offset), and the dispatcher. `RopOpenFolder` and
+    `RopGetHierarchyTable` now answer, so a client can log on, open a folder and
+    count its children in one buffer. Next: `RopSetColumns` and `RopQueryRows`,
+    which carry the folder *rows* — and the point at which the fixed special
+    folders must become the tenant's real mailboxes
   - [ ] 4. Contents tables; Outlook lists messages in a folder
   - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead
   - [ ] 6. NSPI; the address book resolves recipients
