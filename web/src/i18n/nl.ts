@@ -2465,6 +2465,8 @@ export const nl: Partial<Catalog> = {
   projectsWorkType: "Dit werk is voor",
   projectsClientWork: "Een klant",
   projectsInternalWork: "Ons bedrijf",
+  projectsClientWorkHint: "Factureer dit werk aan een klant",
+  projectsInternalWorkHint: "Houd dit werk intern",
   projectsNewCustomerHint: "Na het maken kunt u tarieven en budgetten toevoegen.",
   projectsCreate: "Project maken",
   projectsCreateFailed: "Het project kon niet worden gemaakt.",
@@ -2485,6 +2487,7 @@ export const nl: Partial<Catalog> = {
   projectsCustomerHint:
     "De klant aan wie de uren van dit project worden gefactureerd.",
   projectsCustomerPick: "Kies een klant…",
+  projectsNoCustomersAvailable: "Er zijn nog geen klanten beschikbaar. Voeg er eerst een toe in Facturatie.",
   projectsCustomerUnknown: "Onbekende klant",
   projectsInternal: "Intern",
   projectsRate: "Uurtarief",

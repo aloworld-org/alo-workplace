@@ -11,6 +11,7 @@ import {
   CalendarRange,
   ClipboardList,
   GanttChartSquare,
+  FolderKanban,
   LayoutDashboard,
   LayoutGrid,
   List,
@@ -47,6 +48,16 @@ type View = "overview" | "list" | "board" | "timeline" | "calendar" | "files";
 function isView(value: string | undefined | null): value is View {
   return value === "overview" || value === "list" || value === "board" ||
     value === "timeline" || value === "calendar" || value === "files";
+}
+
+function projectStatusLabel(status: Project["status"]): string {
+  return {
+    planned: strings.projectsStatusPlanned,
+    active: strings.projectsStatusActive,
+    on_hold: strings.projectsStatusOnHold,
+    completed: strings.projectsStatusCompleted,
+    cancelled: strings.projectsStatusCancelled,
+  }[status];
 }
 
 type Mode = { type: "project"; id: string } | { type: "plate" } | { type: "proposals" };
@@ -261,7 +272,7 @@ export function TasksModule({
       ? (projectsContext ? strings.projectsTabMyWork : strings.taskMyPlate)
       : mode.type === "proposals"
         ? strings.taskProposals
-        : (activeProject?.name ?? strings.moduleTasks);
+        : (engagement?.name ?? activeProject?.name ?? strings.moduleTasks);
 
   return (
     <div className="flex h-full min-h-0 bg-app">
@@ -321,22 +332,40 @@ export function TasksModule({
       )}
 
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-5 px-6 pb-3 pt-5 max-lg:flex-wrap max-sm:px-4">
-          <div className="min-w-0 shrink-0">
+        <header className="flex items-center gap-6 border-b border-subtle bg-surface px-6 py-5 max-lg:flex-wrap max-sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {projectId !== undefined && (
               <button
                 type="button"
-                className="mb-1 inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-secondary !no-underline transition-colors hover:bg-raised hover:text-primary hover:!no-underline focus:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="shrink-0 rounded-lg text-secondary !no-underline transition-colors hover:bg-raised hover:text-primary hover:!no-underline focus:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 onClick={() => navigate("/projects/list")}
+                aria-label={strings.projectsTabList}
               >
-                <ArrowLeft size={15} aria-hidden="true" />
-                {strings.projectsTabList}
+                <span className="flex min-h-10 items-center gap-2 px-3">
+                  <ArrowLeft size={16} aria-hidden="true" />
+                  <span className="max-sm:hidden">{strings.projectsTabList}</span>
+                </span>
               </button>
             )}
-            <h1 className="m-0 shrink-0 text-2xl font-bold text-primary">{title}</h1>
+            {projectId !== undefined && <span className="h-8 w-px shrink-0 bg-[var(--border-subtle)]" aria-hidden="true" />}
+            <div className="flex min-w-0 items-center gap-3">
+              {projectId !== undefined && (
+                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-tint)] text-accent" aria-hidden="true">
+                  <FolderKanban size={20} />
+                </span>
+              )}
+              <div className="min-w-0">
+                <h1 className="m-0 truncate text-2xl font-bold text-primary">{title}</h1>
+                {projectId !== undefined && engagement !== null && (
+                  <p className="mt-1 inline-flex items-center rounded-full bg-raised px-2.5 py-0.5 text-xs font-medium text-secondary">
+                    {projectStatusLabel(engagement.status)}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
           <form
-            className="mx-auto flex h-10 max-w-[28.75rem] flex-1 items-center gap-2 rounded-full border border-default bg-surface px-3 transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15 max-sm:order-3 max-sm:w-full max-sm:max-w-none max-sm:basis-full"
+            className="flex h-10 w-full max-w-[28.75rem] items-center gap-2 rounded-full border border-default bg-app px-3 transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15 max-lg:order-3 max-lg:max-w-none max-lg:basis-full"
             role="search"
             onSubmit={(e) => e.preventDefault()}
           >
@@ -360,7 +389,7 @@ export function TasksModule({
         </header>
 
         {mode.type !== "proposals" && (
-          <div className="flex gap-1 overflow-x-auto border-b border-subtle px-6 max-sm:px-4" role="tablist">
+          <div className="flex gap-1 overflow-x-auto border-b border-subtle bg-surface px-6 max-sm:px-4" role="tablist" aria-label={title}>
             {(
               [
                 { id: "overview", label: strings.taskOverview, Icon: LayoutDashboard },
@@ -376,10 +405,13 @@ export function TasksModule({
                 type="button"
                 role="tab"
                 aria-selected={view === t.id}
-                className={`mb-[-1px] inline-flex min-h-11 shrink-0 items-center gap-2 rounded-t-lg border-b-2 px-3 py-2.5 text-sm font-medium !no-underline transition-colors hover:bg-raised/70 hover:text-primary hover:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${view === t.id ? "border-accent bg-selected text-accent" : "border-transparent text-secondary"}`}
+                className={`mb-[-1px] shrink-0 rounded-t-lg border-b-2 text-sm font-medium !no-underline transition-colors hover:bg-raised/70 hover:text-primary hover:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${view === t.id ? "border-accent bg-selected text-accent" : "border-transparent text-secondary"}`}
                 onClick={() => openView(t.id)}
               >
-                <t.Icon size={16} /> {t.label}
+                <span className="flex min-h-11 items-center gap-2 px-4 py-2.5">
+                  <t.Icon size={16} aria-hidden="true" />
+                  <span>{t.label}</span>
+                </span>
               </button>
             ))}
           </div>

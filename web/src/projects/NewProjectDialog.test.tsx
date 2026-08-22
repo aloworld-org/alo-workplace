@@ -11,7 +11,7 @@ describe("the new project journey", () => {
     render(<NewProjectDialog customers={[]} onClose={() => undefined} onCreate={create} />);
 
     fireEvent.change(screen.getByLabelText("Project name"), { target: { value: "Operations" } });
-    expect((screen.getByRole("button", { name: "Our company" }) as HTMLButtonElement).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("radio", { name: /Our company/ }).getAttribute("aria-checked")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
     await waitFor(() => expect(create).toHaveBeenCalledWith({ name: "Operations", customerId: null }));
@@ -28,5 +28,14 @@ describe("the new project journey", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create project" }));
 
     await waitFor(() => expect(create).toHaveBeenCalledWith({ name: "Website", customerId: "customer-1" }));
+  });
+
+  test("explains when client work has no available customers", () => {
+    render(<NewProjectDialog customers={[]} onClose={() => undefined} onCreate={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("radio", { name: /A customer/ }));
+    fireEvent.click(screen.getByRole("combobox"));
+
+    expect(screen.getByText("No customers are available yet. Add one in Billing first.")).toBeTruthy();
   });
 });

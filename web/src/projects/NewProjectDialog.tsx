@@ -41,13 +41,15 @@ function CustomerPicker({ customers, value, onChange }: {
         aria-label={strings.projectsCustomer}
         aria-expanded={open}
         aria-controls="new-project-customer-list"
-        className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-md border bg-surface px-4 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-accent ${open ? "border-accent ring-1 ring-accent" : "border-default hover:border-strong"}`}
+        className={`min-h-12 w-full rounded-lg border bg-surface text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-accent ${open ? "border-accent ring-1 ring-accent" : "border-default hover:border-strong"}`}
         onClick={() => setOpen((current) => !current)}
       >
-        <span className={selected === null ? "text-tertiary" : "font-medium text-primary"}>
-          {selected?.name ?? strings.projectsCustomerPick}
+        <span className="flex min-h-12 w-full items-center justify-between gap-4 px-4 py-2.5">
+          <span className={`min-w-0 truncate ${selected === null ? "text-tertiary" : "font-medium text-primary"}`}>
+            {selected?.name ?? strings.projectsCustomerPick}
+          </span>
+          <ChevronDown className={`size-4 shrink-0 text-secondary transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
         </span>
-        <ChevronDown className={`size-4 shrink-0 text-secondary transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
         <div
@@ -56,6 +58,9 @@ function CustomerPicker({ customers, value, onChange }: {
           aria-label={strings.projectsCustomer}
           className="absolute inset-x-0 top-full z-[var(--z-overlay)] mt-2 max-h-56 overflow-y-auto rounded-lg border border-subtle bg-surface p-1.5 shadow-lg"
         >
+          {customers.length === 0 && (
+            <p className="px-4 py-3 text-sm text-secondary">{strings.projectsNoCustomersAvailable}</p>
+          )}
           {customers.map((customer) => {
             const active = customer.id === value;
             return (
@@ -64,14 +69,16 @@ function CustomerPicker({ customers, value, onChange }: {
                 type="button"
                 role="option"
                 aria-selected={active}
-                className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${active ? "bg-accent-soft text-accent" : "text-primary hover:bg-raised"}`}
+                className={`min-h-10 w-full rounded-md text-left text-sm font-medium transition-colors ${active ? "bg-accent-soft text-accent" : "text-primary hover:bg-raised"}`}
                 onClick={() => {
                   onChange(customer.id);
                   setOpen(false);
                 }}
               >
-                <span className="truncate">{customer.name}</span>
-                {active && <Check className="size-4 shrink-0" aria-hidden="true" />}
+                <span className="flex min-h-10 w-full items-center justify-between gap-3 px-4 py-2.5">
+                  <span className="truncate">{customer.name}</span>
+                  {active && <Check className="size-4 shrink-0" aria-hidden="true" />}
+                </span>
               </button>
             );
           })}
@@ -111,7 +118,7 @@ export function NewProjectDialog({ customers, onClose, onCreate }: {
       </Field>
       <fieldset className="m-0 border-0 p-0">
         <legend className="mb-2 text-sm font-medium text-secondary">{strings.projectsWorkType}</legend>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup">
           {(["client", "internal"] as const).map((option) => {
             const selected = kind === option;
             const Icon = option === "client" ? UserRound : Building2;
@@ -119,15 +126,21 @@ export function NewProjectDialog({ customers, onClose, onCreate }: {
               <button
                 key={option}
                 type="button"
-                className={`relative flex min-h-16 items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-accent ${selected ? "border-accent bg-accent-soft text-primary" : "border-default bg-surface text-secondary hover:border-strong hover:bg-raised hover:text-primary"}`}
-                aria-pressed={selected}
+                className={`relative flex min-h-20 items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${selected ? "border-accent bg-accent-soft shadow-sm" : "border-default bg-surface hover:border-strong hover:bg-raised"}`}
+                role="radio"
+                aria-checked={selected}
                 onClick={() => setKind(option)}
               >
-                <span className={`flex size-8 shrink-0 items-center justify-center rounded-md ${selected ? "bg-accent text-on-accent" : "bg-raised text-secondary"}`}>
-                  <Icon className="size-4" aria-hidden="true" />
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${selected ? "bg-accent text-on-accent" : "bg-raised text-secondary"}`}>
+                  <Icon className="size-5" aria-hidden="true" />
                 </span>
-                <span className="flex-1">{option === "client" ? strings.projectsClientWork : strings.projectsInternalWork}</span>
-                {selected && <Check className="size-4 shrink-0 text-accent" aria-hidden="true" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-primary">{option === "client" ? strings.projectsClientWork : strings.projectsInternalWork}</span>
+                  <span className="mt-0.5 block text-xs font-normal leading-5 text-secondary">{option === "client" ? strings.projectsClientWorkHint : strings.projectsInternalWorkHint}</span>
+                </span>
+                <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selected ? "border-accent bg-accent text-on-accent" : "border-strong bg-surface"}`}>
+                  {selected && <Check className="size-3.5" aria-hidden="true" />}
+                </span>
               </button>
             );
           })}
