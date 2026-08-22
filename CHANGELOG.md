@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Native Outlook can now open and read a message.** A client opens a message
+  from a folder and gets its subject, its plain-text body, its To and Cc lines,
+  its sender and its dates — the point ADR 0051 named in advance as the test of
+  whether native Outlook support was reachable at all. Messages larger than the
+  size limit a client sets for itself, HTML bodies and attachments are not
+  served yet, and a message is reported as having no recipient *table* even
+  though the To and Cc lines it displays are correct. Still off by default.
+  Fifth stage of ADR 0051.
+
 - **Native Outlook: a folder's messages now come back over MAPI-over-HTTP.**
   With `ALO_MAPI_HTTP_ENABLED` set, a client can open one of its folders, ask
   for the contents table and read the messages in it — subject, sender, when it
