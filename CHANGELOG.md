@@ -10,6 +10,16 @@ contracts.
 
 ## Unreleased
 
+- **Native Outlook: a folder's messages now come back over MAPI-over-HTTP.**
+  With `ALO_MAPI_HTTP_ENABLED` set, a client can open one of its folders, ask
+  for the contents table and read the messages in it — subject, sender, when it
+  arrived, how large it is, whether it has been read and whether it carries an
+  attachment — from the same mail every other alo surface serves. A folder's
+  messages are fetched only when a request actually reaches that folder, so
+  opening one costs a single bounded query whatever the size of the mailbox.
+  Opening and reading an individual message is the next stage. Still off by
+  default. Fourth stage of ADR 0051.
+
 - **Native Outlook: the MAPI-over-HTTP handshake now works.** With
   `ALO_MAPI_HTTP_ENABLED` set, alo serves the mailbox endpoint Outlook connects
   to (`/mapi/emsmdb`), authenticates with the same credential door SMTP and IMAP

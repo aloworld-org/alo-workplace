@@ -282,7 +282,7 @@ document or a formula.
   behaviour and verified on the wire, never as "the spec is implemented":
   - [x] 1. Autodiscover returns a `mapiHttp` block; Outlook stops asking for manual settings
   - [x] 2. `Connect`/`Disconnect` envelopes, Basic auth, session contexts; verified on the wire against the real binary
-  - [~] 3. `Logon` + folder hierarchy; Outlook draws the folder tree. **A logon
+  - [x] 3. `Logon` + folder hierarchy; Outlook draws the folder tree. **A logon
     now completes end to end** — `Execute` carries a ROP buffer, the dispatcher
     answers it, and the mailbox a caller may open is decided from the identity
     they authenticated as. Done: the
@@ -298,7 +298,7 @@ document or a formula.
     client draws is the tenant's own mailboxes, under the names they gave them,
     with the message count each one holds. A mailbox with a JMAP role takes over
     the matching MAPI special folder rather than appearing twice beside it
-  - [ ] 4. Contents tables; Outlook lists messages in a folder
+  - [x] 4. Contents tables; Outlook lists messages in a folder. `RopGetContentsTable` opens a table on a folder and reports what it holds; `RopSetColumns` and `RopQueryRows` serve its rows — message id, subject, sender, delivery time as a `FILETIME`, the status flags and the size — read from the tenant's own mail through the account door. A folder's messages are loaded **only when a buffer actually reaches them**: the buffer is rehearsed against a copy of the object table first, so opening a folder costs one bounded query rather than the whole mailbox. A folder nobody loaded refuses rather than reporting itself empty, and an associated (FAI) table is truthfully empty
   - [ ] 5. `OpenMessage` + streams; Outlook opens and reads a message — **the kill gate**: not reached, we stop and ship a client-side connector instead
   - [ ] 6. NSPI; the address book resolves recipients
   - [ ] 7. Submission; Outlook sends
