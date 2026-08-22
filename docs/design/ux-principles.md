@@ -182,6 +182,17 @@ value may be born. The principles that govern the scale:
 - **Room to breathe.** Cards and panels keep generous minimum padding from
   the space scale; reading text keeps a book-like measure; density is a
   deliberate mode (as in Drive's density control), never an accident.
+- **Controls protect their content.** Inputs, selects, combobox triggers, and
+  menu options keep at least `space-4` (16px) between visible text or icons and
+  every bordered edge. Large selectors use `space-5` (20px). Leading icons,
+  labels, values, and trailing affordances use an explicit gap from the token
+  scale; chevrons keep the same trailing inset as the value's leading inset.
+  Trigger text and its menu options align to the same left edge. Content never
+  touches a border, focus ring, or adjacent affordance, and a layout may not
+  compress this protected inset. Long and translated values truncate or wrap
+  before the inset is reduced.
+  *Verify:* inspect the longest translated value in every control and its open
+  menu; the nearest glyph edge remains at least 16px from the control border.
 - **Touch respects fingers.** Interactive targets stay ≥40px regardless of
   how small the glyph inside them is.
 - **New values are legislation, not improvisation.** A dimension that the
