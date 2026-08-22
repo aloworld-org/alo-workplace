@@ -389,7 +389,7 @@ export function TasksModule({
         </header>
 
         {mode.type !== "proposals" && (
-          <div className="flex gap-1 overflow-x-auto border-b border-subtle bg-surface px-6 max-sm:px-4" role="tablist" aria-label={title}>
+          <div className="flex gap-2 overflow-x-auto border-b border-subtle bg-surface px-6 max-sm:px-4" role="tablist" aria-label={title}>
             {(
               [
                 { id: "overview", label: strings.taskOverview, Icon: LayoutDashboard },
@@ -405,13 +405,11 @@ export function TasksModule({
                 type="button"
                 role="tab"
                 aria-selected={view === t.id}
-                className={`mb-[-1px] shrink-0 rounded-t-lg border-b-2 text-sm font-medium !no-underline transition-colors hover:bg-raised/70 hover:text-primary hover:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${view === t.id ? "border-accent bg-selected text-accent" : "border-transparent text-secondary"}`}
+                className={`mb-[-1px] inline-flex min-h-12 shrink-0 items-center gap-2.5 rounded-t-lg border-b-2 px-5 py-3 text-sm !no-underline transition-colors hover:!no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${view === t.id ? "border-accent bg-[var(--accent-soft)] font-semibold !text-accent" : "border-transparent bg-transparent font-medium !text-secondary hover:bg-raised hover:!text-primary"}`}
                 onClick={() => openView(t.id)}
               >
-                <span className="flex min-h-11 items-center gap-2 px-4 py-2.5">
-                  <t.Icon size={16} aria-hidden="true" />
-                  <span>{t.label}</span>
-                </span>
+                <t.Icon size={16} aria-hidden="true" />
+                <span>{t.label}</span>
               </button>
             ))}
           </div>
