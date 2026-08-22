@@ -26,17 +26,44 @@
 set -euo pipefail
 
 HOURS="${1:-2}"
-DB_URL="${DATABASE_URL:-postgres://alo:alo-dev-only@localhost:5432/alo}"
 CONTAINER="${ALO_PG_CONTAINER:-alo-pg}"
 KEEP_EMAILS="'disan@alomails.com','admin@alomails.com'"
 BATCH=5000
+
+# The database to prune, taken from DATABASE_URL's last path segment.
+#
+# This used to be a `DB_URL` variable that psql_q ignored: the query function
+# passed `-d alo` literally, so setting DATABASE_URL changed nothing and a
+# checkout whose suites filled `alo_loop` pruned the wrong database and
+# reported success. It was flagged four times in docs/autonomy before anyone
+# was in a position to fix it, and it hid a second failure behind it — `alo`
+# sat at migration version 154 while the suites needed 405, so the runs that
+# did reach it died with VersionMismatch(154), which reads like a broken
+# migration rather than a wrong database.
+DB="${DATABASE_URL##*/}"
+DB="${DB%%\?*}"
+DB="${DB:-alo_scratch}"
+
+# `alo` is the database the product runs on (CLAUDE.md, one-database rule),
+# and everything below this line is `DELETE FROM tenants`. Pruning it would
+# delete somebody's real tenants — every one of them but two, silently, in
+# batches of five thousand. There is no argument for doing that from a
+# maintenance script, so it is refused rather than confirmed.
+if [ "$DB" = "alo" ]; then
+  echo "refusing to prune \`alo\`: it is the database the product runs on," >&2
+  echo "not a test database (CLAUDE.md, one-database rule). Point" >&2
+  echo "DATABASE_URL at the scratch database your suites fill." >&2
+  exit 2
+fi
+
+echo "pruning database: $DB"
 
 # Errors are NOT swallowed. The first version of this script sent stderr to
 # /dev/null, so when the delete failed it printed an empty string, the caller
 # read that as "nothing to prune", and the script reported success while doing
 # nothing for hours. A maintenance script that cannot fail loudly is worse than
 # no maintenance script.
-psql_q() { docker exec "$CONTAINER" psql -U alo -d alo -t -v ON_ERROR_STOP=1 -c "$1" | tr -d ' '; }
+psql_q() { docker exec "$CONTAINER" psql -U alo -d "$DB" -t -v ON_ERROR_STOP=1 -c "$1" | tr -d ' '; }
 
 # The prunable set: old enough that no running suite can still be using it, and
 # not one of the bootstrap accounts the local backend signs in as.
@@ -65,4 +92,4 @@ done
 
 after=$(psql_q "select count(*) from tenants;")
 echo "tenants after:  ${after:-unknown}"
-echo "database size:  $(psql_q "select pg_size_pretty(pg_database_size('alo'));")"
+echo "database size:  $(psql_q "select pg_size_pretty(pg_database_size('$DB'));")"

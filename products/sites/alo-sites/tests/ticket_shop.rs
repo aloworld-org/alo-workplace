@@ -33,9 +33,12 @@ use time::{Duration, OffsetDateTime};
 /// The apex the tests serve under (`SITES_DOMAIN` in production).
 const APEX: &str = "sites.test";
 
+/// The database this suite runs against.
+///
+/// Delegates to `alo_test_db`, which refuses the database the product
+/// runs on: suites create and drop their own, they never write into `alo`.
 fn database_url() -> String {
-    std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://alo:alo-dev-only@127.0.0.1:5433/alo".to_owned())
+    alo_test_db::url()
 }
 
 /// One tenant's live site selling seats to one event, and the app serving it

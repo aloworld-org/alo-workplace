@@ -18,9 +18,12 @@ use alo_store::{AccountStore, BlobStore, SiteId, SitePublicStore, Store};
 const APEX: &str = "analytics.test";
 const ANALYTICS_SECRET: &[u8] = b"analytics-integration-fixture-secret";
 
+/// The database this suite runs against.
+///
+/// Delegates to `alo_test_db`, which refuses the database the product
+/// runs on: suites create and drop their own, they never write into `alo`.
 fn database_url() -> String {
-    std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://alo:alo-dev-only@127.0.0.1:5432/alo".to_owned())
+    alo_test_db::url()
 }
 
 async fn harness() -> (Store, PgPool, Arc<AppState>) {

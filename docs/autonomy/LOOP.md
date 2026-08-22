@@ -85,6 +85,13 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      gate past the one-command ceiling and sent earlier iterations into the
      polling workarounds below. If a gate is mysteriously slow, this is the
      first thing to check, not the last: `select count(*) from tenants;`.
+     **It prunes the database named in `DATABASE_URL`** — export the same
+     value the gate runs with, or it prunes a different database and then
+     truthfully reports that it found nothing to do. (Until 2026-08-22 it
+     passed `-d alo` literally and ignored `DATABASE_URL`, which is why four
+     iterations flagged a prune that "ran" and changed nothing.) It refuses
+     `alo`: that is the database the product runs on, and this script's only
+     verb is `DELETE FROM tenants`.
    - **A wedged docker, a failed link and a mysteriously dead daemon are all one
      symptom: `df -h` first.** On 2026-08-15 an iteration halted with "docker
      daemon unresponsive" after thirty minutes of `docker ps` hanging; the actual

@@ -29,6 +29,9 @@ image = { workspace = true }
 bytes = { workspace = true }
 
 [dev-dependencies]
+# The one place a suite learns which database it may use: it refuses
+# the database the product runs on (CLAUDE.md, one-database rule).
+alo-test-db = { path = "../../../platform/alo-test-db" }
 # In-process integration tests: oneshot requests through the real router,
 # fixtures written through the real store against the compose Postgres.
 tower = { workspace = true }

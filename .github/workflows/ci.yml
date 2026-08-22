@@ -16,20 +16,26 @@ jobs:
     # tenant-isolation suites run against it. Compile-time query checking
     # uses the committed .sqlx offline cache (SQLX_OFFLINE), so the build
     # and clippy do not need the database — only the tests do.
+    #
+    # The database is `alo_scratch`, not `alo`. The runner is thrown away
+    # after the job, so on paper either name works — but the harnesses
+    # refuse `alo` outright (CLAUDE.md, one-database rule), and a CI file
+    # that names it teaches every developer who copies these settings to
+    # point their laptop at the database their own mail lives in.
     env:
       SQLX_OFFLINE: "true"
-      DATABASE_URL: "postgres://alo:alo-dev-only@localhost:5432/alo"
+      DATABASE_URL: "postgres://alo:alo-dev-only@localhost:5432/alo_scratch"
     services:
       postgres:
         image: postgres:16.14
         env:
           POSTGRES_USER: alo
           POSTGRES_PASSWORD: alo-dev-only
-          POSTGRES_DB: alo
+          POSTGRES_DB: alo_scratch
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U alo -d alo"
+          --health-cmd "pg_isready -U alo -d alo_scratch"
           --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v4

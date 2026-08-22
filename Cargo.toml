@@ -8,6 +8,8 @@ members = [
     "platform/alo-sieve",
     "platform/alo-ai",
     "platform/alo-pdf",
+    # The one place a suite learns which database it may use (see its lib.rs).
+    "platform/alo-test-db",
     # products/mail — the Mail product (alomails)
     "products/mail/alo-smtp",
     "products/mail/alo-smtp-client",
