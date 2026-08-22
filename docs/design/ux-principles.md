@@ -97,10 +97,13 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    token system is the single source of color/type/spacing; one accent per
    surface; information chunked in scannable groups; motion subtle and
    purposeful (reduced-motion respected). Beauty here is trust, not
-   decoration. Sibling module navigation is one shared visual role and uses
-   one state system everywhere: inactive tabs are neutral secondary text on a
-   transparent surface; only the selected tab receives the soft brand-orange
-   background, orange text/icon, semibold weight, and orange bottom indicator.
+   decoration. Sibling module navigation, project view navigation, and every
+   other tab row are one shared visual role and use one state system
+   everywhere: inactive tabs are neutral secondary text on a transparent
+   surface; only the selected tab receives the soft brand-orange background,
+   orange text/icon, semibold weight, and orange bottom indicator. Nested tabs
+   do not invent a quieter or stronger active colour; hierarchy comes from
+   placement and labels, not a different state treatment.
    Global link color must never leak into inactive navigation items.
    *Verify:* no hardcoded colors/spacings outside tokens; screens pass a
    5-second "what is this page about" glance test. Compare sibling module tabs
