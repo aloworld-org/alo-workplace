@@ -590,3 +590,48 @@ mail lands in the **inbox** (not spam) at Gmail / Outlook.com / Proton from the
 warmed IP — do this once the PTR record is set, since PTR is the dominant
 factor. The GUI-client matrix (Thunderbird, Apple Mail, Gmail-app IMAP) beyond
 the protocol-level loop above is also outstanding.
+
+## MAPI-over-HTTP (classic Outlook)
+
+**Specification contradiction — `MetaTagIdsetGiven`'s declared type cannot be
+encoded.** [MS-OXCFXICS] §2.2.1.3 gives `MetaTagIdsetGiven` as property id
+`0x4017` with data type **`PtypInteger32` (`0x0003`)**, while the same section
+says its value "contains a serialization of REPLGUID-based IDSET structures" —
+a variable-length structure of arbitrary size.
+
+Both cannot be true inside a FastTransfer stream. The lexical grammar in
+§2.2.4.1 is:
+
+```abnf
+propValue  = fixedPropType propInfo fixedSizeValue
+propValue =/ varPropType  propInfo length varSizeValue
+```
+
+A fixed-size type carries **no length field**. A reader that meets
+`0x40170003` therefore consumes exactly four bytes and resumes parsing in the
+middle of the IDSET, so every element after it is garbage — silently, since
+the bytes it lands on are still structurally plausible.
+
+Every sibling state property is declared `PtypBinary`: `MetaTagCnsetSeen`
+(`0x6796`), `MetaTagCnsetSeenFAI` (`0x67DA`), `MetaTagCnsetRead` (`0x67D2`),
+`MetaTagIdsetDeleted` (`0x67E5`). The `0x0003` on `MetaTagIdsetGiven` is
+therefore read as a documentation error.
+
+**Our response:** we *write* `0x40170102` (`PtypBinary`), the only encoding the
+grammar admits. We *read* both `0x40170102` and the declared `0x40170003`, so a
+client that follows the letter of §2.2.1.3 still works. Constants and reasoning
+in `products/mail/alo-mapi/src/ics.rs` (`meta::IDSET_GIVEN`,
+`meta::IDSET_GIVEN_AS_DECLARED`).
+
+Derived from the specification's own grammar, **not yet confirmed against a
+real Outlook** — this is the first thing to re-check if cached mode fails to
+establish. Date: 2026-08-23.
+
+**Length widths differ between ROP buffers and FastTransfer streams.**
+[MS-OXCDATA] §2.11.1: `PtypBinary` byte counts are **16 bits** "in the context
+of ROP buffers"; [MS-OXCFXICS] §2.2.4.1 defines the stream's `length` as
+`PtypInteger32` — **32 bits** — for every variable-size value. The two writers
+in `alo-mapi` are deliberately separate for this reason
+(`fasttransfer::Writer` against the ROP writers); sharing them would corrupt
+every stream from its first binary property onward, without an error anywhere.
+Date: 2026-08-23.
