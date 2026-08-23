@@ -24,9 +24,10 @@ contracts.
   size limit a client sets for itself comes back through a stream, read in
   chunks, so long mail opens in full rather than empty. Attachments are listed
   with their names, sizes and types, and a file opens and saves out byte for
-  byte. HTML bodies are not served yet, and a message is reported as having no
-  recipient *table* even though the To and Cc lines it displays are correct.
-  Still off by default. Fifth stage of ADR 0051.
+  byte. An opened message now also carries its recipients and, when the sender
+  sent one, its HTML body — a plain-text message is reported as having no HTML
+  rather than being shown as generated markup. Still off by default. Fifth
+  stage of ADR 0051, complete.
 
 - **Native Outlook: a folder's messages now come back over MAPI-over-HTTP.**
   With `ALO_MAPI_HTTP_ENABLED` set, a client can open one of its folders, ask
