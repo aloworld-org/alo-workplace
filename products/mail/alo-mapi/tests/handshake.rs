@@ -1258,3 +1258,248 @@ async fn execute(h: &Harness, auth: &str, cookie: &str, rops: &[u8]) -> Vec<u8> 
     let size = u16::from_le_bytes(payload[0..2].try_into().unwrap()) as usize;
     payload[2..size].to_vec()
 }
+
+/// A body too large for the client's own property-size limit comes back whole
+/// through a stream — read in chunks, reassembled, byte for byte.
+///
+/// This is the case the property row deliberately refuses: it marks an
+/// oversized value absent rather than truncating it, and this is what a client
+/// does next. Without it, long mail opens with nothing in it.
+#[tokio::test]
+async fn a_long_body_comes_back_through_a_stream() {
+    let h = harness("stream-body").await;
+    let auth = basic(&h.email, &h.password);
+
+    h.account
+        .create_mailbox(None, "Inbox", Some("inbox"))
+        .await
+        .expect("inbox");
+
+    // A body far past any sane property-size limit, with an accented line so a
+    // chunk boundary landing mid-character would show up.
+    let mut long = String::new();
+    for n in 0..400 {
+        long.push_str(&format!("Zeile {n}: Grüße aus Liège.\r\n"));
+    }
+    let raw = format!(
+        "From: Müller <m@example.test>\r\nTo: {to}\r\nSubject: Langer Text\r\n\
+         Content-Type: text/plain; charset=utf-8\r\n\r\n{long}",
+        to = h.email
+    );
+    h.account.deliver(raw.as_bytes()).await.expect("deliver");
+
+    let (_, headers, _) = send(
+        &h.app,
+        "Connect",
+        Some(&auth),
+        None,
+        connect_body("/o=alo/cn=x"),
+    )
+    .await;
+    let cookie = format!("{SESSION_COOKIE}={}", session_cookie(&headers));
+
+    let inbox_fid = {
+        let mut fid = [0u8; 8];
+        fid[0..2].copy_from_slice(&1u16.to_le_bytes());
+        fid[2..8].copy_from_slice(&5u64.to_le_bytes()[0..6]);
+        u64::from_le_bytes(fid)
+    };
+
+    // Learn the MID.
+    let mut rops = Vec::new();
+    let logon = rop_logon("");
+    let rop_size = u16::from_le_bytes(logon[0..2].try_into().unwrap()) as usize;
+    rops.extend_from_slice(&logon[2..rop_size]);
+    rops.push(0x02);
+    rops.extend_from_slice(&[0x00, 0x00, 0x01]);
+    rops.extend_from_slice(&inbox_fid.to_le_bytes());
+    rops.push(0x00);
+    rops.extend_from_slice(&[0x05, 0x00, 0x01, 0x02, 0x00]);
+    rops.extend_from_slice(&[0x12, 0x00, 0x02, 0x00]);
+    rops.extend_from_slice(&1u16.to_le_bytes());
+    rops.extend_from_slice(&[0x14, 0x00, 0x4A, 0x67]); // PidTagMid
+    rops.extend_from_slice(&[0x15, 0x00, 0x02, 0x00, 0x01]);
+    rops.extend_from_slice(&50u16.to_le_bytes());
+    let responses = execute(&h, &auth, &cookie, &rops).await;
+    let mid = u64::from_le_bytes(responses[191..][10..18].try_into().unwrap());
+
+    // ---- the row refuses the oversized body, honouring the limit ----------
+    let mut rops = Vec::new();
+    let logon = rop_logon("");
+    let rop_size = u16::from_le_bytes(logon[0..2].try_into().unwrap()) as usize;
+    rops.extend_from_slice(&logon[2..rop_size]);
+    rops.push(0x03);
+    rops.extend_from_slice(&[0x00, 0x00, 0x01]);
+    rops.extend_from_slice(&0u16.to_le_bytes());
+    rops.extend_from_slice(&inbox_fid.to_le_bytes());
+    rops.push(0x00);
+    rops.extend_from_slice(&mid.to_le_bytes());
+    rops.push(0x07);
+    rops.extend_from_slice(&[0x00, 0x01]);
+    rops.extend_from_slice(&512u16.to_le_bytes()); // PropertySizeLimit: small
+    rops.extend_from_slice(&1u16.to_le_bytes());
+    rops.extend_from_slice(&1u16.to_le_bytes());
+    rops.extend_from_slice(&[0x1F, 0x00, 0x00, 0x10]); // PidTagBody
+
+    let responses = execute(&h, &auth, &cookie, &rops).await;
+    let open = &responses[166..];
+    assert_eq!(
+        u32::from_le_bytes(open[2..6].try_into().unwrap()),
+        0,
+        "opening failed"
+    );
+    let mut at = 9;
+    let _ = read_utf16(open, &mut at);
+    let props = &open[at + 5..];
+    assert_eq!(props[0], 0x07);
+    assert_eq!(props[6], 0x01, "a flagged row: something was withheld");
+    assert_eq!(
+        props[7], 0x01,
+        "the oversized body is marked absent, not truncated"
+    );
+
+    // ---- and comes back whole through a stream ----------------------------
+    let mut rops = Vec::new();
+    let logon = rop_logon("");
+    let rop_size = u16::from_le_bytes(logon[0..2].try_into().unwrap()) as usize;
+    rops.extend_from_slice(&logon[2..rop_size]);
+    rops.push(0x03);
+    rops.extend_from_slice(&[0x00, 0x00, 0x01]);
+    rops.extend_from_slice(&0u16.to_le_bytes());
+    rops.extend_from_slice(&inbox_fid.to_le_bytes());
+    rops.push(0x00);
+    rops.extend_from_slice(&mid.to_le_bytes());
+    // RopOpenStream on the message at index 1, stream to index 2.
+    rops.push(0x2B);
+    rops.extend_from_slice(&[0x00, 0x01, 0x02]);
+    rops.extend_from_slice(&[0x1F, 0x00, 0x00, 0x10]); // PidTagBody
+    rops.push(0x00); // ReadOnly
+    // Two reads: a short-form one, then the 0xBABE extended form.
+    rops.push(0x2C);
+    rops.extend_from_slice(&[0x00, 0x02]);
+    rops.extend_from_slice(&4096u16.to_le_bytes());
+    rops.push(0x2C);
+    rops.extend_from_slice(&[0x00, 0x02]);
+    rops.extend_from_slice(&0xBABEu16.to_le_bytes());
+    rops.extend_from_slice(&60_000u32.to_le_bytes());
+
+    let responses = execute(&h, &auth, &cookie, &rops).await;
+    let open = &responses[166..];
+    assert_eq!(open[0], 0x03);
+    let mut at = 9;
+    let _ = read_utf16(open, &mut at);
+    let stream = &open[at + 5..];
+    assert_eq!(stream[0], 0x2B, "a RopOpenStream response");
+    assert_eq!(
+        u32::from_le_bytes(stream[2..6].try_into().unwrap()),
+        0,
+        "opening the stream failed"
+    );
+    let stream_size = u32::from_le_bytes(stream[6..10].try_into().unwrap()) as usize;
+    assert!(stream_size > 512, "the body really is oversized");
+
+    // First read: the short form, bounded by what was asked for.
+    let first = &stream[10..];
+    assert_eq!(first[0], 0x2C, "a RopReadStream response");
+    assert_eq!(u32::from_le_bytes(first[2..6].try_into().unwrap()), 0);
+    let first_size = usize::from(u16::from_le_bytes(first[6..8].try_into().unwrap()));
+    assert_eq!(first_size, 4096, "the client's own count bounded the read");
+    let mut collected = first[8..8 + first_size].to_vec();
+
+    // Second read: the extended form, and the cursor advanced.
+    let second = &first[8 + first_size..];
+    assert_eq!(second[0], 0x2C);
+    assert_eq!(u32::from_le_bytes(second[2..6].try_into().unwrap()), 0);
+    let second_size = usize::from(u16::from_le_bytes(second[6..8].try_into().unwrap()));
+    assert!(second_size > 0, "the second read returned nothing");
+    collected.extend_from_slice(&second[8..8 + second_size]);
+
+    assert_eq!(
+        collected.len(),
+        stream_size.min(4096 + second_size),
+        "the two reads did not tile the stream"
+    );
+    // The bytes are UTF-16LE and decode to the body that was delivered.
+    let units: Vec<u16> = collected
+        .chunks_exact(2)
+        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .collect();
+    let text = String::from_utf16(&units).expect("utf-16");
+    assert!(
+        text.starts_with("Zeile 0: Grüße aus Liège."),
+        "{:?}",
+        &text[..40]
+    );
+    assert!(
+        text.contains("Zeile 100: Grüße aus Liège."),
+        "a chunk was lost"
+    );
+}
+
+/// A stream cannot be opened for writing: nothing here writes, and a client
+/// holding what it believes is a writable stream would send changes that went
+/// nowhere.
+#[tokio::test]
+async fn a_writable_stream_is_refused_rather_than_opened_read_only() {
+    let h = harness("stream-write").await;
+    let auth = basic(&h.email, &h.password);
+    h.account
+        .create_mailbox(None, "Inbox", Some("inbox"))
+        .await
+        .expect("inbox");
+    h.account
+        .deliver(b"From: s@example.test\r\nTo: o@example.test\r\nSubject: kurz\r\n\r\nText\r\n")
+        .await
+        .expect("deliver");
+
+    let (_, headers, _) = send(
+        &h.app,
+        "Connect",
+        Some(&auth),
+        None,
+        connect_body("/o=alo/cn=x"),
+    )
+    .await;
+    let cookie = format!("{SESSION_COOKIE}={}", session_cookie(&headers));
+
+    let inbox = h.account.inbox().await.expect("inbox id");
+    let rows = h
+        .account
+        .mapi_mailbox_rows(&inbox, alo_store::Page::first(10))
+        .await
+        .expect("rows");
+    let mid = alo_mapi::folders::fid(alo_mapi::messages::message_counter(&rows[0].id));
+    let inbox_fid = {
+        let mut fid = [0u8; 8];
+        fid[0..2].copy_from_slice(&1u16.to_le_bytes());
+        fid[2..8].copy_from_slice(&5u64.to_le_bytes()[0..6]);
+        u64::from_le_bytes(fid)
+    };
+
+    let mut rops = Vec::new();
+    let logon = rop_logon("");
+    let rop_size = u16::from_le_bytes(logon[0..2].try_into().unwrap()) as usize;
+    rops.extend_from_slice(&logon[2..rop_size]);
+    rops.push(0x03);
+    rops.extend_from_slice(&[0x00, 0x00, 0x01]);
+    rops.extend_from_slice(&0u16.to_le_bytes());
+    rops.extend_from_slice(&inbox_fid.to_le_bytes());
+    rops.push(0x00);
+    rops.extend_from_slice(&mid.to_le_bytes());
+    rops.push(0x2B);
+    rops.extend_from_slice(&[0x00, 0x01, 0x02]);
+    rops.extend_from_slice(&[0x1F, 0x00, 0x00, 0x10]);
+    rops.push(0x01); // ReadWrite
+
+    let responses = execute(&h, &auth, &cookie, &rops).await;
+    let open = &responses[166..];
+    let mut at = 9;
+    let _ = read_utf16(open, &mut at);
+    let stream = &open[at + 5..];
+    assert_eq!(stream[0], 0x2B);
+    assert_eq!(
+        u32::from_le_bytes(stream[2..6].try_into().unwrap()),
+        0x8004_0FFF,
+        "a writable stream was opened"
+    );
+}

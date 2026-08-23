@@ -49,6 +49,10 @@ use crate::rows::{
     standard_row, success_body as query_rows_success,
 };
 use crate::session::SessionContext;
+use crate::stream::{
+    MAX_READ, OpenStreamRequest, ROP_OPEN_STREAM, ROP_READ_STREAM, ReadStreamRequest,
+    open_success_body as open_stream_success, read_success_body as read_stream_success,
+};
 
 /// Error codes as they travel in ROP responses ([MS-OXCDATA] §2.4).
 pub mod error {
@@ -117,6 +121,21 @@ pub enum ServerObject {
         folder_id: u64,
         /// The id the client opened it by.
         mid: u64,
+    },
+    /// An open stream over one property of one message.
+    ///
+    /// Holds a cursor, not the bytes. The value is re-read from the loaded
+    /// message on every request, so a session that keeps a stream open across
+    /// many requests costs a position rather than a copy of somebody's mail.
+    Stream {
+        /// The folder the message was opened from.
+        folder_id: u64,
+        /// The message whose property this streams.
+        mid: u64,
+        /// Which property.
+        property_id: u16,
+        /// How many bytes the client has already read.
+        position: usize,
     },
     /// A table of a folder's messages, opened on that folder.
     ///
@@ -247,6 +266,69 @@ pub fn may_open(ctx: &SessionContext, prefix: &str, essdn: &str) -> bool {
         return true;
     }
     essdn.eq_ignore_ascii_case(&mailbox_dn(prefix, &ctx.login))
+}
+
+/// One message property, answered from the loaded message.
+///
+/// The single source for what a message says: [`ROP_GET_PROPERTIES_SPECIFIC`]
+/// builds a row from it and [`ROP_OPEN_STREAM`] streams it. Two lookups would
+/// eventually disagree, and a client that read a body one way and streamed it
+/// another would see the difference.
+fn message_value(
+    entry: &crate::messages::MessageEntry,
+    body: &crate::messages::MessageBody,
+    property_id: u16,
+) -> Option<Value> {
+    match property_id {
+        pid::MID => Some(Value::Integer64(entry.mid)),
+        pid::SUBJECT => Some(Value::String(entry.subject.clone())),
+        pid::SENDER_NAME => Some(Value::String(entry.sender.clone())),
+        pid::MESSAGE_DELIVERY_TIME => Some(Value::Time(entry.delivery_time)),
+        pid::MESSAGE_FLAGS => Some(Value::Integer32(entry.flags)),
+        pid::MESSAGE_SIZE => Some(Value::Integer32(entry.size)),
+        pid::HAS_ATTACHMENTS => Some(Value::Boolean(entry.has_attachment)),
+        pid::MESSAGE_CLASS => Some(Value::String(MESSAGE_CLASS_NOTE.to_owned())),
+        pid::BODY => Some(Value::String(body.text.clone())),
+        pid::DISPLAY_TO => Some(Value::String(body.display_to.clone())),
+        pid::DISPLAY_CC => Some(Value::String(body.display_cc.clone())),
+        // A message with no `Date` header has no submit time, and a zero here
+        // would date it to 1601. Refusing the column is the honest answer.
+        pid::CLIENT_SUBMIT_TIME => body.submit_time.map(Value::Time),
+        pid::INTERNET_MESSAGE_ID => body
+            .internet_message_id
+            .as_ref()
+            .map(|id| Value::String(id.clone())),
+        _ => None,
+    }
+}
+
+/// The bytes a stream over one property carries.
+///
+/// A string streams as its UTF-16LE content **without** the terminating null a
+/// property row carries: the stream's size is the size of the value, and a
+/// client that appended two zero bytes to a body would render a stray
+/// character at the end of every long message. This is the one encoding choice
+/// here not pinned by a specification sentence, so it is written down rather
+/// than assumed — and it is what a real client should be checked against.
+fn stream_bytes(
+    entry: &crate::messages::MessageEntry,
+    body: &crate::messages::MessageBody,
+    property_id: u16,
+) -> Option<Vec<u8>> {
+    match message_value(entry, body, property_id)? {
+        Value::String(text) => {
+            let mut out = Vec::with_capacity(text.len() * 2);
+            for unit in text.encode_utf16() {
+                out.extend_from_slice(&unit.to_le_bytes());
+            }
+            Some(out)
+        }
+        other => {
+            let mut out = Vec::new();
+            other.write(&mut out);
+            Some(out)
+        }
+    }
 }
 
 /// A failure response for an operation that returns only a status
@@ -842,28 +924,7 @@ pub fn dispatch(
                 };
 
                 let answer = |tag: PropertyTag| -> Option<Value> {
-                    match tag.property_id {
-                        pid::MID => Some(Value::Integer64(entry.mid)),
-                        pid::SUBJECT => Some(Value::String(entry.subject.clone())),
-                        pid::SENDER_NAME => Some(Value::String(entry.sender.clone())),
-                        pid::MESSAGE_DELIVERY_TIME => Some(Value::Time(entry.delivery_time)),
-                        pid::MESSAGE_FLAGS => Some(Value::Integer32(entry.flags)),
-                        pid::MESSAGE_SIZE => Some(Value::Integer32(entry.size)),
-                        pid::HAS_ATTACHMENTS => Some(Value::Boolean(entry.has_attachment)),
-                        pid::MESSAGE_CLASS => Some(Value::String(MESSAGE_CLASS_NOTE.to_owned())),
-                        pid::BODY => Some(Value::String(body.text.clone())),
-                        pid::DISPLAY_TO => Some(Value::String(body.display_to.clone())),
-                        pid::DISPLAY_CC => Some(Value::String(body.display_cc.clone())),
-                        // A message with no `Date` header has no submit time,
-                        // and a zero here would date it to 1601. Refusing the
-                        // column is the honest answer.
-                        pid::CLIENT_SUBMIT_TIME => body.submit_time.map(Value::Time),
-                        pid::INTERNET_MESSAGE_ID => body
-                            .internet_message_id
-                            .as_ref()
-                            .map(|id| Value::String(id.clone())),
-                        _ => None,
-                    }
+                    message_value(entry, body, tag.property_id)
                 };
 
                 // The client's own ceiling on a value it will accept, honoured
@@ -882,6 +943,179 @@ pub fn dispatch(
                         ));
                     }
                 }
+            }
+
+            ROP_OPEN_STREAM => {
+                let Ok((request, tail)) = OpenStreamRequest::parse(rest) else {
+                    responses.extend(failure(
+                        ROP_OPEN_STREAM,
+                        header.input_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    return Dispatched {
+                        responses,
+                        handles,
+                        complete: false,
+                        contents_folders,
+                        opened_messages,
+                    };
+                };
+                rest = tail;
+
+                // Opened on a message. Folders and logons have streamable
+                // properties too, and they are a later stage.
+                let opened = handles
+                    .get(usize::from(request.input_handle_index))
+                    .copied()
+                    .filter(|handle| *handle != crate::rop::HANDLE_UNSET)
+                    .and_then(|handle| objects.get(handle));
+                let Some(ServerObject::Message { folder_id, mid }) = opened else {
+                    responses.extend(failure(
+                        ROP_OPEN_STREAM,
+                        request.output_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    continue;
+                };
+                let (folder_id, mid) = (*folder_id, *mid);
+
+                // Nothing here writes. Refused rather than quietly opened
+                // read-only: a client holding what it believes is a writable
+                // stream would send changes that went nowhere.
+                if request.wants_to_write() {
+                    responses.extend(failure(
+                        ROP_OPEN_STREAM,
+                        request.output_handle_index,
+                        error::NOT_IMPLEMENTED,
+                    ));
+                    continue;
+                }
+
+                // Streaming needs the message loaded, exactly as opening it
+                // did — and during the rehearsal it is not, which is what
+                // tells the router to fetch it.
+                let wanted = (folder_id, mid);
+                if !opened_messages.contains(&wanted) {
+                    opened_messages.push(wanted);
+                }
+                let (Some(entry), Some(body)) =
+                    (messages.entry(folder_id, mid), messages.body(mid))
+                else {
+                    responses.extend(failure(
+                        ROP_OPEN_STREAM,
+                        request.output_handle_index,
+                        error::NOT_FOUND,
+                    ));
+                    continue;
+                };
+                let Some(bytes) = stream_bytes(entry, body, request.property_tag.property_id)
+                else {
+                    // A property this message does not have. `ecNotFound` is
+                    // the truthful answer; an empty stream would say the
+                    // property exists and is blank.
+                    responses.extend(failure(
+                        ROP_OPEN_STREAM,
+                        request.output_handle_index,
+                        error::NOT_FOUND,
+                    ));
+                    continue;
+                };
+                let size = u32::try_from(bytes.len()).unwrap_or(u32::MAX);
+
+                let handle = objects.insert(ServerObject::Stream {
+                    folder_id,
+                    mid,
+                    property_id: request.property_tag.property_id,
+                    position: 0,
+                });
+                let index = usize::from(request.output_handle_index);
+                if handles.len() <= index {
+                    handles.resize(index + 1, crate::rop::HANDLE_UNSET);
+                }
+                handles[index] = handle;
+                responses.extend(open_stream_success(request.output_handle_index, size));
+            }
+
+            ROP_READ_STREAM => {
+                let Ok((request, tail)) = ReadStreamRequest::parse(rest) else {
+                    responses.extend(failure(
+                        ROP_READ_STREAM,
+                        header.input_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    return Dispatched {
+                        responses,
+                        handles,
+                        complete: false,
+                        contents_folders,
+                        opened_messages,
+                    };
+                };
+                rest = tail;
+
+                let handle = handles
+                    .get(usize::from(request.input_handle_index))
+                    .copied()
+                    .filter(|handle| *handle != crate::rop::HANDLE_UNSET);
+                let Some(ServerObject::Stream {
+                    folder_id,
+                    mid,
+                    property_id,
+                    position,
+                }) = handle.and_then(|handle| objects.get(handle))
+                else {
+                    responses.extend(failure(
+                        ROP_READ_STREAM,
+                        request.input_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    continue;
+                };
+                let (folder_id, mid, property_id, position) =
+                    (*folder_id, *mid, *property_id, *position);
+
+                // The stream holds a cursor, not the bytes, so a read in a
+                // later request needs the message loaded again.
+                let wanted = (folder_id, mid);
+                if !opened_messages.contains(&wanted) {
+                    opened_messages.push(wanted);
+                }
+                let (Some(entry), Some(body)) =
+                    (messages.entry(folder_id, mid), messages.body(mid))
+                else {
+                    responses.extend(failure(
+                        ROP_READ_STREAM,
+                        request.input_handle_index,
+                        error::NOT_FOUND,
+                    ));
+                    continue;
+                };
+                let Some(bytes) = stream_bytes(entry, body, property_id) else {
+                    responses.extend(failure(
+                        ROP_READ_STREAM,
+                        request.input_handle_index,
+                        error::NOT_FOUND,
+                    ));
+                    continue;
+                };
+
+                // Bounded three ways: what is left, what the client asked for,
+                // and what `DataSize` can describe. A read past the end returns
+                // nothing and succeeds — that is how a client knows it is done,
+                // and an error there would look like a broken stream.
+                let start = position.min(bytes.len());
+                let take = usize::try_from(request.wanted)
+                    .unwrap_or(MAX_READ)
+                    .min(MAX_READ)
+                    .min(bytes.len() - start);
+                let chunk = &bytes[start..start + take];
+
+                if let Some(handle) = handle
+                    && let Some(ServerObject::Stream { position, .. }) = objects.get_mut(handle)
+                {
+                    *position = start + take;
+                }
+                responses.extend(read_stream_success(request.input_handle_index, chunk));
             }
 
             ROP_RELEASE => {

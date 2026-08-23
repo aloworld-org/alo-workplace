@@ -38,6 +38,7 @@ pub mod router;
 pub mod rows;
 pub mod rpc;
 pub mod session;
+pub mod stream;
 
 pub use connect::{ConnectError, ConnectRequest};
 pub use response::{MapiResponse, ResponseCode};
