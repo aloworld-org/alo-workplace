@@ -10,6 +10,14 @@ contracts.
 
 ## Unreleased
 
+- **Native Outlook can now send.** A message composed in Outlook is saved to
+  Drafts, sent through the same path alo's own clients send through, and filed
+  into Sent — so it is DKIM-signed and queued exactly as any other outgoing
+  mail. A message can only be sent from an address the signed-in account owns,
+  and `Bcc` recipients are reached without their addresses appearing in the
+  message anybody receives. Attaching a file to an outgoing message is not
+  supported yet. Still off by default. Seventh stage of ADR 0051.
+
 - **Native Outlook: typing a colleague's name now finds their address.** The
   address book endpoint resolves names against the people in your organisation
   and your own contacts. A name that matches two people is reported as
