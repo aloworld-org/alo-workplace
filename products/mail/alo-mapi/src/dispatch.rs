@@ -19,6 +19,10 @@
 //! and act on it. A short answer is recoverable; acting on a misread request is
 //! not.
 
+use crate::attachments::{
+    AttachmentTableRequest, OpenAttachmentRequest, ROP_GET_ATTACHMENT_TABLE, ROP_OPEN_ATTACHMENT,
+    open_success_body as open_attachment_success, table_success_body as attachment_table_success,
+};
 use crate::columns::{
     PropertyTag, ROP_SET_COLUMNS, SetColumnsRequest, success_body as set_columns_success,
 };
@@ -132,10 +136,33 @@ pub enum ServerObject {
         folder_id: u64,
         /// The message whose property this streams.
         mid: u64,
+        /// The attachment, when the stream reads one of its files rather than
+        /// a property of the message itself.
+        attachment: Option<u32>,
         /// Which property.
         property_id: u16,
         /// How many bytes the client has already read.
         position: usize,
+    },
+    /// A table of a message's attachments, opened on that message.
+    AttachmentTable {
+        /// The folder the message was opened from.
+        folder_id: u64,
+        /// The message whose attachments this lists.
+        mid: u64,
+        /// The columns every row will carry, in order.
+        columns: Vec<PropertyTag>,
+        /// How many rows the client has already read.
+        cursor: usize,
+    },
+    /// One open attachment of a message.
+    Attachment {
+        /// The folder the message was opened from.
+        folder_id: u64,
+        /// The message it hangs off.
+        mid: u64,
+        /// Its `PidTagAttachNumber`.
+        number: u32,
     },
     /// A table of a folder's messages, opened on that folder.
     ///
@@ -302,7 +329,50 @@ fn message_value(
     }
 }
 
-/// The bytes a stream over one property carries.
+/// Which of the three tables a `RopQueryRows` is reading.
+///
+/// They share a shape on the wire and nothing else: the rows come from three
+/// different places and answer three different property sets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TableKind {
+    /// A folder's children.
+    Hierarchy,
+    /// A folder's messages.
+    Contents,
+    /// One message's attachments.
+    Attachments {
+        /// The message they hang off.
+        mid: u64,
+    },
+}
+
+/// One attachment property, answered from the loaded message.
+fn attachment_value(
+    attachment: &crate::messages::AttachmentEntry,
+    property_id: u16,
+) -> Option<Value> {
+    match property_id {
+        pid::ATTACH_NUMBER => Some(Value::Integer32(attachment.number)),
+        pid::ATTACH_SIZE => Some(Value::Integer32(attachment.size)),
+        pid::ATTACH_LONG_FILENAME => Some(Value::String(attachment.filename.clone())),
+        pid::ATTACH_MIME_TAG => Some(Value::String(attachment.mime_type.clone())),
+        // Everything alo attaches is carried in the message itself.
+        pid::ATTACH_METHOD => Some(Value::Integer32(crate::attachments::ATTACH_BY_VALUE)),
+        // `PidTagAttachDataBinary` is deliberately not answered in a row. It is
+        // `PtypBinary`, whose count width is the one thing in this protocol
+        // this crate has not resolved, and any real file exceeds a client's
+        // property-size limit anyway — so it is read as a stream, where there
+        // is no count field to get wrong.
+        _ => None,
+    }
+}
+
+/// The bytes a stream carries.
+///
+/// A stream reads either one property of a message or the contents of one of
+/// its attachments; `attachment` picks which. An attachment's
+/// `PidTagAttachDataBinary` is served raw — a stream has no count field, which
+/// is precisely why the `PtypBinary` width question never arises for a file.
 ///
 /// A string streams as its UTF-16LE content **without** the terminating null a
 /// property row carries: the stream's size is the size of the value, and a
@@ -310,11 +380,26 @@ fn message_value(
 /// character at the end of every long message. This is the one encoding choice
 /// here not pinned by a specification sentence, so it is written down rather
 /// than assumed — and it is what a real client should be checked against.
-fn stream_bytes(
-    entry: &crate::messages::MessageEntry,
-    body: &crate::messages::MessageBody,
+fn stream_source(
+    messages: &MessageView,
+    folder_id: u64,
+    mid: u64,
+    attachment: Option<u32>,
     property_id: u16,
 ) -> Option<Vec<u8>> {
+    if let Some(number) = attachment {
+        let attachment = messages.attachment(mid, number)?;
+        return match property_id {
+            pid::ATTACH_DATA_BINARY => attachment.data.clone(),
+            other => {
+                let mut out = Vec::new();
+                attachment_value(attachment, other)?.write(&mut out);
+                Some(out)
+            }
+        };
+    }
+    let entry = messages.entry(folder_id, mid)?;
+    let body = messages.body(mid)?;
     match message_value(entry, body, property_id)? {
         Value::String(text) => {
             let mut out = Vec::with_capacity(text.len() * 2);
@@ -363,6 +448,12 @@ pub struct Dispatched {
     /// knows which bodies to fetch, and the folder each one names is loaded
     /// first, because a MID can only be resolved inside its folder's rows.
     pub opened_messages: Vec<(u64, u64)>,
+    /// The attachments this buffer opened, as `(folder id, MID, number)`.
+    ///
+    /// Separate from the messages because the costs differ by orders of
+    /// magnitude: listing a message's attachments reads names and sizes out of
+    /// a parse already done, and opening one means decoding a file.
+    pub opened_attachments: Vec<(u64, u64, u32)>,
 }
 
 /// The folders whose messages a buffer is about to read.
@@ -376,32 +467,31 @@ pub struct Dispatched {
 /// exactly the common case.
 ///
 /// So this rehearses the whole dispatch against a **copy** of the object table
-/// and an empty [`MessageView`], and reports what it reached. The responses are
-/// thrown away; only the folder list is kept. Rehearsing costs a second walk of
-/// a buffer that is at most tens of kilobytes, and it cannot drift from the
-/// real walk because it *is* the real walk.
+/// and reports what it reached. The responses are thrown away; only the list of
+/// things to load is kept. Rehearsing costs a second walk of a buffer that is at
+/// most tens of kilobytes, and it cannot drift from the real walk because it
+/// *is* the real walk.
+///
+/// `messages` is what has been loaded so far, which is why the router calls this
+/// more than once: each pass can see one layer further than the last. With
+/// nothing loaded a rehearsal cannot get past `RopOpenMessage`, so it never
+/// reaches the `RopOpenAttachment` behind it.
 #[must_use]
 pub fn wanted_contents(
     ctx: &SessionContext,
     prefix: &str,
     objects: &ObjectTable,
     folders: &FolderView,
+    messages: &MessageView,
     input: &RopBuffer,
     now: LogonTime,
 ) -> Wanted {
     let mut rehearsal = objects.clone();
-    let out = dispatch(
-        ctx,
-        prefix,
-        &mut rehearsal,
-        folders,
-        &MessageView::new(),
-        input,
-        now,
-    );
+    let out = dispatch(ctx, prefix, &mut rehearsal, folders, messages, input, now);
     Wanted {
         folders: out.contents_folders,
         messages: out.opened_messages,
+        attachments: out.opened_attachments,
     }
 }
 
@@ -412,6 +502,8 @@ pub struct Wanted {
     pub folders: Vec<u64>,
     /// Messages whose content is needed, as `(folder id, MID)`.
     pub messages: Vec<(u64, u64)>,
+    /// Attachments whose bytes are needed, as `(folder id, MID, number)`.
+    pub attachments: Vec<(u64, u64, u32)>,
 }
 
 /// Walks a ROP input buffer and answers each request in turn.
@@ -433,6 +525,7 @@ pub fn dispatch(
     let mut rest: &[u8] = &input.rops;
     let mut contents_folders: Vec<u64> = Vec::new();
     let mut opened_messages: Vec<(u64, u64)> = Vec::new();
+    let mut opened_attachments: Vec<(u64, u64, u32)> = Vec::new();
 
     while !rest.is_empty() {
         let Ok(header) = RopHeader::parse(rest) else {
@@ -444,6 +537,7 @@ pub fn dispatch(
                 complete: false,
                 contents_folders,
                 opened_messages,
+                opened_attachments,
             };
         };
 
@@ -461,6 +555,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -547,6 +642,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -610,6 +706,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -662,6 +759,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -733,6 +831,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -753,6 +852,7 @@ pub fn dispatch(
                                 object,
                                 ServerObject::HierarchyTable { .. }
                                     | ServerObject::ContentsTable { .. }
+                                    | ServerObject::AttachmentTable { .. }
                             )
                         });
                 if !is_table {
@@ -764,12 +864,14 @@ pub fn dispatch(
                     continue;
                 }
 
-                // Both kinds of table carry a column list, and `RopSetColumns`
-                // means the same thing to each — it is the *rows* that differ.
+                // Every kind of table carries a column list, and
+                // `RopSetColumns` means the same thing to each — it is the
+                // *rows* that differ.
                 if let Some(handle) = handle
                     && let Some(
                         ServerObject::HierarchyTable { columns, .. }
-                        | ServerObject::ContentsTable { columns, .. },
+                        | ServerObject::ContentsTable { columns, .. }
+                        | ServerObject::AttachmentTable { columns, .. },
                     ) = objects.get_mut(handle)
                 {
                     columns.clone_from(&request.columns);
@@ -790,6 +892,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -885,6 +988,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -945,6 +1049,136 @@ pub fn dispatch(
                 }
             }
 
+            ROP_GET_ATTACHMENT_TABLE => {
+                let Ok((request, tail)) = AttachmentTableRequest::parse(rest) else {
+                    responses.extend(failure(
+                        ROP_GET_ATTACHMENT_TABLE,
+                        header.input_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    return Dispatched {
+                        responses,
+                        handles,
+                        complete: false,
+                        contents_folders,
+                        opened_messages,
+                        opened_attachments,
+                    };
+                };
+                rest = tail;
+
+                let opened = handles
+                    .get(usize::from(request.input_handle_index))
+                    .copied()
+                    .filter(|handle| *handle != crate::rop::HANDLE_UNSET)
+                    .and_then(|handle| objects.get(handle));
+                let Some(ServerObject::Message { folder_id, mid }) = opened else {
+                    responses.extend(failure(
+                        ROP_GET_ATTACHMENT_TABLE,
+                        request.output_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    continue;
+                };
+                let (folder_id, mid) = (*folder_id, *mid);
+
+                let wanted = (folder_id, mid);
+                if !opened_messages.contains(&wanted) {
+                    opened_messages.push(wanted);
+                }
+                let Some(body) = messages.body(mid) else {
+                    responses.extend(failure(
+                        ROP_GET_ATTACHMENT_TABLE,
+                        request.output_handle_index,
+                        error::NOT_FOUND,
+                    ));
+                    continue;
+                };
+                let rows = u32::try_from(body.attachments.len()).unwrap_or(u32::MAX);
+
+                let handle = objects.insert(ServerObject::AttachmentTable {
+                    folder_id,
+                    mid,
+                    columns: Vec::new(),
+                    cursor: 0,
+                });
+                let index = usize::from(request.output_handle_index);
+                if handles.len() <= index {
+                    handles.resize(index + 1, crate::rop::HANDLE_UNSET);
+                }
+                handles[index] = handle;
+                responses.extend(attachment_table_success(request.output_handle_index, rows));
+            }
+
+            ROP_OPEN_ATTACHMENT => {
+                let Ok((request, tail)) = OpenAttachmentRequest::parse(rest) else {
+                    responses.extend(failure(
+                        ROP_OPEN_ATTACHMENT,
+                        header.input_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    return Dispatched {
+                        responses,
+                        handles,
+                        complete: false,
+                        contents_folders,
+                        opened_messages,
+                        opened_attachments,
+                    };
+                };
+                rest = tail;
+
+                // Opened on the message it belongs to: an attachment number
+                // means nothing outside its own message, so there is no way to
+                // name one without first holding the message.
+                let opened = handles
+                    .get(usize::from(request.input_handle_index))
+                    .copied()
+                    .filter(|handle| *handle != crate::rop::HANDLE_UNSET)
+                    .and_then(|handle| objects.get(handle));
+                let Some(ServerObject::Message { folder_id, mid }) = opened else {
+                    responses.extend(failure(
+                        ROP_OPEN_ATTACHMENT,
+                        request.output_handle_index,
+                        error::INVALID_OBJECT,
+                    ));
+                    continue;
+                };
+                let (folder_id, mid) = (*folder_id, *mid);
+
+                let wanted_message = (folder_id, mid);
+                if !opened_messages.contains(&wanted_message) {
+                    opened_messages.push(wanted_message);
+                }
+                // Opening an attachment is what makes its bytes worth fetching;
+                // listing a message's attachments does not.
+                let wanted = (folder_id, mid, request.attachment_id);
+                if !opened_attachments.contains(&wanted) {
+                    opened_attachments.push(wanted);
+                }
+
+                if messages.attachment(mid, request.attachment_id).is_none() {
+                    responses.extend(failure(
+                        ROP_OPEN_ATTACHMENT,
+                        request.output_handle_index,
+                        error::NOT_FOUND,
+                    ));
+                    continue;
+                }
+
+                let handle = objects.insert(ServerObject::Attachment {
+                    folder_id,
+                    mid,
+                    number: request.attachment_id,
+                });
+                let index = usize::from(request.output_handle_index);
+                if handles.len() <= index {
+                    handles.resize(index + 1, crate::rop::HANDLE_UNSET);
+                }
+                handles[index] = handle;
+                responses.extend(open_attachment_success(request.output_handle_index));
+            }
+
             ROP_OPEN_STREAM => {
                 let Ok((request, tail)) = OpenStreamRequest::parse(rest) else {
                     responses.extend(failure(
@@ -958,6 +1192,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -969,15 +1204,24 @@ pub fn dispatch(
                     .copied()
                     .filter(|handle| *handle != crate::rop::HANDLE_UNSET)
                     .and_then(|handle| objects.get(handle));
-                let Some(ServerObject::Message { folder_id, mid }) = opened else {
-                    responses.extend(failure(
-                        ROP_OPEN_STREAM,
-                        request.output_handle_index,
-                        error::INVALID_OBJECT,
-                    ));
-                    continue;
+                // A stream reads a property of a message, or the bytes of one
+                // of its attachments — the two objects a client streams from.
+                let (folder_id, mid, attachment) = match opened {
+                    Some(ServerObject::Message { folder_id, mid }) => (*folder_id, *mid, None),
+                    Some(ServerObject::Attachment {
+                        folder_id,
+                        mid,
+                        number,
+                    }) => (*folder_id, *mid, Some(*number)),
+                    _ => {
+                        responses.extend(failure(
+                            ROP_OPEN_STREAM,
+                            request.output_handle_index,
+                            error::INVALID_OBJECT,
+                        ));
+                        continue;
+                    }
                 };
-                let (folder_id, mid) = (*folder_id, *mid);
 
                 // Nothing here writes. Refused rather than quietly opened
                 // read-only: a client holding what it believes is a writable
@@ -998,18 +1242,13 @@ pub fn dispatch(
                 if !opened_messages.contains(&wanted) {
                     opened_messages.push(wanted);
                 }
-                let (Some(entry), Some(body)) =
-                    (messages.entry(folder_id, mid), messages.body(mid))
-                else {
-                    responses.extend(failure(
-                        ROP_OPEN_STREAM,
-                        request.output_handle_index,
-                        error::NOT_FOUND,
-                    ));
-                    continue;
-                };
-                let Some(bytes) = stream_bytes(entry, body, request.property_tag.property_id)
-                else {
+                let Some(bytes) = stream_source(
+                    messages,
+                    folder_id,
+                    mid,
+                    attachment,
+                    request.property_tag.property_id,
+                ) else {
                     // A property this message does not have. `ecNotFound` is
                     // the truthful answer; an empty stream would say the
                     // property exists and is blank.
@@ -1025,6 +1264,7 @@ pub fn dispatch(
                 let handle = objects.insert(ServerObject::Stream {
                     folder_id,
                     mid,
+                    attachment,
                     property_id: request.property_tag.property_id,
                     position: 0,
                 });
@@ -1049,6 +1289,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -1060,6 +1301,7 @@ pub fn dispatch(
                 let Some(ServerObject::Stream {
                     folder_id,
                     mid,
+                    attachment,
                     property_id,
                     position,
                 }) = handle.and_then(|handle| objects.get(handle))
@@ -1071,8 +1313,8 @@ pub fn dispatch(
                     ));
                     continue;
                 };
-                let (folder_id, mid, property_id, position) =
-                    (*folder_id, *mid, *property_id, *position);
+                let (folder_id, mid, attachment, property_id, position) =
+                    (*folder_id, *mid, *attachment, *property_id, *position);
 
                 // The stream holds a cursor, not the bytes, so a read in a
                 // later request needs the message loaded again.
@@ -1080,17 +1322,8 @@ pub fn dispatch(
                 if !opened_messages.contains(&wanted) {
                     opened_messages.push(wanted);
                 }
-                let (Some(entry), Some(body)) =
-                    (messages.entry(folder_id, mid), messages.body(mid))
+                let Some(bytes) = stream_source(messages, folder_id, mid, attachment, property_id)
                 else {
-                    responses.extend(failure(
-                        ROP_READ_STREAM,
-                        request.input_handle_index,
-                        error::NOT_FOUND,
-                    ));
-                    continue;
-                };
-                let Some(bytes) = stream_bytes(entry, body, property_id) else {
                     responses.extend(failure(
                         ROP_READ_STREAM,
                         request.input_handle_index,
@@ -1131,6 +1364,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -1163,6 +1397,7 @@ pub fn dispatch(
                         complete: false,
                         contents_folders,
                         opened_messages,
+                        opened_attachments,
                     };
                 };
                 rest = tail;
@@ -1177,18 +1412,42 @@ pub fn dispatch(
                 // table reads the folder's children out of the tree, and a
                 // contents table reads its messages out of what was loaded.
                 let opened = handle.and_then(|handle| objects.get(handle));
-                let (folder_id, columns, cursor, is_contents, associated) = match opened {
+                let (folder_id, columns, cursor, kind, associated) = match opened {
                     Some(ServerObject::HierarchyTable {
                         folder_id,
                         columns,
                         cursor,
-                    }) => (*folder_id, columns.clone(), *cursor, false, false),
+                    }) => (
+                        *folder_id,
+                        columns.clone(),
+                        *cursor,
+                        TableKind::Hierarchy,
+                        false,
+                    ),
                     Some(ServerObject::ContentsTable {
                         folder_id,
                         columns,
                         cursor,
                         associated,
-                    }) => (*folder_id, columns.clone(), *cursor, true, *associated),
+                    }) => (
+                        *folder_id,
+                        columns.clone(),
+                        *cursor,
+                        TableKind::Contents,
+                        *associated,
+                    ),
+                    Some(ServerObject::AttachmentTable {
+                        folder_id,
+                        mid,
+                        columns,
+                        cursor,
+                    }) => (
+                        *folder_id,
+                        columns.clone(),
+                        *cursor,
+                        TableKind::Attachments { mid: *mid },
+                        false,
+                    ),
                     _ => {
                         responses.extend(failure(
                             ROP_QUERY_ROWS,
@@ -1201,31 +1460,38 @@ pub fn dispatch(
 
                 // The rows this table could ever return, before the cursor and
                 // the client's count are applied.
-                let total = if is_contents {
-                    if associated {
-                        // alo keeps no FAI messages, so this table is empty and
-                        // stays empty. Not a refusal: an empty answer here is
-                        // the truth, and a client caching it caches the truth.
-                        0
-                    } else {
-                        match messages.rows(folder_id) {
-                            Some(rows) => rows.len(),
-                            None => {
-                                // The folder's messages were never loaded, so
-                                // there is nothing truthful to say about them.
-                                // Returning an empty page would tell a client
-                                // the folder is empty, which it then caches.
-                                responses.extend(failure(
-                                    ROP_QUERY_ROWS,
-                                    request.input_handle_index,
-                                    error::NOT_FOUND,
-                                ));
-                                continue;
-                            }
+                let total = match kind {
+                    TableKind::Hierarchy => folders.children(folder_id).len(),
+                    // alo keeps no FAI messages, so an associated table is
+                    // empty and stays empty. Not a refusal: an empty answer
+                    // here is the truth, and a client caching it caches truth.
+                    TableKind::Contents if associated => 0,
+                    TableKind::Contents => match messages.rows(folder_id) {
+                        Some(rows) => rows.len(),
+                        None => {
+                            // The folder's messages were never loaded, so there
+                            // is nothing truthful to say about them. Returning
+                            // an empty page would tell a client the folder is
+                            // empty, which it then caches.
+                            responses.extend(failure(
+                                ROP_QUERY_ROWS,
+                                request.input_handle_index,
+                                error::NOT_FOUND,
+                            ));
+                            continue;
                         }
-                    }
-                } else {
-                    folders.children(folder_id).len()
+                    },
+                    TableKind::Attachments { mid } => match messages.body(mid) {
+                        Some(body) => body.attachments.len(),
+                        None => {
+                            responses.extend(failure(
+                                ROP_QUERY_ROWS,
+                                request.input_handle_index,
+                                error::NOT_FOUND,
+                            ));
+                            continue;
+                        }
+                    },
                 };
 
                 // Read forwards from the cursor, bounded by what the client
@@ -1244,7 +1510,22 @@ pub fn dispatch(
 
                 let mut rows = Vec::with_capacity(span.1.saturating_sub(span.0));
                 let mut refused = false;
-                if is_contents {
+                if let TableKind::Attachments { mid } = kind {
+                    let empty = Vec::new();
+                    let list = messages.body(mid).map_or(&empty, |body| &body.attachments);
+                    for attachment in &list[span.0..span.1] {
+                        let answer = |tag: PropertyTag| -> Option<Value> {
+                            attachment_value(attachment, tag.property_id)
+                        };
+                        match standard_row(&columns, &answer) {
+                            Some(row) => rows.push(row),
+                            None => {
+                                refused = true;
+                                break;
+                            }
+                        }
+                    }
+                } else if matches!(kind, TableKind::Contents) {
                     let entries = if associated {
                         &[][..]
                     } else {
@@ -1324,7 +1605,8 @@ pub fn dispatch(
                 if let Some(handle) = handle
                     && let Some(
                         ServerObject::HierarchyTable { cursor, .. }
-                        | ServerObject::ContentsTable { cursor, .. },
+                        | ServerObject::ContentsTable { cursor, .. }
+                        | ServerObject::AttachmentTable { cursor, .. },
                     ) = objects.get_mut(handle)
                 {
                     *cursor = advanced;
@@ -1358,6 +1640,7 @@ pub fn dispatch(
                     complete: false,
                     contents_folders,
                     opened_messages,
+                    opened_attachments,
                 };
             }
         }
@@ -1369,6 +1652,7 @@ pub fn dispatch(
         complete: true,
         contents_folders,
         opened_messages,
+        opened_attachments,
     }
 }
 
@@ -2434,6 +2718,7 @@ mod tests {
             "/o=alo",
             &objects,
             &view(),
+            &MessageView::new(),
             &buffer,
             LogonTime::default(),
         );
@@ -2464,6 +2749,7 @@ mod tests {
                 "/o=alo",
                 &objects,
                 &view(),
+                &MessageView::new(),
                 &buffer,
                 LogonTime::default(),
             )

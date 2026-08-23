@@ -1503,3 +1503,251 @@ async fn a_writable_stream_is_refused_rather_than_opened_read_only() {
         "a writable stream was opened"
     );
 }
+
+/// A client lists a message's attachments and reads one back, byte for byte.
+///
+/// The whole chain: open the message, take its attachment table, name the
+/// columns, read the rows, open the attachment the reader picked, and stream
+/// its contents. This is what saving a file out of Outlook does.
+#[tokio::test]
+async fn a_client_lists_and_reads_an_attachment_over_http() {
+    let h = harness("attachments").await;
+    let auth = basic(&h.email, &h.password);
+    h.account
+        .create_mailbox(None, "Inbox", Some("inbox"))
+        .await
+        .expect("inbox");
+
+    // Two files, so the numbering has to be right rather than coincidentally
+    // right: a reader who clicks the second must not get the first.
+    let first = b"Rechnung Nr. 42\r\nBetrag: 199,00 EUR\r\n";
+    let second = b"%PDF-1.4 fake pdf bytes for the test";
+    let raw = format!(
+        "From: M\u{fc}ller <m@example.test>\r\nTo: {to}\r\nSubject: Mit Anhang\r\n\
+         Content-Type: multipart/mixed; boundary=BOUND\r\n\r\n\
+         --BOUND\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\
+         Anbei zwei Dateien.\r\n\
+         --BOUND\r\nContent-Type: text/plain; charset=utf-8\r\n\
+         Content-Disposition: attachment; filename=\"rechnung.txt\"\r\n\r\n\
+         {first}\r\n\
+         --BOUND\r\nContent-Type: application/pdf\r\n\
+         Content-Disposition: attachment; filename=\"anhang.pdf\"\r\n\r\n\
+         {second}\r\n--BOUND--\r\n",
+        to = h.email,
+        first = String::from_utf8_lossy(first),
+        second = String::from_utf8_lossy(second),
+    );
+    h.account.deliver(raw.as_bytes()).await.expect("deliver");
+
+    let (_, headers, _) = send(
+        &h.app,
+        "Connect",
+        Some(&auth),
+        None,
+        connect_body("/o=alo/cn=x"),
+    )
+    .await;
+    let cookie = format!("{SESSION_COOKIE}={}", session_cookie(&headers));
+
+    let inbox = h.account.inbox().await.expect("inbox id");
+    let rows = h
+        .account
+        .mapi_mailbox_rows(&inbox, alo_store::Page::first(10))
+        .await
+        .expect("rows");
+    let mid = alo_mapi::folders::fid(alo_mapi::messages::message_counter(&rows[0].id));
+    let inbox_fid = {
+        let mut fid = [0u8; 8];
+        fid[0..2].copy_from_slice(&1u16.to_le_bytes());
+        fid[2..8].copy_from_slice(&5u64.to_le_bytes()[0..6]);
+        u64::from_le_bytes(fid)
+    };
+
+    // ---- list the attachments --------------------------------------------
+    let mut rops = Vec::new();
+    let logon = rop_logon("");
+    let rop_size = u16::from_le_bytes(logon[0..2].try_into().unwrap()) as usize;
+    rops.extend_from_slice(&logon[2..rop_size]);
+    rops.push(0x03); // RopOpenMessage -> index 1
+    rops.extend_from_slice(&[0x00, 0x00, 0x01]);
+    rops.extend_from_slice(&0u16.to_le_bytes());
+    rops.extend_from_slice(&inbox_fid.to_le_bytes());
+    rops.push(0x00);
+    rops.extend_from_slice(&mid.to_le_bytes());
+    rops.extend_from_slice(&[0x21, 0x00, 0x01, 0x02, 0x00]); // RopGetAttachmentTable
+    rops.extend_from_slice(&[0x12, 0x00, 0x02, 0x00]); // RopSetColumns
+    rops.extend_from_slice(&3u16.to_le_bytes());
+    rops.extend_from_slice(&[0x03, 0x00, 0x21, 0x0E]); // PidTagAttachNumber
+    rops.extend_from_slice(&[0x1F, 0x00, 0x07, 0x37]); // PidTagAttachLongFilename
+    rops.extend_from_slice(&[0x03, 0x00, 0x20, 0x0E]); // PidTagAttachSize
+    rops.extend_from_slice(&[0x15, 0x00, 0x02, 0x00, 0x01]); // RopQueryRows
+    rops.extend_from_slice(&50u16.to_le_bytes());
+
+    let responses = execute(&h, &auth, &cookie, &rops).await;
+    let open = &responses[166..];
+    assert_eq!(open[0], 0x03);
+    let mut at = 9;
+    let _ = read_utf16(open, &mut at);
+    let table = &open[at + 5..];
+    assert_eq!(table[0], 0x21, "a RopGetAttachmentTable response");
+    assert_eq!(
+        u32::from_le_bytes(table[2..6].try_into().unwrap()),
+        0,
+        "opening the attachment table failed"
+    );
+    assert_eq!(
+        u32::from_le_bytes(table[6..10].try_into().unwrap()),
+        2,
+        "two files were attached"
+    );
+
+    let query = &table[10 + 7..];
+    assert_eq!(query[0], 0x15, "a RopQueryRows response");
+    assert_eq!(u32::from_le_bytes(query[2..6].try_into().unwrap()), 0);
+    let count = u16::from_le_bytes(query[7..9].try_into().unwrap());
+    assert_eq!(count, 2);
+
+    let mut at = 9;
+    let mut listed: Vec<(u32, String, u32)> = Vec::new();
+    for _ in 0..count {
+        at += 1; // the flag byte
+        let number = u32::from_le_bytes(query[at..at + 4].try_into().unwrap());
+        at += 4;
+        let name = read_utf16(query, &mut at);
+        let size = u32::from_le_bytes(query[at..at + 4].try_into().unwrap());
+        at += 4;
+        listed.push((number, name, size));
+    }
+    let names: Vec<&str> = listed.iter().map(|(_, n, _)| n.as_str()).collect();
+    assert!(names.contains(&"rechnung.txt"), "{names:?}");
+    assert!(names.contains(&"anhang.pdf"), "{names:?}");
+    assert!(
+        listed.iter().all(|(_, _, size)| *size > 0),
+        "an attachment reported no size: {listed:?}"
+    );
+
+    // ---- read the second one back ----------------------------------------
+    let (number, _, _) = *listed
+        .iter()
+        .find(|(_, name, _)| name == "anhang.pdf")
+        .expect("the pdf is listed");
+
+    let mut rops = Vec::new();
+    let logon = rop_logon("");
+    let rop_size = u16::from_le_bytes(logon[0..2].try_into().unwrap()) as usize;
+    rops.extend_from_slice(&logon[2..rop_size]);
+    rops.push(0x03); // RopOpenMessage -> index 1
+    rops.extend_from_slice(&[0x00, 0x00, 0x01]);
+    rops.extend_from_slice(&0u16.to_le_bytes());
+    rops.extend_from_slice(&inbox_fid.to_le_bytes());
+    rops.push(0x00);
+    rops.extend_from_slice(&mid.to_le_bytes());
+    rops.push(0x22); // RopOpenAttachment -> index 2
+    rops.extend_from_slice(&[0x00, 0x01, 0x02, 0x00]);
+    rops.extend_from_slice(&number.to_le_bytes());
+    rops.push(0x2B); // RopOpenStream on the attachment -> index 3
+    rops.extend_from_slice(&[0x00, 0x02, 0x03]);
+    rops.extend_from_slice(&[0x02, 0x01, 0x01, 0x37]); // PidTagAttachDataBinary
+    rops.push(0x00); // ReadOnly
+    rops.push(0x2C); // RopReadStream
+    rops.extend_from_slice(&[0x00, 0x03]);
+    rops.extend_from_slice(&8192u16.to_le_bytes());
+
+    let responses = execute(&h, &auth, &cookie, &rops).await;
+    let open = &responses[166..];
+    let mut at = 9;
+    let _ = read_utf16(open, &mut at);
+    let attach = &open[at + 5..];
+    assert_eq!(attach[0], 0x22, "a RopOpenAttachment response");
+    assert_eq!(
+        u32::from_le_bytes(attach[2..6].try_into().unwrap()),
+        0,
+        "opening the attachment failed"
+    );
+
+    let stream = &attach[6..];
+    assert_eq!(stream[0], 0x2B, "a RopOpenStream response");
+    assert_eq!(
+        u32::from_le_bytes(stream[2..6].try_into().unwrap()),
+        0,
+        "opening the attachment stream failed"
+    );
+    let stream_size = u32::from_le_bytes(stream[6..10].try_into().unwrap()) as usize;
+    assert_eq!(stream_size, second.len(), "the stream is the file's size");
+
+    let read = &stream[10..];
+    assert_eq!(read[0], 0x2C, "a RopReadStream response");
+    assert_eq!(u32::from_le_bytes(read[2..6].try_into().unwrap()), 0);
+    let size = usize::from(u16::from_le_bytes(read[6..8].try_into().unwrap()));
+    assert_eq!(
+        &read[8..8 + size],
+        second,
+        "the wrong file came back, or came back altered"
+    );
+}
+
+/// An attachment number that names nothing is `ecNotFound` — the same answer a
+/// file that never existed gets, so probing tells a caller nothing.
+#[tokio::test]
+async fn an_attachment_that_is_not_there_is_not_found() {
+    let h = harness("attach-missing").await;
+    let auth = basic(&h.email, &h.password);
+    h.account
+        .create_mailbox(None, "Inbox", Some("inbox"))
+        .await
+        .expect("inbox");
+    h.account
+        .deliver(b"From: s@example.test\r\nTo: o@example.test\r\nSubject: nichts\r\n\r\nText\r\n")
+        .await
+        .expect("deliver");
+
+    let (_, headers, _) = send(
+        &h.app,
+        "Connect",
+        Some(&auth),
+        None,
+        connect_body("/o=alo/cn=x"),
+    )
+    .await;
+    let cookie = format!("{SESSION_COOKIE}={}", session_cookie(&headers));
+
+    let inbox = h.account.inbox().await.expect("inbox id");
+    let rows = h
+        .account
+        .mapi_mailbox_rows(&inbox, alo_store::Page::first(10))
+        .await
+        .expect("rows");
+    let mid = alo_mapi::folders::fid(alo_mapi::messages::message_counter(&rows[0].id));
+    let inbox_fid = {
+        let mut fid = [0u8; 8];
+        fid[0..2].copy_from_slice(&1u16.to_le_bytes());
+        fid[2..8].copy_from_slice(&5u64.to_le_bytes()[0..6]);
+        u64::from_le_bytes(fid)
+    };
+
+    let mut rops = Vec::new();
+    let logon = rop_logon("");
+    let rop_size = u16::from_le_bytes(logon[0..2].try_into().unwrap()) as usize;
+    rops.extend_from_slice(&logon[2..rop_size]);
+    rops.push(0x03);
+    rops.extend_from_slice(&[0x00, 0x00, 0x01]);
+    rops.extend_from_slice(&0u16.to_le_bytes());
+    rops.extend_from_slice(&inbox_fid.to_le_bytes());
+    rops.push(0x00);
+    rops.extend_from_slice(&mid.to_le_bytes());
+    rops.push(0x22);
+    rops.extend_from_slice(&[0x00, 0x01, 0x02, 0x00]);
+    rops.extend_from_slice(&7u32.to_le_bytes()); // no such attachment
+
+    let responses = execute(&h, &auth, &cookie, &rops).await;
+    let open = &responses[166..];
+    let mut at = 9;
+    let _ = read_utf16(open, &mut at);
+    let attach = &open[at + 5..];
+    assert_eq!(attach[0], 0x22);
+    assert_eq!(
+        u32::from_le_bytes(attach[2..6].try_into().unwrap()),
+        0x8004_010F,
+        "an attachment that does not exist was opened"
+    );
+}
