@@ -215,6 +215,13 @@ identical in size, radius, and rhythm across modules.
 
 ## Standing constraints
 
+- **Preserve every working behavior outside the requested change.** A visual
+  refinement must not change data flow, persistence, navigation, validation,
+  permissions, or adjacent interactions unless the user explicitly asks for
+  that change. Identify those invariants before editing and exercise the
+  touched core flow afterward (create, save, reopen, list, and navigate as
+  applicable). If an adjacent contract truly must change, make the impact
+  explicit instead of silently broadening scope.
 - All copy through the i18n catalog, in the user's language, jargon-free
   (write "web address", not "subdomain", wherever a normal person will read).
 - Keyboard reachability and visible focus on all interactive elements;
