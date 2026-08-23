@@ -10,6 +10,12 @@ contracts.
 
 ## Unreleased
 
+- **Every message now carries its own `Message-ID`.** Messages sent from
+  Outlook were all stamped with the same identifier, which receiving servers
+  use to recognise duplicates — a second message could be silently discarded or
+  folded into the first. Identifiers are now random per message. Found by
+  reading the bytes alo actually put on the wire, not by a failing test.
+
 - **Native Outlook can now send.** A message composed in Outlook is saved to
   Drafts, sent through the same path alo's own clients send through, and filed
   into Sent — so it is DKIM-signed and queued exactly as any other outgoing
