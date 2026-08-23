@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- **Native Outlook: typing a colleague's name now finds their address.** The
+  address book endpoint resolves names against the people in your organisation
+  and your own contacts. A name that matches two people is reported as
+  ambiguous rather than resolved to whichever came first, so a message never
+  quietly acquires the wrong recipient. Browsing the whole directory is not
+  served yet. Still off by default. Sixth stage of ADR 0051.
+
 - **Native Outlook can now open and read a message.** A client opens a message
   from a folder and gets its subject, its plain-text body, its To and Cc lines,
   its sender and its dates — the point ADR 0051 named in advance as the test of
