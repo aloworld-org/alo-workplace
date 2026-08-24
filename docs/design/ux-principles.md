@@ -204,6 +204,13 @@ value may be born. The principles that govern the scale:
   menu; the nearest glyph edge remains at least 16px from the control border.
 - **Touch respects fingers.** Interactive targets stay ≥40px regardless of
   how small the glyph inside them is.
+- **Navigation has deliberate separation.** Sibling navigation actions keep at
+  least `space-2` (8px) between their interactive bounds, use a minimum 44px
+  target height, and keep `space-2` between icon and label. The active item uses
+  the soft brand surface, Terracotta text, and a brand indicator; inactive items
+  remain neutral and gain only a quiet neutral hover surface. Navigation labels
+  are never underlined. On narrow screens, the row scrolls horizontally instead
+  of shrinking labels or removing their protected padding.
 - **New values are legislation, not improvisation.** A dimension that the
   scale lacks is added to tokens.css in its own reasoned commit — never
   inlined into a component.
