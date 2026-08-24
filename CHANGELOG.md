@@ -10,6 +10,12 @@ contracts.
 
 ## Unreleased
 
+- **Outlook can now keep its own copy of a folder.** A client that asks to
+  synchronise a folder is sent the messages in it, and on later connections only
+  what has changed since — a message it already has is not sent twice. Still off
+  by default, and still only a folder's message list: bodies, attachments and
+  the folder tree itself come next. Eighth stage of ADR 0051.
+
 - **Every message now carries its own `Message-ID`.** Messages sent from
   Outlook were all stamped with the same identifier, which receiving servers
   use to recognise duplicates — a second message could be silently discarded or
