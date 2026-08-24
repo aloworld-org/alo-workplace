@@ -87,6 +87,9 @@ too) and [ARCHITECTURE.md](ARCHITECTURE.md) for the system design. Every
 change ships end-to-end: implementation, error paths, tests, and docs in the
 same PR.
 
+For the local Windows stack, use the guarded launcher documented in
+[docs/local-development.md](docs/local-development.md).
+
 ## License
 
 Open source core under AGPL-3.0, with a commercial license available
