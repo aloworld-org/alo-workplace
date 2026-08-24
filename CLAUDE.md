@@ -46,18 +46,22 @@ was formerly named Ficina — see ADR 0016.)
 - **`../engines/` is read-only reference material; code changes there
   are never part of any task.** It holds the pinned engine sources
   fetched by `scripts/fetch-engines.sh` for reading alongside our code.
-- **One database.** A machine has exactly one alo database, named
-  `alo`, and every server run against it points there. Scratch copies
-  are how a machine ends up with twenty databases, fifteen copies of
-  the same login, and a dev server quietly reading the wrong one — the
-  bug then looks like missing folders in the product rather than a
-  pointer in an environment variable. If a database is worth keeping it
-  is worth being `alo`; if it is not, it is deleted the same day.
+- **One database.** A machine has exactly one alo database and every
+  server run against it points there. It is named `alo` on a developer
+  machine and `ficina` on the deployment — two names for one role, and
+  anything guarding that role must know both. Scratch copies are how a
+  machine ends up with twenty databases, fifteen copies of the same
+  login, and a dev server quietly reading the wrong one — the bug then
+  looks like missing folders in the product rather than a pointer in an
+  environment variable. If a database is worth keeping it is worth
+  being the one; if it is not, it is deleted the same day.
   **Test suites do not use it.** They create a throwaway database, run,
-  and drop it — a suite that writes into `alo` refills it with
-  thousands of tenants and is what breaks the rule in practice. Every
-  suite takes its connection string from `alo-test-db`, which refuses
-  `alo` and panics; a harness that builds its own is the bug.
+  and drop it — a suite that writes into the product's database refills
+  it with thousands of tenants and is what breaks the rule in practice.
+  Every suite takes its connection string from `alo-test-db`, which
+  panics on any name in its `PRODUCT_DATABASES` list; a harness that
+  builds its own is the bug, and a deployment name missing from that
+  list is the same bug wearing a different hat.
 - **One agent per working tree.** Concurrent editors on one checkout
   are forbidden — a second editor produces uncommitted, ambiguously
   authored work that cannot be trusted. Commits are authored as the
