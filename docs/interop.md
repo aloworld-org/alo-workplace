@@ -635,3 +635,28 @@ in `alo-mapi` are deliberately separate for this reason
 (`fasttransfer::Writer` against the ROP writers); sharing them would corrupt
 every stream from its first binary property onward, without an error anywhere.
 Date: 2026-08-23.
+
+**The `GID` global counter's byte order is not stated, and is settled by
+derivation.** `PidTagSourceKey` carries an `XID` ([MS-OXCFXICS] §2.2.2.2):
+a 16-byte namespace GUID plus a `LocalId` of one to eight bytes. For a message
+that `XID` is a `GID`, but [MS-OXCDATA] §2.2.1.3 describes `GlobalCounter` only
+as "6 bytes; an unsigned integer identifying the folder or message" and never
+says which end comes first.
+
+It is nonetheless determined. [MS-OXCFXICS] §2.2.2.4.2 says a `REPLGUID`
+combined with the `GLOBCNT` values in a `GLOBSET` "produces a set of `GID`
+structures" — an `IDSET` *is* a compressed set of these same identifiers. So
+the counter bytes inside a `GID` and the counter bytes a `GLOBSET` encodes must
+be the same bytes, and a `GLOBSET` is unambiguously **most significant byte
+first**, because its stack holds the values' shared *high-order* bytes
+(§2.2.2.6.1).
+
+**Our response:** one function, `ics::globcnt_to_bytes`, makes that choice, and
+both the `GLOBSET` encoder and `contents_sync::Xid::for_counter` call it. A test
+(`a_source_keys_counter_matches_what_a_globset_encodes`) pins the agreement,
+because if the two ever diverge, a client's own id set and the `SourceKey`
+values we send it describe different messages — with no error anywhere.
+
+Derived from the specification, **not yet confirmed against a real Outlook**.
+If cached mode establishes but the client re-downloads everything each time, or
+messages duplicate, this is the first thing to check. Date: 2026-08-24.
