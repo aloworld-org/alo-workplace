@@ -10,6 +10,12 @@ contracts.
 
 ## Unreleased
 
+- **Mail apps other than alo's own can now send.** A client that leaves the
+  delivery envelope to the server — which the JMAP standard allows, and most
+  clients do — was told its message had no recipients. The recipients are now
+  taken from the message itself, blind-carbon included, so it reaches everyone
+  it names.
+
 - **Outlook can now keep its own copy of a folder.** A client that asks to
   synchronise a folder is sent the messages in it, and on later connections only
   what has changed since — a message it already has is not sent twice. Still off
