@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- **Each send address can now have its own signature.** Someone who sends as
+  support@ and as themselves signs those two differently; until now every
+  identity silently shared the account signature, and a standard mail app that
+  set a per-identity signature was refused. Both are fixed: signatures set per
+  identity are stored and served, and an identity that has never been given its
+  own keeps using the account-level signature exactly as before.
+
 - **Native Outlook support is retired.** alo no longer serves MAPI-over-HTTP,
   and Autodiscover offers IMAP and SMTP only. alo's own apps over 443 are the
   product; a mail client that works perfectly with somebody else's software is
