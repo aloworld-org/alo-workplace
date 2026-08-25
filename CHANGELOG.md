@@ -10,6 +10,10 @@ contracts.
 
 ## Unreleased
 
+- Billing now opens on invoices in a polished financial workspace with a clear
+  module identity, comfortably spaced navigation, contained list toolbars,
+  protected compact actions, and a corrected Business details icon surface.
+
 - Project task lists now use a focused, responsive workspace with a unified command
   bar, scannable status sections, explicit completion controls, and drag-and-drop
   movement between workflow stages. Project workspaces now also use a clearer
