@@ -13,7 +13,8 @@ contracts.
 - Project task lists now use a focused, responsive workspace with a unified command
   bar, scannable status sections, explicit completion controls, and drag-and-drop
   movement between workflow stages. Project workspaces now also use a clearer
-  identity header, framed navigation and search, and compact pill-style view tabs.
+  identity header, framed navigation and search, and comfortably spaced
+  pill-style view tabs with protected icon and label insets.
 
 - Project timelines now use a contained planning canvas with readable task rows,
   calendar context, uncluttered colour-only schedule bars, inset task metadata,
