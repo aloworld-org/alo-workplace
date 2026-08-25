@@ -22,6 +22,9 @@ contracts.
 - Project calendars now use a framed monthly workspace with integrated navigation,
   stronger date states, balanced weekend treatment, and status-aware task cards.
 
+- Project files now use a focused attachment workspace with clear task context,
+  polished upload and Drive actions, responsive file cards, and active drop feedback.
+
 - Projects timesheets now keep week controls, status, scope, and time entry in
   one clear workspace; portfolio milestones use scannable progress cards, and
   report project names open their project workspace.
