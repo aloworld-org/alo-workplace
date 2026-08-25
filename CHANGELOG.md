@@ -34,6 +34,14 @@ contracts.
   milestones use scannable progress cards, and report project names open their
   project workspace.
 
+- **A server-side failure now leaves a trace an operator can act on.** When a
+  request failed for a reason we deliberately keep off the wire, the log said
+  nothing at all — so "could not load messages" read the same whether a message
+  body was missing or the database had gone away. Those failures are now
+  recorded with a cause, and a stored object that has gone missing names
+  itself. Clients still see no internal detail, and no value out of a row ever
+  reaches the log.
+
 - **Out-of-office can now be scheduled.** Set the first and last day you are
   away and the automatic reply starts and stops on its own — set it the evening
   before you leave rather than remembering on the morning. Leaving both dates

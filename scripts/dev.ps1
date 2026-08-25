@@ -121,7 +121,25 @@ $env:SQLX_OFFLINE = "true"
 cargo build -p alo-jmap --bin alo-jmap
 if ($LASTEXITCODE -ne 0) { throw "alo-jmap build failed." }
 
-$env:ALO_BLOB_DIR = if ($env:ALO_BLOB_DIR) { $env:ALO_BLOB_DIR } else { Join-Path $repo ".localdev\blobs" }
+# The blob store is the other half of the one local database, so it lives the
+# same way: outside every checkout, shared by all of them.
+#
+# It used to sit in whichever checkout launched the server. With one 'alo'
+# database and several checkouts, that meant a message row written from one
+# tree and its bytes written into that tree's folder — so the message would not
+# open from another tree, and cleaning a tree destroyed bodies whose rows lived
+# on. What that looks like is a message list that loads and a message that will
+# not open: a broken product, not a stranded file. A per-user path (never in a
+# checkout, never inside OneDrive) makes the two halves of the store agree by
+# construction.
+#
+# An explicit ALO_BLOB_DIR still wins, for a case that genuinely wants its own.
+$env:ALO_BLOB_DIR = if ($env:ALO_BLOB_DIR) {
+    $env:ALO_BLOB_DIR
+} else {
+    Join-Path $env:LOCALAPPDATA "alo\dev-blobs"
+}
+New-Item -ItemType Directory -Force -Path $env:ALO_BLOB_DIR | Out-Null
 $env:ALO_IDENTITY_ISSUER = "http://localhost:5173"
 $env:ALO_JMAP_ADDR = "127.0.0.1:8080"
 $env:VITE_DEV_API = "http://localhost:8080"
