@@ -177,20 +177,49 @@ top open item.
 
 ## 5. The TLS certificate
 
-One Let's Encrypt certificate covers HTTPS (443) and mail TLS (465/587/993/995).
-It **renews itself** automatically (the `certbot` container checks twice a day
-and renews within 30 days of expiry).
+Let's Encrypt certificates cover HTTPS (443) and mail TLS (465/587/993/995).
+They **renew themselves** (the `certbot` container checks twice a day and
+renews within 30 days of expiry) and, since 2026-08-25, **are put into service
+automatically** by `alo-cert-reload.timer`, which runs hourly.
 
-The mail services pick up a renewed certificate when they restart, so once a
-month (or after a renewal) give them a nudge:
+**Renewing and serving are two different things.** certbot has no access to the
+Docker socket — that socket is root on the host — so it cannot restart the
+services that read the certificate; its only renewal hook fixes file
+permissions. Before this timer existed, a renewed certificate sat on disk while
+every service went on presenting the old one, and the deployment would have
+stopped all at once on expiry day. It looked healthy only because deploys
+happened to restart things often enough.
+
+`cert-reload.sh` restarts a service when the certificate is newer than the
+process reading it — the certificate's mtime against each container's start
+time — so it is correct on its first run and does nothing when there is nothing
+to do.
+
+**Caddy must be restarted, not reloaded.** `caddy reload` re-reads the Caddyfile,
+not the certificate files it already holds in memory. On 2026-08-25 a reissued
+certificate reached 993 and 465 while 443 kept serving the old one until Caddy
+was restarted outright. By hand, if ever needed:
 
 ```sh
 cd /opt/alo/deploy/production
-docker compose restart alo-smtp alo-imap
+docker compose restart caddy alo-smtp alo-imap
 ```
 
-If the "certificate expires soon" alert ever fires, do the restart above; if it
-persists, check `docker compose logs certbot`.
+To check what is actually **served**, rather than what is on disk:
+
+```sh
+for p in 443 993 465; do
+  echo | openssl s_client -connect mail.alomails.com:$p -servername mail.alomails.com 2>/dev/null \
+    | openssl x509 -noout -enddate
+done
+```
+
+If the "certificate expires soon" alert fires, read
+`journalctl -u alo-cert-reload.service -n50` first, then run
+`docker exec alo-certbot-1 certbot renew --dry-run`. It reports each
+certificate separately — one can fail while the rest succeed, which is how
+`mail.alomails.com` was found to be renewing by the wrong method (`standalone`,
+which cannot bind port 80 because Caddy owns it, instead of `webroot`).
 
 ---
 
