@@ -29,8 +29,10 @@ contracts.
   can download from the published update.
 
 - Projects timesheets now keep week controls, status, scope, and time entry in
-  one clear workspace; portfolio milestones use scannable progress cards, and
-  report project names open their project workspace.
+  one clear workspace, with a readable weekly allocation card, roomier daily
+  cells, a polished time log, and a persistent submission summary; portfolio
+  milestones use scannable progress cards, and report project names open their
+  project workspace.
 
 - **Out-of-office can now be scheduled.** Set the first and last day you are
   away and the automatic reply starts and stops on its own — set it the evening
