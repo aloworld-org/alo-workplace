@@ -660,3 +660,104 @@ values we send it describe different messages — with no error anywhere.
 Derived from the specification, **not yet confirmed against a real Outlook**.
 If cached mode establishes but the client re-downloads everything each time, or
 messages duplicate, this is the first thing to check. Date: 2026-08-24.
+
+## MAPI-over-HTTP: what a real client has and has not exercised
+
+ADR 0051 states every MAPI stage as *observable Outlook behaviour verified on
+the wire*, and names stage 5 as the criterion for continuing at all. This
+section is the honest record of how much of that has actually happened, so the
+answer is never reconstructed from memory or from a green test suite.
+
+### Verified against the live deployment, on the wire — 2026-08-25
+
+Driven by hand against `https://mail.alomails.com` as `disan@alomails.com`, not
+in a harness.
+
+**Autodiscover advertises MAPI/HTTP, and only when asked.** A POX request
+*without* `X-MapiHttpCapability` returns IMAP and SMTP blocks and no `mapiHttp`
+— which is correct ([MS-OXDSCLI] §3.2.5.1: the header is optional, and its
+absence means a client that cannot speak MAPI/HTTP). The same request *with*
+`X-MapiHttpCapability: 1` returns, alongside those two:
+
+```xml
+<Protocol Type="mapiHttp" Version="1">
+  <MailStore>
+    <InternalUrl>https://mail.alomails.com/mapi/emsmdb/</InternalUrl>
+    <ExternalUrl>https://mail.alomails.com/mapi/emsmdb/</ExternalUrl>
+  </MailStore>
+  <AddressBook>
+    <InternalUrl>https://mail.alomails.com/mapi/nspi/</InternalUrl>
+    <ExternalUrl>https://mail.alomails.com/mapi/nspi/</ExternalUrl>
+  </AddressBook>
+</Protocol>
+```
+
+Worth recording because the first probe looked like a failure and was not: a
+missing `mapiHttp` block is the *documented* answer to a request that never
+asked for one. Anyone testing Autodiscover with `curl` must send the header or
+they will conclude the adapter is off when it is running.
+
+**`Connect` and `Disconnect` work with real credentials.** `POST
+/mapi/emsmdb/` with `X-RequestType: Connect`, Basic authentication, and a
+[MS-OXCMAPIHTTP] §2.2.4.1.1 body (empty `UserDn`, `Flags` 0, code page 1252,
+LCIDs 1033, no auxiliary buffer):
+
+```
+HTTP 200 · Set-Cookie: MapiContext=…; Path=/mapi; HttpOnly; Secure; SameSite=None
+trailer  X-ResponseCode: 0
+payload  StatusCode=0  ErrorCode=0x00000000
+         PollsMax=60000  RetryCount=3  RetryDelay=1000
+```
+
+`Disconnect` on that context returns `X-ResponseCode: 0`. So authentication,
+session-context issue, the chunked `PROCESSING`/`DONE` response envelope
+(§2.2.7) and clean teardown are all real, not inferred.
+
+Note the envelope when reading a response by hand: the payload does **not**
+start at byte zero. `PROCESSING\r\nDONE\r\n`, then the trailer headers, then a
+blank line, and only then the response body. Parsing from byte zero yields
+plausible-looking nonsense — `StatusCode=1129271888` is the ASCII of `PROC`.
+
+### Not verified — no real Outlook has ever connected
+
+Everything above is transport and discovery. The stages that carry the mail —
+logon, the folder hierarchy, the contents table, opening a message — have been
+built and tested against our own tests only. **No classic Outlook profile has
+ever completed against alo.**
+
+This matters more than an ordinary gap, because ADR 0051 makes stage 5 the kill
+gate: reach "Outlook opens and reads a message" or stop and ship a connector
+instead. `ROADMAP.md` records stage 5 as passed. It was not passed against a
+client. Whatever the explanation, the gate has not been run, and the two
+derivations in the sections above — the `MetaTagIdsetGiven` type and the `GID`
+counter byte order — are still marked "not yet confirmed against a real
+Outlook" for the same reason.
+
+### How to run it, and what counts as passing
+
+Half a day, one Windows machine with classic Outlook (not the new Outlook,
+which does not speak MAPI/HTTP):
+
+1. **New profile**, Control Panel → Mail → Show Profiles → Add. Enter
+   `disan@alomails.com` and the password. Nothing else — the point of the test
+   is that Autodiscover does the rest. If Outlook asks for a server name, stage
+   1 has failed for this client and the answer is in its Autodiscover log.
+2. **Capture the wire.** Fiddler or mitmproxy on 443, or the server side:
+   `RUST_LOG=alo_mapi=debug` on `alo-jmap` gives every `X-RequestType`, the ROP
+   ids inside each `Execute`, and the failure point.
+3. **Record verbatim in this file** — what worked, what did not, and the exact
+   request that failed. A summary is worth nothing here; the byte layouts are
+   the whole difficulty.
+
+Passing is stage by stage, in the order Outlook does them: the profile
+completes; the folder tree appears; a folder lists its messages; **a message
+opens and its body is readable** (this is the gate); an attachment opens; a
+recipient resolves when typed; a sent message arrives and appears in Sent.
+
+Expect it to stop somewhere. That is the point — where it stops is the finding,
+and it belongs here rather than in someone's memory.
+
+Per [ADR 0055](decisions/0055-outlook-is-a-bridge-not-a-destination.md) the
+scope now ends at open/read/send, so cached mode failing is not a defect to
+chase: there is no cached mode. A client that cannot complete a profile, or
+cannot open a message, is a defect.

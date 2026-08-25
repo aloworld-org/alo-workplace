@@ -336,13 +336,25 @@ document or a formula.
     - Stage 6's directory browsing, and stage 7's outgoing attachments and reply
       threading, are likewise not planned — reopened only if a paying customer's
       migration is actually blocked on one
-  - [ ] **Settle the kill gate that was never run.** ADR 0051 defines each stage
+  - [~] **Settle the kill gate that was never run.** ADR 0051 defines each stage
     as observable Outlook behaviour and names stage 5 as the criterion to
-    continue or stop. Stage 5 is marked passed; `docs/interop.md` says in two
-    places the work is "not yet confirmed against a real Outlook". One real
-    classic Outlook profile against `mail.alomails.com`, on the wire, recorded
-    in `docs/interop.md`: what works, what does not, verbatim. Independent of
-    ADR 0055 — we are already telling people the mail opens
+    continue or stop. Stage 5 is marked passed; it was passed against our own
+    tests, never against a client. Independent of ADR 0055 — we are already
+    telling people the mail opens
+    - [x] Everything verifiable without the client, driven by hand against the
+      live deployment and recorded in `docs/interop.md` (2026-08-25):
+      Autodiscover returns the `mapiHttp` block for `mail.alomails.com` when
+      `X-MapiHttpCapability` is sent and correctly stays silent when it is not;
+      `Connect` authenticates with real credentials and issues a session
+      context (`StatusCode=0`, `ErrorCode=0`, `PollsMax=60000`), and
+      `Disconnect` closes it. Discovery and transport are real, not inferred
+    - [ ] **One classic Outlook profile against `mail.alomails.com`**, on the
+      wire, recorded verbatim in `docs/interop.md` — the procedure and the
+      pass criteria are written there. Needs a Windows machine with *classic*
+      Outlook; the new Outlook does not speak MAPI/HTTP. Everything the mail
+      actually travels through — logon, hierarchy, contents table, opening a
+      message — is unexercised by any client, and the two byte-layout
+      derivations in `interop.md` are waiting on it
 - [ ] Remote support / screen control (AnyDesk/TeamViewer-class — the EU IT-management play: one sovereign suite instead of a bolted-on remote tool). **Integrate** a self-hostable engine (RustDesk primary candidate); never build the capture/stream/input-injection engine ourselves — the highest-CVE-density surface in the product (ADR 0009). alo owns the UI/UX, session brokering, auth, consent, and audit logging. Launches from **Chat** (primary: the 1:1 DM header + person-profile quick-actions, beside Meet/Call/Email — where "help me" conversations live) and **Meet** (secondary: an in-call control-bar button for take-over-while-talking); a dedicated Remote/Support **rail tab is deferred** until the feature needs its own session management, history, and audit views. Requirements: native per-device agent (browsers cannot grant OS-level control — a hard boundary), E2E-encrypted session, **explicit per-session consent before any input**, an audit-log entry in the controlled user's security log, instant termination by either party, and a self-hosted relay (no third-party cloud). Screen *share* (read-only) is already in Meet; this is remote *control*, correctly sequenced post-launch. UX source of truth: the Figma design (request access / consent prompt / active-control banner with stop-sharing)
 - [ ] Second developer hired and shipping independently (bus factor > 1 proven by a release the founder didn't cut)
 
