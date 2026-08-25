@@ -860,6 +860,27 @@ wave.
 | Project templates (recurring engagement setup) | Shipped (B3.09b). A template *is* a project; instantiating copies the shape and shifts the dates, and copies nobody's assignees, comments, hours or finished cards. |
 | `[B+]` Gantt with dependencies; capacity planning; field-service work orders | Out of scope, unchanged. |
 
+## Portfolio work surfaces
+
+**Surface.** Timesheet keeps week, scope, status, and its primary action in one
+header before the editable grid. Timeline presents the same milestones as
+scannable cards with progress and a compact portfolio filter. Report project
+names open their project workspace; invoice values retain their separate
+invoice action.
+
+**Errors.** Existing load and mutation failures remain visible in the shared
+Projects error banner. Navigation has no new failure state, and unavailable
+source projects remain plain text rather than dead controls.
+
+**Tenancy.** These are presentation and navigation changes over the existing
+tenant-scoped project, time, plan, and profitability reads. They introduce no
+new read, write, identifier, or cross-tenant aggregation.
+
+**Out of scope.** This does not add task dependencies, drag-to-reschedule,
+capacity planning, report charting, or a second approval model. The rejected
+alternative was a Gantt-style canvas: it would imply dependencies and planning
+precision the current milestone contract does not provide.
+
 Two cross-cutting things this wave did **not** change, restated so a reader
 does not assume otherwise: **per-project access roles** are still B4.12's (a
 `team` project and its aggregates are tenant-wide; per-person hours are

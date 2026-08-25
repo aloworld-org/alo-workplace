@@ -10,6 +10,10 @@ contracts.
 
 ## Unreleased
 
+- Projects timesheets now keep week controls, status, scope, and time entry in
+  one clear workspace; portfolio milestones use scannable progress cards, and
+  report project names open their project workspace.
+
 - Projects reports now show one portfolio-wide view of every accessible client project, without a project dropdown that could silently narrow the totals.
 
 - **Mail apps other than alo's own can now send.** A client that leaves the
