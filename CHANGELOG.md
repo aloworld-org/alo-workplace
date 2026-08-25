@@ -15,7 +15,8 @@ contracts.
   movement between workflow stages.
 
 - Project timelines now use a contained planning canvas with readable task rows,
-  calendar context, schedule bars, status cues, and a separate unscheduled queue.
+  calendar context, uncluttered colour-only schedule bars, inset task metadata,
+  status cues, and a separate unscheduled queue.
 
 - Projects timesheets now keep week controls, status, scope, and time entry in
   one clear workspace; portfolio milestones use scannable progress cards, and
