@@ -34,6 +34,26 @@ powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -Action Stop
 `Stop` terminates only listeners whose executable or command line belongs to
 this checkout. PostgreSQL and all data remain running and untouched.
 
+## Reclaiming disk
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -Action Clean
+```
+
+Removes this checkout's own crates and their test binaries and keeps every
+dependency, printing free space before and after. Rebuilding costs a few
+minutes; a full `cargo clean` would cost far longer for a fraction more space,
+because our crates are the part that grows.
+
+Worth knowing before the disk fills: Windows does not report a full disk as a
+full disk. It surfaces as `rustc-LLVM ERROR: IO failure on output stream`, as
+`LNK1318 Unexpected PDB error`, and as a Docker daemon that stops answering
+`docker ps`. If any of those appear, check free space first.
+
+Several checkouts on one machine each carry their own `target/`, and a full
+test build is tens of gigabytes apiece. That, not any single build, is what
+fills the disk.
+
 ## Mail actually sends
 
 `EmailSubmission/set` does not deliver anything itself: it hands the message to

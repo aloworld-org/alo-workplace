@@ -1,7 +1,7 @@
 # One safe door into the local alo stack.
 [CmdletBinding()]
 param(
-    [ValidateSet("Start", "Check", "Stop")]
+    [ValidateSet("Start", "Check", "Stop", "Clean")]
     [string]$Action = "Start",
     [string]$RepoPath = ""
 )
@@ -115,6 +115,33 @@ if ($Action -eq "Stop") {
     exit 0
 }
 if ($Action -eq "Check") { Show-Status; exit 0 }
+
+if ($Action -eq "Clean") {
+    # Reclaims this checkout's own build output and nothing else.
+    #
+    # A full `cargo clean` also throws away every dependency, which costs a
+    # long rebuild for a fraction of the space: our crates and their test
+    # binaries are the part that grows. Rebuilding them takes a few minutes,
+    # which is the trade this action exists to make.
+    #
+    # Windows does not report a full disk as a full disk. It surfaces as
+    # `rustc-LLVM ERROR: IO failure on output stream`, as `LNK1318 Unexpected
+    # PDB error`, and as a Docker daemon that stops answering `docker ps` — so
+    # the free space before and after is printed rather than left to be
+    # guessed at.
+    $free = { [math]::Round((Get-PSDrive -Name ((Get-Item $repo).PSDrive.Name)).Free / 1GB, 1) }
+    $before = & $free
+    $packages = cargo metadata --no-deps --format-version 1 |
+        ConvertFrom-Json |
+        Select-Object -ExpandProperty packages |
+        ForEach-Object { "-p"; $_.name }
+    if ($packages.Count -eq 0) { throw "No workspace packages found; refusing to clean blindly." }
+    cargo clean @packages
+    if ($LASTEXITCODE -ne 0) { throw "cargo clean failed." }
+    $after = & $free
+    Write-Host "[dev] cleaned this checkout's crates; free space ${before} GB -> ${after} GB (dependencies kept)."
+    exit 0
+}
 
 Assert-GitRevision
 Assert-Database
