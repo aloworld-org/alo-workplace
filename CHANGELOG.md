@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **Native Outlook support is retired.** alo no longer serves MAPI-over-HTTP,
+  and Autodiscover offers IMAP and SMTP only. alo's own apps over 443 are the
+  product; a mail client that works perfectly with somebody else's software is
+  software nobody opens. Nothing else changes for anyone connecting a
+  third-party client: IMAP, POP3, SMTP submission, CalDAV and CardDAV are
+  unaffected and still serve Thunderbird, Apple Mail, iOS and Android.
+  **Operators:** `ALO_MAPI_HTTP_ENABLED` no longer does anything and can be
+  removed from any deployment environment file that still carries it.
+
 - Billing now opens on invoices in a polished financial workspace with a clear
   module identity, comfortably spaced navigation, contained list toolbars,
   protected compact actions, and a corrected Business details icon surface.

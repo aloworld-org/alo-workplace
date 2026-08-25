@@ -1,6 +1,15 @@
 # 0051 — Exchange-compatible client access: MAPI-over-HTTP on 443
 
-**Status:** accepted, but the **parity goal is superseded by
+**Status:** **superseded entirely by
+[ADR 0056](0056-our-own-client-on-443-is-the-product.md)** — MAPI-over-HTTP is
+retired, the adapter is deleted, and alo's own client over 443 is the product.
+Kept as the record of what was decided, what it cost, and what was learned from
+the specifications; `docs/interop.md` keeps the wire findings, which are the
+part worth having. The intermediate narrowing to a migration bridge is in
+[ADR 0055](0055-outlook-is-a-bridge-not-a-destination.md), superseded on the
+same day.
+
+Formerly: accepted, with the **parity goal superseded by
 [ADR 0055](0055-outlook-is-a-bridge-not-a-destination.md)** — Outlook support
 stops at what stage 7 delivers (open, read, send) and is a migration bridge
 rather than Exchange parity; stages 8 and 9 are not built. Everything below

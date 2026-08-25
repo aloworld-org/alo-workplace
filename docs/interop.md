@@ -661,14 +661,23 @@ Derived from the specification, **not yet confirmed against a real Outlook**.
 If cached mode establishes but the client re-downloads everything each time, or
 messages duplicate, this is the first thing to check. Date: 2026-08-24.
 
-## MAPI-over-HTTP: what a real client has and has not exercised
+## MAPI-over-HTTP: a closed chapter, kept for what it cost to learn
 
-ADR 0051 states every MAPI stage as *observable Outlook behaviour verified on
-the wire*, and names stage 5 as the criterion for continuing at all. This
-section is the honest record of how much of that has actually happened, so the
-answer is never reconstructed from memory or from a green test suite.
+**The adapter is retired and deleted
+([ADR 0056](decisions/0056-our-own-client-on-443-is-the-product.md)).** alo does
+not serve `/mapi/*`, Autodiscover offers IMAP and SMTP only, and native Outlook
+is not offered. Nothing below is live behaviour.
 
-### Verified against the live deployment, on the wire — 2026-08-25
+It stays here because specification reading is the expensive part and it does
+not expire. If this is ever picked up again — and reversal is deliberately
+expensive — these are the findings that would otherwise be rediscovered at the
+same price, and the answer to "did a real client ever exercise this" is
+recorded rather than remembered.
+
+ADR 0051 stated every MAPI stage as *observable Outlook behaviour verified on
+the wire*, and named stage 5 as the criterion for continuing at all.
+
+### Verified against the live deployment, on the wire — 2026-08-25 (before retirement)
 
 Driven by hand against `https://mail.alomails.com` as `disan@alomails.com`, not
 in a harness.
@@ -757,7 +766,9 @@ recipient resolves when typed; a sent message arrives and appears in Sent.
 Expect it to stop somewhere. That is the point — where it stops is the finding,
 and it belongs here rather than in someone's memory.
 
-Per [ADR 0055](decisions/0055-outlook-is-a-bridge-not-a-destination.md) the
-scope now ends at open/read/send, so cached mode failing is not a defect to
-chase: there is no cached mode. A client that cannot complete a profile, or
-cannot open a message, is a defect.
+**That procedure was never run, and now will not be.** The adapter was retired
+the same day it was written, so the kill gate ADR 0051 set — reach "Outlook
+opens and reads a message" or stop — is settled the only honest way left: it was
+never passed against a client, and we are not continuing. The procedure is kept
+because it is the correct way to test a MAPI implementation against a real
+Outlook, and because writing it down was how the gap became undeniable.

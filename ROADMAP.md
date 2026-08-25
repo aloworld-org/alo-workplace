@@ -291,84 +291,33 @@ document or a formula.
 - [ ] Tauri desktop shell: tray, notifications, autostart
 - [ ] Offline-first local cache (design review first, per ADR 0005)
 - [ ] Mobile apps
-- [~] **MAPI-over-HTTP adapter: Outlook opens, reads and sends — a migration bridge.**
-  Specified in [ADR 0051](docs/decisions/0051-native-outlook-without-manual-setup.md);
-  **scope now set by [ADR 0055](docs/decisions/0055-outlook-is-a-bridge-not-a-destination.md):
-  the goal is no longer Exchange parity.** Support stops at what stage 7
-  delivers, and the promise is "your Outlook still opens your mail while you
-  move" — not "Outlook works as it did with Exchange". Perfect compatibility is
-  a reason for a customer never to open alo's own client, which is the only
-  surface where we win rather than tie. Server-side, in Rust, on 443,
-  translating to the JMAP core rather than forking the store; its own crate
-  (`products/mail/alo-mapi`) so a half-built adapter cannot destabilise mail that
-  works. Every stage is stated as observable Outlook behaviour and verified on
-  the wire, never as "the spec is implemented":
-  - [x] 1. Autodiscover returns a `mapiHttp` block; Outlook stops asking for manual settings
-  - [x] 2. `Connect`/`Disconnect` envelopes, Basic auth, session contexts; verified on the wire against the real binary
-  - [x] 3. `Logon` + folder hierarchy; Outlook draws the folder tree. **A logon
-    now completes end to end** — `Execute` carries a ROP buffer, the dispatcher
-    answers it, and the mailbox a caller may open is decided from the identity
-    they authenticated as. Done: the
-    `Execute` envelope, the `RPC_HEADER_EXT` chain, LZ77+DIRECT2 decompression,
-    the ROP buffer container and handle table, the `RopLogon` **request**,
-    the `RopLogon` **success response** (166 bytes, every field pinned at its
-    offset), and the dispatcher. `RopOpenFolder` and
-    `RopGetHierarchyTable` now answer, so a client can log on, open a folder and
-    count its children in one buffer. `RopSetColumns` and
-    `RopQueryRows` complete the chain: a client can log on, open a folder, take
-    its hierarchy table, set the columns and read the rows in one buffer.
-    **The store is now behind it**: the tree a
-    client draws is the tenant's own mailboxes, under the names they gave them,
-    with the message count each one holds. A mailbox with a JMAP role takes over
-    the matching MAPI special folder rather than appearing twice beside it
-  - [x] 4. Contents tables; Outlook lists messages in a folder. `RopGetContentsTable` opens a table on a folder and reports what it holds; `RopSetColumns` and `RopQueryRows` serve its rows — message id, subject, sender, delivery time as a `FILETIME`, the status flags and the size — read from the tenant's own mail through the account door. A folder's messages are loaded **only when a buffer actually reaches them**: the buffer is rehearsed against a copy of the object table first, so opening a folder costs one bounded query rather than the whole mailbox. A folder nobody loaded refuses rather than reporting itself empty, and an associated (FAI) table is truthfully empty
-  - [x] 5. `OpenMessage` + streams; Outlook opens and reads a message, attachments included — **the kill gate, passed.** `RopOpenMessage` opens a message named by folder id and MID, `RopGetPropertiesSpecific` answers its properties as a flagged row (so one absent property no longer refuses the read), and `RopRelease` closes it. A value over the client's own size limit comes back through `RopOpenStream`/`RopReadStream` — including the `0xBABE` extended read form, which makes the request four bytes longer. `RopGetAttachmentTable` and `RopOpenAttachment` list a message's files and hand one back, its bytes streamed. The **recipient table** is served: `OpenRecipientRow` per addressee, with the `RecipientFlags` bitfield and the fields it promises written from one description so they cannot disagree. **HTML bodies** are served as `PtypBinary` with a 16-bit count — [MS-OXCDATA] §2.11.1 does settle the width, since the 32-bit case it names is [MS-OXCMAPIHTTP] §2.2.5, the address book's own structures, not ROP buffers carried over HTTP. Only a *real* `text/html` part is offered: the MIME parser renders HTML for a plain-text message, and a client that prefers HTML would otherwise show generated markup instead of what was written
-  - [~] 6. NSPI; the address book resolves recipients. `/mapi/nspi` serves `Bind`, `Unbind` and `ResolveNames`: a typed string becomes a recipient, matched against the tenant's own people and the caller's own contacts, both through the account door. A name matching two people comes back `MID_AMBIGUOUS` with **no row** rather than a guess — picking one would put a colleague's address on a message somebody believed was going elsewhere. Entries are declared `SMTP`, not `EX`: alo has no X.500 namespace and will not invent one. **Still to do:** browsing the directory (`QueryRows`, `GetSpecialTable`, `SeekEntries`), which is refused rather than half-answered because a client shown a truncated directory cannot tell
-  - [x] 7. Submission; Outlook sends. `RopCreateMessage`, `RopSetProperties`, `RopModifyRecipients`, `RopSaveChangesMessage` and `RopSubmitMessage` are one arc: a draft accumulates in the session, reaches the store once when saved, and is sent from **what was stored** — so the bytes that go out are the bytes the sender can afterwards read in Sent. The send-as check, the `Bcc` strip and the filing into Sent are the *same code* JMAP uses (`alo-submit`), because a second copy of the check binding a message's visible `From:` to the authenticated account is a second place for it to be wrong. Writes happen in the router, never in dispatch: dispatch is rehearsed, so anything it wrote would be written twice. **Not yet:** attachments on outgoing mail (`RopCreateAttachment`), and reply threading (`In-Reply-To`/`References` are empty)
-  - **Not built, by decision ([ADR 0055](docs/decisions/0055-outlook-is-a-bridge-not-a-destination.md)) — not a backlog:**
-    - ~~8. ICS/FastTransfer; cached mode and offline~~ — Outlook works online
-      against alo; there is no cached mode. The producer was blocked on byte
-      layouts the specification does not settle, and answering them needs a real
-      Outlook to answer them against
-    - ~~9. Calendar, contacts and tasks as native MAPI classes~~ — served by
-      CalDAV and CardDAV instead, which are finished and which every other
-      client already uses
-    - Stage 6's directory browsing, and stage 7's outgoing attachments and reply
-      threading, are likewise not planned — reopened only if a paying customer's
-      migration is actually blocked on one
-  - [~] **Settle the kill gate that was never run.** ADR 0051 defines each stage
-    as observable Outlook behaviour and names stage 5 as the criterion to
-    continue or stop. Stage 5 is marked passed; it was passed against our own
-    tests, never against a client. Independent of ADR 0055 — we are already
-    telling people the mail opens
-    - [x] Everything verifiable without the client, driven by hand against the
-      live deployment and recorded in `docs/interop.md` (2026-08-25):
-      Autodiscover returns the `mapiHttp` block for `mail.alomails.com` when
-      `X-MapiHttpCapability` is sent and correctly stays silent when it is not;
-      `Connect` authenticates with real credentials and issues a session
-      context (`StatusCode=0`, `ErrorCode=0`, `PollsMax=60000`), and
-      `Disconnect` closes it. Discovery and transport are real, not inferred
-    - [ ] **One classic Outlook profile against `mail.alomails.com`**, on the
-      wire, recorded verbatim in `docs/interop.md` — the procedure and the
-      pass criteria are written there. Needs a Windows machine with *classic*
-      Outlook; the new Outlook does not speak MAPI/HTTP. Everything the mail
-      actually travels through — logon, hierarchy, contents table, opening a
-      message — is unexercised by any client, and the two byte-layout
-      derivations in `interop.md` are waiting on it
+- [x] ~~**MAPI-over-HTTP adapter: native Outlook**~~ — **retired, not deferred
+  ([ADR 0056](docs/decisions/0056-our-own-client-on-443-is-the-product.md)).**
+  alo's own client over 443 is the product. An app that works perfectly with
+  somebody else's client is an app nobody opens, and the compatibility question
+  turned out to be the wrong question rather than one with a wrong answer.
+  ADR 0051 committed to Exchange-class access and ADR 0055 narrowed it to a
+  migration bridge; both are superseded. `products/mail/alo-mapi` is deleted,
+  `/mapi/*` is no longer a route, and Autodiscover offers IMAP and SMTP only.
+  Checked as done because it *is* done — decided, executed and recorded — not
+  because it shipped. Open standards are unaffected: IMAP, POP3, CalDAV,
+  CardDAV and SMTP submission stay exactly as they are, and are how any
+  third-party client connects. What was learned on the wire is kept in
+  `docs/interop.md`, which is worth more than the code was
 - [ ] Remote support / screen control (AnyDesk/TeamViewer-class — the EU IT-management play: one sovereign suite instead of a bolted-on remote tool). **Integrate** a self-hostable engine (RustDesk primary candidate); never build the capture/stream/input-injection engine ourselves — the highest-CVE-density surface in the product (ADR 0009). alo owns the UI/UX, session brokering, auth, consent, and audit logging. Launches from **Chat** (primary: the 1:1 DM header + person-profile quick-actions, beside Meet/Call/Email — where "help me" conversations live) and **Meet** (secondary: an in-call control-bar button for take-over-while-talking); a dedicated Remote/Support **rail tab is deferred** until the feature needs its own session management, history, and audit views. Requirements: native per-device agent (browsers cannot grant OS-level control — a hard boundary), E2E-encrypted session, **explicit per-session consent before any input**, an audit-log entry in the controlled user's security log, instant termination by either party, and a self-hosted relay (no third-party cloud). Screen *share* (read-only) is already in Meet; this is remote *control*, correctly sequenced post-launch. UX source of truth: the Figma design (request access / consent prompt / active-control banner with stop-sharing)
 - [ ] Second developer hired and shipping independently (bus factor > 1 proven by a release the founder didn't cut)
 
 ### Exit gate — Phase 6 done when:
 
-- [ ] A business moves off Exchange without a desktop visit: Autodiscover
-  configures each Outlook from an address and a password, and mail opens, reads
-  and sends against alo from the first day — while the people on it move across
-  to alo's own client, which is where the product is actually better. Restated
-  from *"an Outlook desktop user works a full week against alo without knowing
-  Exchange is gone"* by [ADR 0055](docs/decisions/0055-outlook-is-a-bridge-not-a-destination.md):
-  that gate described Exchange parity, which we have decided not to build, and a
-  gate we have decided against can never be checked. The bridge has to be good
-  enough to remove the objection, not good enough to remove the reason to switch
+- [ ] A business runs on alo's own clients over 443: mail, calendar, contacts,
+  chat, meet, drive and docs reached from alo's web and desktop apps and nothing
+  else — no sidecar port, no per-desktop install, no "you also need to configure
+  X". Restated by
+  [ADR 0056](docs/decisions/0056-our-own-client-on-443-is-the-product.md). It
+  previously asked for an Outlook user who never notices Exchange is gone, then
+  for a business that migrates without a desktop visit; both described
+  Microsoft's product rather than ours. Third-party clients keep IMAP, POP3,
+  CalDAV and CardDAV — supported, simply not what this gate measures
 
 ---
 

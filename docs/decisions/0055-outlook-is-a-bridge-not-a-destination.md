@@ -1,6 +1,11 @@
 # ADR 0055 — Outlook support is a migration bridge, not a destination
 
-**Status:** accepted
+**Status:** **superseded by
+[ADR 0056](0056-our-own-client-on-443-is-the-product.md)**, on the same day. The
+freeze below was half a position: a bridge still has to be maintained, still has
+to be explained in every sales conversation, and still gives a customer a way
+never to arrive. The owner went further and retired the adapter. This is kept
+because the step matters — the argument here is what led to that one.
 **Date:** 2026-08-25
 **Decided by:** the owner, revisiting their own earlier decision on the argument
 recorded below.
