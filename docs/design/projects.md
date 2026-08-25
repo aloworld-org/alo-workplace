@@ -881,6 +881,24 @@ capacity planning, report charting, or a second approval model. The rejected
 alternative was a Gantt-style canvas: it would imply dependencies and planning
 precision the current milestone contract does not provide.
 
+### Project task list presentation
+
+**Surface.** The existing task list presents filtered workload totals above
+responsive, grouped task rows. Task titles remain the primary drill-down;
+completion, filtering, sorting, grouping, density, and inline creation keep
+their existing behavior.
+
+**Errors.** No new network operation is introduced. Existing load and mutation
+errors continue through the Tasks module's established surfaces.
+
+**Tenancy.** Summary figures are derived only from tasks already returned by
+the tenant-scoped task read and admitted by the active local filters.
+
+**Out of scope.** Saved views, bulk editing, custom columns, and a new task
+workflow are deliberately excluded. The rejected alternative was one card per
+task: it consumes too much vertical space for an operational list and weakens
+fast comparison across due dates, owners, and priorities.
+
 Two cross-cutting things this wave did **not** change, restated so a reader
 does not assume otherwise: **per-project access roles** are still B4.12's (a
 `team` project and its aggregates are tenant-wide; per-person hours are
