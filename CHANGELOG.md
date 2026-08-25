@@ -10,6 +10,8 @@ contracts.
 
 ## Unreleased
 
+- Projects reports now show one portfolio-wide view of every accessible client project, without a project dropdown that could silently narrow the totals.
+
 - **Mail apps other than alo's own can now send.** A client that leaves the
   delivery envelope to the server — which the JMAP standard allows, and most
   clients do — was told its message had no recipients. The recipients are now
