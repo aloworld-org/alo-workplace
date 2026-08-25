@@ -14,6 +14,12 @@ contracts.
   module identity, comfortably spaced navigation, contained list toolbars,
   protected compact actions, and a corrected Business details icon surface.
 
+- **A server that cannot send now says so as a server problem.** When no
+  submission listener is configured, sending was refused as though the sender
+  lacked permission — sending whoever hit it through identities, aliases and
+  send-as rules, none of which were the cause. It now answers as the
+  configuration fault it is, and names the missing setting in the log.
+
 - Project task lists now use a focused, responsive workspace with a unified command
   bar, scannable status sections, explicit completion controls, and drag-and-drop
   movement between workflow stages. Project workspaces now also use a clearer

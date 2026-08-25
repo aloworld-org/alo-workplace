@@ -12,7 +12,14 @@ if ([string]::IsNullOrWhiteSpace($RepoPath)) {
 }
 $repo = (Resolve-Path -LiteralPath $RepoPath).Path
 $backend = Join-Path $repo "target\debug\alo-jmap.exe"
+$mailer = Join-Path $repo "target\debug\alo-smtp.exe"
 $logDir = Join-Path $repo ".localdev\logs"
+
+# Every port this stack owns. 2525 is the MX and 2526 the trusted internal
+# submission listener that alo-jmap hands composed mail to; without the latter
+# running, EmailSubmission/set has nowhere to send and the app can read mail
+# but not send any.
+$devPorts = 5173, 8080, 2525, 2526
 
 function Get-Listener([int]$Port) {
     Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue |
@@ -51,6 +58,16 @@ function Wait-Http([string]$Uri, [int]$Seconds = 30) {
     throw "$Uri did not become ready within $Seconds seconds."
 }
 
+# The mail server has no HTTP surface, so readiness is the listening socket.
+function Wait-Port([int]$Port, [string]$What, [int]$Seconds = 60) {
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    do {
+        if ($null -ne (Get-Listener $Port)) { return }
+        Start-Sleep -Milliseconds 500
+    } while ((Get-Date) -lt $deadline)
+    throw "$What did not start listening on $Port within $Seconds seconds. See $logDir\smtp.err.log."
+}
+
 function Assert-Database {
     if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {
         throw "DATABASE_URL is required. Point it at the one local development database named 'alo'."
@@ -82,7 +99,7 @@ function Assert-GitRevision {
 }
 
 function Show-Status {
-    foreach ($port in 5173, 8080) {
+    foreach ($port in $devPorts) {
         $process = Get-Owner $port
         if ($null -eq $process) { Write-Host "[dev] $port stopped"; continue }
         Write-Host "[dev] $port PID $($process.ProcessId): $($process.CommandLine)"
@@ -93,24 +110,22 @@ function Show-Status {
 
 Set-Location $repo
 if ($Action -eq "Stop") {
-    Stop-ProjectListener 5173
-    Stop-ProjectListener 8080
-    Write-Host "[dev] stopped alo frontend and backend; database left running and untouched."
+    foreach ($port in $devPorts) { Stop-ProjectListener $port }
+    Write-Host "[dev] stopped alo frontend, backend and mail server; database left running and untouched."
     exit 0
 }
 if ($Action -eq "Check") { Show-Status; exit 0 }
 
 Assert-GitRevision
 Assert-Database
-foreach ($port in 5173, 8080) {
+foreach ($port in $devPorts) {
     $owner = Get-Owner $port
     if ($null -ne $owner -and -not (Test-ProjectProcess $owner)) {
         throw "Port $port belongs to PID $($owner.ProcessId) ($($owner.CommandLine)); use the correct checkout or stop it explicitly."
     }
 }
 
-Stop-ProjectListener 5173
-Stop-ProjectListener 8080
+foreach ($port in $devPorts) { Stop-ProjectListener $port }
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 $revision = git rev-parse HEAD
@@ -118,8 +133,8 @@ git diff --quiet --ignore-submodules HEAD --
 if ($LASTEXITCODE -ne 0) { $revision = "$revision-dirty" }
 $env:ALO_BUILD_REVISION = $revision
 $env:SQLX_OFFLINE = "true"
-cargo build -p alo-jmap --bin alo-jmap
-if ($LASTEXITCODE -ne 0) { throw "alo-jmap build failed." }
+cargo build -p alo-jmap --bin alo-jmap -p alo-smtp --bin alo-smtp
+if ($LASTEXITCODE -ne 0) { throw "build failed." }
 
 # The blob store is the other half of the one local database, so it lives the
 # same way: outside every checkout, shared by all of them.
@@ -143,6 +158,56 @@ New-Item -ItemType Directory -Force -Path $env:ALO_BLOB_DIR | Out-Null
 $env:ALO_IDENTITY_ISSUER = "http://localhost:5173"
 $env:ALO_JMAP_ADDR = "127.0.0.1:8080"
 $env:VITE_DEV_API = "http://localhost:8080"
+
+# ---- the mail server -------------------------------------------------------
+#
+# Without this, the stack could read mail but not send any: EmailSubmission/set
+# hands a composed message to a submission listener, and when there is none it
+# refuses. Reading needs only Postgres and the blob store, which is why the gap
+# stayed invisible until somebody pressed Send.
+#
+# NOTHING LEAVES THIS MACHINE — and the way that is arranged matters, because
+# the obvious way does not work.
+#
+# Submission does not deliver: it spools, and the queue runner drains the spool.
+# The queue runner only exists when outbound is enabled. So simply turning
+# outbound off makes the stack look like it sends — Sent fills, no error — while
+# every message sits in the spool forever, including one addressed to yourself.
+# That is a worse lie than the honest refusal it replaces.
+#
+# So outbound is ON, and every message is routed to a smarthost that is our own
+# MX on 127.0.0.1. A recipient at a local domain is delivered into the store,
+# which is exactly what happens in production once MX lookup lands back on our
+# own server. A recipient anywhere else is refused by that same MX, because a
+# domain we do not host is precisely what its anti-open-relay guard rejects, and
+# the sender gets a bounce. The loop is what keeps the box sealed: there is no
+# route out of it that does not pass through a listener bound to 127.0.0.1.
+$env:ALO_SMTP_ADDR = "127.0.0.1:2525"
+$env:ALO_SMTP_INTERNAL_SUBMISSION_ADDR = "127.0.0.1:2526"
+$env:ALO_SMTP_HOSTNAME = "localhost"
+$env:ALO_SMTP_OUTBOUND_ENABLED = "true"
+$env:ALO_SMTP_SMARTHOST = "127.0.0.1:2525"
+$env:ALO_SMTP_ALLOW_SELF_SIGNED = "true"
+# Deliver promptly: the production default paces a real queue, and waiting a
+# minute to see your own test message is how you conclude sending is broken.
+$env:ALO_SMTP_QUEUE_INTERVAL_SECS = "2"
+# Which domains count as ours, and so get delivered rather than spooled. It is
+# also the anti-open-relay guard, which is why it is never empty.
+if (-not $env:ALO_SMTP_LOCAL_DOMAINS) { $env:ALO_SMTP_LOCAL_DOMAINS = "alomails.com" }
+# The two services must read and write ONE blob store. Separate directories
+# would put a delivered message's row in the shared database and its bytes
+# somewhere the API cannot reach — a message that arrives and will not open.
+$env:ALO_SMTP_BLOB_DIR = $env:ALO_BLOB_DIR
+$env:ALO_SMTP_SPOOL_DIR = Join-Path (Split-Path -Parent $env:ALO_BLOB_DIR) "dev-spool"
+New-Item -ItemType Directory -Force -Path $env:ALO_SMTP_SPOOL_DIR | Out-Null
+# What alo-jmap hands composed mail to. Set before the backend starts, because
+# it is read once at startup.
+$env:ALO_JMAP_SUBMISSION_ADDR = $env:ALO_SMTP_INTERNAL_SUBMISSION_ADDR
+
+Start-Process -FilePath $mailer -WorkingDirectory $repo -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $logDir "smtp.out.log") `
+    -RedirectStandardError (Join-Path $logDir "smtp.err.log")
+Wait-Port 2526 "alo-smtp internal submission" 60
 
 Start-Process -FilePath $backend -WorkingDirectory $repo -WindowStyle Hidden `
     -RedirectStandardOutput (Join-Path $logDir "backend.out.log") `
