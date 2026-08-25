@@ -1,9 +1,17 @@
 # 0051 — Exchange-compatible client access: MAPI-over-HTTP on 443
 
-**Status:** accepted
+**Status:** accepted, but the **parity goal is superseded by
+[ADR 0055](0055-outlook-is-a-bridge-not-a-destination.md)** — Outlook support
+stops at what stage 7 delivers (open, read, send) and is a migration bridge
+rather than Exchange parity; stages 8 and 9 are not built. Everything below
+about the transport, the crate, translating to JMAP rather than forking the
+store, and the stages already shipped still stands. The goal they were serving
+does not.
 **Date:** 2026-08-21
 **Decided by:** the owner, explicitly and repeatedly, with the cost below stated
-and accepted.
+and accepted. Revisited by the owner on 2026-08-25, on an argument this ADR
+never addressed: that perfect Outlook compatibility is itself a reason for the
+customer never to open alo's own client.
 **Realises** the "Exchange adapters become edge translators to JMAP" clause of
 [ADR 0001](0001-jmap-native-core.md) and the ROADMAP item *"MAPI-over-HTTP
 adapter: native Outlook — the last wall"*.

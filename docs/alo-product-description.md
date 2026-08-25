@@ -74,7 +74,7 @@ The rule: **build where we differentiate, integrate the commodity, operate the r
 | `alo-ai` | Event-bus indexer, per-tenant semantic index, LLM orchestration, triage/summarization/drafting workers, MCP server. |
 | `alo-control` | Multi-tenant control plane: provisioning, quotas, billing hooks, monitoring. |
 | `alo-migrate` | The full M365 migration suite (Graph API based). |
-| Compatibility adapters | Exchange ActiveSync (phones), then MAPI-over-HTTP (native Outlook) — translating at the edge into JMAP calls. Post-launch roadmap. |
+| Compatibility adapters | Exchange ActiveSync (phones), and MAPI-over-HTTP so an existing Outlook opens, reads and sends against alo — translating at the edge into JMAP calls. A migration bridge, not Exchange parity: no cached mode, and calendar/contacts come over CalDAV/CardDAV ([ADR 0055](decisions/0055-outlook-is-a-bridge-not-a-destination.md)). Post-launch roadmap. |
 | **Web application** | The entire user-facing product in TypeScript: mail, agenda, chat, meet, drive, docs shells, admin console — one design system so five engines feel like one product. |
 | **Desktop & mobile shells** | PWA at launch; Tauri desktop app in phase two — the same TypeScript UI inside a thin Rust shell (tray, native notifications, autostart, deep links), followed by an offline-first layer: a local Rust mail cache syncing over JMAP, sharing types and client logic with `alo-core`, so desktop users get instant search and mail that works on the train. Mobile apps reuse the same UI and sync engine. No third language ever enters the codebase — Rust below the waterline, TypeScript above it, on every platform. |
 
@@ -152,7 +152,7 @@ For the rare immovable dependency (the accountant's macro workbook), the playboo
 | 4 — Migration suite | 12–16 | Full alo Migrate as described above | A non-Axon pilot migrated in one weekend by their own IT |
 | 5 — Launch | 16–18 | Remaining Axon companies as case studies, security audit, pricing, 2–3 MSP partners, public launch | Public availability; EAS/MAPI adapter work begins |
 
-Exchange-compatibility adapters (ActiveSync, then MAPI) are the year-two battle: launch sells alo's own apps plus open protocols; native Outlook support lands after.
+Exchange-compatibility adapters (ActiveSync, then MAPI) are the year-two battle: launch sells alo's own apps plus open protocols. MAPI is deliberately a bridge and not a destination — it carries a customer's existing Outlook through the move, and stops there. Compatibility good enough to remove the objection, never good enough to remove the reason to switch: an Outlook that works perfectly is an alo nobody opens ([ADR 0055](decisions/0055-outlook-is-a-bridge-not-a-destination.md)).
 
 ## 9. Market and competition
 
