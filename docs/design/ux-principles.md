@@ -222,6 +222,13 @@ identical in size, radius, and rhythm across modules.
 
 ## Standing constraints
 
+- **The interface never uses underlines as decoration or interaction feedback.**
+  Links, buttons, tabs, navigation, table actions, and their hover, focus,
+  active, and visited states use colour, weight, surface, and a visible focus
+  ring instead. Underlining remains available only inside user-authored rich
+  text where it is content, not application chrome.
+  *Verify:* interactive interface text has `text-decoration: none` in every
+  state; keyboard focus remains obvious without an underline.
 - **Preserve every working behavior outside the requested change.** A visual
   refinement must not change data flow, persistence, navigation, validation,
   permissions, or adjacent interactions unless the user explicitly asks for

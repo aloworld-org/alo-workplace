@@ -42,6 +42,9 @@ contracts.
   itself. Clients still see no internal detail, and no value out of a row ever
   reaches the log.
 
+- Interface links no longer gain browser underlines on hover, focus, active,
+  or visited states; task links use colour, surface, and focus rings instead.
+
 - **Out-of-office can now be scheduled.** Set the first and last day you are
   away and the automatic reply starts and stops on its own — set it the evening
   before you leave rather than remembering on the morning. Leaving both dates
