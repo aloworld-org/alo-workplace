@@ -16,6 +16,11 @@ contracts.
   taken from the message itself, blind-carbon included, so it reaches everyone
   it names.
 
+- **Local development now refuses checkout and runtime drift.** One guarded
+  launcher owns ports 5173 and 8080, verifies `main`, the preserved `alo`
+  database, schema and OIDC configuration, rebuilds the backend, and waits for
+  revision-aware readiness. Vite no longer silently moves to another port.
+
 - **Outlook can now keep its own copy of a folder.** A client that asks to
   synchronise a folder is sent the messages in it, and on later connections only
   what has changed since — a message it already has is not sent twice. Still off
