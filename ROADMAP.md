@@ -167,7 +167,18 @@ RFC 8601 contract) and at submission (DKIM signing). RSA crypto uses
       — tenant lifecycle, domain ownership, quotas, and the operator surface
       (`alo-control`) landed (ADR 0012); per-engine provisioning + billing remain
 - [ ] Native distribution lists + shared mailboxes with delegation
-- [ ] Backups per DR targets; restore rehearsal scripted and passing
+- [~] Backups per DR targets; restore rehearsal scripted and passing.
+  **Nightly encrypted backup restored 2026-08-25** after 25 silent failures
+  (2026-08-01 to 08-25): the ops layer in `deploy/production/ops` had been
+  updated for the namel3ss→alomails migration but never installed, so the
+  server ran the pre-migration scripts against paths that no longer existed —
+  and the alarm that should have said so was broken by the same migration.
+  Now installed as `alo-backup.timer` / `alo-monitor.timer`, restic history
+  carried across, `restic check` clean. **Restore rehearsed on the wire**: the
+  dump restored into a throwaway database matched live exactly (8 users, 7
+  tenants, 44 messages). Remaining: the rehearsal is not yet *scripted*, and
+  the restic password still needs a copy held off the server — without it the
+  backups cannot be decrypted.
 - [ ] Audit log; GDPR export; tenant export (exit as a feature)
       — tenant audit log landed (ADR 0012); GDPR + tenant export remain
 
