@@ -320,3 +320,35 @@ of them can't.
 4. **Re-run mail-tester** — after the DNS items, send a message to a fresh
    `mail-tester.com` address to confirm the score. Last score: 8/10, with
    SPF, DKIM and DMARC all passing.
+
+## Building on the production box (learned 2026-08-25, the hard way)
+
+**Never build more than one service at a time on the box that serves
+production.** `docker compose build alo-jmap alo-smtp alo-imap alo-control`
+runs the builds in parallel: on the 4 GB server that meant eight concurrent
+`rustc` processes, 65 MB of memory left, load average 74, and ~40 minutes in
+which the web UI returned 502s and SSH could not complete a handshake. Build
+sequentially instead:
+
+```sh
+for s in alo-jmap alo-smtp alo-imap alo-control; do
+  docker compose build "$s" || break
+done
+```
+
+run detached with output to a file (`nohup sh -c '…' </dev/null >/log 2>&1 &`),
+because the SSH session will not survive the build either way.
+
+Two things about that incident worth keeping:
+
+- **Inbound mail survived the whole event.** Port 25 kept answering while 443
+  and 22 starved, because the SMTP listener is cheap per connection and TLS
+  handshakes are not. Senders retry regardless; nothing was lost.
+- **The OOM killer's victims stay hidden inside healthy-looking containers.**
+  It killed `clamd` inside `alo-clamav-1`; the container stayed "Up (healthy)"
+  while every inbound delivery deferred fail-closed with `clamav unreachable`.
+  After ANY memory event on this box: `docker exec alo-clamav-1 sh -c
+  'echo PING | nc -w 2 127.0.0.1 3310'` must answer `PONG`, and
+  `dmesg | grep -i "killed process"` names who else died. Fail-closed did
+  exactly its job — mail deferred, none delivered unscanned, none lost — and
+  it looks, from the outside, like mail silently not arriving.
