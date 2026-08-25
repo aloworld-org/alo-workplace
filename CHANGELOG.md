@@ -19,6 +19,9 @@ contracts.
   status cues, protected sticky labels, and a separate unscheduled queue. Task
   details now always layer above the planning canvas.
 
+- Project calendars now use a framed monthly workspace with integrated navigation,
+  stronger date states, balanced weekend treatment, and status-aware task cards.
+
 - Projects timesheets now keep week controls, status, scope, and time entry in
   one clear workspace; portfolio milestones use scannable progress cards, and
   report project names open their project workspace.
