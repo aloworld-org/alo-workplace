@@ -105,9 +105,11 @@ RFC 8601 contract) and at submission (DKIM signing). RSA crypto uses
   GUI-client matrix (the actual Thunderbird/Apple Mail/Gmail apps)
 - [~] Deliverability: our mail reaches Gmail/Outlook.com/Proton inboxes (not spam) from the warmed IP.
   **Trust stack verified on prod** (SPF/DKIM/DMARC/MX all pass, strict alignment).
-  **Blocker: PTR (reverse DNS) is unset** — must be set at the IP/hosting provider;
-  it dominates inbox placement. MTA-STS optional/unpublished. External-inbox receipt
-  test pending the PTR fix (see `docs/interop.md`)
+  **PTR is set and forward-confirmed** (verified 2026-08-25): 152.53.179.142 →
+  `mail.alomails.com` → 152.53.179.142, and the SMTP HELO matches. The blocker
+  recorded here was stale. MTA-STS optional/unpublished. Remaining: receipt in a
+  real Gmail/Outlook.com/Proton **inbox** (not spam), which needs an account at
+  each — a human with those accounts, not a protocol check
 
 ## Phase 2 — Product layer ⇄ (may overlap Phase 1 tail)
 
