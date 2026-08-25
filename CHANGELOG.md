@@ -18,6 +18,21 @@ contracts.
   one clear workspace; portfolio milestones use scannable progress cards, and
   report project names open their project workspace.
 
+- **Out-of-office can now be scheduled.** Set the first and last day you are
+  away and the automatic reply starts and stops on its own — set it the evening
+  before you leave rather than remembering on the morning. Leaving both dates
+  blank keeps the previous behaviour: on now, until you switch it off. The last
+  day away is covered to its end, so whoever writes on the day you are back
+  reaches you and not a message saying you are away.
+
+- **Standard mail apps can schedule that holiday too.** alo advertises the JMAP
+  vacation-response capability, whose object carries a start and an end date;
+  both were accepted and then reported as empty, so a client that scheduled a
+  holiday was told in the reply to its own request that its dates had not been
+  stored, and the auto-reply either never started or never stopped. Both dates
+  are now kept and reported, and a date that cannot be read is refused rather
+  than quietly dropped.
+
 - Projects reports now show one portfolio-wide view of every accessible client project, without a project dropdown that could silently narrow the totals.
 
 - **Mail apps other than alo's own can now send.** A client that leaves the

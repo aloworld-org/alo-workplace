@@ -121,7 +121,7 @@ RFC 8601 contract) and at submission (DKIM signing). RSA crypto uses
 - [ ] Organization primitives: flags with due dates, categories/colors, archive keystroke, unread counts
 - [x] Undo send, send later, snooze — *attested 2026-08-08: all three live in production (send-later scheduler, snooze store + sweeper, deployed routes on mail.alomails.com)*
 - [ ] Visual Sieve rule builder
-- [ ] Signatures (per identity + org footer), out-of-office with scheduling
+- [~] Signatures (per identity + org footer), out-of-office with scheduling — **out-of-office with scheduling done 2026-08-25**: a first and last day away on the settings screen, the reply gated on that window when a message arrives rather than by a timer that could be down on the day, and the JMAP `VacationResponse` `fromDate`/`toDate` we advertise now actually stored and reported instead of always reported as null. Org footer is live. Still open: signatures are **one per account, not per identity**
 - [x] Search UI over the store index — fast enough to feel local — *attested 2026-08-08: the Ctrl/Cmd-K workspace search over the store FTS is live and daily-used; it also grounds the Ask-alo agent*
 - [x] Responsive / phone layout for Mail: below 768px the three-pane view becomes single-pane list↔detail (a `useIsMobile` matchMedia hook drives it) — folders slide in as an off-canvas drawer (toggled from the list header, closes on selection), the reading pane gets a back-to-list control, resize handles are hidden, and the reading toolbar wraps. Desktop unchanged
 - [ ] PWA installable: offline shell, push notifications
