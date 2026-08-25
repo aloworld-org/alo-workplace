@@ -176,9 +176,13 @@ RFC 8601 contract) and at submission (DKIM signing). RSA crypto uses
   Now installed as `alo-backup.timer` / `alo-monitor.timer`, restic history
   carried across, `restic check` clean. **Restore rehearsed on the wire**: the
   dump restored into a throwaway database matched live exactly (8 users, 7
-  tenants, 44 messages). Remaining: the rehearsal is not yet *scripted*, and
-  the restic password still needs a copy held off the server — without it the
-  backups cannot be decrypted.
+  tenants, 44 messages), and **the rehearsal is now scripted and weekly**
+  (`alo-restore-rehearsal.timer`): it restores the newest snapshot into a
+  throwaway database, counts what came back, and alerts if it cannot — both
+  failure paths exercised. **Two DR promises in the product description remain
+  unmet:** the repository sits on the same filesystem as the data it protects,
+  so nothing survives losing the disk, and the restic password still needs a
+  copy held off the server — without it the backups cannot be decrypted.
 - [ ] Audit log; GDPR export; tenant export (exit as a feature)
       — tenant audit log landed (ADR 0012); GDPR + tenant export remain
 
