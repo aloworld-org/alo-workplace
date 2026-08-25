@@ -10,8 +10,9 @@ contracts.
 
 ## Unreleased
 
-- Project task lists now use a focused, responsive workspace with workload
-  summaries, scannable status sections, clearer metadata, and keyboard-accessible rows.
+- Project task lists now use a focused, responsive workspace with a unified command
+  bar, scannable status sections, explicit completion controls, and drag-and-drop
+  movement between workflow stages.
 
 - Projects timesheets now keep week controls, status, scope, and time entry in
   one clear workspace; portfolio milestones use scannable progress cards, and
