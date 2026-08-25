@@ -16,7 +16,8 @@ contracts.
 
 - Project timelines now use a contained planning canvas with readable task rows,
   calendar context, uncluttered colour-only schedule bars, inset task metadata,
-  status cues, and a separate unscheduled queue.
+  status cues, protected sticky labels, and a separate unscheduled queue. Task
+  details now always layer above the planning canvas.
 
 - Projects timesheets now keep week controls, status, scope, and time entry in
   one clear workspace; portfolio milestones use scannable progress cards, and
