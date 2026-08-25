@@ -25,6 +25,9 @@ contracts.
 - Project files now use a focused attachment workspace with clear task context,
   polished upload and Drive actions, responsive file cards, and active drop feedback.
 
+- Project updates can now include durable image and file attachments that readers
+  can download from the published update.
+
 - Projects timesheets now keep week controls, status, scope, and time entry in
   one clear workspace; portfolio milestones use scannable progress cards, and
   report project names open their project workspace.
