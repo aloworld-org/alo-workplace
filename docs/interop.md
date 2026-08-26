@@ -236,6 +236,63 @@ Client quirks and RFC deviations. Format per entry: date · client+version · qu
   same-mailbox MOVE and leave the message untouched (an earlier draft would have
   expunged the sole membership — caught in review, now regression-tested).
 
+## SASL XOAUTH2 (alo-imap IMAP + alo-smtp submission)
+
+- 2026-08-26 · **XOAUTH2, not OAUTHBEARER** · we implement the de-facto
+  `XOAUTH2` mechanism (published by Google, shipped by Thunderbird and the
+  major mobile clients), not RFC 7628 `OAUTHBEARER` — real MUAs implement
+  XOAUTH2 first and some implement nothing else. Tokens are our own OIDC
+  access tokens, verified through the same `resolve_access_token` seam the
+  RFC 7662 introspection endpoint wraps (ADR 0025), so revocation/expiry
+  bite on the next connection. The asserted `user=` must resolve to
+  exactly the token's `(tenant, user)`; any mismatch fails like a bad
+  token (no oracle). POP3 deliberately has no XOAUTH2 (no client demand);
+  app passwords cover it.
+- 2026-08-26 · **The base64 shape that trips every implementer** · the
+  client response is ONE base64 blob over the whole string, not
+  per-field: `base64("user=" user "^Aauth=Bearer " token "^A^A")` where
+  `^A` is byte 0x01 (not the two characters `^` `A`, not `\n`, not NUL).
+  The trailing `^A^A` is required by the published spec; we accept its
+  absence, ignore extra `key=value` fields (`host=`/`port=` appear in the
+  wild), and match `Bearer` case-insensitively. Example, token `ya29.x`
+  for `user@example.com`:
+  `dXNlcj11c2VyQGV4YW1wbGUuY29tAWF1dGg9QmVhcmVyIHlhMjkueAEB`.
+- 2026-08-26 · **The failure dialog is part of the mechanism** · on a bad
+  token the server does NOT reply `NO`/`535` immediately: it first sends a
+  continuation carrying a base64 JSON error status, the client answers
+  with one empty line, and only then comes the protocol-level rejection.
+  Clients hang or mis-report if the extra round-trip is skipped. Ours is
+  `{"status":"401","schemes":"bearer","scope":""}` (clients act on
+  `status` only). Malformed blobs (bad base64, missing fields, control
+  chars in `user=`) are a protocol error instead: IMAP `BAD` / SMTP `501`,
+  with no error-status dialog.
+- 2026-08-26 · **IMAP exchange** (implicit TLS; SASL-IR form, RFC 4959 —
+  `SASL-IR` and `AUTH=XOAUTH2` are advertised post-TLS):
+
+  ```
+  C: a1 AUTHENTICATE XOAUTH2 dXNlcj11c2VyQGV4YW1wbGUuY29tAWF1dGg9QmVhcmVyIHlhMjkueAEB
+  S: a1 OK [CAPABILITY IMAP4rev2 ...] LOGIN completed        (live token)
+
+  C: a2 AUTHENTICATE XOAUTH2 dXNlcj1...                      (revoked token)
+  S: + eyJzdGF0dXMiOiI0MDEiLCJzY2hlbWVzIjoiYmVhcmVyIiwic2NvcGUiOiIifQ==
+  C:                                                          (empty line)
+  S: a2 NO [AUTHENTICATIONFAILED] invalid credentials
+  ```
+- 2026-08-26 · **SMTP submission exchange** (after STARTTLS; EHLO
+  advertises `AUTH PLAIN LOGIN XOAUTH2`):
+
+  ```
+  C: AUTH XOAUTH2 dXNlcj11c2VyQGV4YW1wbGUuY29tAWF1dGg9QmVhcmVyIHlhMjkueAEB
+  S: 235 2.7.0 Authentication successful                     (live token)
+
+  C: AUTH XOAUTH2 dXNlcj1...                                 (revoked token)
+  S: 334 eyJzdGF0dXMiOiI0MDEiLCJzY2hlbWVzIjoiYmVhcmVyIiwic2NvcGUiOiIifQ==
+  C:                                                          (empty line)
+  S: 535 5.7.8 Authentication credentials invalid
+  ```
+  Without an initial response (`AUTH XOAUTH2` alone / IMAP without IR),
+  the server prompts with an empty challenge (`334 ` / `+ `) first.
+
 ## Inbound local delivery (SMTP → store)
 
 - 2026-07-28 · **Unknown local user is refused `550 5.1.1` at RCPT** · when

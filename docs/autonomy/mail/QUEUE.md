@@ -74,7 +74,7 @@ restructures billing/chat/ds/sites code.
   wrong-tenant tests per route, and a settings-screen section — shown once on
   create with copy affordance, list shows name + created + last-used, revoke
   is immediate. Strings in en/fr/nl from day one.
-- [ ] M1.4 SASL `XOAUTH2` on IMAP and SMTP submission, verifying our own OIDC
+- [x] M1.4 SASL `XOAUTH2` on IMAP and SMTP submission, verifying our own OIDC
   bearer tokens through the existing introspection seam (ADR 0025) — so a
   client that can do OAuth never needs an app password at all. Record the
   exact SASL exchange in `docs/interop.md` (the base64 shape trips every

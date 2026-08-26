@@ -239,10 +239,25 @@ same app-password check so "correct primary, policy-refused" costs the
 same argon2 work as "wrong password" and timing cannot distinguish them.
 An app password carries no second-factor obligation because it is issued
 only from inside an already-authenticated session and is never a
-phishable human-chosen secret. OAuth-capable desktop clients
-(Thunderbird supports `XOAUTH2`) also work via the OIDC flow; the
-follow-up is `XOAUTH2` SASL on IMAP and submission so an OAuth client
-never needs an app password at all.
+phishable human-chosen secret.
+
+**SASL `XOAUTH2`** (IMAP `AUTHENTICATE` and SMTP submission `AUTH`)
+closes the loop for OAuth-capable clients: the client presents one of our
+own OIDC access tokens, verified through `resolve_access_token` — the
+seam the RFC 7662 introspection endpoint wraps (ADR 0025) — so
+revocation and expiry are honoured on the next connection. The asserted
+`user=` must resolve to exactly the token's `(tenant, user)`; a token
+can never log in as anyone but its own principal. Because a token is
+only ever issued after the *full* login (password and, when enrolled,
+the second factor), accepting it here does not weaken the fail-closed
+rule — it is the sanctioned way around it, and such a client never needs
+an app password at all. There is no per-username backoff and no dummy
+hash on this path, deliberately: both failure paths are single indexed
+lookups of a 256-bit random token's SHA-256 (nothing guessable, no
+argon2 timing to equalize), and the common failure — an expired token —
+is exactly what a well-behaved client refreshes and retries. Wire shape
+and the mechanism's error dialog: `docs/interop.md`. POP3 deliberately
+has no `XOAUTH2` (no client demand; app passwords cover it).
 
 ## Tenancy
 
@@ -269,8 +284,9 @@ never data and never a `500`.
 
 ## Out of scope (recorded, deferred)
 
-- **App-specific passwords + `XOAUTH2`** on submission — the sanctioned
-  cut seam above; interim is account-password-on-legacy.
+- ~~**App-specific passwords + `XOAUTH2`** on submission~~ — both shipped
+  (M1.1–M1.4): the app-password seam and `XOAUTH2` on IMAP + submission
+  are described above.
 - **Sender authorization** (bind submission `MAIL FROM` to the
   authenticated identity / send-as) — still deferred (M3 audit item #2):
   it needs the group/alias permission model this milestone *ships the

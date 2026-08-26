@@ -114,3 +114,49 @@ fix: `web/src/shell/AppShell.layout.test.ts` fails because
 interactive agent this morning) — flagged here for whoever owns the shell.
 
 Next: M1.4 — SASL XOAUTH2 on IMAP and SMTP submission.
+
+### 2026-08-26 — iteration 4 — M1.4 SASL XOAUTH2 on IMAP and SMTP submission
+
+Shipped: `alo-identity/src/xoauth2.rs` — the one XOAUTH2 blob parser both
+protocols share (tolerant: extra `host=`/`port=` fields ignored, `Bearer`
+case-insensitive, trailing `^A^A` optional; token redacted from Debug) and
+`Identity::authenticate_xoauth2`, which verifies the bearer through
+`resolve_access_token` — the same seam the RFC 7662 introspection endpoint
+wraps (ADR 0025; rejected alternative: an HTTP hop to `/oauth/introspect`
+from a process that already links the authority) — and requires the asserted
+`user=` to resolve to exactly the token's `(tenant, user)`. No backoff/dummy
+hash on this path by design (indexed lookups of a 256-bit token's hash,
+nothing guessable; expired-token retries are legitimate) — rationale in the
+rustdoc + `docs/design/identity.md`. IMAP: `AUTH=XOAUTH2` + `SASL-IR`
+advertised post-TLS, `AUTHENTICATE XOAUTH2` with the mechanism's error
+dialog on failure (`+ <b64 status>` → empty client ack → tagged NO); the
+old try_login success/cap logic factored into shared `auth_success`/
+`auth_failure` (behaviour unchanged). SMTP submission: `AUTH PLAIN LOGIN
+XOAUTH2` after TLS, `do_auth_xoauth2` (334 error-status dialog → 535;
+malformed blob 501; store fault 454); `Mechanism::XOAuth2` routed before
+`collect_credentials`, whose unreachable arm fails safe as 504. The exact
+SASL exchange (the base64 shape, the failure dialog, full IMAP + SMTP
+transcripts) recorded in `docs/interop.md`; 2FA note: a token is only
+issued after the full login, so accepting it does not weaken fail-closed.
+
+Verified: fmt + clippy clean on alo-identity/alo-imap/alo-smtp; 281 tests
+green across the three crates incl. 9 new — parser unit tests (canonical
+shape, tolerance, rejections, Debug redaction, stable error-status JSON),
+identity seam test (own principal OK + scope-less; cross-tenant/cross-user
+and unknown-user refused; garbage token; revoked fails next connection),
+real-TLS IMAP wire test (capability advertised, SASL-IR login reaches
+SELECT INBOX, revoked token runs the error dialog with a decoded 401
+status, malformed blob is BAD), real-TLS SMTP submission wire test (EHLO
+advertises, live token 235, revoked 334-dialog→535, malformed 501). One
+unrelated flake observed and cleared: `alo-smtp::dmarc_report sweep_…`
+failed under full parallel load, passed alone and on the full rerun.
+
+Cuts/flags: POP3 gets no XOAUTH2 (queue scopes M1.4 to IMAP + submission;
+no client demand — app passwords cover it; noted in interop.md). No
+feature flag: the mechanism is additive — a client only uses it by
+selecting it — and the off-switch is revert; misbehaviour shows in the
+existing auth success/failure tracing. OAUTHBEARER (RFC 7628) not
+implemented, recorded in interop.md with rationale. M6.1's transcript
+script should cover XOAUTH2 now that it exists.
+
+Next: M2.1 — distribution lists.

@@ -10,6 +10,12 @@ contracts.
 
 ## Unreleased
 
+- **Mail clients that support OAuth can now sign in without any password.**
+  IMAP and SMTP sending accept the XOAUTH2 sign-in that clients like
+  Thunderbird use: the client completes the normal alo login (two-factor
+  included) in a browser window and never stores a password at all. Signing
+  out of that session locks the client out on its next connection.
+
 - **App passwords are now yours to manage in Settings.** A new "App
   passwords" section lists each one with its name, creation date, and when it
   last signed a client in; creating one shows the password exactly once with
