@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- **App passwords are now yours to manage in Settings.** A new "App
+  passwords" section lists each one with its name, creation date, and when it
+  last signed a client in; creating one shows the password exactly once with
+  a copy button (the server keeps only a hash and can never show it again),
+  and revoking one locks that client out on its next connection. In English,
+  French, and Dutch.
+
 - **Classic mail clients can now sign in with an app-specific password.**
   IMAP, POP3, and SMTP sending accept them wherever the client asks for a
   password. An account protected by two-factor authentication keeps its real

@@ -69,7 +69,7 @@ restructures billing/chat/ds/sites code.
   password succeeds on real TLS IMAP; 2FA account + primary password still
   fails; revoked app password fails on the next connection; a non-2FA account
   behaves exactly as before.
-- [ ] M1.3 Owning them from the product: `/api/settings/app-passwords`
+- [x] M1.3 Owning them from the product: `/api/settings/app-passwords`
   (create/list/revoke; the secret appears only in the create response) with
   wrong-tenant tests per route, and a settings-screen section — shown once on
   create with copy affordance, list shows name + created + last-used, revoke

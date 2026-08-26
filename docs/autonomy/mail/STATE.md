@@ -78,3 +78,39 @@ no XOAUTH2 (M1.4). Non-2FA accounts keep primary login byte-identical —
 every pre-existing suite login is the regression test for that.
 
 Next: M1.3 — owning app passwords from the product (routes + settings UI).
+
+### 2026-08-26 — iteration 3 — M1.3 owning app passwords from the product
+
+Shipped: route module `alo-jmap/src/app_passwords.rs` — `GET/POST
+/settings/app-passwords` and `DELETE /settings/app-passwords/{id}` (mounted
+under `/api` like every product route), all scoped to the token's
+`(tenant, user)` and nothing else; the secret rides only in the create
+response. Store refusals keep their meaning on the wire (422 bad name, 409
+at the 20-per-user cap, 404 unknown-or-foreign id — same denial for both).
+Web: `JmapClient.listAppPasswords/createAppPassword/revokeAppPassword`,
+new settings tab "App passwords" (`web/src/shell/AppPasswordsSection.tsx`,
+a new file on purpose — Codex is churning other shell/mail components) with
+the one-time secret card (copy affordance + select-all fallback, dismissed
+for good on Done), list showing name/created/last-used, immediate revoke
+with per-row labels. Strings in en/fr/nl.
+
+Verified: fmt + clippy clean; `cargo nextest run -p alo-jmap` 1313 green
+incl. 5 new (secret shape + verifies at the identity seam, list never
+carries it, 422s, revoke kills the credential + second revoke 404s,
+cross-tenant list/revoke on one shared store denied with the credential
+proven still alive, 401s without a token). Web: typecheck, eslint, vitest
+(4 new section tests), `npm run build` — clean. Wire-verified against the
+local debug backend on the `alo` database with real curl through the full
+PKCE login: create 200 `{id,name,secret}`, empty name 422, list 200 with
+the secret absent from the body, anonymous 401, revoke 200 then 404, list
+empty after. Scratch tenant `wire-m13` created for it; the prune sweep
+removes it on age.
+
+Cuts/flags: none in scope. `cargo fmt` on the crate also normalized an
+unformatted hunk someone landed in `ai.rs` — formatting only, kept so the
+crate passes `fmt --check`. Pre-existing on main and NOT this track's to
+fix: `web/src/shell/AppShell.layout.test.ts` fails because
+`AppShell.module.css` is not in the tree (shell rework in flight by the
+interactive agent this morning) — flagged here for whoever owns the shell.
+
+Next: M1.4 — SASL XOAUTH2 on IMAP and SMTP submission.
