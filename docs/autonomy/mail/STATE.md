@@ -450,3 +450,47 @@ change was needed — the card was already wired end to end, so no i18n
 additions. No new routes, no migration — no Caddyfile note.
 
 Next: M3.4 — free/busy (VFREEBUSY).
+
+### 2026-08-27 — iteration 10 — M3.4 free/busy (VFREEBUSY)
+
+Shipped: the CalDAV `free-busy-query` REPORT (RFC 4791 §7.10) on every
+calendar collection, answered as an RFC 5545 §3.6.4 `VFREEBUSY` —
+`text/calendar`, the queried window as `DTSTART`/`DTEND`, one
+`FREEBUSY;FBTYPE=BUSY` UTC period per busy span. Three seams, each in the
+file that owns its subject: `alo_store::merged_busy_spans`
+(calendar_availability.rs — clamp to the window, drop empties, merge
+overlapping/touching spans; the existing JSON `/calendar/freebusy` endpoint
+now calls it too, so "busy" is computed exactly once),
+`ical::to_vfreebusy` (a serializer whose type has no field for
+titles/locations/descriptions — busy/free only, by construction), and the
+REPORT dispatch in carddav.rs (visibility gate identical to PROPFIND: an
+unshared or foreign calendar id is 404, unprobeable; missing/invalid
+`<C:time-range>` is 400 per RFC 4791 §9.11's exactly-one rule). Instances
+come from the store's ONE expansion function (`events_in_range`), so
+recurrence, moved occurrences, and EXDATEs are honoured with no second
+implementation. `free-busy-query` advertised in supported-report-set.
+
+Verified: fmt + clippy clean (alo-store, alo-jmap); full suites 3 838 run,
+3 838 passed, 1 skipped (the standing serial skip), including the new
+tests — merge unit tests (clamp/merge/sort, empty/disjoint), VFREEBUSY
+byte-exact serialization, and two wire tests over the real router +
+Postgres: merged-overlap + weekly-series expansion + outside-window
+exclusion + no-SUMMARY-anywhere, and the MANDATED cross-account proof — a
+viewer-role share yields busy periods but never the title, A's unshared
+personal calendar 404s to a colleague, and a foreign tenant gets 404
+through both path shapes with no `FREEBUSY` in any denial body.
+
+Cuts/flags: `TRANSP` is not modelled — every event counts as busy
+(transparent all-day events still block); recorded in interop.md, revisit
+if a real-client pass objects. iTIP `VFREEBUSY` REQUEST/REPLY over iMIP
+(RFC 5546 §3.3) not built — the queue item asks for the queried-window
+answer, and no client in our interop set schedules via iMIP free/busy. No
+web change (the Agenda's scheduling grid already rides the JSON endpoint,
+which now shares the merge). No migration, no new route prefix (rides
+`/dav`), no Caddyfile note. Ops note: the background+marker build form
+lost its marker subshell when the launching Bash call ended (Windows: the
+`( … ) &` parent dies with the call; cargo itself survived) — the build's
+"Finished" line in the log plus a fast foreground `--no-run` re-check is
+the honest completion signal.
+
+Next: M4.1 — German catalog (`web/src/i18n/de.ts`).

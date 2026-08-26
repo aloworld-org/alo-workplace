@@ -527,6 +527,18 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   if the store's expansion — the same function the Agenda uses — actually
   yields an occurrence in the window, or a per-occurrence override moved one
   into it). No range → whole collection, as before.
+- **Free/busy (`free-busy-query`, RFC 4791 §7.10):** a REPORT on a calendar
+  collection answers `200` with a `text/calendar` body — one `VFREEBUSY`
+  (RFC 5545 §3.6.4) carrying the queried window as `DTSTART`/`DTEND` and one
+  `FREEBUSY;FBTYPE=BUSY` UTC period per busy span (clamped to the window,
+  overlaps merged; the same store expansion and the same merge the Agenda's
+  scheduling grid uses). The serializer has no field for event detail, so
+  titles cannot leak by construction — proven by a cross-account test: a
+  viewer-role share gets periods, never `SUMMARY`. A REPORT without a
+  parseable `<C:time-range>` is `400` (the range is the query — RFC 4791
+  §9.11 requires exactly one). Deliberate cut: `TRANSP` is not modelled, so
+  every event counts as busy — a "free"-marked (transparent) event, e.g. an
+  all-day birthday, still blocks; revisit if a real-client pass objects.
 - **Time zones:** a `TZID=`-qualified `DTSTART`/`DTEND`/`EXDATE`/`RDATE` is
   converted from that IANA zone to UTC at rest, and (since M3.2) the zone is
   **kept** on the event so recurrence expands in its wall-clock. Serving goes

@@ -1,5 +1,6 @@
 # Changelog
 
+- Calendar apps can now ask "when is this calendar busy?" over CalDAV (a free-busy query) and get back merged busy blocks only — never event titles, locations, or descriptions — including for shared calendars you can only view.
 - Cancelling a single occurrence of a recurring meeting now removes only that occurrence from your guests' calendars — the rest of the series stays — and the whole invitation round trip (invite, accept/decline/maybe, reply recorded on the organizer's event) is verified end to end.
 - Chat now has a cleaner, responsive Tailwind interface with clearer room navigation, message actions, people management, and a compact composer that reveals tools only when needed.
 - HR teams can now create and maintain approved letter templates in the People module, using the server-provided placeholder vocabulary and clear safeguards around deletion and sending.

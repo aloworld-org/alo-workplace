@@ -118,7 +118,7 @@ restructures billing/chat/ds/sites code.
   Every deviation a real client forces goes in `docs/interop.md`. Tests: full
   request→reply round trip across two accounts on a real local stack;
   a CANCEL removes the instance, not the series, when it names one.
-- [ ] M3.4 Free/busy: `VFREEBUSY` answered from the store (RFC 5545 §3.6.4)
+- [x] M3.4 Free/busy: `VFREEBUSY` answered from the store (RFC 5545 §3.6.4)
   for a queried window, exposing busy/free only — never event detail — with a
   cross-account test proving titles cannot leak through it.
 
