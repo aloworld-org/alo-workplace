@@ -10,6 +10,14 @@ contracts.
 
 ## Unreleased
 
+- Every screen is now immune by default to the page-scrollbar-over-dead-space
+  bug, not just the ones already fixed: the app root itself clips the document
+  and anchors any absolutely-positioned stray, so a future layout that forgets
+  its own positioning cannot recreate it. Standalone pages (sign-in, sign-up,
+  password reset, invitations, unsubscribe) now scroll themselves on short
+  windows, and printing is exempt from the clip so documents still flow across
+  pages.
+
 - The app can no longer grow a page scrollbar with a dead white band under it.
   A screen-reader-only table caption could escape the shell's clipping —
   absolute positioning is only clipped by an ancestor in its containing-block
