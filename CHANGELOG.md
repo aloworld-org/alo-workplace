@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- The app can no longer grow a page scrollbar with a dead white band under it.
+  A screen-reader-only table caption could escape the shell's clipping —
+  absolute positioning is only clipped by an ancestor in its containing-block
+  chain — anchor to the page itself, and stretch the document past the
+  viewport. The shell is now that containing block, which closes the whole
+  class, not the one caption.
+
 - **Each send address can now have its own signature.** Someone who sends as
   support@ and as themselves signs those two differently; until now every
   identity silently shared the account signature, and a standard mail app that
