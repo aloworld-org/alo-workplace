@@ -2719,10 +2719,10 @@ function CustomizeQuote({
                   type="button"
                   aria-pressed={design.headerAlignment === alignment}
                   className={cx(
-                    "group rounded-2xl border bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25",
+                    "group relative min-h-48 overflow-hidden rounded-2xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25",
                     design.headerAlignment === alignment
-                      ? "border-accent bg-accent-soft/35"
-                      : "border-default",
+                      ? "border-accent bg-accent-soft/30 shadow-sm"
+                      : "border-default bg-surface shadow-sm",
                   )}
                   onClick={() =>
                     onChange((current) => ({
@@ -2733,29 +2733,38 @@ function CustomizeQuote({
                 >
                   <span
                     className={cx(
-                      "flex h-20 items-center justify-between gap-4 rounded-xl bg-raised px-4",
+                      "flex h-24 items-center justify-between gap-5 rounded-xl border border-subtle bg-raised px-5",
                       alignment === "right" && "flex-row-reverse",
                     )}
                     aria-hidden="true"
                   >
-                    <span className="h-8 w-16 rounded-lg bg-accent-soft ring-1 ring-accent/20" />
-                    <span className="h-1 w-12 rounded-full bg-accent" />
+                    <span className="flex items-center gap-2.5">
+                      <span className="size-9 rounded-lg border border-accent/20 bg-accent-soft" />
+                      <span className="space-y-1.5">
+                        <span className="block h-2 w-16 rounded-full bg-primary/20" />
+                        <span className="block h-1.5 w-11 rounded-full bg-primary/10" />
+                      </span>
+                    </span>
+                    <span className="space-y-1.5">
+                      <span className="block h-1.5 w-10 rounded-full bg-primary/15" />
+                      <span className="block h-1.5 w-14 rounded-full bg-accent/70" />
+                    </span>
                   </span>
-                  <span className="mt-3 flex items-center justify-between gap-3">
+                  <span className="flex items-start justify-between gap-4 px-1 pb-1 pt-4">
                     <span>
                       <strong className="block text-sm font-semibold text-primary">
-                        Identity {alignment}
+                        Logo {alignment}
                       </strong>
-                      <small className="mt-0.5 block font-normal text-secondary">
-                        Logo and company details align {alignment}.
+                      <small className="mt-1 block text-xs font-normal leading-relaxed text-secondary">
+                        Company identity on the {alignment}; quote details opposite.
                       </small>
                     </span>
                     <span
                       className={cx(
-                        "grid size-6 shrink-0 place-items-center rounded-full border",
+                        "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border transition-colors",
                         design.headerAlignment === alignment
                           ? "border-accent bg-accent text-white"
-                          : "border-default bg-surface",
+                          : "border-default bg-surface group-hover:border-accent",
                       )}
                     >
                       {design.headerAlignment === alignment && (
