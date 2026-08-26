@@ -559,6 +559,45 @@ sync-collection/DELETE, sync-token advancing on writes), and CI-gated
 end-to-end by `alo-jmap/tests/caldav.rs` — the full client sequence plus
 per-method wrong-tenant, wrong-user-same-tenant, and read-only-share proofs.
 
+## Invitations: iTIP over iMIP (RFC 5546 / RFC 6047)
+
+Scheduling messages are ordinary mail through the one submission door (the
+internal listener): a `multipart/alternative` of a short plain-text note and a
+base64 `text/calendar; method=REQUEST|REPLY|CANCEL` part. Deliberate shapes
+and deviations, so the next implementer inherits knowledge not debugging:
+
+- **Outbound.** Saving an event with attendees mails each a `METHOD:REQUEST`
+  from the organizer's address; re-saving re-issues it (same `UID` — clients
+  treat it as an update). Editing or deleting **one instance** of a series
+  sends a REQUEST/CANCEL carrying the same `UID` plus a `RECURRENCE-ID` at the
+  instance's original slot and no `RRULE`, so clients change only that one.
+  Sends are best-effort after the calendar write (a dead listener never fails
+  the save; it is logged).
+- **Inbound application is read-time, not delivery-time.** RFC 6047 imagines
+  the receiving agent processing iMIP on arrival; alo parses the
+  `text/calendar` part when the message is *read* (`Email/get` surfaces
+  `alo:invitation`) and the reading-pane card acts: Accept/Maybe/Decline posts
+  `/calendar/rsvp` (stores the event on the personal calendar unless declining
+  — keyed on the organizer's `UID`, so a changed mind re-RSVPs in place — and
+  mails the `METHOD:REPLY` back), a reply card applies the guest's `PARTSTAT`
+  onto the organizer's event on mount, a cancellation card removes on mount.
+  All three re-read the message server-side by its account-scoped blob — a
+  client cannot name an arbitrary event id, only what a message it owns says.
+- **A CANCEL naming a `RECURRENCE-ID` removes the instance, not the series**
+  (RFC 5546 §3.2.5): the recipient's stored series gains an `EXDATE` at that
+  slot and everything else stays; a CANCEL without one removes the whole
+  event by `UID`. Accepted value shapes: UTC (`…Z`), `VALUE=DATE`, and
+  `TZID=<zone>` wall-clock. Cancelling what is not on the calendar (declined,
+  already removed) is honoured success (`removed:false`), never an error.
+- **A REPLY speaks for one attendee**: the first `ATTENDEE` line is read
+  (email + `PARTSTAT`, defaulting `NEEDS-ACTION`); it applies only to an
+  event the reader can edit (their organized copy, matched by `UID`) —
+  otherwise a clean `applied:false`, never another account's data.
+- CI-gated end-to-end by `alo-jmap/tests/invitations_http.rs`: the full
+  REQUEST→REPLY round trip across two accounts over a real local stack (real
+  routes, real Postgres, a real SMTP dialog to an in-process sink), the
+  instance-vs-series CANCEL distinction, and foreign-blob 404s on every door.
+
 ## IMAP import (client role, RFC 3501)
 
 The **Import mail** wizard makes alo an IMAP *client* (distinct from the

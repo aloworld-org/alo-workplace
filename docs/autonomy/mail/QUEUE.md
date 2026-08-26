@@ -110,7 +110,7 @@ restructures billing/chat/ds/sites code.
   weekly-with-exceptions, monthly-by-day, and a Europe/Brussels DST crossing.
   Expansion is one function used by both CalDAV time-range queries and the
   Agenda UI, never two implementations.
-- [ ] M3.3 Invitations, iTIP over iMIP (RFC 5546/6047): sending a REQUEST when
+- [x] M3.3 Invitations, iTIP over iMIP (RFC 5546/6047): sending a REQUEST when
   an event gains attendees (through the one submission door — the internal
   listener), parsing REQUEST/REPLY/CANCEL on inbound mail into attendee state
   on the stored event, and the Mail reading pane's existing `InvitationCard`

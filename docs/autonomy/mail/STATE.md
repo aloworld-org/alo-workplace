@@ -381,3 +381,72 @@ docker, then Postgres up; not a HALT); the profile's `DATABASE_URL` has an
 `postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` for the gate.
 
 Next: M3.3 — invitations, iTIP over iMIP.
+
+### 2026-08-26 — iteration 9 — M3.3 invitations, iTIP over iMIP
+
+Found built, kept (the bulk of the item predated this track): outbound
+`METHOD:REQUEST` on save (and a one-instance update carries `UID` +
+`RECURRENCE-ID`), `METHOD:CANCEL` on delete (whole-series and one-instance
+shapes), all through the one submission door (`crate::submission::submit` →
+the internal listener), best-effort after the calendar write; the reading
+pane's `Email/get` surfacing `alo:invitation` from the message's
+`text/calendar` part; `InvitationCard` already wired to that parsed data —
+Accept/Maybe/Decline → `/calendar/rsvp` (stores the event on the personal
+calendar keyed on the organizer's UID and mails the `METHOD:REPLY`), the
+reply card → `/calendar/apply-reply` (`set_attendee_status` merges the
+guest's PARTSTAT onto the organizer's event), the cancellation card →
+`/calendar/cancel`.
+
+Shipped (what the item still owed): **a CANCEL naming one instance now
+removes the instance, not the series** — `ical::recurrence_id_of` (a
+standalone reader for the first VEVENT's `RECURRENCE-ID`; UTC, `VALUE=DATE`,
+and `TZID` wall-clock shapes; `from_ics` deliberately keeps parsed masters'
+`recurrence_id: None`, the CalDAV override-sync contract) and
+`/calendar/cancel` routes through `exclude_occurrence` when the CANCEL names
+a slot (an EXDATE on the recipient's stored series) and `delete_event` only
+when it does not; the response gains an additive `scope:
+"occurrence"|"series"`. And **the mandated round-trip proof**: new
+`alo-jmap/tests/invitations_http.rs` drives the full arc across two accounts
+on a real local stack — real routes, real Postgres, a real SMTP dialog into
+an in-process multi-connection sink; the captured wire bytes are delivered
+into the counterpart's mailbox and acted on through the same endpoints the
+card calls. iMIP section added to `docs/interop.md` (read-time application
+vs RFC 6047's on-arrival model, instance-CANCEL semantics, one-attendee
+REPLY reading).
+
+Found-and-fixed under this item's remit (the round-trip test caught it):
+`Email/get`'s `alo:invitation` JSON never carried `attendee`/`partstat` —
+the struct had them, the hand-built JSON dropped them — so the reply card
+could never say WHO replied or how (the web type already declared both
+fields; it always got undefined). Additive JSON fix in `jtypes.rs`.
+
+Verified: fmt + clippy clean, zero warnings (alo-store, alo-jmap). New
+tests — ical unit (`recurrence_id_of` UTC/`VALUE=DATE`/`TZID` shapes +
+absent), REQUEST→REPLY round trip (invite → sink → deliver →
+`alo:invitation` REQUEST → decline first (added:false, REPLY sent, event
+absent) → accept (added:true) → REPLY wire → deliver → reply card data
+(attendee + partstat) → apply → PARTSTAT=ACCEPTED on the organizer's
+event), CANCEL (weekly COUNT=4 accepted by the guest; organizer cancels the
+2nd Monday → guest applies → `scope:occurrence`, series survives, range
+listing shows exactly the other three Mondays; whole-series delete →
+`scope:series`, event gone; re-applying the same CANCEL is `removed:false`,
+not an error), and tenancy (wrong tenant AND wrong user-same-tenant get 404
+on rsvp/cancel/apply-reply against a foreign blob, with the owner's own
+RSVP proven alive after). Full suites: 3 833 tests across both crates —
+3 832 green + the known `site_ticket_orders` parallel-load flake, cleared
+alone (same class iterations 4–8 recorded). Wire evidence is the suite
+itself: a real SMTP dialog into the sink, real Postgres rows, the captured
+bytes re-delivered and acted on. Ops note: one healthy nextest run was
+killed mid-flight after a misread process check (no test binaries visible ≠
+stuck — the runner's own CPU stays near zero while binaries run); the
+tell that it IS alive is the growing log, not the process table.
+
+Cuts/flags: inbound application stays read-time (the card acting on an
+account-scoped blob), not delivery-time — automatic on-arrival processing
+would put iMIP logic in alo-smtp as a second implementation; recorded in
+interop.md, revisit only if a real-client pass demands it. REPLY reads the
+first ATTENDEE only (a REPLY speaks for one attendee per RFC 5546). No web
+change was needed — the card was already wired end to end, so no i18n
+additions. No new routes, no migration — no Caddyfile note.
+
+Next: M3.4 — free/busy (VFREEBUSY).
