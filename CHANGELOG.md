@@ -10,6 +10,15 @@ contracts.
 
 ## Unreleased
 
+- **"Send later" now works from a shared mailbox.** A delegate with a send
+  grant can schedule a message from a mailbox shared with them (and cancel it
+  from its Scheduled folder); when the mailbox was shared "on behalf",
+  recipients see who actually sent the scheduled message, exactly as they do
+  for an immediate send. The first message ever sent from a fresh shared
+  mailbox now lands in a Sent folder created on the spot instead of lingering
+  in Drafts, and undoing a send no longer targets the wrong mailbox if you
+  switch accounts during the undo window.
+
 - **Mail to a distribution list reliably reaches every member — and only
   current members.** A group with a list address delivers one copy per member
   through each member's own filters, a member you remove stops receiving with

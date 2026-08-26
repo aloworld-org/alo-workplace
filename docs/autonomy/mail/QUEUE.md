@@ -90,7 +90,7 @@ restructures billing/chat/ds/sites code.
   admin CRUD over `/api/admin/*` gated exactly as other admin routes. Tests:
   wrong-tenant on every operation, a member leaving stops delivery on the next
   message, the envelope recipient a member sees is the list address.
-- [ ] M2.2 Shared-mailbox audit, then close what it finds: delegation exists
+- [x] M2.2 Shared-mailbox audit, then close what it finds: delegation exists
   (ADR 0017: none/as/on-behalf) — audit the full path as a user would live it
   (grant, read, send-as, where the sent copy lands, unread counts) against a
   real stack, record findings in STATE.md, then fix the gaps found and test

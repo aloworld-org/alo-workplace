@@ -206,3 +206,66 @@ tenant users; per-member DSN semantics unchanged (conservative 4xx,
 documented). No new routes, so no Caddyfile note.
 
 Next: M2.2 — shared-mailbox audit, then close what it finds.
+
+### 2026-08-26 — iteration 6 — M2.2 shared-mailbox audit
+
+Audited the whole delegate lifecycle as a user lives it, against a real
+local stack (debug `alo-jmap` on the docker `alo` DB, two provisioned
+users, everything driven over HTTP with curl) plus a code walk of every
+enforcement seam.
+
+Found working, verified live: no grant → `accountNotFound` (no oracle);
+self-service grant/list/revoke on `/jmap/delegates`; the session
+advertises the shared account (`isPersonal:false`, owner email as name,
+`alo:canSend`); delegate reads the owner's folders and messages with live
+unread counts; a canWrite delegate marking seen drops the owner's unread
+count (read-state is shared — deliberate: keywords are per message, not
+per viewer; Exchange-style per-user read state would be a redesign, noted,
+not built); revocation bites on the very next request. Read-only,
+folder-restricted, and no-send enforcement re-verified by the existing
+`delegation.rs` suite.
+
+Gaps found, then fixed:
+1. **Send-later was delegation-blind** (proven live: a delegate scheduling
+   a shared-mailbox draft got 404 while the UI offers "Send later" there).
+   `/api/send-later` + `/send-later/cancel` now resolve an optional
+   `accountId` through the same `resolve_target` door as JMAP — ungranted/
+   cross-tenant ids stay 404 (no oracle), a read-only delegate cannot
+   cancel (403), the send grant is enforced by the shared validation.
+2. **The on-behalf `Sender:` could not survive scheduling** — the schedule
+   row never recorded the acting delegate and the sweep re-reads the raw
+   draft. Migration `0901` (expand-only) adds `on_behalf_sender`;
+   `validate_and_prepare` now returns the acting delegate instead of
+   rewriting bytes, both send paths prepend `Sender:` to the wire copy at
+   send time, and the stored draft/Sent copy is never rewritten.
+3. **First send from a fresh mailbox filed nowhere**: `post_send` gave up
+   when no `sent`-role mailbox existed (fresh shared mailboxes typically).
+   It now creates Sent on first use, as Drafts always was.
+4. **Undo-send account race**: the web flush resolved the active account at
+   flush time, so switching mailboxes inside the 5 s undo window re-
+   targeted the submission. The account is now captured when the send is
+   queued; `scheduleSend`/`cancelScheduledSend` pass the active account.
+
+Sent-copy semantics recorded: a delegated send files into the OWNER's
+Sent (the shared mailbox's, modern-Exchange style); the delegate's own
+Sent stays empty; the disclosure `Sender:` is a wire matter only.
+
+Verified: fmt + clippy clean (alo-store/alo-submit/alo-jmap); full suites
+3 822 tests across the three crates green (two known parallel-load flakes
+cleared alone: `site_schedule_http` publish sweep, `site_ticket_orders` —
+the same class iterations 4–5 recorded). New `delegated_send.rs`: real-
+wire sink proof that on-behalf discloses the delegate and send-as does
+not, sent copy lands in owner's Sent (created on first use) and never in
+the delegate's account, the scheduled path round-trips the disclosure
+through the sweep, and the route door (ungranted 404, wrong-tenant 404,
+no-send 403, read-only cancel 403, manage cancel returns the draft to the
+owner's Drafts). Wire re-verified post-fix on the live stack: schedule
+200 with `on_behalf_sender` in the row, bogus id 404, cancel 200. Web:
+tsc, eslint, build clean.
+
+Cuts/flags: per-viewer read state in shared mailboxes not built (design
+note above); GUI-client passes stay owner-gated (M6 note). No new route
+prefixes — `/api/send-later` already deployed. `alo` DB carries audit
+tenant `m22-audit` (two users) from the live walk.
+
+Next: M3.1 — CalDAV calendar collections.
