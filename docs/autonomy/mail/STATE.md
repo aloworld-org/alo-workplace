@@ -47,3 +47,34 @@ the enrolled count of a user already known to exist, never existence — noted
 in the rustdoc.
 
 Next: M1.2 — the legacy auth seam accepts app passwords.
+
+### 2026-08-26 — iteration 2 — M1.2 legacy auth seam accepts app passwords
+
+Shipped: `Identity::authenticate_legacy` (the one seam IMAP `LOGIN`, POP3
+`USER`/`PASS`, SMTP `AUTH`, and CardDAV HTTP Basic all call) now tries the
+presented secret against the user's app passwords when it is not an accepted
+primary — so every legacy protocol gained app-password login in one place.
+Order preserves the common path's cost: primary first (unchanged for the
+non-2FA majority), then `verify_app_password`. A 2FA account's primary stays
+refused exactly as before, and that refusal path *also* runs the app-password
+check so "correct primary, policy-refused" pays the same argon2 work as
+"wrong password" — the seam does not become a timing oracle for the primary.
+2FA policy refusals still record no backoff strike; app-password failures do.
+Call-site comments (imap session, pop3, smtp server) and
+`docs/design/identity.md`'s app-password section updated to match.
+
+Verified: fmt + clippy clean on alo-identity/alo-imap/alo-smtp; 272 tests
+green across the three crates, incl. 4 new: identity seam test (non-2FA
+primary + app pw both work, 6 primary refusals past the free-attempt budget
+arm no backoff, revoked app pw fails next connection, principal is
+scope-less and correctly tenant/user-bound), real-TLS IMAP (2FA primary NO,
+app pw OK + SELECT INBOX, revoked NO), POP3 over TLS (primary -ERR, app pw
++OK on the same connection), SMTP submission STARTTLS AUTH PLAIN (primary
+535, app pw 235). Wire evidence is those suites: real rustls sockets, real
+Postgres rows.
+
+Cuts/flags: none. No new routes (M1.3 owns `/api/settings/app-passwords`),
+no XOAUTH2 (M1.4). Non-2FA accounts keep primary login byte-identical —
+every pre-existing suite login is the regression test for that.
+
+Next: M1.3 — owning app passwords from the product (routes + settings UI).

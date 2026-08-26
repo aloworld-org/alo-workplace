@@ -221,20 +221,28 @@ with nowhere to prompt for a code. Rather than silently accept a
 password-only login for a 2FA account — which would give the user a false
 sense of protection and let a phished password read their mail over IMAP —
 **the legacy protocols fail closed**: `authenticate_legacy` refuses a
-TOTP-enabled account (returning the same indistinguishable failure as a
-wrong password — no oracle) and the user must authenticate via the OIDC
-flow. A non-2FA account authenticates normally. The same method adds a
-**per-username backoff across connections** on top of the per-connection
-failure caps (a correct-password 2FA refusal is not counted as a failure,
-so a legitimate 2FA user is never locked out by trying their password).
+TOTP-enabled account's *primary* password (returning the same
+indistinguishable failure as a wrong password — no oracle); the user
+connects a legacy client with an app-specific password instead, or
+authenticates via the OIDC flow. A non-2FA account authenticates
+normally. The same method adds a **per-username backoff across
+connections** on top of the per-connection failure caps (a
+correct-password 2FA refusal is not counted as a failure, so a
+legitimate 2FA user is never locked out by trying their password).
 
-**App-specific passwords / `XOAUTH2`** are the sanctioned cut seam that
-re-opens legacy clients to 2FA users: a per-client random password that
-carries no interactive step but stays revocable. OAuth-capable desktop
-clients (Thunderbird supports `XOAUTH2`) already work today via the OIDC
-flow; the founder's Thunderbird in the exit gate uses that. The follow-up
-is app passwords + `XOAUTH2` SASL on submission so a 2FA user can also use
-a non-OAuth client.
+**App-specific passwords** re-open legacy clients to 2FA users: a
+per-client, server-generated random password that carries no interactive
+step but stays revocable one at a time. `authenticate_legacy` tries the
+primary first (the common path's cost is unchanged), then the presented
+secret against the user's app passwords; the 2FA-refusal path runs the
+same app-password check so "correct primary, policy-refused" costs the
+same argon2 work as "wrong password" and timing cannot distinguish them.
+An app password carries no second-factor obligation because it is issued
+only from inside an already-authenticated session and is never a
+phishable human-chosen secret. OAuth-capable desktop clients
+(Thunderbird supports `XOAUTH2`) also work via the OIDC flow; the
+follow-up is `XOAUTH2` SASL on IMAP and submission so an OAuth client
+never needs an app password at all.
 
 ## Tenancy
 

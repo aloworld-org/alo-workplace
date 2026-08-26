@@ -62,7 +62,7 @@ restructures billing/chat/ds/sites code.
   wrong app password are indistinguishable by timing — prove it with the same
   style of timing test the identity crate already carries. Wrong-tenant AND
   wrong-user tests on every operation.
-- [ ] M1.2 The legacy auth seam accepts them: IMAP/POP3 `LOGIN` and SMTP `AUTH`
+- [x] M1.2 The legacy auth seam accepts them: IMAP/POP3 `LOGIN` and SMTP `AUTH`
   try app passwords for accounts that have them; a 2FA account's *primary*
   password stays refused on legacy exactly as today — the whole point is that
   a phished primary cannot bypass 2FA over IMAP. Tests: 2FA account + app
