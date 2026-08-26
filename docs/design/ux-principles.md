@@ -298,6 +298,17 @@ identical in size, radius, and rhythm across modules.
   instead of shipping an unbranded platform menu.
   _Verify:_ exercise every control state in Chromium, Firefox, and WebKit;
   no state falls back to an unthemed browser colour.
+- **Development must fail closed when its API is unavailable.** A frontend
+  configured for a loopback API may not start until that API reports ready.
+  Never leave a convincing login screen in front of a dead proxy: it turns an
+  infrastructure failure into a false password failure and sends debugging in
+  the wrong direction. Use the repository's full-stack launcher, which checks
+  the database revision, API readiness, OAuth issuer, and frontend together.
+  If the API later becomes unavailable, authentication must describe a server
+  connection problem rather than blaming credentials.
+  _Verify:_ point `VITE_DEV_API` at a stopped loopback port and confirm the dev
+  command exits with the recovery command; a real HTTP 401 remains the only
+  outcome presented as incorrect credentials.
 - **Focus indicators never use browser blue or cool blue-gray.** Text fields,
   textareas, selects, buttons, links, listboxes, and composite controls use a
   Terracotta outline or ring and a Terracotta focused border. Strong neutral
