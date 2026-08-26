@@ -82,7 +82,7 @@ restructures billing/chat/ds/sites code.
 
 ### M2 — Groups of people as mail destinations
 
-- [ ] M2.1 Distribution lists: a tenant-level list address that delivery
+- [x] M2.1 Distribution lists: a tenant-level list address that delivery
   expands to member mailboxes. Store model + migration (`09xx`), expansion in
   the delivery path (one inbound message → one copy per member through the
   normal Sieve/delivery pipeline), loop-safe (a list containing a list

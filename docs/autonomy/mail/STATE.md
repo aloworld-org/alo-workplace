@@ -160,3 +160,49 @@ implemented, recorded in interop.md with rationale. M6.1's transcript
 script should cover XOAUTH2 now that it exists.
 
 Next: M2.1 — distribution lists.
+
+### 2026-08-26 — iteration 5 — M2.1 distribution lists
+
+Found built, kept: the mechanism largely predated this track — `groups` +
+`group_members` (migration 0008), the list address (0012, globally unique,
+lowercased), delivery fan-out in `alo-smtp`'s `local_delivery.rs`
+(user/alias precedence, one copy per member through each member's own
+Sieve, envelope recipient = the list address, memberless list = 550 at
+RCPT), and admin CRUD on `/api/admin/groups*` (admin-gated,
+`require_domain_owned` on the address). No new migration needed — the 09xx
+slot stays for schema this track actually adds.
+
+Shipped (what the ROADMAP line still owed): explicit wrong-tenant denials
+and the proof. Store: `delete_group`/`set_group_address` now NotFound when
+the group is not this tenant's (was a silent no-op reported as success),
+`group_members`/`group_members_detailed`/`remove_group_member` assert the
+group first (was an empty-vec answer indistinguishable from an empty
+group); admin `DELETE /groups/{id}` + `POST /groups/members/remove` map
+that to 404 (was a blanket 500 swallowing it). Loop-safety documented at
+the seam it is enforced: members are users only (`assert_user`), so a list
+can never contain a list and expansion is single-level by construction.
+Design note `docs/design/local-delivery.md` gained the distribution-lists
+section; CHANGELOG line added.
+
+Verified: fmt + clippy clean on alo-store/alo-identity/alo-jmap/alo-smtp.
+New tests — store `group_lists.rs` (wrong-tenant on EVERY operation with
+the group proven untouched after each; A cannot enroll B's user; a group
+id as member refused incl. self-containment; cross-tenant address
+Conflict; expansion returns the owning tenant only; case-insensitive
+match; clearing the address turns the list off; absent id NotFound), SMTP
+`local_delivery.rs` (real-wire: one message → one copy per member with a
+member's `envelope :is "to" <list>` Sieve filing it — proving the envelope
+recipient members see is the list address; removed member stops receiving
+on the very next message; memberless list 550 at RCPT). Full suites: 4 055
+tests across the four crates, all green except two known parallel-load
+flakes cleared alone — `site_ticket_orders` "…never offered to the
+fulfilment sweep" (sites track's sweep timing) and `alo-smtp::dmarc_report
+sweep_…` (the same flake iteration 4 recorded). alo-identity's
+`groups_are_tenant_scoped` updated to the strengthened NotFound contract.
+
+Cuts/flags: nested lists deliberately unsupported (the loop-safety design,
+not a gap); external (non-user) list members out of scope — members are
+tenant users; per-member DSN semantics unchanged (conservative 4xx,
+documented). No new routes, so no Caddyfile note.
+
+Next: M2.2 — shared-mailbox audit, then close what it finds.

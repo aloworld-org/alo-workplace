@@ -41,6 +41,31 @@ submission role and the outbound queue are untouched.
   **CR/LF-stripped before any header is built** (the injection guard the
   Sieve session's audit flagged as an M5 must-do).
 
+## Distribution lists
+
+A recipient that resolves to no user or alias is tried as a **group's list
+address** (`Store::list_members_by_address`): the group's members become the
+delivery targets, each through their own Sieve script, and the **envelope
+recipient stays the list address** — so a member's `envelope :is "to"` rule
+files list mail as list mail. Resolution precedence is user/alias first,
+list second; a memberless list is not a deliverable destination (`550` at
+RCPT, same as an unknown user).
+
+Loop safety is enforced where membership is **written**, not where mail is
+expanded: a member is always a user (`add_group_member` refuses a group id
+via `assert_user`), so a list can never contain another list and expansion
+is single-level with no cycle detection to get wrong. Sieve `redirect`
+chains out of a member's script stay bounded by the existing hop ceiling
+and redirect budget.
+
+Lists are administered over `/api/admin/groups*` (admin-gated like every
+admin route); a list address must be on a domain the tenant owns
+(`require_domain_owned`), is stored lowercase, and is **globally unique**
+across tenants — like a user or alias address — so inbound routing never
+guesses between tenants. Wrong-tenant access to any group operation is an
+explicit `404`, proven per operation in `alo-store/tests/group_lists.rs`;
+the wire behaviour is proven in `alo-smtp/tests/local_delivery.rs`.
+
 ## Durability
 
 Delivered message bytes go to a **durable on-disk blob backend**

@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- **Mail to a distribution list reliably reaches every member — and only
+  current members.** A group with a list address delivers one copy per member
+  through each member's own filters, a member you remove stops receiving with
+  the very next message, and administration of someone else's list now
+  answers with a clear "not found" instead of silently doing nothing. A list
+  can never contain another list, so list mail can never loop.
+
 - **Mail clients that support OAuth can now sign in without any password.**
   IMAP and SMTP sending accept the XOAUTH2 sign-in that clients like
   Thunderbird use: the client completes the normal alo login (two-factor
