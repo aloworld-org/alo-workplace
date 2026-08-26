@@ -13,19 +13,19 @@ NEVER need a menu to use an alo tool.** Everything required to do the job
 lives on the surface, in sight, in reach; menus exist for depth and rarities,
 never for discovery of the core flow. A first-time user must achieve the
 screen's core task in under a minute with no help, no menu-hunting, no tour.
-Tooltips and docs may *deepen* understanding, never *enable* it.
-*The menu test:* remove every menu from the screen in your head — can the
+Tooltips and docs may _deepen_ understanding, never _enable_ it.
+_The menu test:_ remove every menu from the screen in your head — can the
 core task still be completed with what remains visible? If not, redesign.
-*Verify:* the wave review walks each new screen as a stranger; any step that
+_Verify:_ the wave review walks each new screen as a stranger; any step that
 required knowing-in-advance is filed as a defect, like S1.30b/c were.
 
 ## Ten laws that implement it
 
-1. **Recognition over recall** *(Nielsen heuristic)* — every available action
+1. **Recognition over recall** _(Nielsen heuristic)_ — every available action
    is visible where it is used; nothing important lives only in a context
    menu, keyboard shortcut, or memory. Menus may duplicate, never gatekeep.
-   *Verify:* core tasks completable with visible controls alone.
-2. **Meet expectations users already own** *(Jakob's law)* — people arrive
+   _Verify:_ core tasks completable with visible controls alone.
+2. **Meet expectations users already own** _(Jakob's law)_ — people arrive
    trained by the best-known tools of EACH domain, and every alo module must
    match the reflexes of ITS OWN world: Mail/Agenda → Outlook & Gmail; Sheets
    → Excel; Docs → Word & Google Docs; **Sites → Wix/Squarespace-class
@@ -34,15 +34,15 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    never their learning curve**; Chat → Slack/WhatsApp**. Before designing a screen, name
    its domain references and match their reflexes — then beat them on clarity.
    Innovate in what the product does, not in how controls behave.
-   *Verify:* each new screen's design/journal names its domain references; no
+   _Verify:_ each new screen's design/journal names its domain references; no
    control behaves unlike its lookalike in that domain's mainstream tools.
-3. **Few choices per moment** *(Hick's law + progressive disclosure)* — a
+3. **Few choices per moment** _(Hick's law + progressive disclosure)_ — a
    screen presents one obvious next step; advanced options unfold only when
    summoned. Default over decision: settings the user never met must already
    be right (the Insights pre-built overview is the canon example).
-   *Verify:* count the decisions a new user must make before value — target
+   _Verify:_ count the decisions a new user must make before value — target
    ≤1 per screen.
-4. **The primary action is unmissable** *(Fitts's law)* — biggest, closest,
+4. **The primary action is unmissable** _(Fitts's law)_ — biggest, closest,
    highest-contrast thing in reach; destructive actions are farther and
    quieter. Every call to action uses the shared `Button` primitive's
    **brand-orange primary treatment**; neutral, outline, and text treatments
@@ -56,7 +56,7 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    action placed beside a primary remains visibly quieter while retaining the
    same control height, protected inset, radius role, focus visibility, and
    minimum touch target.
-   *Verify:* squint test — the blurred screen still shows what to press.
+   _Verify:_ squint test — the blurred screen still shows what to press.
    Button labels and icons must never touch or visually crowd a button border.
    Measure from the outermost text or icon edge to the inside of the border:
    compact buttons keep at least `space-5` (20px) horizontally and `space-2`
@@ -69,31 +69,31 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    Flex rows, tables, and action clusters must preserve the button's intrinsic
    width instead of compressing it; surrounding content reflows or scrolls
    before a call-to-action loses its protected inset.
-   *Verify:* every button remains legible with its longest translated label;
+   _Verify:_ every button remains legible with its longest translated label;
    the shared Button test mechanically guards the minimum inset and target.
 5. **Empty states are the onboarding** — a new module's first screen is not
    blank; it teaches the ONE next step and often does it for the user
    (auto-created Home page; pre-built dashboard). Every empty list explains
    itself in one sentence + one button.
-   *Verify:* every empty state has action + explanation; none says just
+   _Verify:_ every empty state has action + explanation; none says just
    "No items".
-6. **Immediate, honest feedback** *(Doherty threshold, <400ms)* — every click
+6. **Immediate, honest feedback** _(Doherty threshold, <400ms)_ — every click
    visibly responds instantly: optimistic updates, skeletons over spinners,
    progress with meaning. Silence after a click is a defect.
-   *Verify:* no interaction leaves the screen unchanged >400ms without a
+   _Verify:_ no interaction leaves the screen unchanged >400ms without a
    working indicator.
-7. **Undo over confirmation** *(error tolerance; peak-end)* — routine actions
+7. **Undo over confirmation** _(error tolerance; peak-end)_ — routine actions
    execute immediately with a visible undo window; confirmations are reserved
    for the genuinely irreversible/outward (send, issue, publish, delete-forever
    — where alo's propose-then-approve pattern rules). Never punish the 99%
    flow to guard the 1% mistake.
-   *Verify:* count confirm dialogs per module; each must justify itself
+   _Verify:_ count confirm dialogs per module; each must justify itself
    against this law.
 8. **Errors speak human and help** — say what happened, why, and the way out,
    in the user's words; surface the server's precise reason verbatim rather
    than a generic veil (the S1.30b lesson, now law). No codes, no blame.
-   *Verify:* trigger each error path; every message names a next step.
-9. **Calm surfaces, one voice** *(aesthetic-usability; Miller's law)* — the
+   _Verify:_ trigger each error path; every message names a next step.
+9. **Calm surfaces, one voice** _(aesthetic-usability; Miller's law)_ — the
    token system is the single source of color/type/spacing; one accent per
    surface; information chunked in scannable groups; motion subtle and
    purposeful (reduced-motion respected). Beauty here is trust, not
@@ -111,17 +111,17 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    tab, and a 44px minimum hit height. Increase those values for a calmer
    desktop layout; do not reduce them to fit more items—allow horizontal
    scrolling on narrow screens instead.
-   *Verify:* no hardcoded colors/spacings outside tokens; screens pass a
+   _Verify:_ no hardcoded colors/spacings outside tokens; screens pass a
    5-second "what is this page about" glance test. Compare sibling module tabs
    side by side and confirm their active and inactive states are identical.
-10. **End on a high** *(peak-end rule)* — completing something meaningful
+10. **End on a high** _(peak-end rule)_ — completing something meaningful
     (site published, invoice issued, week approved) earns a small, fast
     moment of acknowledgment with the result's identity (the live URL, the
     number assigned) — never a modal essay.
-    *Verify:* each module's "done" moments show the outcome, not just close.
+    _Verify:_ each module's "done" moments show the outcome, not just close.
 
-11. **Smoother than the tool they came from** *(flow: the goal-gradient
-    effect, and the reason to switch)* — familiarity is the floor; the flow
+11. **Smoother than the tool they came from** _(flow: the goal-gradient
+    effect, and the reason to switch)_ — familiarity is the floor; the flow
     is where alo wins. Three measurable rules:
     (a) **Step budget:** every core journey takes FEWER clicks/screens than
     the same journey in its domain-reference tool — count them both in the
@@ -134,7 +134,7 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
     are ONE motion here (won deal → invoice; site form → CRM lead; hours →
     invoice line; question → chart on the board). alo owns the whole house —
     walking between rooms must feel like one floor, not doorways with locks.
-    *Verify:* wave reviews map each core journey's step count vs. the
+    _Verify:_ wave reviews map each core journey's step count vs. the
     reference tool, hunt for any re-typed field, and walk every cross-module
     handoff end-to-end.
 
@@ -146,11 +146,11 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
     of every screen is exactly one click away from where the user already is.
     When extra clicks exist to feel "safe" or "organized", they are neither —
     they are friction wearing a costume.
-    *Verify:* for each screen, list its three most frequent actions and count
+    _Verify:_ for each screen, list its three most frequent actions and count
     the clicks from screen-open to done; any count that could be lower with
     a safe design is filed as a defect.
 
-13. **Brilliant with the AI off** *(economics + philosophy)* — AI calls cost
+13. **Brilliant with the AI off** _(economics + philosophy)_ — AI calls cost
     money per use; navigation, defaults, and design cost nothing per use.
     Therefore the excellence of every alo flow comes FIRST from deterministic
     UX — galleries, pre-built defaults, direct manipulation, one-click paths,
@@ -161,7 +161,7 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
     gallery beside generate-my-site; tile gallery beside ask-to-chart), and
     the AI-off configuration is a complete, pleasant product — not a degraded
     mode.
-    *Verify:* the wave review walks every module with NO AI key configured;
+    _Verify:_ the wave review walks every module with NO AI key configured;
     every core task must be achievable and feel finished. Count model calls
     in routine flows — a routine action that silently spends an AI call is a
     defect.
@@ -200,7 +200,12 @@ value may be born. The principles that govern the scale:
   touches a border, focus ring, or adjacent affordance, and a layout may not
   compress this protected inset. Long and translated values truncate or wrap
   before the inset is reduced.
-  *Verify:* inspect the longest translated value in every control and its open
+  Selection cards implemented with native buttons must protect the same inset
+  from the global zero-padding button reset: use the token-equivalent important
+  padding utility where required and verify the computed padding, not merely
+  the class name. Checkboxes, radio marks, previews, and labels must sit wholly
+  inside the card with at least `space-5` (20px) to every bordered edge.
+  _Verify:_ inspect the longest translated value in every control and its open
   menu; the nearest glyph edge remains at least 16px from the control border.
 - **Touch respects fingers.** Interactive targets stay ≥40px regardless of
   how small the glyph inside them is.
@@ -215,8 +220,8 @@ value may be born. The principles that govern the scale:
   scale lacks is added to tokens.css in its own reasoned commit — never
   inlined into a component.
 
-*Verify (mechanical):* grep new UI for hardcoded px/color values outside the
-ds — any literal that isn't a token reference is a defect. *Verify (human):*
+_Verify (mechanical):_ grep new UI for hardcoded px/color values outside the
+ds — any literal that isn't a token reference is a defect. _Verify (human):_
 the wave review compares sibling screens side by side — same roles must look
 identical in size, radius, and rhythm across modules.
 
@@ -228,7 +233,7 @@ identical in size, radius, and rhythm across modules.
   never persist base64/data URLs there. Every upload save is guarded so quota,
   permission, or serialization failures produce an inline recovery message
   instead of crashing or unmounting the screen.
-  *Verify:* upload representative and near-limit files, reload the page, and
+  _Verify:_ upload representative and near-limit files, reload the page, and
   simulate a storage rejection; the file remains available when saved and the
   surrounding workspace remains usable when saving fails.
 - **Full-page workspaces consume the available viewport through their final
@@ -239,7 +244,7 @@ identical in size, radius, and rhythm across modules.
   clip the lower half of a page while unused application background appears
   beneath it, and never add arbitrary footer padding or viewport calculations
   to disguise a broken height chain.
-  *Verify:* test short, viewport-height, and long records at common desktop and
+  _Verify:_ test short, viewport-height, and long records at common desktop and
   mobile sizes. The workspace reaches the bottom edge when content is short,
   the final section remains reachable when content is long, and there is no
   detached blank footer or nested page scrollbar.
@@ -254,7 +259,7 @@ identical in size, radius, and rhythm across modules.
   their own viewport height. This keeps the navigation rail, workspace ground,
   and final content edge aligned even when browser chrome, zoom, extensions,
   or mobile viewport controls change the usable height.
-  *Verify:* the shell rail and main background reach the same bottom edge at
+  _Verify:_ the shell rail and main background reach the same bottom edge at
   every tested viewport; resizing DevTools or browser chrome never exposes a
   blank band beneath the application.
 - **Every application colour comes from the approved alo palette.** Product
@@ -270,7 +275,7 @@ identical in size, radius, and rhythm across modules.
   chosen in a colour picker may flow through scoped CSS custom properties to
   the document preview and export only. They must never recolour alo's own
   navigation, controls, focus, validation, or status states.
-  *Verify:* audit all resting, hover, focus, selected, disabled, error, overlay,
+  _Verify:_ audit all resting, hover, focus, selected, disabled, error, overlay,
   and autofill states; every computed application colour resolves to an alo
   semantic token or a documented status/data exception.
 - **Application components use Tailwind utilities only.** Do not create CSS
@@ -281,7 +286,7 @@ identical in size, radius, and rhythm across modules.
   design-system foundations Tailwind consumes: the Tailwind entrypoint,
   shared tokens, themes, resets, fonts, and genuinely global browser rules.
   Those files define the language; components speak it through utilities.
-  *Verify:* new or changed component files import no component stylesheet and
+  _Verify:_ new or changed component files import no component stylesheet and
   introduce no `style={{...}}`; searches for new `.module.css` files are empty.
 - **Browser defaults never become product design.** No native browser or
   operating-system blue, purple, bevel, focus glow, selected-row colour,
@@ -291,7 +296,7 @@ identical in size, radius, and rhythm across modules.
   colours. When a native popup cannot be themed consistently across supported
   browsers, use the accessible design-system primitive for that interaction
   instead of shipping an unbranded platform menu.
-  *Verify:* exercise every control state in Chromium, Firefox, and WebKit;
+  _Verify:_ exercise every control state in Chromium, Firefox, and WebKit;
   no state falls back to an unthemed browser colour.
 - **Focus indicators never use browser blue or cool blue-gray.** Text fields,
   textareas, selects, buttons, links, listboxes, and composite controls use a
@@ -301,7 +306,7 @@ identical in size, radius, and rhythm across modules.
   the browser's default blue glow, outline, or selected-control treatment.
   Shared form primitives and the global fallback own this rule so feature code
   does not invent a local focus colour.
-  *Verify:* tab through and click every interactive control in Chromium,
+  _Verify:_ tab through and click every interactive control in Chromium,
   Firefox, and WebKit; inspect focused borders and outlines and confirm every
   visible focus treatment resolves to `--accent`, never a browser/system blue.
 - **Form controls show one border, never a double ring.** Inputs, textareas,
@@ -310,7 +315,7 @@ identical in size, radius, and rhythm across modules.
   focused border with an outward ring or offset outline. The shared primitive
   and global fallback own this treatment so it remains identical throughout
   the application and does not shift layout or get clipped by a dialog.
-  *Verify:* focus every field with mouse and keyboard at normal and high zoom;
+  _Verify:_ focus every field with mouse and keyboard at normal and high zoom;
   exactly one continuous Terracotta edge is visible around the control.
 - **Every dropdown option has an unmistakable branded hover state.** Menu,
   listbox, combobox, command-palette, suggestion, and picker rows use the soft
@@ -321,7 +326,7 @@ identical in size, radius, and rhythm across modules.
   checkmark, or `aria-selected`; disabled rows do not react to hover. Shared
   dropdown primitives own this behavior so product screens inherit it rather
   than restating it.
-  *Verify:* open every dropdown and move the pointer across every enabled row;
+  _Verify:_ open every dropdown and move the pointer across every enabled row;
   the complete row changes to `bg-accent-soft text-accent`, with no native blue
   or visually inert option.
 - **The interface never uses underlines as decoration or interaction feedback.**
@@ -329,7 +334,7 @@ identical in size, radius, and rhythm across modules.
   active, and visited states use colour, weight, surface, and a visible focus
   ring instead. Underlining remains available only inside user-authored rich
   text where it is content, not application chrome.
-  *Verify:* interactive interface text has `text-decoration: none` in every
+  _Verify:_ interactive interface text has `text-decoration: none` in every
   state; keyboard focus remains obvious without an underline.
 - **Preserve every working behavior outside the requested change.** A visual
   refinement must not change data flow, persistence, navigation, validation,
