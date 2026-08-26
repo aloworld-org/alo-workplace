@@ -2111,13 +2111,8 @@ function BottomComposer({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<
-    "Popular" | "Text" | "Media" | "Tables" | "Layout"
-  >("Popular");
-  const [recent, setRecent] = useState<string[]>([]);
   const add = (kind: InsertKind, label: string, ordered = false) => {
     onAdd(index, kind, ordered);
-    setRecent((current) => [label, ...current.filter((item) => item !== label)].slice(0, 3));
     setOpen(false);
     setQuery("");
   };
@@ -2125,7 +2120,6 @@ function BottomComposer({
     label: string;
     help: string;
     category: "Text" | "Media" | "Tables" | "Layout";
-    popular?: boolean;
     Icon: typeof AlignLeft;
     action: () => void;
   }> = [
@@ -2133,7 +2127,6 @@ function BottomComposer({
       label: "Heading",
       help: "Choose H1, H2, or H3",
       category: "Text",
-      popular: true,
       Icon: Type,
       action: () => add("heading", "Heading"),
     },
@@ -2141,7 +2134,6 @@ function BottomComposer({
       label: "Paragraph",
       help: "Add explanatory text",
       category: "Text",
-      popular: true,
       Icon: AlignLeft,
       action: () => add("paragraph", "Paragraph"),
     },
@@ -2170,10 +2162,8 @@ function BottomComposer({
       label: "Image",
       help: "Upload and arrange a visual",
       category: "Media",
-      popular: true,
       Icon: ImagePlus,
       action: () => {
-        setRecent((current) => ["Image", ...current.filter((item) => item !== "Image")].slice(0, 3));
         onImage(index);
         setOpen(false);
         setQuery("");
@@ -2183,7 +2173,6 @@ function BottomComposer({
       label: "Pricing table",
       help: "Group products and services",
       category: "Tables",
-      popular: true,
       Icon: Table2,
       action: () => add("pricing", "Pricing table"),
     },
@@ -2191,7 +2180,6 @@ function BottomComposer({
       label: "Table",
       help: "Create flexible rows and columns",
       category: "Tables",
-      popular: true,
       Icon: Rows3,
       action: () => add("table", "Table"),
     },
@@ -2203,16 +2191,13 @@ function BottomComposer({
       action: () => add("divider", "Divider"),
     },
   ];
+  const categories = ["Text", "Media", "Tables", "Layout"] as const;
   const normalizedQuery = query.trim().toLowerCase();
-  const visibleOptions = options.filter((option) => {
-    if (normalizedQuery !== "")
-      return `${option.label} ${option.help} ${option.category}`
-        .toLowerCase()
-        .includes(normalizedQuery);
-    if (category === "Popular")
-      return option.popular === true || recent.includes(option.label);
-    return option.category === category;
-  });
+  const visibleOptions = options.filter((option) =>
+    `${option.label} ${option.help} ${option.category}`
+      .toLowerCase()
+      .includes(normalizedQuery),
+  );
   return (
     <div
       className="relative flex flex-col items-center py-2"
@@ -2235,77 +2220,82 @@ function BottomComposer({
         <span className="h-px flex-1 bg-[var(--quote-table-header)]" aria-hidden="true" />
       </div>
       {open && (
-        <div className="mt-2 w-full max-w-2xl rounded-2xl border border-default bg-surface p-5 shadow-xl">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-primary">Add to quotation</h3>
-              <p className="mt-0.5 text-sm text-secondary">
-                Choose what should appear next in the document.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="rounded-lg p-2 text-secondary hover:bg-accent-soft hover:text-accent"
-              aria-label="Close block picker"
-              onClick={() => setOpen(false)}
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-          <label className="mt-4 flex min-h-11 items-center gap-3 rounded-xl border border-default bg-surface px-3 text-secondary transition-colors focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10">
-            <Search className="size-4 shrink-0" aria-hidden="true" />
-            <input
-              autoFocus
-              className="min-w-0 flex-1 appearance-none !border-0 bg-transparent !p-0 text-sm text-primary !shadow-none !outline-none !ring-0 placeholder:text-tertiary focus:!border-0 focus:!outline-none focus:!ring-0"
-              value={query}
-              placeholder="Search blocks..."
-              aria-label="Search quotation blocks"
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setOpen(false);
-              }}
-            />
-          </label>
-          <div className="mt-3 flex gap-1 overflow-x-auto pb-1" role="tablist" aria-label="Block categories">
-            {(["Popular", "Text", "Media", "Tables", "Layout"] as const).map((item) => (
+        <div className="mt-2 w-full max-w-2xl rounded-2xl border border-default bg-surface shadow-xl">
+          <div className="p-5 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-primary">Add to quotation</h3>
+                <p className="mt-0.5 text-sm text-secondary">
+                  Choose what should appear next in the document.
+                </p>
+              </div>
               <button
-                key={item}
                 type="button"
-                role="tab"
-                aria-selected={category === item}
-                className={cx(
-                  "min-h-9 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors hover:bg-accent-soft hover:text-accent",
-                  category === item ? "bg-accent-soft text-accent" : "text-secondary",
-                )}
-                onClick={() => {
-                  setCategory(item);
-                  setQuery("");
-                }}
+                className="rounded-lg p-2 text-secondary hover:bg-accent-soft hover:text-accent"
+                aria-label="Close block picker"
+                onClick={() => setOpen(false)}
               >
-                {item}
+                <X className="size-4" />
               </button>
-            ))}
-          </div>
-          {category === "Popular" && recent.length > 0 && query === "" && (
-            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-tertiary">
-              Popular and recently used
-            </p>
-          )}
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {visibleOptions.map(({ label, help, Icon, action }) => (
-              <AddButton
-                key={label}
-                label={label}
-                help={help}
-                Icon={Icon}
-                onClick={action}
+            </div>
+            <label className="mt-4 flex min-h-11 items-center gap-3 rounded-xl border border-default bg-surface px-3 text-secondary transition-colors focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10">
+              <Search className="size-4 shrink-0" aria-hidden="true" />
+              <input
+                autoFocus
+                className="min-w-0 flex-1 appearance-none !border-0 bg-transparent !p-0 text-sm text-primary !shadow-none !outline-none !ring-0 placeholder:text-tertiary focus:!border-0 focus:!outline-none focus:!ring-0"
+                value={query}
+                placeholder="Search blocks..."
+                aria-label="Search quotation blocks"
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setOpen(false);
+                }}
               />
-            ))}
+            </label>
+          </div>
+          <div className="max-h-[min(65vh,40rem)] overflow-y-auto border-t border-default px-5">
+            {(normalizedQuery === "" ? categories : ["Search results"] as const).map(
+              (section, sectionIndex) => {
+                const sectionOptions =
+                  section === "Search results"
+                    ? visibleOptions
+                    : visibleOptions.filter((option) => option.category === section);
+                if (sectionOptions.length === 0) return null;
+                return (
+                  <section
+                    key={section}
+                    className={cx(
+                      "py-4",
+                      sectionIndex > 0 && "border-t border-default",
+                    )}
+                    aria-labelledby={`quote-blocks-${section.toLowerCase().replace(" ", "-")}`}
+                  >
+                    <h4
+                      id={`quote-blocks-${section.toLowerCase().replace(" ", "-")}`}
+                      className="mb-2 text-xs font-semibold uppercase tracking-wide text-tertiary"
+                    >
+                      {section}
+                    </h4>
+                    <div className="grid gap-1 sm:grid-cols-2">
+                      {sectionOptions.map(({ label, help, Icon, action }) => (
+                        <AddButton
+                          key={label}
+                          label={label}
+                          help={help}
+                          Icon={Icon}
+                          onClick={action}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              },
+            )}
           </div>
           {visibleOptions.length === 0 && (
-            <div className="py-8 text-center">
+            <div className="border-t border-default px-5 py-8 text-center">
               <p className="text-sm font-semibold text-primary">No matching blocks</p>
-              <p className="mt-1 text-xs text-secondary">Try a different name or category.</p>
+              <p className="mt-1 text-xs text-secondary">Try another name.</p>
             </div>
           )}
         </div>
@@ -2331,7 +2321,7 @@ function AddButton({
     <button
       type="button"
       disabled={disabled}
-      className="flex min-h-20 items-center gap-3 rounded-xl border border-default bg-surface px-4 py-3 text-left text-primary transition-colors hover:border-accent hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-45"
+      className="flex min-h-16 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-primary transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-45"
       onClick={onClick}
     >
       <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
