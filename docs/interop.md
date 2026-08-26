@@ -480,11 +480,10 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
 (`calendar-multiget`, `calendar-query`, `sync-collection`), `GET`, `PUT`
 (`If-Match`/`If-None-Match`), `DELETE`. Deliberate scope cuts:
 - **iCalendar (RFC 5545) is minimal**: `UID`, `SUMMARY`, `DESCRIPTION`,
-  `LOCATION`, `DTSTART`/`DTEND` as UTC (`…Z`) or all-day (`VALUE=DATE`). A
-  `TZID`-qualified or floating time is read as **UTC** — so a client that
-  writes local times with a `VTIMEZONE` may see the instant shifted. Clients
-  configured to write UTC round-trip exactly. Recurrence (`RRULE`), attendees,
-  alarms, and `VTODO`/`VJOURNAL` are not yet modelled (Agenda later slices).
+  `LOCATION`, `DTSTART`/`DTEND` as UTC (`…Z`), zone-qualified (`;TZID=` — see
+  the time-zones note below), or all-day (`VALUE=DATE`). A floating time is
+  read as **UTC** (documented cut). Recurrence (`RRULE`/`RDATE`/`EXDATE`),
+  attendees, and display alarms are modelled; `VTODO`/`VJOURNAL` are not.
 - `calendar-query` time-range/component filters are **not** evaluated — the
   REPORT returns the whole collection (a valid, unfiltered result the client
   narrows), exactly as CardDAV does for `addressbook-query`.
@@ -500,6 +499,15 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
 - **Recurrence rules:** `FREQ`+`INTERVAL`+`COUNT`/`UNTIL`+`BYDAY`+`BYMONTHDAY`
   expand (weekly Mon/Wed/Fri, monthly n-th/last weekday, month-day incl. `-1`);
   `BYMONTH`/`BYSETPOS`/`WKST` are ignored (Monday week-start assumed).
+  `RDATE` adds extra occurrence instants (deduplicated against the rule; an
+  RDATE-only series works too); `RDATE;VALUE=PERIOD` values are **skipped** —
+  start/duration pairs are not modelled. A series whose `DTSTART` carries a
+  resolvable `TZID` expands in that zone's **wall-clock**: a 09:00
+  Europe/Brussels weekly stays 09:00 local across a DST switch (the UTC
+  instant shifts), matching what the client's own expansion shows. `UNTIL` is
+  compared as UTC per RFC 5545 §3.3.10. Expansion is one store function shared
+  by the Agenda range listing, availability, and CalDAV time-range narrowing —
+  never two implementations.
 - **Multiple collections:** every calendar the user can see is its own CalDAV
   collection — the personal calendar keeps the backward-compatible `default`
   segment, and each shared/team calendar is served at
@@ -515,26 +523,36 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   event's calendar — so each collection syncs independently, at the cost of a
   no-op sync round when another calendar changed.
 - **Time-range filtering:** a `calendar-query` with `<C:time-range>` is now
-  honoured (events are filtered to the window; a recurring master is kept if it
-  starts before the window end and the client expands). No range → whole
-  collection, as before.
-- **Time zones:** a `TZID=`-qualified `DTSTART`/`DTEND`/`EXDATE` is converted
-  from that IANA zone to UTC (via the `jiff` tz database). An unknown zone (e.g.
-  a Windows name like `Eastern Standard Time`) or a floating time still falls
-  back to UTC. Full `VTIMEZONE` definitions are not parsed — the `TZID` name is
-  trusted against the IANA database.
+  honoured (events are filtered to the window; a recurring master is kept only
+  if the store's expansion — the same function the Agenda uses — actually
+  yields an occurrence in the window, or a per-occurrence override moved one
+  into it). No range → whole collection, as before.
+- **Time zones:** a `TZID=`-qualified `DTSTART`/`DTEND`/`EXDATE`/`RDATE` is
+  converted from that IANA zone to UTC at rest, and (since M3.2) the zone is
+  **kept** on the event so recurrence expands in its wall-clock. Serving goes
+  the other way: a zoned event's date-times are written back as
+  `;TZID=<zone>:<local>` so the client's own expansion is DST-correct too.
+  **No `VTIMEZONE` block is emitted or parsed** — the IANA name is the
+  definition. RFC 5545 §3.2.19 strictly wants a matching `VTIMEZONE`;
+  mainstream clients (Apple, Thunderbird, DAVx5) ship the IANA database and
+  resolve the bare name — to be confirmed in the owner-gated GUI pass, and if
+  one balks, emitting `VTIMEZONE` is the follow-up. A client that writes a
+  Windows display name (`Eastern Standard Time`) or a floating time still
+  falls back to UTC-fixed behaviour, and the fallback drops the unknown name
+  so expansion and serving agree.
 - **Remaining cut:** a phone-*originated* per-occurrence edit is still not
   captured — `from_ics` reads only the first `VEVENT`, so a client PUT of a
   multi-`VEVENT` series keeps the master and drops the client's override
   (server → client override sync works).
 - **Round-trip corpus** (`alo-store/tests/ical_corpus.rs`): client fixtures —
   plain UTC, all-day, `TZID=Europe/Brussels` zoned, floating, §3.3.11-escaped
-  text, folded long lines — each parse → store (real Postgres, the CalDAV PUT
-  path) → serialize to checked-in canonical bytes, and the canonical form is a
-  fixed point of another full cycle. `DTSTAMP` is the one property that derives
-  from nothing in the event (RFC 5545 §3.8.7.2: the serialization instant), so
-  the corpus pins it through `ical::to_ics_at`; live responses stamp the
-  current time. Grows recurrence + DST-crossing fixtures in M3.2.
+  text, folded long lines, and (M3.2) weekly-with-exceptions, monthly-by-day
+  with an `RDATE`, and a Europe/Brussels DST-crossing recurring series — each
+  parse → store (real Postgres, the CalDAV PUT path) → serialize to checked-in
+  canonical bytes, and the canonical form is a fixed point of another full
+  cycle. `DTSTAMP` is the one property that derives from nothing in the event
+  (RFC 5545 §3.8.7.2: the serialization instant), so the corpus pins it
+  through `ical::to_ics_at`; live responses stamp the current time.
 
 Wire-verified on the live server (principal discovery, PUT/GET/REPORT/
 sync-collection/DELETE, sync-token advancing on writes), and CI-gated

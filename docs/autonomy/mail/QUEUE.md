@@ -105,7 +105,7 @@ restructures billing/chat/ds/sites code.
   corpus**: every fixture parses → stores → serializes byte-stable. Start the
   corpus with plain events, all-day events, and UTC/zoned/floating times
   (jiff owns tz math). Wrong-tenant and wrong-account tests per method.
-- [ ] M3.2 Recurring events with exceptions: RRULE/RDATE/EXDATE/RECURRENCE-ID
+- [x] M3.2 Recurring events with exceptions: RRULE/RDATE/EXDATE/RECURRENCE-ID
   expansion, correct across DST boundaries — the corpus grows fixtures for
   weekly-with-exceptions, monthly-by-day, and a Europe/Brussels DST crossing.
   Expansion is one function used by both CalDAV time-range queries and the

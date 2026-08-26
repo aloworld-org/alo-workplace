@@ -322,3 +322,62 @@ corpus grows recurrence + Europe/Brussels DST fixtures in M3.2. No new
 routes, no migration, no web change — no Caddyfile note.
 
 Next: M3.2 — recurring events with exceptions.
+
+### 2026-08-26 — iteration 8 — M3.2 recurring events with exceptions
+
+Adopted the killed predecessor's two uncommitted files (migration
+`0902_calendar_event_recurrence_zone.sql`, `alo-jmap/tests/calendar_http.rs`)
+and built the item around them.
+
+Shipped: **DST-correct recurrence.** `CalendarEvent` gains `timezone` (IANA
+zone the series' wall-clock follows) and `rdates` (RDATE extras); migration
+0902 adds `tzid`/`rdates` (additive, existing rows keep UTC-fixed expansion).
+New `alo-store/src/tz.rs` (zone lookup + wall↔UTC conversion, jiff-backed,
+compatible disambiguation; `ical`'s TZID conversion now goes through it too).
+`expand_occurrences` — still the one expansion function — runs the RRULE
+period math on the zone's wall-clock and converts each occurrence back to the
+UTC instant it lands on, so a 09:00 Brussels weekly stays 09:00 local across
+the 2026-10-25 switch everywhere at once (Agenda range listing, availability,
+CalDAV) — all-day events and unknown zones stay UTC-fixed. RDATEs expand
+(deduped against the rule, EXDATE-cancellable, RDATE-only series work),
+parse/serialize in `ical` (`VALUE=PERIOD` skipped, documented), and ride
+every store write path. **iCal serving changed shape:** a zoned event now
+serializes `;TZID=<zone>:<local>` (DTSTART/DTEND/EXDATE/RDATE/RECURRENCE-ID)
+with **no VTIMEZONE** — the IANA name is the definition (interop.md records
+the deviation and the owner-gated GUI check). CalDAV `time-range` now narrows
+recurring masters through `series_occurs_in_range` (exported store seam over
+the same expansion; overrides that move an instance into the window still
+count) instead of the keep-if-started-before-end superset. Agenda API:
+`timezone` on create/update/read, unknown zone refused 400 with the name
+verbatim; a whole-series update now **preserves** stored EXDATEs/RDATEs/zone
+the JSON body can't express — before this, editing a series from the UI
+silently resurrected every cancelled instance (found-and-fixed under this
+item's "exceptions" remit).
+
+Verified: fmt + clippy clean (alo-store, alo-jmap). alo-store 2 505/2 506
+green (the known `site_ticket_orders` parallel-load flake, cleared alone —
+same class as iterations 4–7); alo-jmap 1 323/1 323. New coverage: tz unit
+tests (IANA-only lookup, round-trip across both DST edges, gap-time
+disambiguation), expansion tests (Brussels weekly + monthly-BYDAY across the
+switch, unknown-zone degrade, RDATE dedupe/EXDATE/RDATE-only,
+`series_occurs_in_range` on a spent series), ical tests (TZID capture +
+refusal-to-capture on unknown zones, zoned fixed-point serialization, RDATE
+round-trip + PERIOD skip), corpus grown per the queue item — weekly-with-
+exceptions, monthly-by-day + RDATE, Europe/Brussels DST-crossing series —
+and the zoned fixture's canonical form intentionally changed from flattened
+UTC to the TZID wall-clock form (it was DST-wrong for recurring events).
+HTTP: adopted `calendar_http.rs` proves create→list expands 07:00Z/08:00Z/
+08:00Z across the switch and the verbatim 400; new caldav test proves the
+zoned series round-trips on the wire and time-range narrowing keeps the
+DST-crossing series while dropping a spent COUNT-bounded one.
+
+Cuts/flags: no VTIMEZONE emit/parse (above); `RDATE;VALUE=PERIOD` skipped;
+the JSON API exposes but does not accept `rdates` (they arrive via CalDAV);
+no Agenda UI timezone picker yet (API + CalDAV carry the zone; UI is a
+later slice — Codex is churning web/src/mail). Environment notes for later
+iterations: Docker Desktop was down at gate start (started it, ~15 s to
+docker, then Postgres up; not a HALT); the profile's `DATABASE_URL` has an
+**empty password** and every DB test fails 28P01 with it — export
+`postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` for the gate.
+
+Next: M3.3 — invitations, iTIP over iMIP.

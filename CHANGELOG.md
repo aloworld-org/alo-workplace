@@ -10,6 +10,13 @@ contracts.
 
 ## Unreleased
 
+- **Repeating events now keep their local time across daylight-saving
+  changes.** A weekly 9:00 in Brussels stays 9:00 after the clocks change —
+  in the Agenda, in availability lookups, and on every synced phone or
+  desktop calendar — and one-off extra dates (RDATE) added by a calendar
+  app now show up too. Events synced from apps that speak time zones keep
+  the zone; the API refuses an unknown zone name outright instead of
+  silently drifting an hour.
 - **Calendar sync over CalDAV is now proven end-to-end and safer to share.**
   The full client sequence — discovery, create/read/update/delete, multiget,
   time-range queries, incremental sync — is exercised the way a phone runs
