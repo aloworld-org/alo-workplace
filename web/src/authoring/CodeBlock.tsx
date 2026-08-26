@@ -68,7 +68,7 @@ function LanguagePicker({
               type="button"
               role="option"
               aria-selected={l.id === language}
-              className={cx(styles.pickerItem, l.id === language && styles.pickerItemOn)}
+              className={cx(styles.pickerItem, "hover:!bg-accent-soft hover:!text-accent", l.id === language && styles.pickerItemOn)}
               onClick={() => onChange(l.id)}
             >
               <span className={styles.langBadge} style={{ background: l.badgeBg }}>

@@ -222,6 +222,108 @@ identical in size, radius, and rhythm across modules.
 
 ## Standing constraints
 
+- **Uploaded files never go into `localStorage`.** Images, logos, documents,
+  and other binary content use the workspace file service or IndexedDB for a
+  local-only draft. `localStorage` is reserved for small preferences and IDs;
+  never persist base64/data URLs there. Every upload save is guarded so quota,
+  permission, or serialization failures produce an inline recovery message
+  instead of crashing or unmounting the screen.
+  *Verify:* upload representative and near-limit files, reload the page, and
+  simulate a storage rejection; the file remains available when saved and the
+  surrounding workspace remains usable when saving fails.
+- **Full-page workspaces consume the available viewport through their final
+  section.** A module with a fixed application shell must have exactly one
+  deliberate vertical scroll owner beneath its header. That scroll region is
+  `min-h-0 flex-1 overflow-y-auto`; its primary document or workspace is at
+  least `min-h-full` and grows with content. Never let a fixed-height ancestor
+  clip the lower half of a page while unused application background appears
+  beneath it, and never add arbitrary footer padding or viewport calculations
+  to disguise a broken height chain.
+  *Verify:* test short, viewport-height, and long records at common desktop and
+  mobile sizes. The workspace reaches the bottom edge when content is short,
+  the final section remains reachable when content is long, and there is no
+  detached blank footer or nested page scrollbar.
+  A viewport-filling document must not reserve bottom page padding or opt out
+  of flex growth with `shrink-0`; its final surface continues to the workspace
+  edge. Bottom breathing room belongs inside the document's last section, not
+  as an exposed band of application canvas beneath the document.
+- **The authenticated application shell owns the dynamic viewport height.**
+  Its outer frame uses `100dvh` (with a `100vh` fallback) rather than relying
+  only on percentage heights inherited through route guards and wrappers.
+  Internal modules consume that frame with flex/grid sizing; they do not set
+  their own viewport height. This keeps the navigation rail, workspace ground,
+  and final content edge aligned even when browser chrome, zoom, extensions,
+  or mobile viewport controls change the usable height.
+  *Verify:* the shell rail and main background reach the same bottom edge at
+  every tested viewport; resizing DevTools or browser chrome never exposes a
+  blank band beneath the application.
+- **Every application colour comes from the approved alo palette.** Product
+  chrome uses only the semantic design tokens for Terracotta accents,
+  ivory/cream surfaces, warm-stone neutrals, warm-charcoal structure, and ink
+  text. Components must not introduce generic Tailwind palette colours such as
+  `blue-*`, `slate-*`, `gray-*`, arbitrary hex/RGB values, or browser/system
+  colours. Success, warning, and danger tokens are reserved for states that
+  genuinely communicate those meanings; charts and user-authored content are
+  the only intentional broader-colour exceptions. Change the shared semantic
+  token when the palette evolves rather than patching individual screens.
+  User-authored document branding is the narrow exception: validated colours
+  chosen in a colour picker may flow through scoped CSS custom properties to
+  the document preview and export only. They must never recolour alo's own
+  navigation, controls, focus, validation, or status states.
+  *Verify:* audit all resting, hover, focus, selected, disabled, error, overlay,
+  and autofill states; every computed application colour resolves to an alo
+  semantic token or a documented status/data exception.
+- **Application components use Tailwind utilities only.** Do not create CSS
+  modules, component stylesheets, inline style objects, or local `<style>`
+  blocks. When touched code still depends on a component-specific `.css` or
+  `.module.css` file, migrate those rules to token-backed Tailwind utilities
+  and delete the obsolete stylesheet. The only CSS files allowed are the
+  design-system foundations Tailwind consumes: the Tailwind entrypoint,
+  shared tokens, themes, resets, fonts, and genuinely global browser rules.
+  Those files define the language; components speak it through utilities.
+  *Verify:* new or changed component files import no component stylesheet and
+  introduce no `style={{...}}`; searches for new `.module.css` files are empty.
+- **Browser defaults never become product design.** No native browser or
+  operating-system blue, purple, bevel, focus glow, selected-row colour,
+  autofill colour, or default spacing may appear in alo application chrome.
+  Every visible state—resting, hover, focus, open, selected, checked,
+  disabled, invalid, and autofilled—uses design-system tokens and brand
+  colours. When a native popup cannot be themed consistently across supported
+  browsers, use the accessible design-system primitive for that interaction
+  instead of shipping an unbranded platform menu.
+  *Verify:* exercise every control state in Chromium, Firefox, and WebKit;
+  no state falls back to an unthemed browser colour.
+- **Focus indicators never use browser blue or cool blue-gray.** Text fields,
+  textareas, selects, buttons, links, listboxes, and composite controls use a
+  Terracotta outline or ring and a Terracotta focused border. Strong neutral
+  borders use the warm-stone token; they are not a substitute focus colour.
+  Mouse, keyboard, autofill, validation, and programmatic focus must not reveal
+  the browser's default blue glow, outline, or selected-control treatment.
+  Shared form primitives and the global fallback own this rule so feature code
+  does not invent a local focus colour.
+  *Verify:* tab through and click every interactive control in Chromium,
+  Firefox, and WebKit; inspect focused borders and outlines and confirm every
+  visible focus treatment resolves to `--accent`, never a browser/system blue.
+- **Form controls show one border, never a double ring.** Inputs, textareas,
+  selects, combobox triggers, date fields, and editable cells use a single
+  Terracotta focus perimeter aligned to the control edge. Do not combine a
+  focused border with an outward ring or offset outline. The shared primitive
+  and global fallback own this treatment so it remains identical throughout
+  the application and does not shift layout or get clipped by a dialog.
+  *Verify:* focus every field with mouse and keyboard at normal and high zoom;
+  exactly one continuous Terracotta edge is visible around the control.
+- **Every dropdown option has an unmistakable branded hover state.** Menu,
+  listbox, combobox, command-palette, suggestion, and picker rows use the soft
+  Terracotta surface with Terracotta text on pointer hover. The hover applies
+  across the row's full protected target, not only its label or icon, and never
+  depends on a browser's native option highlight. Selected and keyboard-active
+  rows use the same brand family and remain distinguishable through weight,
+  checkmark, or `aria-selected`; disabled rows do not react to hover. Shared
+  dropdown primitives own this behavior so product screens inherit it rather
+  than restating it.
+  *Verify:* open every dropdown and move the pointer across every enabled row;
+  the complete row changes to `bg-accent-soft text-accent`, with no native blue
+  or visually inert option.
 - **The interface never uses underlines as decoration or interaction feedback.**
   Links, buttons, tabs, navigation, table actions, and their hover, focus,
   active, and visited states use colour, weight, surface, and a visible focus
