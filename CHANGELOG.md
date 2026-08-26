@@ -10,6 +10,14 @@ contracts.
 
 ## Unreleased
 
+- **Calendar sync over CalDAV is now proven end-to-end and safer to share.**
+  The full client sequence — discovery, create/read/update/delete, multiget,
+  time-range queries, incremental sync — is exercised the way a phone runs
+  it, an event you edit on another device round-trips byte-for-byte (plain,
+  all-day, time-zoned, and floating times alike), and trying to change a
+  calendar someone shared with you read-only now gets a clear "not allowed"
+  instead of a server error.
+
 - **"Send later" now works from a shared mailbox.** A delegate with a send
   grant can schedule a message from a mailbox shared with them (and cancel it
   from its Scheduled folder); when the mailbox was shared "on behalf",

@@ -98,7 +98,7 @@ restructures billing/chat/ds/sites code.
 
 ### M3 — Calendar interop (the minefield; budget several iterations)
 
-- [ ] M3.1 CalDAV calendar collections (RFC 4791) over the existing calendar
+- [x] M3.1 CalDAV calendar collections (RFC 4791) over the existing calendar
   store, mirroring the CardDAV implementation's shape: OPTIONS/PROPFIND,
   `calendar-query` + `calendar-multiget` + `sync-collection` REPORTs, GET/PUT/
   DELETE with ETags. iCalendar (RFC 5545) serialization gets a **round-trip

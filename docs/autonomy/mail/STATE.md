@@ -269,3 +269,56 @@ prefixes — `/api/send-later` already deployed. `alo` DB carries audit
 tenant `m22-audit` (two users) from the live walk.
 
 Next: M3.1 — CalDAV calendar collections.
+
+### 2026-08-26 — iteration 7 — M3.1 CalDAV calendar collections
+
+Found built, kept: the protocol surface predated this track —
+`carddav.rs` already serves calendar collections (OPTIONS advertising
+`calendar-access`, PROPFIND principal/home/collection/object, REPORTs
+`calendar-multiget` + `calendar-query` with time-range + `sync-collection`
+on the account modseq, GET/PUT/DELETE with field-hash ETags and RFC 7232
+preconditions), one collection per visible calendar with `default` for the
+personal one, all recorded in `docs/interop.md`.
+
+Shipped (what the queue item still owed): the **round-trip corpus** and
+the **per-method isolation proofs** — and the two real bugs writing them
+surfaced. (1) `put_event` keyed its upsert by (tenant, user, id), so an
+editor's CalDAV PUT replacing a colleague's event on a *shared* calendar
+forked a per-user duplicate row of the same href instead of replacing it
+(the Agenda path via `update_event` was fine); it now replaces in place,
+keeping the row's owner. (2) A PUT/DELETE against a calendar the caller
+cannot edit surfaced as a raw 500; it is now 403 when the calendar is
+visible (read-only grant) and 404 when it is not — no oracle. New
+`ical::to_ics_at(event, dtstamp)` seam pins DTSTAMP (the one property that
+derives from nothing in the event) so byte-stability is provable; live
+responses still stamp now.
+
+Verified: fmt + clippy clean (alo-store, alo-jmap). New
+`alo-store/tests/ical_corpus.rs`: five fixtures (plain UTC, all-day,
+TZID=Europe/Brussels zoned, floating-read-as-UTC, §3.3.11 escapes) parse →
+store through real Postgres → serialize to checked-in canonical bytes,
+and the canonical form is a fixed point of a second full cycle; a folded
+long-line fixture proves fold/unfold stability. New
+`alo-jmap/tests/caldav.rs`: the full client sequence (discovery → PUT →
+GET → PROPFIND → multiget → time-range query → incremental sync with
+token advance → delete reported as 404 member → preconditions), plus
+wrong-tenant AND wrong-user-same-tenant probes per method (via the
+victim's paths and via own paths carrying the victim's ids — never data,
+never a 500), and the read-only share: viewer reads, viewer PUT/DELETE
+403, editor PUT replaces without forking. Full suites 3 816 tests:
+3 815 green + the known `site_ticket_orders` parallel-load flake cleared
+alone (the same class iterations 4–6 recorded). One environmental rerun:
+a first suite run overlapped a killed predecessor on the same scratch DB
+and produced 9 spurious billing failures with ~25-minute test times; all
+passed on the clean rerun. Disk hit 100 %/2.9 GB free at gate start —
+PDB + stale-binary sweep freed 20 GB (the LOOP.md playbook, again).
+
+Cuts/flags: change-log visibility on shared calendars — an edit by a
+delegate bumps only the editor's own account modseq, so another viewer's
+sync token does not advance until their own account changes (the
+account-wide-modseq cut interop.md already records; flagged for the M3
+tail, not redesigned here). Floating/TZID-read-as-UTC stands (documented);
+corpus grows recurrence + Europe/Brussels DST fixtures in M3.2. No new
+routes, no migration, no web change — no Caddyfile note.
+
+Next: M3.2 — recurring events with exceptions.

@@ -505,8 +505,12 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   segment, and each shared/team calendar is served at
   `calendars/<uid>/<calendarId>/`. `PROPFIND` on calendar-home (Depth 1)
   enumerates them (name + colour from the calendar; a view-only shared calendar
-  advertises only `read` in `current-user-privilege-set`). A PUT to a collection
-  the caller can't edit is refused by the store (`can_edit`), not misfiled.
+  advertises only `read` in `current-user-privilege-set`). A PUT or DELETE
+  against a calendar the caller can't edit is refused by the store (`can_edit`),
+  not misfiled — on the wire that is **`403`** when the calendar is visible (a
+  read-only grant: the denial is a permission) and **`404`** when it is not
+  (an unshared calendar id stays unprobeable; it was a raw 500 before the
+  M3.1 pass).
   Sync-token is still the account-wide modseq, filtered per collection by the
   event's calendar — so each collection syncs independently, at the cost of a
   no-op sync round when another calendar changed.
@@ -523,8 +527,19 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   captured — `from_ics` reads only the first `VEVENT`, so a client PUT of a
   multi-`VEVENT` series keeps the master and drops the client's override
   (server → client override sync works).
+- **Round-trip corpus** (`alo-store/tests/ical_corpus.rs`): client fixtures —
+  plain UTC, all-day, `TZID=Europe/Brussels` zoned, floating, §3.3.11-escaped
+  text, folded long lines — each parse → store (real Postgres, the CalDAV PUT
+  path) → serialize to checked-in canonical bytes, and the canonical form is a
+  fixed point of another full cycle. `DTSTAMP` is the one property that derives
+  from nothing in the event (RFC 5545 §3.8.7.2: the serialization instant), so
+  the corpus pins it through `ical::to_ics_at`; live responses stamp the
+  current time. Grows recurrence + DST-crossing fixtures in M3.2.
+
 Wire-verified on the live server (principal discovery, PUT/GET/REPORT/
-sync-collection/DELETE, sync-token advancing on writes).
+sync-collection/DELETE, sync-token advancing on writes), and CI-gated
+end-to-end by `alo-jmap/tests/caldav.rs` — the full client sequence plus
+per-method wrong-tenant, wrong-user-same-tenant, and read-only-share proofs.
 
 ## IMAP import (client role, RFC 3501)
 
