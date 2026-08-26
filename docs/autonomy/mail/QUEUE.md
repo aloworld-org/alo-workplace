@@ -54,7 +54,7 @@ restructures billing/chat/ds/sites code.
 
 ### M1 — Legacy-client access for 2FA accounts
 
-- [ ] M1.1 App-specific passwords in the store + identity: per-user, named
+- [x] M1.1 App-specific passwords in the store + identity: per-user, named
   ("Thunderbird on the desk machine"), generated server-side (CSPRNG, shown
   once, never retrievable), argon2id-hashed with the same parameter contract
   as account passwords, revocable one at a time, migration `09xx`. Verify is

@@ -18,4 +18,32 @@ Standing facts every iteration should know:
 
 ## Iterations
 
-(none yet)
+### 2026-08-26 — iteration 1 — M1.1 app-specific passwords (store + identity)
+
+Shipped: migration `0900_app_passwords.sql` (per-user named credentials,
+argon2id PHC hash at rest, `last_used_at`, revoke = delete); store module
+`alo-store/src/app_passwords.rs` (tenant-door create/list/revoke with a
+20-per-user cap bounding the argon2 work one login can cost, pre-tenant
+`app_password_credentials_by_username` + `touch_app_password` for the legacy
+auth path) with `AppPasswordId`; identity module
+`alo-identity/src/app_password.rs` (CSPRNG generation — 16 lowercase letters
+shown once as `xxxx-xxxx-xxxx-xxxx`, ~75 bits; hashing under the account
+password parameter contract; `verify_app_password` through the existing
+dummy-hash seam, verifying the canonical de-dashed form so clipboard grouping
+never matters; list/revoke pass-throughs).
+
+Verified: clippy clean on both crates; full suites green (2 540 tests, incl.
+12 new: wrong-tenant AND wrong-user on create/list/revoke, username lookup
+resolves one user only, cap + name validation, revoked-hash gone, roundtrip
+verify with/without dashes, primary password never verifies as app password,
+cross-tenant/account denial, and a `constant_time.rs`-style timing test
+proving unknown-user vs wrong-app-password minima are comparable).
+
+Cuts/flags: none. Mechanism only by design — policy (which account may use an
+app password on which protocol, 2FA fail-closed) is M1.2's seam; no routes
+yet (M1.3), so no wire verification was due. A user with several app
+passwords pays one argon2 verify per stored hash; timing can reveal at most
+the enrolled count of a user already known to exist, never existence — noted
+in the rustdoc.
+
+Next: M1.2 — the legacy auth seam accepts app passwords.
