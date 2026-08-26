@@ -35,7 +35,7 @@ import {
   X,
 } from "lucide-react";
 
-import { Button, Input, Modal, Select, cx } from "../ds";
+import { Button, ChoicePicker, Input, Modal, Select, cx } from "../ds";
 import {
   QuoteTableOptionsProvider,
   type QuoteLineContent,
@@ -50,7 +50,13 @@ type Block =
   | { id: string; kind: "heading"; level: 1 | 2 | 3; text: string }
   | { id: string; kind: "paragraph"; text: string }
   | { id: string; kind: "quote"; text: string; attribution: string }
-  | { id: string; kind: "list"; ordered: boolean; items: string }
+  | {
+      id: string;
+      kind: "list";
+      ordered: boolean;
+      items: string;
+      columns?: 1 | 2 | 3;
+    }
   | { id: string; kind: "divider" }
   | {
       id: string;
@@ -379,7 +385,8 @@ export const QuoteContentStudio = forwardRef<
     if (kind === "paragraph") insertBlock(index, { id, kind, text: "" });
     if (kind === "quote")
       insertBlock(index, { id, kind, text: "", attribution: "" });
-    if (kind === "list") insertBlock(index, { id, kind, ordered, items: "" });
+    if (kind === "list")
+      insertBlock(index, { id, kind, ordered, items: "", columns: 1 });
     if (kind === "divider") insertBlock(index, { id, kind });
     if (kind === "pricing") {
       setDesign((current) => ({
@@ -784,7 +791,13 @@ export const QuoteContentStudio = forwardRef<
                       ) : block.kind === "list" ? (
                         readOnly ? (
                           block.ordered ? (
-                            <ol className="list-decimal space-y-1 pl-6">
+                            <ol
+                              className={cx(
+                                "grid list-decimal gap-x-10 gap-y-2 pl-6",
+                                (block.columns ?? 1) === 2 && "md:grid-cols-2",
+                                (block.columns ?? 1) === 3 && "md:grid-cols-3",
+                              )}
+                            >
                               {block.items
                                 .split("\n")
                                 .filter(Boolean)
@@ -793,7 +806,13 @@ export const QuoteContentStudio = forwardRef<
                                 ))}
                             </ol>
                           ) : (
-                            <ul className="list-disc space-y-1 pl-6">
+                            <ul
+                              className={cx(
+                                "grid list-disc gap-x-10 gap-y-2 pl-6",
+                                (block.columns ?? 1) === 2 && "md:grid-cols-2",
+                                (block.columns ?? 1) === 3 && "md:grid-cols-3",
+                              )}
+                            >
                               {block.items
                                 .split("\n")
                                 .filter(Boolean)
@@ -806,7 +825,8 @@ export const QuoteContentStudio = forwardRef<
                           <ListBlockEditor
                             ordered={block.ordered}
                             items={block.items}
-                            onChange={(items) => update(block.id, { items })}
+                            columns={block.columns ?? 1}
+                            onChange={(patch) => update(block.id, patch)}
                           />
                         )
                       ) : block.kind === "divider" ? (
@@ -947,18 +967,24 @@ export const QuoteContentStudio = forwardRef<
 function ListBlockEditor({
   ordered,
   items,
+  columns,
   onChange,
 }: {
   ordered: boolean;
   items: string;
-  onChange: (items: string) => void;
+  columns: 1 | 2 | 3;
+  onChange: (patch: { items?: string; columns?: 1 | 2 | 3 }) => void;
 }) {
   const rows = items === "" ? [""] : items.split("\n");
   const replace = (index: number, value: string) =>
-    onChange(rows.map((item, itemIndex) => (itemIndex === index ? value : item)).join("\n"));
+    onChange({
+      items: rows
+        .map((item, itemIndex) => (itemIndex === index ? value : item))
+        .join("\n"),
+    });
   const remove = (index: number) => {
     const next = rows.filter((_, itemIndex) => itemIndex !== index);
-    onChange(next.length === 0 ? "" : next.join("\n"));
+    onChange({ items: next.length === 0 ? "" : next.join("\n") });
   };
   const move = (index: number, direction: -1 | 1) => {
     const destination = index + direction;
@@ -967,12 +993,44 @@ function ListBlockEditor({
     const [item] = next.splice(index, 1);
     if (item === undefined) return;
     next.splice(destination, 0, item);
-    onChange(next.join("\n"));
+    onChange({ items: next.join("\n") });
   };
 
   return (
     <div>
-      <div className="flex flex-col gap-2">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-primary">List layout</p>
+          <p className="mt-0.5 text-xs text-secondary">
+            Split longer lists into easy-to-scan columns.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-secondary">
+          <span>Columns</span>
+          <div className="w-36">
+            <ChoicePicker
+              value={String(columns)}
+              label={`${ordered ? "Numbered" : "Bullet"} list columns`}
+              placeholder="Choose columns"
+              options={[
+                { value: "1", label: "1 column" },
+                { value: "2", label: "2 columns" },
+                { value: "3", label: "3 columns" },
+              ]}
+              onChange={(value) =>
+                onChange({ columns: Number(value) as 1 | 2 | 3 })
+              }
+            />
+          </div>
+        </div>
+      </div>
+      <div
+        className={cx(
+          "grid gap-2",
+          columns === 2 && "md:grid-cols-2",
+          columns === 3 && "md:grid-cols-2 xl:grid-cols-3",
+        )}
+      >
         {rows.map((item, index) => (
           <div
             key={index}
@@ -1012,7 +1070,9 @@ function ListBlockEditor({
       <button
         type="button"
         className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-default bg-surface px-4 text-sm font-semibold text-primary transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent"
-        onClick={() => onChange(items === "" ? "\n" : `${items}\n`)}
+        onClick={() =>
+          onChange({ items: items === "" ? "\n" : `${items}\n` })
+        }
       >
         <Plus className="size-4" aria-hidden="true" /> Add item below
       </button>
@@ -2196,7 +2256,7 @@ function BottomComposer({
             <Search className="size-4 shrink-0" aria-hidden="true" />
             <input
               autoFocus
-              className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-sm text-primary shadow-none outline-none ring-0 placeholder:text-tertiary focus:border-0 focus:outline-none focus:ring-0"
+              className="min-w-0 flex-1 appearance-none !border-0 bg-transparent !p-0 text-sm text-primary !shadow-none !outline-none !ring-0 placeholder:text-tertiary focus:!border-0 focus:!outline-none focus:!ring-0"
               value={query}
               placeholder="Search blocks..."
               aria-label="Search quotation blocks"
