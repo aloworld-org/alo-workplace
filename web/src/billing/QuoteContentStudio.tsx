@@ -2553,7 +2553,7 @@ function CustomizeQuote({
       title="Customize quotation"
       icon={<Palette className="size-5" />}
       onClose={onClose}
-      wide
+      wide="extra"
       actions={
         <button
           type="button"
@@ -2578,36 +2578,59 @@ function CustomizeQuote({
         </>
       }
     >
-      <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
-        <section>
-          <h3 className="text-sm font-semibold text-primary">Logo</h3>
-          <p className="mt-1 text-xs text-secondary">PNG, JPG, WebP, or SVG.</p>
+      <div className="grid gap-8 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <section className="rounded-2xl bg-raised/45 p-5">
+          <div>
+            <h3 className="text-base font-semibold text-primary">Brand mark</h3>
+            <p className="mt-1 text-sm leading-relaxed text-secondary">
+              Shown at the top of the customer quotation.
+            </p>
+          </div>
           <button
             type="button"
-            className="mt-3 flex min-h-28 w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-default bg-raised/30 p-3 text-sm font-medium text-secondary hover:border-accent hover:bg-accent-soft hover:text-accent"
+            className="mt-5 flex min-h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-default bg-surface p-5 text-sm font-semibold text-secondary shadow-sm transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
             onClick={() => logoInput.current?.click()}
           >
             {design.logo ? (
               <img
                 src={design.logo}
                 alt="Quote logo"
-                className="max-h-20 max-w-full object-contain"
+                className="max-h-28 max-w-full object-contain"
               />
             ) : (
-              <span className="flex items-center gap-2">
-                <Upload className="size-4" /> Upload logo
+              <span className="flex flex-col items-center gap-3 text-center">
+                <span className="grid size-11 place-items-center rounded-xl bg-accent-soft text-accent">
+                  <Upload className="size-5" />
+                </span>
+                <span>
+                  <strong className="block text-sm text-primary">
+                    Upload your logo
+                  </strong>
+                  <small className="mt-1 block font-normal text-tertiary">
+                    PNG, JPG, WebP, or SVG
+                  </small>
+                </span>
               </span>
             )}
           </button>
-          {design.logo && (
+          <div className="mt-3 flex items-center justify-between gap-3">
             <button
               type="button"
-              className="mt-2 text-xs font-semibold text-secondary hover:text-danger"
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-accent transition-colors hover:bg-accent-soft hover:text-accent-hover disabled:cursor-not-allowed disabled:text-tertiary disabled:opacity-50"
+              onClick={() => logoInput.current?.click()}
+            >
+              <Upload className="size-4" />
+              {design.logo ? "Replace" : "Choose file"}
+            </button>
+            <button
+              type="button"
+              disabled={!design.logo}
+              className="min-h-9 rounded-lg px-3 text-sm font-semibold text-secondary transition-colors hover:bg-danger-tint hover:text-danger disabled:cursor-not-allowed disabled:text-tertiary disabled:opacity-40"
               onClick={() => onChange((current) => ({ ...current, logo: "" }))}
             >
-              Remove logo
+              Remove
             </button>
-          )}
+          </div>
           <input
             ref={logoInput}
             type="file"
@@ -2622,19 +2645,19 @@ function CustomizeQuote({
             }}
           />
         </section>
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-8">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-primary">
-                Document colours
+              <h3 className="text-base font-semibold text-primary">
+                Document palette
               </h3>
-              <p className="mt-1 text-xs text-secondary">
-                Applied only to this customer-facing quotation.
+              <p className="mt-1 text-sm text-secondary">
+                Control the customer-facing page and pricing table colours.
               </p>
             </div>
             <button
               type="button"
-              className="text-xs font-semibold text-accent hover:text-accent-hover"
+              className="min-h-9 rounded-lg px-3 text-sm font-semibold text-accent transition-colors hover:bg-accent-soft hover:text-accent-hover"
               onClick={() =>
                 onChange((current) => ({ ...current, colors: DEFAULT_COLORS }))
               }
@@ -2642,7 +2665,7 @@ function CustomizeQuote({
               Reset
             </button>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
             <ColorField
               label="Accent"
               value={design.colors.accent}
@@ -2669,38 +2692,63 @@ function CustomizeQuote({
               onChange={(value) => setColor("tableRows", value)}
             />
           </div>
-          <h3 className="mt-6 text-sm font-semibold text-primary">
-            Typography
-          </h3>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            {themeChoices.map((theme) => (
-              <button
-                key={theme.id}
-                type="button"
-                className={cx(
-                  "flex min-h-20 items-center gap-3 rounded-xl border bg-surface px-3 py-3 text-left hover:border-accent hover:bg-accent-soft",
-                  design.theme === theme.id
-                    ? "border-accent shadow-[inset_0_0_0_1px_var(--accent)]"
-                    : "border-default",
-                )}
-                onClick={() =>
-                  onChange((current) => ({ ...current, theme: theme.id }))
-                }
-              >
-                <span className="min-w-0 flex-1">
+          <section className="border-t border-subtle pt-7">
+            <div>
+              <h3 className="text-base font-semibold text-primary">
+                Typography
+              </h3>
+              <p className="mt-1 text-sm text-secondary">
+                Choose the reading style that best matches your brand.
+              </p>
+            </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              {themeChoices.map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  aria-pressed={design.theme === theme.id}
+                  className={cx(
+                    "group relative min-h-36 rounded-2xl border bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25",
+                    design.theme === theme.id
+                      ? "border-accent bg-accent-soft/35"
+                      : "border-default",
+                  )}
+                  onClick={() =>
+                    onChange((current) => ({ ...current, theme: theme.id }))
+                  }
+                >
+                  <span
+                    className={cx(
+                      "mb-4 block text-3xl leading-none text-primary",
+                      theme.id === "editorial" && "font-editorial",
+                      theme.id === "minimal" && "font-light tracking-tight",
+                    )}
+                    aria-hidden="true"
+                  >
+                    Aa
+                  </span>
                   <strong className="block text-sm font-semibold text-primary">
                     {theme.name}
                   </strong>
-                  <small className="mt-1 block text-xs text-secondary">
+                  <small className="mt-1 block text-xs leading-relaxed text-secondary">
                     {theme.help}
                   </small>
-                </span>
-                {design.theme === theme.id && (
-                  <Check className="size-4 shrink-0 text-accent" />
-                )}
-              </button>
-            ))}
-          </div>
+                  <span
+                    className={cx(
+                      "absolute right-3 top-3 grid size-5 place-items-center rounded-full border",
+                      design.theme === theme.id
+                        ? "border-accent bg-accent text-on-accent"
+                        : "border-default bg-surface group-hover:border-accent",
+                    )}
+                  >
+                    {design.theme === theme.id && (
+                      <Check className="size-3.5" aria-hidden="true" />
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     </Modal>
@@ -3115,27 +3163,27 @@ function ColorField({
 }) {
   const valid = /^#[0-9a-f]{6}$/i.test(value);
   return (
-    <div className="rounded-xl border border-default bg-surface p-3 transition-colors hover:border-accent">
+    <div>
       <label
-        className="block text-xs font-semibold text-primary"
+        className="block text-sm font-semibold text-primary"
         htmlFor={`quote-colour-${label.replace(/\s+/g, "-").toLowerCase()}`}
       >
         {label}
       </label>
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex min-h-12 items-center gap-2 rounded-xl border border-default bg-surface p-1.5 shadow-sm transition-colors hover:border-accent focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10">
         <input
           type="color"
           value={valid ? value : DEFAULT_COLORS.accent}
           aria-label={`Choose ${label.toLowerCase()} colour`}
           title={`Choose ${label.toLowerCase()} colour`}
-          className="size-11 shrink-0 cursor-pointer rounded-lg border border-default bg-surface p-1 shadow-sm"
+          className="size-9 shrink-0 cursor-pointer rounded-lg border-0 bg-transparent p-0"
           onChange={(event) => onChange(event.target.value)}
         />
         <input
           id={`quote-colour-${label.replace(/\s+/g, "-").toLowerCase()}`}
           value={value.toUpperCase()}
           aria-label={`${label} hex colour`}
-          className="h-11 min-w-0 w-full rounded-lg border border-default bg-surface px-3 font-mono text-xs uppercase text-primary focus:border-accent focus:outline-none"
+          className="h-9 min-w-0 w-full border-0 bg-transparent px-2 font-mono text-sm font-medium uppercase text-primary shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0"
           maxLength={7}
           spellCheck={false}
           onChange={(event) => {
