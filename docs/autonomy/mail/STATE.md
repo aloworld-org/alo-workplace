@@ -879,3 +879,58 @@ the boundary.
 
 Next: M4.1 tranche 9 — the Sites commerce half, which completes the
 surface and closes M4.1.
+
+### 2026-08-27 — iteration 19 — M4.1 German catalog, tranche 9 (the Sites commerce half) — M4.1 COMPLETE
+
+Shipped: the ninth and final complete-modules tranche of `de.ts`
+(+529 keys → 5 182 of 5 182): the Sites commerce half entire — the
+catalog (settings, currency, groups, items with photos and alt text,
+availability, per-item accessible delete labels, the page section with
+its group choice and order-form facts), bookable services (the calendar
+seam, opening-hour windows, custom questions, the booking section and
+its honesty strings about where free times come from), the ticket shop
+(events, seats with sold/held counts, capacity that only shrinks to
+what is left, the section), the web shop (the shelf, delivery pricing,
+the read-only notice, and the AI-proposed shop setup approval list),
+the order inbox (states, lines, the personal-data delete warning, CSV
+export), Base-backed collections (connect, column mapping, row
+preview, the section), the sealed custom-code block (the three
+boundary facts, capabilities, byte budgets), and domains end to end
+(the alo address, connecting an owned domain with its DNS record
+dialogue, search and buy with the price said twice — today and every
+year after — registrant details, price approval, and all nine purchase
+states with their step sentences). Vocabulary: a website visitor
+places a „Bestellung" — the everyday B2C word; the formal „Auftrag"
+stays the order book's (the tranche-7 split holds, and a test pins
+that the two words stay different). A ticketed event is the
+„Veranstaltung" — the calendar keeps „Termin" — selling „Plätze"; the
+shop-setup proposal is „genehmigt" with the agent cards' own word
+(sitesShopSetupApprove contains agentApprove, pinned), while a domain
+price — money — is „freigegeben"; stock speaks Lager's language („auf
+Lager", „Lagerware", „Bestand"); prices come „auf Anfrage"; and the
+proposal quotes item names in German quotes („Brot" anlegen).
+
+Verified: de.ts now carries every one of en's 5 182 keys (node
+key-diff: 0 missing, 0 extra, 0 duplicates). The catalog being
+complete, three structural changes landed with it: the
+partial-catalog fallback assertion (sitesNewCatalog reads as English)
+retired in favour of a full-parity assertion; the SHIPPED_PREFIXES
+negative lookahead over the commerce families dropped, so plain
+`sites` is claimed (thresholds raised to the tranche-9 floor: >5 000
+shipped, >5 100 de — actual 5 061 and 5 182); and de joined the nl/fr
+UNTRANSLATED drift ratchet, so from now on a new English key must land
+with Dutch, French AND German or an explicit untranslated.ts line —
+the per-module ratchet remains as the map of how German got here. New
+German spot checks pin the Bestellung/Auftrag distinction, Neue
+Veranstaltung, Preis auf Anfrage, Ausverkauft, the Genehmigen/
+freigeben split, the German-quoted proposal name, and the plural
+branches (Veranstaltungen im Verkauf, Stück, seats cell, Jahr/Jahre,
+first-year/renewal price both branches). 86/86 i18n tests green;
+`npx tsc --noEmit` clean; `npx eslint` on de.ts, locale.test.ts and
+untranslated.ts clean; `npm run build` green. Web-only, additive — no
+Rust, no routes, no migration.
+
+Cuts/flags: none — the surface is complete and M4.1 is `[x]`. Every
+UI string in the product now exists in en, fr, nl and de.
+
+Next: M4.2 — server-synced locale preference.

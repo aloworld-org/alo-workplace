@@ -124,7 +124,7 @@ restructures billing/chat/ds/sites code.
 
 ### M4 — Platform polish (small, high-value, mostly backend)
 
-- [ ] M4.1 German catalog: `web/src/i18n/de.ts`, the entire key surface at
+- [x] M4.1 German catalog: `web/src/i18n/de.ts`, the entire key surface at
   native quality (the bar French set), registered in `locale.ts` + the
   switcher. Additive-only against en/fr/nl. If the surface is too large for
   one iteration, ship complete modules per iteration (the fallback mechanism
@@ -182,6 +182,15 @@ restructures billing/chat/ds/sites code.
     Remaining: the Sites commerce half (~529 keys: catalog, shop,
     booking, tickets, collections, custom code, orders, domains), which
     completes the surface — boundary in STATE.md.
+  - Tranche 9 shipped 2026-08-27 (iteration 19): the Sites commerce half
+    entire — catalog (groups, items, photos, availability, the section),
+    bookable services (hours, questions, the section), the ticket shop,
+    the web shop with delivery and the AI-proposed setup, the order
+    inbox, Base collections, the sealed custom-code block, and domains
+    (connect, buy, registrant, price approval, purchase states)
+    (+529 keys → 5 182 of 5 182). The catalog is complete: de joined
+    the nl/fr drift ratchet, the partial-catalog fallback assertion
+    retired, and the SHIPPED_PREFIXES claim widened to plain `sites`.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for
