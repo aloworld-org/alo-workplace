@@ -298,6 +298,14 @@ identical in size, radius, and rhythm across modules.
   instead of shipping an unbranded platform menu.
   _Verify:_ exercise every control state in Chromium, Firefox, and WebKit;
   no state falls back to an unthemed browser colour.
+  Browser-managed details are included in this rule: text selection, search
+  decorations, autofill, file-picker triggers, checkbox/radio accents, date
+  affordances, validation, and disabled states all need an Alo treatment.
+  Use `ChoicePicker` for visible dropdown menus, `DatePicker` for dates, the
+  shared checkbox/toggle primitives for choices, and an Alo button backed by a
+  visually hidden file input for uploads. A raw native control is only an
+  accessibility fallback; it is never the finished visible interaction. These
+  treatments live in Tailwind-based components, not feature or fallback CSS.
 - **Development must fail closed when its API is unavailable.** A frontend
   configured for a loopback API may not start until that API reports ready.
   Never leave a convincing login screen in front of a dead proxy: it turns an
