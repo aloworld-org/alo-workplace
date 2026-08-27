@@ -934,3 +934,47 @@ Cuts/flags: none — the surface is complete and M4.1 is `[x]`. Every
 UI string in the product now exists in en, fr, nl and de.
 
 Next: M4.2 — server-synced locale preference.
+
+### 2026-08-27 — iteration 20 — M4.2 server-synced locale preference
+
+Shipped: the language choice now lives on the account, not the browser.
+Store: migration `0903_user_locale.sql` (nullable `locale` TEXT on
+`user_settings` — NULL means "never chosen", which keeps browser
+detection in charge exactly as before the column existed) and
+`AccountStore::locale()/set_locale()` (tenant+user-bound, length-capped
+at BCP 47's 35). API: `GET`/`POST /api/settings/locale` — the POST
+validates the *shape* of the tag (2–8-letter primary subtag,
+alphanumeric subtags, single hyphens) and deliberately not the shipped
+catalog, so adding a fifth language never needs a server release; null
+clears back to detection; store refusals keep 422. Web: `locale.ts`
+gained the sync seam (`adoptRemoteLocale` applies a server value
+without echoing a write; `setRemoteLocaleWriter` is registered only
+while a session is live, so anonymous pages stay purely
+browser-detected), a new `i18n/LocaleSync.tsx` mounted once inside
+`AuthProvider` in `App.tsx` (outside the locale-keyed fragment so a
+switch does not remount the syncer; imported directly, not through the
+i18n barrel, to avoid an import cycle with auth), and
+`JmapClient.localePreference()/setLocalePreference()`.
+
+Verified: 6 new HTTP tests green (`locale_preference_http.rs`: round
+trip incl. null-clears and last-write-wins, `pt-BR` stored as written,
+7 malformed shapes 422 with the stored value proven untouched,
+cross-tenant invisibility on one shared store in BOTH directions,
+same-tenant colleague isolation — the wrong-user case a tenant test
+alone would miss — and 401s on both methods); full `cargo nextest run
+-p alo-store -p alo-jmap` 3 844 green; fmt + clippy clean. Web: 8 new
+vitest tests (adoption applies/ignores unknown/never echoes a write;
+switcher writes through, no-op and removed-writer write nothing),
+94/94 i18n tests green, `npx tsc --noEmit`, eslint on changed files,
+`npm run build` all clean. Wire-verified against the local debug
+backend on the `alo` database with real curl via `/auth/token`:
+GET null → POST de → GET de → `de_DE` 422 → POST null → GET null →
+anonymous 401, and the `user_settings.locale` row read back `fr` in
+psql after the final write. Scratch tenant `wire-m42`; a stale
+`alo-jmap` from a previous night was found squatting :8080 and killed
+first (LOOP.md's warning, verbatim).
+
+Cuts/flags: none. No new top-level route prefix (`/settings/*` is
+already routed), no new UI strings, so no catalog changes.
+
+Next: M4.3 — the mail surface's login screen says alomails.

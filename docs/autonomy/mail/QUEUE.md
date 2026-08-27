@@ -191,7 +191,7 @@ restructures billing/chat/ds/sites code.
     (+529 keys → 5 182 of 5 182). The catalog is complete: de joined
     the nl/fr drift ratchet, the partial-catalog fallback assertion
     retired, and the SHIPPED_PREFIXES claim widened to plain `sites`.
-- [ ] M4.2 Server-synced locale preference: a per-user setting (existing
+- [x] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for
   anonymous pages. Test the round trip through the real API.
