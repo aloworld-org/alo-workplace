@@ -535,3 +535,38 @@ progress, and the next iteration continues the surface.
 
 Next: M4.1 tranche 2 — the item stays first in the queue until the
 surface is complete.
+
+### 2026-08-27 — iteration 12 — M4.1 German catalog, tranche 2 (Docs/Drive/Spaces)
+
+Shipped: the second complete-modules tranche of `de.ts` (+562 keys →
+1 348 of 5 182): Docs entire — document chrome (menus, page setup,
+colors, comments, AI drafting), the block editor (heading/paragraph/
+table/code blocks), technical authoring (equation editor + symbol
+picker, the example spec, cross-reference chips + picker), the shared
+formatting-toolbar strays that tranche 1's prefix ratchet missed
+(strikethrough/align/font/size/…, used by mail compose too) — plus
+Drive + Spaces (browser, sort/view menus, trash, versions, members +
+roles, import, Base entry points), Sheets (the full ribbon: tabs,
+groups, number formats with German previews „1.234,56 €“/„06.08.2026“,
+borders, rotation, formula categories in German Excel vocabulary,
+charts), the Office embed, the search overlay (incl. `searchKind` in
+German words), and the Drive file picker. Conventions held: Siezen,
+„…“ quotes, type names (Space, Base, Sheet, Doc) untranslated;
+Excel-de vocabulary where the ribbon mirrors it (AutoSumme, Fenster
+fixieren, Bedingte Formatierung, Matrix).
+
+Verified: all 33 new key families joined the `SHIPPED_PREFIXES` ratchet
+in `locale.test.ts` (any new English key in them now fails without
+German in the same change); thresholds raised to the tranche-2 floor
+(>1 000 shipped keys, >1 100 de keys); new spot checks incl. both
+`driveSelected` plural branches and the `searchKind` mapping. 71/71
+i18n tests green; `npx tsc --noEmit`, eslint on changed files, and
+`npm run build` all clean. Web-only, additive — no Rust, no routes, no
+migration.
+
+Cuts/flags: remaining surfaces (queue order of value): Chat/Meet, admin
+console + control plane, and the business modules (billing/CRM/insights/
+projects/finance/inventory/HR/campaigns + sites). M4.1 stays `[ ]`; the
+tranche note under the queue item records the boundary.
+
+Next: M4.1 tranche 3 — Chat/Meet.

@@ -131,9 +131,12 @@ restructures billing/chat/ds/sites code.
   makes partial catalogs safe) and record the boundary in STATE.md.
   - Tranche 1 shipped 2026-08-27 (iteration 11): `de` registered end to end;
     the mail daily-driver surface translated (~770 of 5 182 keys) and
-    ratcheted per shipped module in `locale.test.ts`. Remaining: Docs/Drive/
-    Spaces, Chat/Meet, admin + control plane, and the business modules —
-    boundary in STATE.md.
+    ratcheted per shipped module in `locale.test.ts`.
+  - Tranche 2 shipped 2026-08-27 (iteration 12): Docs (block editor,
+    technical authoring, formatting toolbar), Drive + Spaces, Sheets, the
+    Office embed, the search overlay and the Drive picker (+562 keys →
+    1 348 of 5 182), all families joined the ratchet. Remaining: Chat/Meet,
+    admin + control plane, and the business modules — boundary in STATE.md.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for

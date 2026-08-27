@@ -1,5 +1,6 @@
 # Changelog
 
+- German now also covers Docs, Drive and Spaces, Sheets, the built-in Office editor, search, and the file picker — writing a document, organizing files, or working in a spreadsheet happens entirely in Deutsch.
 - alo now speaks German: the language menu offers Deutsch, and the everyday mail surface — inbox, reading pane, compose, folders, contacts, calendar, tasks, sign-in, and mail settings — is fully translated, with the remaining screens following module by module (they show English until their German lands).
 - Calendar apps can now ask "when is this calendar busy?" over CalDAV (a free-busy query) and get back merged busy blocks only — never event titles, locations, or descriptions — including for shared calendars you can only view.
 - Cancelling a single occurrence of a recurring meeting now removes only that occurrence from your guests' calendars — the rest of the series stays — and the whole invitation round trip (invite, accept/decline/maybe, reply recorded on the organizer's event) is verified end to end.
