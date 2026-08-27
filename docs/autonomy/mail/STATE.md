@@ -494,3 +494,44 @@ lost its marker subshell when the launching Bash call ended (Windows: the
 the honest completion signal.
 
 Next: M4.1 — German catalog (`web/src/i18n/de.ts`).
+
+### 2026-08-27 — iteration 11 — M4.1 German catalog, tranche 1 (mail surface)
+
+Shipped: `web/src/i18n/de.ts` — German at native quality (Siezen, „…“
+quotes, the type-name rule kept), registered end to end: `Locale` gains
+`"de"`, the switcher row (Deutsch), the catalog overlay, storage-key
+acceptance, and browser detection (`de` prefix → German) in `locale.ts`.
+The queue item's own scaling rule applied: the full surface is 5 182 keys,
+so this iteration ships the first **complete-modules tranche** (~770 keys)
+— the mail daily-driver surface: brand + all module rail labels, Home,
+shell/app launcher, Contacts, IMAP import wizard, auth (sign-in,
+two-factor, errors, signup, password reset), Agenda incl. sharing/
+reminders/availability, Tasks, Mail entire (list, reading pane, compose,
+folders, delegation + app passwords + per-folder access, categories,
+Transfer, filters, spam banner, one-click unsubscribe, send/attach error
+details), and Mail settings. Wording notes: DMARC/SPF spam-banner
+sentences are both phrased with dative "von" so the shared
+`spamSenderFallback` declines correctly in each; "Re:"/"Fwd:" prefixes
+kept (Gmail-de convention, and AW:/WG: breaks cross-client threading).
+
+Verified: `locale.test.ts` grows a German block — every de key is a real
+en key, every interpolation keeps arity, no empty strings, spot-checks
+prove real German incl. plural branches, the fallback shows English for a
+not-yet-shipped surface, and a **per-module ratchet**: every en key in the
+shipped prefix families must exist in de, so a new mail-surface English
+key now fails the build without German (the nl/fr UNTRANSLATED ratchet is
+untouched — de joins it only when the full surface is done). 71/71 i18n
+tests green; `npx tsc --noEmit`, eslint on changed files, `npm run build`
+all clean. No Rust, no routes, no migration — web-only, additive.
+
+Cuts/flags: remaining surfaces for later tranches (in queue order of
+value): Docs/Drive/Spaces, Chat/Meet, Search, admin console + control
+plane, and the business modules (billing/CRM/insights/projects/finance/
+inventory/HR/campaigns — each has its own "fully translated" test to join
+when its German lands). Meet's caption-language picker hardcodes its own
+en/fr/nl union (live-translation feature, not catalog) — left alone.
+M4.1 stays `[ ]` on purpose: the tranche note under the item records
+progress, and the next iteration continues the surface.
+
+Next: M4.1 tranche 2 — the item stays first in the queue until the
+surface is complete.
