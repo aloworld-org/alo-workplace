@@ -187,7 +187,11 @@ value may be born. The principles that govern the scale:
   radius is how users subconsciously read "what kind of thing is this".
 - **Elevation is a ladder.** Shadows come only from the token set, one step
   between adjacent layers; a surface never jumps two levels. Depth is
-  information, not decoration.
+  information, not decoration. Cards and selection tiles never translate,
+  scale, rise, or gain elevation on hover. Hover may change only token-based
+  border, background, text, or icon colour; selected state remains visible
+  without motion. This keeps the layout spatially stable and prevents a
+  decorative hover from masquerading as navigation.
 - **Room to breathe.** Cards and panels keep generous minimum padding from
   the space scale; reading text keeps a book-like measure; density is a
   deliberate mode (as in Drive's density control), never an accident.
