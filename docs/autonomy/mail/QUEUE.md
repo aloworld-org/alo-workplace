@@ -147,6 +147,14 @@ restructures billing/chat/ds/sites code.
     control plane, the invitation page, the record-history panel, and the
     compose recipient strays (+278 keys → 1 934 of 5 182), all families in
     the ratchet. Remaining: the business modules — boundary in STATE.md.
+  - Tranche 5 shipped 2026-08-27 (iteration 15): the first business
+    cluster — Billing, CRM and Insights entire plus their agent cards
+    (+596 keys → 2 530 of 5 182); de joined those modules' own
+    fully-translated describes (B1.27, B2.14, BI1.08) and the German
+    Insights overview is now seeded server-side in German
+    (`insights_gallery.rs` DE table). Remaining: Projects, Finance,
+    Inventory, HR, Campaigns + the shared agent tail, and Sites —
+    boundary in STATE.md.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for

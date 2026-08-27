@@ -1,5 +1,6 @@
 # Changelog
 
+- German now also covers the first business cluster: Billing (customers, price list, quotes, invoices, credit notes, payments, the VAT report, exchange rates, reminders and recurring invoices), Sales (the deal board, win/loss reporting, the billing handoff and linked conversations) and Insights (boards, the chart gallery and every chart label) all speak Deutsch — and a German-speaking tenant's seeded Insights overview now arrives with German chart titles instead of English ones.
 - German now also covers running the workspace itself: the admin console (users, invitations, groups and distribution lists, domains and DKIM, security checks, the audit log, AI providers), the platform operator's console, the invitation a new colleague opens, and the history panel on business records all speak Deutsch.
 - German now also covers Chat and Meet — channels, threads, reactions and the composer, and the whole meeting experience from the ready room to recording consent, captions, polls and minutes — so a conversation or a call happens entirely in Deutsch.
 - German now also covers Docs, Drive and Spaces, Sheets, the built-in Office editor, search, and the file picker — writing a document, organizing files, or working in a spreadsheet happens entirely in Deutsch.

@@ -663,3 +663,57 @@ the boundary.
 
 Next: M4.1 tranche 5 — the business modules (likely several tranches;
 sites alone is ~1 292 keys).
+
+### 2026-08-27 — iteration 15 — M4.1 German catalog, tranche 5 (Billing/CRM/Insights)
+
+Shipped: the fifth complete-modules tranche of `de.ts` (+596 keys →
+2 530 of 5 182): Billing entire — customers and the price list, the
+invoice list and draft editor, the irreversible lifecycle acts
+(ausstellen/stornieren/Gutschrift, each confirm saying what it DOES in
+German), payments, the VAT report, quotes end to end, the printed-
+document identity settings, multi-currency and exchange rates,
+payment reminders, and recurring invoices — CRM entire — board/list/
+pipeline, the deal form, win/loss with every lost-reason, the billing
+handoff, the report, the activity log, next steps, and linked
+conversations — Insights entire — boards, the ready-made gallery, the
+ask-to-chart dialog, and every axis/bucket/status label a chart draws
+with — plus the agent cards those surfaces render (proposal frame,
+billing tools, CRM tools). Vocabulary: MwSt. on amounts but USt-IdNr.
+for the identifier (the split German paperwork itself makes),
+Zahlungsziel for terms, `billingStatusIssued` = „Ausgestellt“ reusing
+tranche 4's `auditActionIssue` word as flagged, declined quote =
+„Abgelehnt“ (the decline word, not reject's „Zurückgewiesen“), sales
+keeps the trade's loanwords (der Deal, die Pipeline, das Board, die
+Phase), `crmDocumentDraft` returns a capitalized noun so both
+interpolating sentences stay orthographic, calendar weeks are „KW“,
+and quarters keep „Q“. Server side (`insights_gallery.rs`, this
+track's `products/mail/**`): a DE SeedWords table + match arm, so a
+German tenant's seeded Insights overview arrives in German instead of
+falling back to English — captions pinned to the catalog's gallery
+titles from both sides.
+
+Verified: `billing`/`crm`/`insights` prefixes joined `SHIPPED_PREFIXES`
+(thresholds raised to the tranche-5 floor: >2 300 shipped, >2 450 de —
+actual 2 385 and 2 530); German joined the fully-translated describes
+B1.27, B2.14 and BI1.08 (every-key + arity + different-words + the
+seed-words pin now run for de too, covering the agent-card keys); new
+spot checks pin the one-word rules (status chip = history verb, decline
+≠ reject), the capitalized handoff noun in both sentences, KW/Q, and
+both plural branches of the unconverted-documents note. 77/77 i18n
+tests green; `npx tsc --noEmit`, eslint on changed files, `npm run
+build` all clean. Rust: fmt + clippy clean on alo-jmap; `cargo nextest
+run -p alo-jmap` green (unit tests cover the DE table captioning the
+whole overview and `de`/`de-AT`/`DE_ch` resolving to it). One duplicate
+key caught by the vite build warning (billingWorkspacePurpose already
+shipped in tranche 1) and removed.
+
+Cuts/flags: remaining surfaces (queue order of value): Projects,
+Finance, Inventory, HR, Campaigns + the shared agent tail (~147 agent
+keys spread across those modules), the Drive Base family (~51 keys
+tranche 2's boundary left out), and Sites (~1 292 keys, likely two
+tranches). de joins the nl/fr UNTRANSLATED ratchet only when the full
+surface is done. M4.1 stays `[ ]`; the tranche note under the queue
+item records the boundary.
+
+Next: M4.1 tranche 6 — Projects + Finance (or the largest cluster that
+fits the iteration).
