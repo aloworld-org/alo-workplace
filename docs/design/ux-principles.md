@@ -57,12 +57,27 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    same control height, protected inset, radius role, focus visibility, and
    minimum touch target.
    _Verify:_ squint test — the blurred screen still shows what to press.
+   All primary calls to action use the shared `Button` primitive with
+   `variant="primary"`; matching its appearance with a locally styled raw
+   `<button>` is not acceptable. `Create customer`, `Create invoice`,
+   `Compose`, `New task`, `Join now`, `Send invoice`, and `Schedule meeting`
+   are the same component and the same interaction contract. The canonical
+   primary CTA is 40px high, has a 12px radius, 16px horizontal padding, 14px
+   medium-weight text, an optional 16px leading icon with an 8px gap,
+   Terracotta `#E76F51` through the semantic `accent` token, white text, the
+   shared subtle shadow, and a 150ms interaction. Hover uses the semantic
+   darker Terracotta state, press scales to `0.98`, disabled controls are
+   non-interactive at 50% opacity, and keyboard focus uses the Terracotta ring.
+   Width is contextual (`block` may fill a form; the default hugs content),
+   but height, radius, inset, typography, colour, icon relationship, and
+   interaction never change between modules.
    Button labels and icons must never touch or visually crowd a button border.
    Measure from the outermost text or icon edge to the inside of the border:
-   compact buttons keep at least `space-5` (20px) horizontally and `space-2`
-   (8px) vertically; standard calls to action keep at least `space-6` (24px)
-   horizontally and 10px vertically. These are minimums, not targets that a
-   screen may compress. CSS resets, table cells, and layout constraints must
+   primary calls to action keep the canonical `space-4` (16px) horizontal
+   inset and 40px height. Wider secondary and utility controls may use
+   `space-5` (20px) or `space-6` (24px) when their role calls for it. These
+   insets are deliberate, not values that a screen may compress. Resets,
+   table cells, and layout constraints must
    never reduce the shared `Button` primitive's computed padding or place an
    icon outside it. Longer labels expand the control; they
    never touch its border, clip, or force a sibling action out of shape.
@@ -231,6 +246,122 @@ _Verify (mechanical):_ grep new UI for hardcoded px/color values outside the
 ds — any literal that isn't a token reference is a defect. _Verify (human):_
 the wave review compares sibling screens side by side — same roles must look
 identical in size, radius, and rhythm across modules.
+
+## Alo card layout, spacing, and element order
+
+Cards feel intentional before they feel decorative. The governing order is
+**hierarchy first, spacing second, styling third**. A plain card with clear
+rhythm is more premium than a decorative card with inconsistent insets.
+
+### Canonical spacing rhythm
+
+Use the shared 4px-family scale and do not invent local gaps:
+
+| Relationship | Tailwind | Size |
+|---|---|---:|
+| Tiny icon/text gap | `gap-1.5` | 6px |
+| Small internal gap | `gap-2` | 8px |
+| Related elements | `gap-3` | 12px |
+| Standard content | `gap-4` | 16px |
+| Section | `gap-5` | 20px |
+| Major section | `gap-6` | 24px |
+| Large separation | `gap-8` | 32px |
+| Page section | `gap-10` / `gap-12` | 40–48px |
+
+Related elements stay close: title to description is normally `mt-1`.
+Unrelated sections receive `mt-5` or `mt-6`. Uniform 16px spacing everywhere
+removes hierarchy. Ask: _are these elements one thought?_ If yes, keep them
+close. If no, create more space.
+
+### Card surface and density
+
+- Use the shared `Card` primitive, not a locally reconstructed card.
+- Comfortable is the default: 24px padding and 20px internal gaps.
+- Compact utility/list cards use 16px padding and 12px gaps.
+- Medium cards may use 20px padding. Spacious hero, onboarding, and empty
+  states may use 32px padding and 24px gaps.
+- Do not mix density modes randomly on one page.
+- Cards in one group use 20px gaps by default, 16px when closely related, and
+  24px for large dashboard sections. Never use 8px between independent cards.
+- Card height follows content unless equal height materially helps comparison.
+- Do not put every list row in another card. Prefer one list card with quiet
+  dividers and `py-3.5` rows.
+- Card hover feedback never translates, scales, rises, or changes elevation;
+  the stable-hover law applies to every card variant.
+
+### Element order
+
+The default card order is:
+
+1. header;
+2. supporting context;
+3. primary content;
+4. secondary content;
+5. footer or actions.
+
+The header uses `flex items-start justify-between gap-4`: title and its
+description are left; the essential action is right. More than two secondary
+actions move into the overflow menu. An icon, when useful, sits horizontally
+before the title in a 40px container with a 12px gap. Decorative icons sit
+above text only in empty states, onboarding, and heroes.
+
+Actions never appear randomly between content blocks. A card exposes at most
+one primary button and normally one or two secondary actions. A single state
+has one obvious path: do not show both an empty-state `Create your first…`
+button and a duplicate `New…` action in the header. Form and modal actions
+end with `Cancel` then the primary action, with the primary rightmost.
+
+Use a footer only when it carries metadata, ownership, status, or a relevant
+secondary action. Separate it from the body with a quiet divider and 16px top
+padding; never add a footer as decoration.
+
+### Patterns by job
+
+- **KPI:** context/icon, dominant value, label, then optional trend. The value
+  owns the hierarchy.
+- **Empty state:** illustration, headline, one-sentence explanation, primary
+  CTA, then optional help. Use 20–24px before the headline, 8px before the
+  description, and 20px before the CTA.
+- **List:** header, optional filter, divider, rows, then optional footer action.
+- **Status/progress:** identity and status first, progress/value second,
+  secondary metadata third.
+- **Profile/entity:** identity, primary contact details, then one quiet action.
+- **Modal/form:** title and close action, description, fields at 16px rhythm,
+  optional advanced section, divider, then `Cancel` and primary action.
+- **Nested sections:** subsections use 24px separation; fields inside a
+  subsection use 12–16px. The subsection gap must exceed the field gap.
+
+Badges sit beside the label they qualify. Metadata descends from primary to
+secondary to tertiary weight; timestamp, owner, and status do not receive
+equal emphasis unless the job truly requires it. Dividers mark a change of
+category, not every small element.
+
+### Page and responsive rhythm
+
+Page order is title/context, primary action or search, tabs/navigation,
+primary work, secondary work, then help/onboarding. Never put onboarding
+before the user's active work. Page padding is 24px, rising to 32px on large
+screens and 40px only where the shared shell permits it; cards never touch
+browser edges.
+
+Search/filter rows order controls as search, filters, view options, then the
+primary action at the far edge. Search takes remaining width. Tabs sit directly
+below page context with deliberate separation and use the shared tab state.
+
+Text-heavy content uses a readable measure of roughly 55–75 characters.
+Working content is left aligned; centering is reserved for empty, onboarding,
+success, and compact summary states. Multi-line icon/text pairs use
+`items-start`; `items-center` is for single-line pairs.
+
+On mobile, preserve title, description, primary action, primary content, then
+secondary content. Move cramped header actions below the description instead
+of squeezing the desktop row. Use 16px card/page padding and 16px gaps; reduce
+whitespace before reducing typography or touch targets.
+
+_Verify:_ compare sibling cards side by side, inspect their computed padding,
+and walk desktop, tablet, and mobile layouts. The hierarchy must survive a
+five-second glance; no content, icon, checkbox, or action may crowd a border;
+and every element must appear where a first-time user expects it.
 
 ## Standing constraints
 
