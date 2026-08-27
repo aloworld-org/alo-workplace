@@ -1,5 +1,7 @@
 # Changelog
 
+- Quotation dividers now keep their controls on the line and open a focused visual settings dialog for solid, dashed, or dotted styles, line weight, width, and colour.
+
 - Quotation headers now align the company-number and issue-date dividers on one shared visual baseline.
 
 - Draft quotations now keep a direct edit action, while finalized quotations clearly offer a protected revision instead of implying that the original will be changed.
