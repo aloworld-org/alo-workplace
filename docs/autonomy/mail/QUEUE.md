@@ -224,7 +224,7 @@ restructures billing/chat/ds/sites code.
   The worker must never cache API responses or auth redirects; a stale-shell
   bug is worse than no PWA, so the worker updates on new deploys and a test
   covers the version-bump path.
-- [ ] M5.3 Push: Web Push (VAPID) endpoints + subscription store (migration
+- [x] M5.3 Push: Web Push (VAPID) endpoints + subscription store (migration
   `09xx`, per user+device, wrong-tenant tested) fed from the existing JMAP
   PushHub, per-user opt-in in settings, payload carries counts and ids only —
   never subject lines or bodies (the notification fetches on tap). The server

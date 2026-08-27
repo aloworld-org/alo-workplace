@@ -1274,3 +1274,87 @@ alo-jmap routes, no i18n catalog keys (the offline page carries its
 own four languages; it cannot reach the catalogs while offline).
 
 Next: M5.3 — Web Push (VAPID) endpoints + subscription store.
+
+### 2026-08-27 — iteration 26 — M5.3 Web Push
+
+Shipped: a closed alo app can now say "something arrived". Store:
+migration `0905_push_subscriptions` (one row per user+device: endpoint
++ the browser's RFC 8291 key material, UNIQUE per (tenant, user,
+endpoint) so re-subscribing refreshes rather than duplicates) with
+`push_subscriptions.rs` on the tenant door (create with a 10-device
+cap, list, deliveries, delete; system-handle `drop_dead_push_
+subscription` for 404/410 cleanup). Crypto: `alo-jmap/web_push.rs` —
+VAPID ES256 tokens (RFC 8292, 12 h exp, aud = endpoint origin) and
+aes128gcm payload encryption (RFC 8291 over RFC 8188), all on `ring`
+(already in-tree; no new crypto dependency), with the deterministic
+half split out so RFC 8291 Appendix A pins every derivation
+byte-for-byte in a unit test. Dispatch: `push_notify.rs` — the
+existing PushHub gained a tap that fires INDEPENDENTLY of SSE
+subscribers (the broadcast half serves the connected, the tap serves
+the absent); the dispatcher throttles per (tenant,user) at 30 s, reads
+devices through the tenant door, POSTs with TTL/Urgency/Topic
+(`alo-state`, so queued wake-ups collapse), and deletes a subscription
+the push service reports gone. Payload = the RFC 8620 StateChange
+object verbatim — type names, account id, opaque state string; never
+subject/sender/body. SSRF guard both at the create route (422) and
+again before every POST: https only, loopback http excepted for local
+stacks; endpoint URLs are treated as capabilities and never logged.
+Routes: GET/POST `/settings/push-subscriptions`, DELETE `…/{id}`
+(token-scoped, same shape as app-passwords). Config: `ALO_VAPID_KEY` +
+`ALO_VAPID_SUBJECT`, both-or-nothing; `alo-jmap --generate-vapid-key`
+mints the key and prints the .env lines. Web: sw.js gained push +
+notificationclick handlers (generic four-language notification, quiet
+while an alo window is focused, click focuses/opens the app);
+`pwa/push.ts` does permission → subscribe → wire shape;
+`shell/PushSection.tsx` in Settings → Notifications shows the per-
+device toggle + every registered device with per-device remove;
+16 new i18n keys in en/fr/nl/de (drift ratchet green).
+
+Verified: store `push_subscriptions_tenancy.rs` — wrong-tenant AND
+wrong-user denials on every operation, upsert-not-duplicate, cap,
+validation. `alo-jmap` `push_subscriptions_http.rs` — 401s, 422s on
+bad endpoints, cross-tenant 404 with nothing deleted, and the e2e
+wire: a real local HTTP server standing in for the push service, a
+real browser-side P-256 keypair decrypting what the dispatcher sent —
+VAPID JWT verifies against the advertised key with the right aud/sub,
+envelope headers pinned, decrypted payload asserted to be EXACTLY the
+StateChange object and nothing more; a 410 answer deletes the row.
+web_push.rs unit tests: RFC 8291 Appendix A vector byte-for-byte,
+encrypt/decrypt round trip, VAPID token self-verification, bad key
+material refused. Gates: fmt clean; clippy -p alo-store -p alo-jmap
+--all-targets zero warnings; nextest alo-store 2520 passed, alo-jmap
+1347 passed; web: vitest pwa 43 + locale 86 + shell green,
+tsc clean, eslint clean, npm run build clean for default AND
+ALO_PRODUCT=mail.
+
+HANDOVER (owner): (1) deploy config — run `alo-jmap
+--generate-vapid-key` on the server, set ALO_VAPID_KEY and
+ALO_VAPID_SUBJECT (a real mailto:) in the deployment .env; until then
+the feature is dark and Settings says so honestly. (2) The browser-
+permission half needs a human: open Settings → Notifications on the
+deployed app, Turn on, accept the browser prompt, close alo, send
+yourself a mail from elsewhere — a "New mail" notification should
+appear within ~30 s; tapping it opens alo. Verify the notification
+never shows a subject line. (3) No Caddyfile change: the new routes
+live under /settings/* and /api/settings/*, both already proxied.
+
+Cuts/flags: payload carries type names + ids only — no unread COUNT
+(computing counts per push would put a store query on every state
+change for detail the generic notification doesn't show; the queue's
+"counts and ids" is satisfied on the conservative side). Throttle is
+30 s per (tenant,user), in-memory per process. The settings list
+names devices by push-service host + registration date (a
+subscription carries no friendlier name). Removing ANOTHER device's
+row server-side stops its pushes but cannot unsubscribe that
+browser locally — its next re-subscribe re-registers; the settings
+copy implies removal, which is what it does from the server's side.
+
+Environment note for future iterations: this machine's shell exports
+`DATABASE_URL=postgres://alo:@127.0.0.1:5432/alo_scratch` — an EMPTY
+password, which Postgres refuses (28P01). A full suite run against it
+fails ~1600 tests in a way that reads like a code regression (uniform
+FAILs at ~16 s, all binaries). The working URL is
+`postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` (the
+alo-test-db fallback) — export it explicitly for every gate run.
+
+Next: M6.1 — scripted wire transcripts against a full local stack.
