@@ -169,6 +169,19 @@ restructures billing/chat/ds/sites code.
     `inventory`, `hr`, `campaign` and `base` prefixes. Remaining:
     Sites only (~1 292 keys, likely two tranches) — boundary in
     STATE.md.
+  - Tranche 8 shipped 2026-08-27 (iteration 18): the Sites builder half
+    entire — site creation (description/template/blank), pages, sections
+    and the palette, inline and AI editing, images (framing, focal
+    point, alt text), theme, languages + whole-site translation review,
+    the blog desk, collaborators and the invitation page, the
+    contact-form inbox with the sales handoff, the site assistant
+    (settings, knowledge, transcript, appearance), analytics + the
+    attention map + results, version history, scheduled publishing and
+    page passwords (+763 keys → 4 653 of 5 182). The ratchet claims
+    `sites` minus a negative lookahead over the commerce families.
+    Remaining: the Sites commerce half (~529 keys: catalog, shop,
+    booking, tickets, collections, custom code, orders, domains), which
+    completes the surface — boundary in STATE.md.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for

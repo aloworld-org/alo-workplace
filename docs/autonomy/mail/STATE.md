@@ -823,3 +823,59 @@ joins the nl/fr UNTRANSLATED ratchet when Sites lands. M4.1 stays
 `[ ]`; the tranche note under the queue item records the boundary.
 
 Next: M4.1 tranche 8 — Sites (first half), which completes the surface.
+
+### 2026-08-27 — iteration 18 — M4.1 German catalog, tranche 8 (the Sites builder half)
+
+Shipped: the eighth complete-modules tranche of `de.ts` (+763 keys →
+4 653 of 5 182): the Sites builder half entire — making a website
+(from a description, a template or blank), pages and paths, the section
+stack and the palette with its own-content previews, inline text
+editing with undo/redo, the AI change list and copy improvements,
+images end to end (upload, framing, focal point, alt text and the
+AI-drafted description), the theme screen, website languages with the
+whole-site translation review, the blog desk (alo Docs remains the
+source), collaborators and the join-this-website invitation page, the
+contact-form inbox with CSV export and the hand-to-sales dialog, the
+site assistant entire (budget switch, what-it-reads, the action
+transcript, appearance with tone/corner/icon/colour and the
+accessibility notes), privacy-friendly analytics with all grouped
+panels, the attention map with its held-back-until-enough honesty
+strings, the results funnel with its four honesty facts, version
+history (Fassungen named by date, restore with undo), publishing at a
+chosen moment, and pages behind a password. Vocabulary: Live is
+„Online" and unpublishing „Vom Netz nehmen" — the verb says what
+happens; the hero section is the „Aufmacher", testimonials are
+„Kundenstimmen", a CTA the „Handlungsaufruf", pricing tiers are
+„Pakete"; the funnel and handoff reuse CRM's own words („Deal",
+„Board", „Gewonnen/Verloren"), so the same thing stays the same word
+across module lines; a published version is a „Fassung" (the draft
+being edited stays the „Entwurf"); buttons stay the house's „Knopf";
+percentages take the DIN space (30 %); and the German
+`sitesPaletteAdd` template deliberately drops the English
+`.toLowerCase()` — lowercasing „Ans Ende" would break German
+capitalization mid-sentence.
+
+Verified: the SHIPPED_PREFIXES ratchet now claims `sites` minus a
+negative lookahead over the commerce families
+(Booking/Catalog/Collection/Commerce/Connect/Custom/Domain/Order/
+Shop/Ticket plus their New*/No*/Section*/AssistantSuggested* strays) —
+a node check proved the regex claims exactly the 763 builder-half keys
+and none of the 529 commerce keys; thresholds raised to the tranche-8
+floor (>4 400 shipped, >4 500 de — actual 4 532 and 4 653); the
+catalog-fallback example key moved from `sitesNewSite` (now shipped)
+to `sitesNewCatalog` in the commerce half; new German spot checks pin
+Online/Vom Netz nehmen, Aufmacher, Kundenstimmen, the funnel-CRM
+one-word rule (`sitesFunnelColDeals` === `crmDealsTable`), the
+no-lowercase palette template, the dated Fassung, the DIN percent and
+the plural branches. 86/86 i18n tests green; `npx tsc --noEmit`,
+`npx eslint` on both changed files, `npm run build` all clean.
+Web-only, additive — no Rust, no routes, no migration.
+
+Cuts/flags: remaining surface: the Sites commerce half only (~529
+keys: catalog, shop, booking, tickets, collections, custom code, the
+order inbox, domains). de joins the nl/fr UNTRANSLATED ratchet when it
+lands. M4.1 stays `[ ]`; the tranche note under the queue item records
+the boundary.
+
+Next: M4.1 tranche 9 — the Sites commerce half, which completes the
+surface and closes M4.1.
