@@ -1,5 +1,7 @@
 # Changelog
 
+- Quotation headers now align the company-number and issue-date dividers on one shared visual baseline.
+
 - Draft quotations now keep a direct edit action, while finalized quotations clearly offer a protected revision instead of implying that the original will be changed.
 
 - The mail engine's manners are now on record: one command replays the exact conversations a mail app has with alo — signing in and reading mail over IMAP (including the live "new mail arrived" push), POP3, sending over SMTP, contact and calendar sync, and OAuth sign-in for mail apps — and writes the word-for-word exchanges into the interop notes, so any change in behaviour shows up as a diff.
