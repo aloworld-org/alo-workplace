@@ -202,14 +202,12 @@ value may be born. The principles that govern the scale:
   radius is how users subconsciously read "what kind of thing is this".
 - **Elevation is a ladder.** Shadows come only from the token set, one step
   between adjacent layers; a surface never jumps two levels. Depth is
-  information, not decoration. Across the entire application, cards,
-  panels, rows, and selection tiles never translate, scale, rise, or gain
-  elevation on hover. This applies to the shared `Card` primitive and every
-  locally composed card. Hover may change only token-based
-  border, background, text, or icon colour; selected state remains visible
-  without motion. This keeps the layout spatially stable and prevents a
-  decorative hover from masquerading as navigation. A repository-wide check
-  for hover shadows and hover transforms is required in every UI audit.
+  information, not decoration. Static cards never pretend to be clickable.
+  Interactive cards and selection tiles may gain exactly one tokenized shadow
+  level on hover, but never translate or scale. Hover may also change
+  token-based border, background, text, or icon colour; selected state remains
+  visible without motion. This provides a clear affordance without shifting
+  layout or making a surface jump toward the pointer.
 - **Room to breathe.** Cards and panels keep generous minimum padding from
   the space scale; reading text keeps a book-like measure; density is a
   deliberate mode (as in Drive's density control), never an accident.
@@ -286,8 +284,8 @@ close. If no, create more space.
 - Card height follows content unless equal height materially helps comparison.
 - Do not put every list row in another card. Prefer one list card with quiet
   dividers and `py-3.5` rows.
-- Card hover feedback never translates, scales, rises, or changes elevation;
-  the stable-hover law applies to every card variant.
+- Static cards have no hover treatment. Interactive cards may gain one shared
+  elevation step (`shadow-sm` to `shadow-md`) but never translate or scale.
 
 ### Element order
 
