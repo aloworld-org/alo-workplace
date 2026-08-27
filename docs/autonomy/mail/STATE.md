@@ -1358,3 +1358,59 @@ FAILs at ~16 s, all binaries). The working URL is
 alo-test-db fallback) — export it explicitly for every gate run.
 
 Next: M6.1 — scripted wire transcripts against a full local stack.
+
+### 2026-08-27 — iteration 27 — M6.1 scripted wire transcripts — QUEUE COMPLETE
+
+Shipped: the protocol-level interop evidence, regenerable with one command.
+New `scripts/wire-transcripts.sh` runs the three new `transcripts`
+integration-test binaries (`ALO_WIRE_TRANSCRIPTS` names the capture
+directory) and splices their dated output into `docs/interop.md` between
+`wire-transcripts` markers — seven transcripts: IMAP over implicit TLS
+(LOGIN/SELECT/FETCH/STORE/IDLE with a delivery arriving mid-IDLE), IMAP
+SASL XOAUTH2 (SASL-IR login + the revoked-token error dialog, decoded),
+POP3 (USER/PASS/STAT/LIST/RETR/DELE/QUIT), SMTP submission (STARTTLS,
+AUTH PLAIN, a BODY=8BITMIME transaction with an 8-bit UTF-8 body proven
+byte-intact in the spool, and the honest 555 for the unadvertised
+SMTPUTF8 parameter), SMTP XOAUTH2 (235 + the 334 dialog to 535), CardDAV
+(discovery, PUT, initial + incremental sync-collection with the 404 for
+the deleted member), CalDAV (PUT of a Europe/Brussels weekly series
+crossing the 2026-10-25 DST switch, time-range calendar-query, VFREEBUSY
+showing 07:00Z→08:00Z with no title leaking, sync-collection). Each
+transcript is captured by a test that asserts the same exchange
+(alo-imap/alo-smtp/alo-jmap `tests/transcripts.rs`), so a transcript
+cannot stay green while drifting; recording clients redact passwords,
+bearer blobs and Basic headers before anything is written, and
+normalise emails/account ids/spool ids so regeneration diffs cleanly.
+
+Verified: fmt + clippy clean, zero warnings (alo-imap, alo-smtp,
+alo-jmap); full suites 1 602 tests across the three crates — 1 600
+passed; the two reds are `alo-smtp::dmarc_report` under parallel load,
+the flake iteration 23 reproduced on unmodified main, cleared solo here
+(and `site_schedule_http`, red in the first pass, passed the rerun —
+same recorded class). The 7 new transcript tests ran green three times
+(transcripts regenerated twice to prove rerunnability). One real bug the
+rerun surfaced and fixed in-test: contact hrefs are globally unique in
+the store (contacts.rs Conflict guard), so a fixed `ada.vcf` href 409s
+against the row an earlier run left — hrefs now carry the account id,
+normalised to ACCOUNT in the output.
+
+HANDOVER (owner, unchanged from the queue): the GUI-client passes —
+real Thunderbird, Apple Mail and the Gmail app clicked by hand against
+a deployed stack (account setup via autoconfig, read/send, contacts +
+calendar sync, an app password and an OAuth login) — need a human at a
+screen; the transcripts above are the protocol-level half of that
+evidence. Also still open from earlier iterations: M4.4's production
+`.env` return-path variables, M4.5's Ed25519 DNS record + key, M5.3's
+VAPID key generation, and the M5 headed-browser checks.
+
+Cuts/flags: SMTPUTF8 stays unadvertised (RFC 6531 support is a protocol
+feature, not evidence — the transcript records the deliberate refusal);
+transcripts capture the decrypted TLS stream, and the DAV exchanges run
+over plain HTTP exactly as behind the production proxy. Environment
+notes: the harness's `| tail` pipelines buffer nextest output until
+exit, which reads like a hang — write gate logs straight to a file
+instead; one wedged `cargo-nextest` (no children, no output, ~30 min)
+had to be killed and rerun.
+
+QUEUE COMPLETE: every mail item is `[x]`. The tail that remains on this
+track is owner-gated (deploy steps + GUI-client passes, listed above).
