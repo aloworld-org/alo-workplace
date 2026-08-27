@@ -1212,3 +1212,65 @@ longer requires one in current Chromium. No migration, no Rust, no
 new alo-jmap routes.
 
 Next: M5.2 — the offline shell service worker.
+
+### 2026-08-27 — iteration 25 — M5.2 the offline shell service worker
+
+Shipped: the app now degrades honestly when the network is gone. New
+`web/public/sw.js` (served verbatim, no build step): precaches exactly
+one thing — `web/public/offline.html` — and intercepts ONLY GET
+navigations, network-first. While the network answers, everything (the
+app shell, OAuth redirects, API calls) passes through untouched and
+uncached; a failed navigation gets the offline screen; a failed
+navigation with an evicted precache gets a plain 503 rather than a
+hang. `offline.html` is fully self-contained (inline styles, inline
+hand mark, ds token values spelled inline) with its own en/fr/nl/de
+dictionary picked by browser language, a retry button, and an `online`
+listener that reloads back into the app by itself. Registration:
+`web/src/pwa/registerSw.ts`, called from the existing `install.ts`
+entry, production builds only, on window `load`; calling register() on
+every page load doubles as the deploy-update check, and sw.js's
+skipWaiting + clients.claim + activate-time cache sweep make a bumped
+VERSION take over immediately and drop every previous version's cache
+(only caches matching `alo-offline-*` — foreign caches are left alone).
+
+Verified: `npx vitest run src/pwa/` 30/30 green — the new sw.test.ts
+evaluates the REAL sw.js source in a mock worker scope and drives the
+lifecycle: install precaches offline.html with cache:"reload" and
+nothing else; activate drops `alo-offline-v0` and keeps foreign
+caches; API/XHR/non-GET requests are never intercepted; a successful
+navigation returns the exact network object (a 302 auth redirect
+included) with nothing added to any cache; a failed one serves the
+precache; and the version-bump path end to end (old-VERSION worker
+installs+activates, shipped worker installs over it, only the new
+cache survives). offline.html self-containment (no link/img/url()/
+external script) and four-language dictionary are pinned by test.
+`npx tsc --noEmit` clean; eslint clean; `npm run build` clean for BOTH
+default and ALO_PRODUCT=mail. Wire: `vite preview` on the mail build
+served /sw.js 200 text/javascript and /offline.html 200 text/html, and
+the built bundle contains `serviceWorker.register("/sw.js")`.
+
+Cuts (both by queue design, recorded here as instructed): (1) mail
+data offline is OUT OF SCOPE — a sync engine is not a queue item; the
+offline screen says so honestly instead of showing a shell full of
+spinners. (2) The precached "app shell" is deliberately ONLY the
+offline screen, not index.html + hashed assets: this block's write
+scope excludes vite.config.ts, so no build manifest is available, and
+a runtime-cached index.html whose asset graph cannot be proven
+complete is exactly the stale-shell bug the queue calls worse than no
+PWA. Navigations therefore stay network-only; nothing user-visible is
+ever served stale. Maintenance rule (in sw.js's header): editing
+offline.html requires bumping VERSION in sw.js, or existing installs
+keep the old precache.
+
+HANDOVER: (1) owner's headed check — DevTools → Application → Service
+Workers should show sw.js activated after deploy; then toggle
+"Offline" and reload: the alo offline screen appears, and going back
+online reloads into the app unaided. (2) `/sw.js` and `/offline.html`
+are new top-level static files in the web dist — same situation as
+M5.1's manifests: nothing to add if the production file server tries
+existing files first, but if the Caddyfile whitelists prefixes, these
+two need to be servable at next deploy. No migration, no Rust, no new
+alo-jmap routes, no i18n catalog keys (the offline page carries its
+own four languages; it cannot reach the catalogs while offline).
+
+Next: M5.3 — Web Push (VAPID) endpoints + subscription store.

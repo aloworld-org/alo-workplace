@@ -218,7 +218,7 @@ restructures billing/chat/ds/sites code.
 - [x] M5.1 Installable: web manifest per product surface (alomails / alo
   workplace names + icons), served + linked, passing Chromium installability.
   No behaviour change beyond installability.
-- [ ] M5.2 Offline shell: a service worker that precaches the app shell and
+- [x] M5.2 Offline shell: a service worker that precaches the app shell and
   shows an honest offline screen — mail data offline is **deliberately out of
   scope** (a sync engine is not a queue item; write the cut into STATE.md).
   The worker must never cache API responses or auth redirects; a stale-shell
