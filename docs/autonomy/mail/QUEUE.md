@@ -206,7 +206,7 @@ restructures billing/chat/ds/sites code.
   fabricated DSN suppresses; a soft bounce does not; a non-DSN message to the
   address is stored, not crashed on. The production `.env` change is the
   human's deploy step — record it in STATE.md as the handover.
-- [ ] M4.5 The Ed25519 DKIM second signature: dual-sign (rsa + ed25519,
+- [x] M4.5 The Ed25519 DKIM second signature: dual-sign (rsa + ed25519,
   RFC 8463) in the signer behind config, `--install-dkim-key` handles the
   second selector, and the DNS record the owner must publish is printed and
   recorded in STATE.md. The key order rule stands: the record is published

@@ -1084,3 +1084,75 @@ provider ever offers us one. No new route prefixes, no web change, no
 i18n.
 
 Next: M4.5 — the Ed25519 DKIM second signature.
+
+### 2026-08-27 — iteration 23 — M4.5 the Ed25519 DKIM second signature
+
+Shipped: the configured deployment signer dual-signs (RFC 8463) behind
+config. New env pair `ALO_SMTP_DKIM_SELECTOR2` + `ALO_SMTP_DKIM_KEY2`
+(additive; unset means byte-identical behaviour). The second key's
+algorithm is **read from the key file at startup, never declared** —
+the alternative (an `ALGORITHM2` flag) was rejected because a flag the
+key contradicts puts an `a=` tag on signatures the key cannot produce,
+surfacing as lost delivery weeks later. Startup refuses, naming the
+variable: a half-set pair, a second key without a first, a shared
+selector, an unreadable/unrecognisable key file, a primary
+`ALO_SMTP_DKIM_ALGORITHM` the key contradicts, and a pair signing one
+family. `sign_outbound` emits one signature per configured key, **RSA
+first** (same courtesy the per-tenant store path applies; the RSA key
+also seals ARC — one seal per hop, never two chains), and one key
+failing costs only its own signature. Startup logs the exact TXT
+record the second selector must publish (public material only), so a
+DNS mismatch is a diff away. `--install-dkim-key` already handled the
+second selector per-algorithm (C2.1a); that behaviour is now pinned by
+a test (rsa import + ed25519 generate coexist; rotating one never
+retires the other). The shared RSA test fixture moved to
+`alo-auth-mail`'s `keystore::fixture_keys` (three suites needed it).
+
+Verified: fmt + clippy clean, zero warnings (alo-auth-mail, alo-smtp);
+suites 278 run / 277 passed. The one red is `dmarc_report
+sweep_enqueues_…` — reproduced IDENTICALLY on unmodified main (git
+stash -u), passes solo every time; the recorded parallel-load flake,
+not this change (flagged below). New tests: algorithm-detection unit
+(rsa/ed25519/garbage), config pairing rules, key-file rules (tempfile
+keys, incl. the lying-flag and same-family refusals, no key bytes in
+errors), the mandated dual-sign proof in `tests/dkim_dual_sign.rs`
+(real `sign_outbound` → two signatures, RSA first, BOTH verify Pass
+under the real verifier against fixture DNS; single-key emits exactly
+one; a vanished second key degrades to one signature, never to
+unsigned), and the install coexistence test. Wire evidence (captured
+from the test run): two `DKIM-Signature` headers, `a=rsa-sha256 s=r1`
+then `a=ed25519-sha256 s=e1`, identical `bh=`, verifier returns Pass
+for both selectors.
+
+HANDOVER (the human's steps, in this order — the key-order rule says
+the record is published BEFORE the key signs, so the code ships dark):
+1. On the mail host: `openssl genpkey -algorithm ed25519 -out
+   /etc/alo/dkim/ed25519-2026.pem && chmod 600 <file>` (owner-only, or
+   the server refuses to load it).
+2. Derive the record value: `echo "v=DKIM1; k=ed25519; p=$(openssl
+   pkey -in /etc/alo/dkim/ed25519-2026.pem -pubout -outform DER |
+   tail -c 32 | base64)"`.
+3. Publish TXT `<selector>._domainkey.alomails.com` with that value
+   (suggested selector: `ed1`), wait for propagation.
+4. Only then add to the production `.env`:
+   `ALO_SMTP_DKIM_SELECTOR2=ed1`,
+   `ALO_SMTP_DKIM_KEY2=/etc/alo/dkim/ed25519-2026.pem`, restart, and
+   diff the record the startup log prints against DNS.
+
+Cuts/flags: (1) The `dmarc_report sweep_…` test now fails
+CONSISTENTLY under intra-binary parallel load on this machine (was
+recorded as an occasional flake, iterations 4–5 and 22) while passing
+solo — reproduced on clean main, so it is queue-worthy hygiene, not a
+regression here. (2) This session's environment exported
+`DATABASE_URL` without a password (`postgres://alo:@…`), which made
+every skip-on-no-DB suite skip silently and the bounce_intake suite
+fail loudly; gates here ran with the full
+`postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch`. Future
+iterations should check this before trusting a "green" DB suite.
+(3) Pre-existing trap, unchanged: if a store key is ever installed for
+the file-configured domain, `sign_outbound`'s store path wins outright
+and the file key's signature disappears — for the deployment domain,
+the env pair above is the sanctioned dual path; do not also install a
+DB key for it. No migration, no web change, no i18n, no new routes.
+
+Next: M5.1 — the PWA web manifest.
