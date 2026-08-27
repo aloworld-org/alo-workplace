@@ -1017,3 +1017,70 @@ address") is deliberately product-neutral under the umbrella brand and
 was left alone.
 
 Next: M4.4 — the campaign return path.
+
+### 2026-08-27 — iteration 22 — M4.4 the campaign return path
+
+Adopted a killed predecessor's uncommitted implementation (all six file
+changes plus the four new files were in the tree, coherent and complete)
+and finished the item: fixed its one clippy warning, split the config
+validation into a pure testable function, and wrote the whole mandated
+test surface, which the predecessor had not started.
+
+Shipped: the MX now accepts the campaign bounce address and acts on what
+comes back. Config: `ALO_SMTP_CAMPAIGN_RETURN_PATH` (deployment config,
+not hardcoded) — startup refuses a non-address, a domain missing from
+`ALO_SMTP_LOCAL_DOMAINS`, or a build without local delivery, each with a
+message naming the variable. Store: migration `0904_campaign_bounces.sql`
++ `campaign_bounce.rs` — a host-level (tenant-less, like
+`dmarc_report_events`) receipt per intake message with verdict/recipient/
+status/suppression-count and the raw bytes (256 KiB cap, true wire size
+beside), plus `tenants_with_sent_campaign_recipient` mapping a bounced
+address to tenants via `campaign_send_recipients` rows in state `sent`
+only. SMTP: `dsn_parse.rs` (tolerant RFC 3464 reader, split from the
+`dsn` composer on one-file-one-reason; strict only in `classify` — only
+`Action: failed` + class-5 status is hard, contradictions resolve soft
+because suppression is irreversible) and `bounce_intake.rs` (hard bounce
+→ `suppress_campaign_address` through C1.3's tenant-scoped seam in every
+tenant that mailed the address; suppress-first-record-last ordering makes
+the sender's retry after a mid-flight fault safe). Delivery routes the
+return path (subaddress-tolerant, so VERP later needs no RCPT change) to
+the intake instead of a mailbox; a store fault defers with a transient
+reply. No address or message byte is ever logged.
+
+Verified: fmt + clippy clean, zero warnings (alo-store, alo-smtp); full
+suites 2 722 run / 2 722 passed / 1 skipped (the standing serial skip).
+One fail-fast run first: the known `dmarc_report sweep_…` parallel-load
+flake (same class iterations 4–5 recorded) — green on the full
+`--no-fail-fast` rerun. New tests: dsn_parse unit corpus (round trip
+against our own composer, multi-recipient, Original- over
+Final-Recipient, bare-LF/folded/uppercase tolerance, truncated report,
+ARF and non-mail refused, RFC 3463 grammar), config startup rules,
+`campaign_bounce` SQL-shape pins (never reads `contacts`, never writes
+`campaign_suppression`, mapping counts only `sent`), and the mandated
+integration arc in `alo-smtp/tests/bounce_intake.rs`: a fabricated hard
+DSN over a real SMTP connection (null sender) suppresses the address in
+exactly the tenant that mailed it — proven against a tenant that mailed
+someone else AND a tenant that only enrolled the address without sending
+(both untouched), with the domain gaining no catch-all (stranger RCPT
+still 550); a soft bounce records `soft` and suppresses nobody; a
+non-DSN message is stored whole with verdict `none`, never crashed on
+(garbage bytes included); a hard bounce for an address nobody mailed
+suppresses nowhere; an oversized message stores truncated with its true
+size beside.
+
+HANDOVER (the human's deploy step, hard rail — not done here): add
+`ALO_SMTP_CAMPAIGN_RETURN_PATH=bounces@news.alomails.com` to the
+production `.env`, and ensure `news.alomails.com` is in
+`ALO_SMTP_LOCAL_DOMAINS` there — the server will refuse to start if the
+domain is missing, which is the misconfiguration guard working as
+designed. Until that deploy, the MX keeps answering the clean 550 the
+queue's ground-truth note records.
+
+Cuts/flags: none in scope. VERP (per-recipient return addresses) is
+C2.10's, not built — but `bounces+anything@` already routes to the
+intake. ARF complaint reports (RFC 5965) deliberately parse as `None`
+(stored, not acted on) — complaint-loop handling is its own item if a
+provider ever offers us one. No new route prefixes, no web change, no
+i18n.
+
+Next: M4.5 — the Ed25519 DKIM second signature.

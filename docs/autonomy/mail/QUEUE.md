@@ -199,7 +199,7 @@ restructures billing/chat/ds/sites code.
   audit the brand strings on the login/signup/reset pages under
   `ALO_PRODUCT=mail`, fix what still says workspace, and keep the workspace
   surface's own copy intact (the `@product` seam decides, not a hardcode).
-- [ ] M4.4 The campaign return path: accept `bounces@news.alomails.com` for
+- [x] M4.4 The campaign return path: accept `bounces@news.alomails.com` for
   delivery (config-driven, not hardcoded — the domain list is deployment
   config), parse DSNs (RFC 3464) into hard/soft verdicts, and fire hard
   bounces into the campaign suppression store (C1.3's seam). Tests: a
