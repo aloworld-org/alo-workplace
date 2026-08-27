@@ -769,3 +769,57 @@ item records the boundary.
 
 Next: M4.1 tranche 7 — Inventory + HR (or the largest cluster that
 fits).
+
+### 2026-08-27 — iteration 17 — M4.1 German catalog, tranche 7 (Inventory/HR/Campaigns/Base/agent tail)
+
+Shipped: the seventh complete-modules tranche of `de.ts` (+691 keys →
+3 890 of 5 182): Inventory entire — the catalog and product form (SKU,
+GTIN check-digit hint, stocked-vs-service), the stock list with
+counterparties and the movement history, purchase and sales orders end
+to end (the drafts, the irreversible acts and their say-what-it-does
+confirms, booking arrivals and consignments, the order book, mixed-
+currency honesty), and barcode scanning — HR entire — recruiting
+(openings, the seven-stage board, candidates and CVs, the hire bridge,
+retention and erasure), letter templates, the approvals inbox, the
+directory and org chart, leave from ask to decision, and the absence
+month — Campaigns entire — the audience with its who-will-NOT-be-mailed
+reasons, saved questions, the letter preview (recipient vs fallback,
+HTML vs plain), and the stranger-facing unsubscribe page — the Drive
+Base family (field types, views, empty states), and the whole remaining
+agent tail: the assistant's mail/calendar/chat/Drive act cards plus the
+inventory and HR tools. Vocabulary: German trade language splits what
+English shares — a purchase order is the „Bestellung", a sales order
+the „Auftrag", the shared column „Beleg" — movement reasons carry the
+warehouse's own nouns (Wareneingang, Umlagerung, Inventur, Schwund,
+Bruch), goods are „eingelagert"/„entnommen" (the nl ingeslagen finding),
+the draft invoice stays Billing's „Rechnungsentwurf" in every module
+that raises one, employment kinds are the German papers' own words
+(Unbefristet/Befristet/Ausbildung), a candidate not taken further is
+„Nicht berücksichtigt" (the rejection letter's phrase, pinned ≠ the
+form's Zurückgewiesen/Abgelehnt), having left is „Ausgeschieden" said
+plainly, the absence layer names no reason (the health-data regex now
+also refuses krank/Elternzeit/Mutterschutz/schwanger in German), HR
+send-back reuses Projects' „Zurückweisen", and the unsubscribe page
+says „Abmelden" and „Senden Sie mir gar nichts mehr" — stop, not
+"manage preferences". The candidate card is die „Bewerbung" throughout,
+which keeps German gender-neutral without colon forms.
+
+Verified: `inventory`, `hr`, `campaign`, `base` and the plain `agent`
+prefix joined `SHIPPED_PREFIXES` (the anchored agentApprove/agentDiscard
+singletons retired into it; thresholds raised to the tranche-7 floor:
+>3 700 shipped, >3 800 de — actual 3 769 and 3 890); German joined the
+fully-translated describes B5.11 and B6.11 (every-key + arity +
+different-words + the reorder reason codes now run for de too); a new
+German-specific test pins the Bestellung/Auftrag/Beleg split, the
+warehouse nouns and the invariable agent-card quantity phrase; the
+catalog-fallback example key moved from inventory (now shipped) to
+`sitesNewSite`, the one family left. 86/86 i18n tests green; `npx tsc
+--noEmit`, eslint on changed files, `npm run build` all clean. Web-only,
+additive — no Rust, no routes, no migration.
+
+Cuts/flags: remaining surface: Sites only (~1 292 keys — likely two
+tranches: the builder/editor half and the storefront/orders half). de
+joins the nl/fr UNTRANSLATED ratchet when Sites lands. M4.1 stays
+`[ ]`; the tranche note under the queue item records the boundary.
+
+Next: M4.1 tranche 8 — Sites (first half), which completes the surface.

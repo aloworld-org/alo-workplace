@@ -161,6 +161,14 @@ restructures billing/chat/ds/sites code.
     fully-translated describes (B3.11, B4.15). Remaining: Inventory,
     HR, Campaigns + the rest of the shared agent tail, the Drive Base
     family, and Sites — boundary in STATE.md.
+  - Tranche 7 shipped 2026-08-27 (iteration 17): Inventory, HR and
+    Campaigns entire (incl. the unsubscribe page), the Drive Base
+    family, and the whole remaining agent tail (+691 keys → 3 890 of
+    5 182); de joined the B5.11 and B6.11 fully-translated describes
+    and the SHIPPED_PREFIXES ratchet widened to the plain `agent`,
+    `inventory`, `hr`, `campaign` and `base` prefixes. Remaining:
+    Sites only (~1 292 keys, likely two tranches) — boundary in
+    STATE.md.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for
