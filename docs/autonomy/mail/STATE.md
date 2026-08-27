@@ -1156,3 +1156,59 @@ the env pair above is the sanctioned dual path; do not also install a
 DB key for it. No migration, no web change, no i18n, no new routes.
 
 Next: M5.1 — the PWA web manifest.
+
+### 2026-08-27 — iteration 24 — M5.1 the PWA web manifest
+
+Shipped: all three product surfaces are Chromium-installable. New
+`web/public/`: a `manifest-{mail,workplace,drive}.webmanifest` each
+(name/short_name per brand, `start_url`/`scope`/`id` at `/`,
+`display: standalone`, cream canvas `#f4f1ec` as theme + splash
+background) and `web/public/icons/`: per product an SVG master plus
+192/512 PNGs — the terracotta lucide Hand brand mark, full-bleed on a
+per-product ground (mail: login cream, workplace: brand navy, drive:
+rail charcoal), sized for the maskable safe zone so one artwork serves
+`purpose: any` AND `maskable`. Selection is runtime, not build-time
+plumbing: this block's write scope is index.html + public/ + src/pwa/
+only, so instead of a vite.config plugin the new `web/src/pwa/install.ts`
+(its own module entry in index.html, ahead of main.tsx) reads the
+brand the existing `alo-product-title` plugin stamps into `<title>`
+before any script runs, and injects `<link rel=manifest>`, SVG + PNG
+favicons, `apple-touch-icon`, and `meta theme-color` for that product
+(unknown title → workspace, the same default vite.config applies).
+The mapping lives in `productPwa.ts`; keys must stay in step with
+`productTitle` in vite.config.ts — the test suite pins all of it.
+PNGs rasterized from the SVG masters with headless Chrome (wrapper
+HTML per size, `--force-device-scale-factor=1`; direct SVG screenshots
+misrender below ~500px).
+
+Verified: `npx vitest run src/pwa/` 17/17 green (manifest members per
+Chromium's install criteria, icon files exist with IHDR dimensions
+matching declared sizes, per-brand injection + workspace fallback +
+idempotence, index.html script order); `npx tsc --noEmit` clean;
+eslint clean; `npm run build` clean for BOTH the default and the
+ALO_PRODUCT=mail surface. Wire: `vite preview` served the mail build —
+manifest 200 `application/manifest+json`, icons 200 `image/png` — and
+headless Chrome `--dump-dom` on the served page shows the alomails
+manifest link, both icon links, apple-touch-icon and theme-color in
+the live DOM. The click-the-install-button pass in a headed browser
+remains the owner's (listed as handover).
+
+HANDOVER: (1) headed-Chromium check: open the deployed app →
+DevTools → Application → Manifest should show "alomails" with icons
+and no installability warnings; the omnibox offers Install. (2) The
+new top-level static paths `/manifest-*.webmanifest` and `/icons/*`
+are files in the web dist, NOT server routes — if the production
+Caddyfile whitelists path prefixes for the SPA's static file server,
+those two prefixes need to be servable at next deploy (no alo-jmap
+change; nothing to add if file_server already tries existing files
+first).
+
+Cuts/flags: icon artwork is v1 brand-derived (hand on ground) —
+deliberately simple so a designed set can replace the files in
+`web/public/icons/` without code changes. No i18n keys: manifest
+names are proper-noun brands (same exemption as the `<title>` stamp).
+No service worker yet — that is M5.2 by design, and installability no
+longer requires one in current Chromium. No migration, no Rust, no
+new alo-jmap routes.
+
+Next: M5.2 — the offline shell service worker.

@@ -215,7 +215,7 @@ restructures billing/chat/ds/sites code.
 
 ### M5 — PWA (the one frontend-heavy block; last on purpose)
 
-- [ ] M5.1 Installable: web manifest per product surface (alomails / alo
+- [x] M5.1 Installable: web manifest per product surface (alomails / alo
   workplace names + icons), served + linked, passing Chromium installability.
   No behaviour change beyond installability.
 - [ ] M5.2 Offline shell: a service worker that precaches the app shell and
