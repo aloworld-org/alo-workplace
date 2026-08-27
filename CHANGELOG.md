@@ -1,5 +1,6 @@
 # Changelog
 
+- German now also covers running the workspace itself: the admin console (users, invitations, groups and distribution lists, domains and DKIM, security checks, the audit log, AI providers), the platform operator's console, the invitation a new colleague opens, and the history panel on business records all speak Deutsch.
 - German now also covers Chat and Meet — channels, threads, reactions and the composer, and the whole meeting experience from the ready room to recording consent, captions, polls and minutes — so a conversation or a call happens entirely in Deutsch.
 - German now also covers Docs, Drive and Spaces, Sheets, the built-in Office editor, search, and the file picker — writing a document, organizing files, or working in a spreadsheet happens entirely in Deutsch.
 - alo now speaks German: the language menu offers Deutsch, and the everyday mail surface — inbox, reading pane, compose, folders, contacts, calendar, tasks, sign-in, and mail settings — is fully translated, with the remaining screens following module by module (they show English until their German lands).

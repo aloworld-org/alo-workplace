@@ -614,3 +614,52 @@ M4.1 stays `[ ]`; the tranche note under the queue item records the
 boundary.
 
 Next: M4.1 tranche 4 — admin console + control plane.
+
+### 2026-08-27 — iteration 14 — M4.1 German catalog, tranche 4 (admin console + control plane)
+
+Shipped: the fourth complete-modules tranche of `de.ts` (+278 keys →
+1 934 of 5 182): the admin console entire — chrome and denied screens,
+the overview dashboard, domains with the DKIM publish/rotate flow, the
+admin audit log, the security & trust checks, groups & distribution
+lists, users & mailboxes (create, reset, roles incl. the accountant,
+aliases, per-user app switches with their carefully-worded hints, and
+the invitation flow), and the AI providers page (provider kinds and
+descriptions, the connect/configure modal, key handling, connection
+test) — plus the control plane (tenants, domains, the operator-denied
+screen), the invitation page a new colleague opens, the record-history
+panel (`auditHistoryTitle` + the 35 action verbs shared by billing/CRM
+and friends), and the three compose strays tranche 1's prefix list
+missed (`removeRecipient`, `recipientCount`, `archiveUnavailable`).
+Wording notes: tenant is «Organisation» following fr/nl («Nouvelle
+organisation» / «Nieuwe organisatie») — never «Mandant»; the control
+plane is «Plattformverwaltung» (named by function, as nl's
+«Beheerplatform»); users are «Benutzer» (first tranche to need the
+word); reject vs decline stay two words (Zurückgewiesen /
+Abgelehnt) because a timesheet sent back and a quote a customer
+refused are different acts; provider/product names (Ollama, alo AI,
+Mistral, OpenAI, Anthropic) stay untranslated per the type-name rule;
+record-history labels stay past-tense verbs per en.ts's own rule.
+`auditActionIssue` is «Ausgestellt» — when the business tranche lands,
+`billingStatusIssued` must reuse that word (the one-word rule the
+fr/nl suites already pin).
+
+Verified: 14 new prefix families (admin, audit, control, domain, group,
+invite, overview, provider, security, tenant, user, dkim, kind, access)
+plus 12 anchored singletons joined `SHIPPED_PREFIXES` in
+`locale.test.ts`; thresholds raised to the tranche-4 floor (>1 750
+shipped keys, >1 900 de keys — actual: 1 812 and 1 934); new spot
+checks cover both plural branches of groupMemberCount, userUsage and
+providerTestOk, the Plattformverwaltung title, the reject≠decline pin,
+and the German delete-organization warning. 71/71 i18n tests green;
+`npx tsc --noEmit`, eslint on changed files, and `npm run build` all
+clean. Web-only, additive — no Rust, no routes, no migration.
+
+Cuts/flags: remaining surface (the last): the business modules
+(billing/CRM/insights/projects/finance/inventory/HR/campaigns/orders +
+sites) — each joins its per-module describe when its German lands, and
+de joins the nl/fr UNTRANSLATED ratchet only when the full surface is
+done. M4.1 stays `[ ]`; the tranche note under the queue item records
+the boundary.
+
+Next: M4.1 tranche 5 — the business modules (likely several tranches;
+sites alone is ~1 292 keys).

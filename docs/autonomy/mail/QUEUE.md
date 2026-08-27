@@ -141,6 +141,12 @@ restructures billing/chat/ds/sites code.
     the exact-match generics those surfaces are first to use (+308 keys →
     1 656 of 5 182), both families in the ratchet. Remaining: admin +
     control plane and the business modules — boundary in STATE.md.
+  - Tranche 4 shipped 2026-08-27 (iteration 14): the admin console entire
+    (overview, domains + DKIM, audit log, security checks, groups &
+    lists, users + invitations + app switches, AI providers), the
+    control plane, the invitation page, the record-history panel, and the
+    compose recipient strays (+278 keys → 1 934 of 5 182), all families in
+    the ratchet. Remaining: the business modules — boundary in STATE.md.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for
