@@ -195,7 +195,7 @@ restructures billing/chat/ds/sites code.
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for
   anonymous pages. Test the round trip through the real API.
-- [ ] M4.3 The mail surface's login screen says alomails, not "workspace":
+- [x] M4.3 The mail surface's login screen says alomails, not "workspace":
   audit the brand strings on the login/signup/reset pages under
   `ALO_PRODUCT=mail`, fix what still says workspace, and keep the workspace
   surface's own copy intact (the `@product` seam decides, not a hardcode).

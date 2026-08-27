@@ -978,3 +978,42 @@ Cuts/flags: none. No new top-level route prefix (`/settings/*` is
 already routed), no new UI strings, so no catalog changes.
 
 Next: M4.3 — the mail surface's login screen says alomails.
+
+### 2026-08-27 — iteration 21 — M4.3 the mail surface's auth pages say alomails
+
+Audited every brand string a stranger sees before signing in, under
+`ALO_PRODUCT=mail`: the login page and the reset page already resolve
+their brand panel and email placeholder through `surface.brand` /
+`surface.login` (the `@product` seam, ADR 0019), the mail surface's own
+copy exists in all four catalogs (`brandHeadlineMail` "Your mail. Your
+privacy. Your rules." etc.), the two-factor screen carries no brand
+copy, the `Logo` wordmark is the product-neutral "alo", and the
+browser-tab title is stamped per product by the vite plugin (verified in
+both dists: "alomails" / "alo workplace"). One page failed the audit:
+**the signup page hardcoded `strings.brandHeadline`/`brandSubtitle`/
+`brandEuBadge`** — the workspace's "Your workspace. Your servers. Your
+rules." on every product, including alomails, whose personal-signup page
+is the one place signup is most at home.
+
+Shipped: `SignupPage.tsx` resolves its brand panel through
+`surface.brand.*()` like its two siblings — the mail build now says
+alomails, the workspace build keeps its own copy byte-identically. And
+the audit's rule made structural: new `web/src/product/brandSeam.test.ts`
+(the established source-scan test pattern) fails the build if any file
+outside `src/product/` and `src/i18n/` ever references
+`strings.brandHeadline*`/`brandSubtitle*`/`brandEuBadge*`/
+`emailPlaceholder*` again — the seam decides, not the page.
+
+Verified: `npx tsc --noEmit` clean; eslint clean on both changed files;
+the new scan test green (and it flags the pre-fix SignupPage form);
+auth + product vitest suites 55/55 green (one first-run failure was the
+documented loaded-runner flake — two consecutive clean re-runs);
+`ALO_PRODUCT=mail npm run build` and plain `npm run build` both green,
+each dist's `<title>` checked. Web-only, additive — no Rust, no routes,
+no migration, no new strings (the Mail brand keys shipped with M4.1).
+
+Cuts/flags: none. The signup form's own copy ("Create your personal alo
+address") is deliberately product-neutral under the umbrella brand and
+was left alone.
+
+Next: M4.4 — the campaign return path.
