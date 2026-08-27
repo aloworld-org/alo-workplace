@@ -29,6 +29,7 @@ contracts.
 
 ## Unreleased
 
+- **Destructive confirmations now use alo's clear, spacious dialog pattern,** with the safe action focused first, and the quotation list keeps breathing room beneath its final row instead of meeting the viewport edge.
 - **Repeating events now keep their local time across daylight-saving
   changes.** A weekly 9:00 in Brussels stays 9:00 after the clocks change —
   in the Agenda, in availability lookups, and on every synced phone or
