@@ -717,3 +717,55 @@ item records the boundary.
 
 Next: M4.1 tranche 6 — Projects + Finance (or the largest cluster that
 fits the iteration).
+
+### 2026-08-27 — iteration 16 — M4.1 German catalog, tranche 6 (Projects/Finance)
+
+Shipped: the sixth complete-modules tranche of `de.ts` (+669 keys →
+3 199 of 5 182): Projects entire — the engagement list and form, project
+health and updates, the week grid with suggestion accept/discard, the
+milestone plan and timeline, templates, the approvals inbox, the
+profitability report, the invoice handoff and the rail timer — Finance
+entire — expense claims from receipt to pay-back (the three verbs, the
+approver's two queues), bank statement import (CAMT.053/MT940/CSV, the
+column-mapping dialog), the reconciliation pile with its why-we-think-so
+sentences, the chart of accounts (kinds, roles, retire-not-delete), and
+the four reports (P&L, balance sheet, aged debt, VAT) — plus both
+modules' agent cards (log-time, project status, timesheet-from-calendar
+with all its reason codes; categorise, VAT figures, books-check with all
+its reason and kind codes). Vocabulary: durations written as a German
+timesheet writes them („7 Std.“, „30 Min.“, `/Std.`, DIN-5008 „60 %“),
+billable = „abrechenbar“ throughout, the sent-back week reuses the
+history verb „Zurückgewiesen“ (auditActionReject) and the approved week
+„Genehmigt“, a refused claim is „Abgelehnt“ (the everyday word, as nl
+chose), statement vocabulary is the bank's own („Kontoauszug“,
+„Wertstellung“, „Verwendungszweck“), the chart is the „Kontenplan“ with
+accounts „stillgelegt“ never deleted, the P&L carries its statutory name
+„Gewinn- und Verlustrechnung“, and the finance/billing shared word holds
+(„ausgestellte Rechnung“ inside finance sentences matches
+billingStatusIssued „Ausgestellt“). Amount-interpolating sentences are
+deliberately invariable („Eingegangen: 1,00 €“, „ein Betrag von … ist
+unerklärt“) so no verb has to agree with a formatted string.
+
+Verified: `projects` and `finance` joined `SHIPPED_PREFIXES` (thresholds
+raised to the tranche-6 floor: >2 900 shipped, >3 100 de — actual 2 975
+and 3 199); German joined the fully-translated describes B3.11 and B4.15
+(every-key + arity + different-words + duration-units + every
+reason/kind code now run for de too); new spot checks pin the
+status-chip = history-verb rules, the DIN duration/percent forms, the
+four report names, the shared issued-word, and the invariable amount
+sentences; the fallback example key moved from finance (now shipped) to
+inventory — and the first replacement key I picked did not exist in
+`en.ts`, which vitest passed vacuously (undefined === undefined): the
+real key is now asserted. 81/81 i18n tests green; `npx tsc --noEmit`,
+eslint on changed files, `npm run build` all clean. Web-only, additive —
+no Rust, no routes, no migration.
+
+Cuts/flags: remaining surfaces (queue order of value): Inventory, HR,
+Campaigns + the rest of the shared agent tail (inventory + HR agent
+cards), the Drive Base family (~51 keys), and Sites (~1 292 keys, likely
+two tranches). de joins the nl/fr UNTRANSLATED ratchet only when the
+full surface is done. M4.1 stays `[ ]`; the tranche note under the queue
+item records the boundary.
+
+Next: M4.1 tranche 7 — Inventory + HR (or the largest cluster that
+fits).

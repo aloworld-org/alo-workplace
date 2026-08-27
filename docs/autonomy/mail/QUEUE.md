@@ -155,6 +155,12 @@ restructures billing/chat/ds/sites code.
     (`insights_gallery.rs` DE table). Remaining: Projects, Finance,
     Inventory, HR, Campaigns + the shared agent tail, and Sites —
     boundary in STATE.md.
+  - Tranche 6 shipped 2026-08-27 (iteration 16): the second business
+    cluster — Projects and Finance entire plus both modules' agent
+    cards (+669 keys → 3 199 of 5 182); de joined those modules'
+    fully-translated describes (B3.11, B4.15). Remaining: Inventory,
+    HR, Campaigns + the rest of the shared agent tail, the Drive Base
+    family, and Sites — boundary in STATE.md.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for
