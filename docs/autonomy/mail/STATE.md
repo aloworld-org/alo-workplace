@@ -1414,3 +1414,9 @@ had to be killed and rerun.
 
 QUEUE COMPLETE: every mail item is `[x]`. The tail that remains on this
 track is owner-gated (deploy steps + GUI-client passes, listed above).
+
+LOOP COMPLETE: all mail queue items are `[x]` (M1–M6). No `[!]` blockers.
+Remaining work is owner-gated only: production `.env` return-path variables
+(M4.4), the Ed25519 DKIM DNS record + key (M4.5), VAPID key generation and
+the headed-browser checks (M5), and the GUI-client interop passes (M6) —
+all listed in the handover above. 2026-08-27.
