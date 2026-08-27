@@ -570,3 +570,47 @@ projects/finance/inventory/HR/campaigns + sites). M4.1 stays `[ ]`; the
 tranche note under the queue item records the boundary.
 
 Next: M4.1 tranche 3 — Chat/Meet.
+
+### 2026-08-27 — iteration 13 — M4.1 German catalog, tranche 3 (Chat/Meet)
+
+Shipped: the third complete-modules tranche of `de.ts` (+308 keys →
+1 656 of 5 182): Chat entire — channels (create/rename/describe/archive),
+direct messages, the message feed (read receipts, edits, withdrawals,
+reactions, threads, mentions), the composer with its formatting toolbar
+and share menu (Drive files, mentions, Ask alo), search, the people-and-
+agents panel with the approval-card strings the chat agent renders — and
+Meet entire: the lobby (hero, happening-now, upcoming/recent, join by
+code), the ready room, in-call controls (record with consent, captions,
+backgrounds, fullscreen, picture-in-picture), moderation, the in-call
+chat with private messages, and the meeting tools (agenda, polls, notes,
+files, minutes). Plus the five exact-match generics those two surfaces
+are first to use: `add`, `save`, `deleteLabel`, `agentApprove`,
+`agentDiscard` — anchored with `$` in the ratchet so each claims one key,
+not a family. Wording notes: das Meeting kept (German business usage;
+Gastgeber for host), moduleAgenda consistency held — every Meet button
+that opens the calendar module says „Kalender“, never „Agenda“, while the
+in-call agenda tool stays „Agenda“; prose uses inclusive forms
+(Teilnehmende) where they fit, compact role badges stay short.
+
+Verified: `chat` and `meet` joined `SHIPPED_PREFIXES` (any new English
+key in either family now fails the build without German in the same
+change); thresholds raised to the tranche-3 floor (>1 400 shipped keys,
+>1 600 de keys — actual: 1 532 and 1 656); new spot checks cover both
+plural branches of chatReplies/chatMentionsYou/meetLiveCount, the
+number-changing verb in meetConsentCount, the two-argument
+chatAgentRecord, and the meetOpenAgenda→„Kalender öffnen“ consistency
+pin. 71/71 i18n tests green; `npx tsc --noEmit`, eslint on changed
+files, and `npm run build` all clean. Web-only, additive — no Rust, no
+routes, no migration.
+
+Cuts/flags: remaining surfaces (queue order of value): admin console +
+control plane, then the business modules (billing/CRM/insights/projects/
+finance/inventory/HR/campaigns + sites — each joins its own fully-
+translated describe when its German lands, and de joins the nl/fr
+UNTRANSLATED ratchet only when the full surface is done). Meet's
+caption-language picker still hardcodes its live-translation language
+union — a feature list, not catalog debt; left alone as in tranche 1.
+M4.1 stays `[ ]`; the tranche note under the queue item records the
+boundary.
+
+Next: M4.1 tranche 4 — admin console + control plane.

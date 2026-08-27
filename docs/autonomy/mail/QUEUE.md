@@ -137,6 +137,10 @@ restructures billing/chat/ds/sites code.
     Office embed, the search overlay and the Drive picker (+562 keys →
     1 348 of 5 182), all families joined the ratchet. Remaining: Chat/Meet,
     admin + control plane, and the business modules — boundary in STATE.md.
+  - Tranche 3 shipped 2026-08-27 (iteration 13): Chat and Meet entire, plus
+    the exact-match generics those surfaces are first to use (+308 keys →
+    1 656 of 5 182), both families in the ratchet. Remaining: admin +
+    control plane and the business modules — boundary in STATE.md.
 - [ ] M4.2 Server-synced locale preference: a per-user setting (existing
   `user_settings` row, migration `09xx` if a column is needed), read at login,
   written when the switcher changes, browser detection stays the fallback for
