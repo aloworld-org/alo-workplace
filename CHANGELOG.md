@@ -1,5 +1,7 @@
 # Changelog
 
+- The Chat agent can now say what is going on across your conversations — which rooms you are in, where something is unread and whether you were mentioned, who is in a room, what a room said while you were away — answered from the same record the sidebar draws. It can also, for the first time, do two things for you: post a message to a room you are in and create a room — always shown to you first, word for word, and posted in your own name only after you approve.
+
 - Agents can now remember. Tell one "remember that Northstar invoices are net 30" and the fact is kept — instantly, no AI provider needed — and after an agent answers a question it quietly notes anything durable the exchange taught, as short facts tied to the message they came from, never transcripts. What is said in a channel stays that channel's memory; a one-to-one with an agent feeds only your own. Learning has a switch in each room's settings (the owner's; in a one-to-one, yours) and a workspace-wide default in the admin console — switching it off stops learning, while an explicit "remember that…" always works.
 
 - The Drive agent now answers a colleague's questions from the record — "which files do we have", "what is in that folder", "what is shared with me" — and can propose a new folder for your approval, alongside the reads and writes it already had; its screens and its agent run through one shared path, so what the agent reports and what Drive shows can never quietly drift apart.
