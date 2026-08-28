@@ -4291,3 +4291,26 @@ routing call for Ask alo is not memory-grounded; its steps are, through
 
 **Next:** A6.3 — deletion follows the source: message, channel archive,
 agent removed from the channel, switch off (30-day hide then delete).
+
+**Addendum, same iteration — the tree moved twice under the push.** (1) The
+final gate ran on the rebased tree: clippy zero warnings, store+ai
+**2809/2809**, `alo-jmap` **1428/1428** (the suite grew under me as
+agents-b/c landed). (2) Main was briefly red beneath this item: the Drive
+and Chat intent moves landed from two machines at once and the keep-both
+rebase resurrected the deleted `CHAT_SET`/`DRIVE_SET` lines, double-armed
+`answer_if_asked` (A6.1 added a fifth argument their branch predates), and
+left the A6.1 memory-switch route uncovered by the new Chat coverage test.
+I repaired all three and so did the other machine, in parallel — its fix
+(`4c6fa402`) reached origin first, mine deduplicated to nothing in the
+rebase and was dropped rather than pushed as an empty echo. Lesson for the
+shared-lists rule: keep-both is right for *different* modules' lines, but
+when both sides carry the SAME module the resolution is the newer side
+alone — a keep-both there is what resurrected the deleted constants.
+(3) Environment note: this machine's ambient `DATABASE_URL` is
+`postgres://alo:@127.0.0.1:5432/alo_scratch` — no password — and postgres
+refuses it, which reads as every suite failing at connect. Gates must
+export `postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` (and the
+prune script must be run with the same value). (4) One flake seen once and
+not reproduced, before the final green run: `agent_sites_http::
+publishing_waits_for_the_owner_and_only_then_is_the_site_live` failed under
+full-suite load, passed alone and passed in both later full runs.
