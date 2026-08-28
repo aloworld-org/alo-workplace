@@ -4102,3 +4102,60 @@ harness imports moved to `crate::common`); the full suite then runs
 **114/114 green**, the five delegation tests inside it. One flake noted, not
 mine: `agent_sites_http::an_approved_edit_rewrites_the_copy…` failed once
 under full-suite load and passed alone and in the `--no-fail-fast` rerun.
+
+## A5.3 — delegation isolation: the delegate's whole world is the asker's (2026-08-28)
+
+**What "done" was here.** A5.1/A5.2 built the machinery so that every path a
+delegation takes — grounding, read execution, roster resolution, room
+posting — threads the **asker's** account; A5.3 is the item that *proves* the
+three claims on the wire instead of leaving them as comments. Two new tests in
+`agent_delegation_http.rs` (inside `agents_http_suite`); **no production code
+changed, because the tests found no gap to fix** — which is the outcome the
+A5.1/A5.2 design was aiming at, now pinned so a refactor cannot quietly
+un-aim it.
+
+**Test one — a delegate reaches nothing the asker could not**
+(`a_delegates_grounding_and_reads_are_the_askers_and_nobody_elses`). Three
+diary entries on one day, all matching "kestrel": the asker's own
+("kestrel planning"), a colleague's private one ("kestrel review with the
+board"), and another tenant's on the same store ("kestrel dinner with the
+board"). `@billing anything on the kestrel?` → billing hands to `@agenda` →
+the delegate's grounding (its first call) and the `whats_on` it executes
+inside its turn (folded into its second) both carry "kestrel planning" and
+**neither of the other two** — the negatives mean something because the
+positive sits beside them, per the A1.6 pattern. Same test also proves the
+run never crosses channels: a second room the delegate is a member of ends
+the run with **zero messages**; the handoff line and the answer land only
+where the question was asked.
+
+**Test two — never across a shared channel**
+(`a_shared_room_is_not_a_way_round_the_module_gate_for_a_handoff`). Carol
+joins the shared room and puts `@inventory` in it herself; an admin switches
+Inventory off for the asker only. The same room now reads differently to two
+people (`channel_agents`: asker sees `[billing]`, Carol `[billing,
+inventory]`) — and the handoff follows the asker, not the room: the asker's
+run drops the handle (no room line, no delegate turn, 2 model calls, the
+offer never named it, the model told "there is no @inventory"), while
+Carol's run in the **same room** hands off to the **same handle** and gets
+"The X100: twelve in stock." folded back. Membership grants nothing;
+the asker's module-gated roster is the only door — the delegation-surface
+twin of `channel_agents`' mention rule.
+
+**Verified.** Pruned first (3 325 → 1 598 tenants). `cargo fmt`; clippy
+`-p alo-jmap --all-targets` zero warnings (66 s); `cargo nextest run -p
+alo-jmap` **1406/1406 green** (205 s), the two new tests plus the seven
+existing delegation tests inside `agents_http_suite`. Scripted transcript,
+test one: room reads *"I'm asking @agenda: what is on the diary about the
+kestrel?"* → *"The diary holds the kestrel planning at nine [1]."* — four
+model calls, the delegate posting nothing.
+
+**Flag, not a cut.** The roster also filters **retired** agents
+(`agent_orchestrate::roster`, `!agent.disabled`), but no surface can retire
+an agent today — `chat_agents.disabled_at` has readers everywhere and no
+writer anywhere — so that filter cannot be exercised on the wire by any
+test or any user. The moment a retire surface lands, its wire test belongs
+in this suite next to the module-gate one.
+
+**Next:** A6.1 — `agent_memories` (migration `04xx`), the per-channel
+switch, the workspace default, learning at the end of a turn, explicit
+"remember that …".

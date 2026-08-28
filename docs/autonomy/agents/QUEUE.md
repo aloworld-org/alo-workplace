@@ -176,7 +176,7 @@ against a real model after each item and quote the answers.
   the room sees the handoff line; the delegate's answer is folded in, cited.
 - [x] A5.2 Ask alo's planner becomes the delegation path (one mechanism, not
   two); writes proposed by a delegate land on the asker's one approval surface.
-- [ ] A5.3 Isolation: a delegate reaches nothing the asker could not; a
+- [x] A5.3 Isolation: a delegate reaches nothing the asker could not; a
   handle the asker cannot see is dropped; never across a shared channel.
 
 ## Wave A6 — channel memory
