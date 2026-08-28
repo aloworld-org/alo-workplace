@@ -206,7 +206,7 @@ without it.
   from are not met (B6.12b, finding 3). Done when: an approved absence appears
   in the team's Agenda view for its dates and disappears when the request is
   withdrawn; the wrong-tenant test covers the feed.
-- [ ] B7.04 Consolidate the integration-test binaries. Every file under
+- [x] B7.04 Consolidate the integration-test binaries. Every file under
   `platform/alo-store/tests/` (~115) and `products/mail/alo-jmap/tests/` (~60)
   links its own binary against the whole crate, so any change to the crate
   triggers ~40 minutes of relinking — which no longer fits the build loop's

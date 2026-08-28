@@ -129,12 +129,11 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      the build finish across two calls.
    - Rust touched: `cargo fmt` on changed crates; `SQLX_OFFLINE=true cargo
      clippy -p <crates> --all-targets` clean; then **`cargo nextest run -p
-     <crates>`** green — *not* `cargo test`. `cargo test` runs each test
-     binary one after another, and this workspace has ~185 of them, so a full
-     `alo-store` run takes over ten minutes and no longer fits one command.
-     nextest runs them across all cores: the same 1 769 tests finish in ~18 s
-     (measured 2026-08-12). Config, including which binaries must stay serial,
-     is in `.config/nextest.toml`. If nextest is missing on this machine,
+     <crates>`** green — *not* `cargo test`. nextest runs tests across all
+     cores in one process per test — thousands of tests finish in tens of
+     seconds where `cargo test`'s binary-at-a-time execution took over ten
+     minutes. Config, including which tests must stay serial, is in
+     `.config/nextest.toml`. If nextest is missing on this machine,
      install it — `curl -sSfL https://get.nexte.st/latest/mac | tar zxf - -C
      ~/.cargo/bin` — rather than falling back to `cargo test`, which will
      blow the ceiling and send you back to polling.
@@ -175,26 +174,15 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      (found: one survived 19 hours and poisoned a whole night). Kill it before rebuilding too
      (macOS/Linux: `pkill -f alo-jmap`; Windows locks the exe:
      `taskkill //F //IM alo-jmap.exe`). Real curl calls, real DB rows checked.
-   - **RUN GATES IN THE FOREGROUND — except the ONE command that cannot fit.**
-     One `Bash` call, `timeout: 600000`, read the exit code. Running the tests
-     is fast (~18 s for all of `alo-store` under nextest) and clippy is
-     seconds; those are always foreground.
-     **The exception is the test-binary BUILD after `alo-store` source
-     changed.** Every file under `tests/` links its own binary against the
-     crate, so a change to the crate invalidates ~115 links, and relinking
-     them takes ~40 minutes — it cannot fit one call, and retrying it in the
-     foreground kills it at 600 s each time. On 2026-08-14 an iteration spent
-     130 of 138 minutes in THIRTEEN such kill-retry cycles (cargo's
-     incremental state is what let it converge at all). For that one step,
-     use the sanctioned background+marker form — this is exactly the "single
-     call cannot fit" case the paragraph below describes:
-       `(SQLX_OFFLINE=true cargo nextest run -p alo-store --no-run \
-          > /tmp/nextest-build.log 2>&1; echo "BUILD_EXIT=$?" \
-          >> /tmp/nextest-build.log) &`
-       then `until grep -q "BUILD_EXIT=" /tmp/nextest-build.log; do sleep 15;
-       done` — the poll exits on the condition, never on a count. Once built,
-       run the tests themselves in the FOREGROUND; they fit with room to
-       spare.
+   - **RUN GATES IN THE FOREGROUND.** One `Bash` call, `timeout: 600000`,
+     read the exit code. Running the tests is fast (seconds under nextest)
+     and clippy is seconds; those are always foreground. A cut-off build is
+     carried forward by cargo's cache — re-run the same foreground command.
+     (The one step that once could not fit a call — relinking ~170 per-file
+     test binaries after an `alo-store` change, ~40 minutes — was removed on
+     2026-08-28 by consolidating each big crate's `tests/` into a handful of
+     suite binaries, the `[[test]]` targets in their Cargo.tomls. Nothing in
+     the gate needs a background run now.)
      **You run in one-shot mode: there are no notifications, and ending your
      turn ends the PROCESS.** Never background a command and then finish your
      message with "I'll wait for the completion notification" — no
@@ -210,11 +198,11 @@ conflict you cannot resolve cleanly → `LOOP HALT`.
      History, kept because each sentence was paid for: the first version of
      this rule said "everything fits, 5 min 34 s" (2026-08-11) and was false
      a day later after 61 new test binaries landed; the second said
-     "foreground, no exceptions" and produced the thirteen kill-retry cycles
-     above. A rule that rests on a measurement rots when the measurement
-     does. The durable fix is fewer test binaries (queued as a consolidation
-     item); until it lands, the exception above is the honest shape of the
-     gate.
+     "foreground, no exceptions" and produced thirteen kill-retry cycles on
+     2026-08-14; the third sanctioned a background+marker exception for the
+     40-minute relink. A rule that rests on a measurement rots when the
+     measurement does. The durable fix — fewer test binaries — landed on
+     2026-08-28, and the exception went with it.
    - **Never size a wait by iteration count.** `for i in $(seq 1 58); do …
      sleep 10; done` runs 580 s whatever happens — it spends its entire budget
      even when the work finished in the first ten seconds. This is what turned

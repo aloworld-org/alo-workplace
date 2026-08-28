@@ -20400,3 +20400,63 @@ Next: B7.03 (leave reaches Agenda).
   nothing stale to delete — healthy, for once.
 
 Next: B7.04 (consolidate the integration-test binaries).
+
+## 2026-08-28 — B7.04 consolidate the integration-test binaries
+
+**What shipped.**
+- `platform/alo-store/tests/` (169 files) and `products/mail/alo-jmap/tests/`
+  (112 files) are now four and five suite binaries instead of one binary per
+  file: `autotests = false` plus explicit `[[test]]` targets in each
+  Cargo.toml, with suite roots (`billing_finance_suite.rs`,
+  `business_suite.rs`, `sites_suite.rs`, `core_suite.rs`; jmap adds
+  `agents_http_suite.rs` and names its set `*_http_suite`) that declare the
+  existing files as `mod`s. No file moved, no file renamed, no test changed.
+- The only per-file edit is the import of the shared harness: as crate roots
+  the files said `mod common;` / `use common::…`; as modules they say
+  `use crate::common;` / `use crate::common::…` (the 14 files that only
+  imported named items lost the redundant module import rather than gaining
+  an unused one). Each suite root declares `mod common;` once.
+- `.config/nextest.toml`: the five serial-group overrides retargeted from
+  `binary(name)` to `test(/^name::/)` — the former binary name lives on as
+  the first segment of the test name, so the filters pin the same tests.
+  Header comment rewritten to describe the consolidated layout.
+- `docs/autonomy/LOOP.md`: the 2026-08-14 background+marker build exception
+  is deleted as the item ordered — the ~40-minute relink it existed for no
+  longer exists; the foreground rule and one-shot discipline stand.
+
+**How verified.**
+- `cargo nextest run -p alo-store -p alo-jmap`: **3917 passed, 1 skipped**,
+  exit 0 (first call hit the 600 s ceiling and was backgrounded by the
+  harness; the until-grep poll read its real summary).
+- Same test count as before: `cargo nextest list -p alo-store` = **2531**,
+  exactly the full-suite count the B7.03 entry recorded before this change;
+  alo-jmap lists 1386 (contents untouched — only import lines differ, and
+  the tests/ attribute grep count is unchanged at 943/593).
+- The timed acceptance: `touch alo-store/src/lib.rs` then
+  `cargo nextest run -p alo-store --no-run` finishes in **2 m 20 s** (was
+  ~40 min); the dependent alo-jmap rebuild finishes in 7 m 44 s. Live test
+  binaries per crate: alo-store 5 (4 suites + libtest), alo-jmap 7
+  (5 suites + libtest + server bin) — single digits.
+- `cargo nextest show-config test-groups` proves every serial override still
+  matches its tests: all nine former binaries appear as module prefixes with
+  their tests in `group: serial`.
+- fmt clean; `SQLX_OFFLINE=true cargo clippy -p alo-store -p alo-jmap
+  --all-targets` clean. No web, no storage semantics, no routes, no
+  migrations touched.
+
+**Cuts and flags.**
+- The `test(/^name::/)` filters over-match same-named src unit-test modules:
+  alo-jmap's `site_booking_notify::tests::*` lib unit tests now join the
+  serial group beside the e2e suite of the same name. Four pure-function
+  tests running serially — accepted rather than complicating the filters.
+- Under plain `cargo test` (the no-nextest fallback), tests that used to be
+  isolated by separate binaries now share a process per suite; nextest's
+  process-per-test model — the gate — is unchanged. The in-process mutexes
+  the sweep suites already hold cover the fallback.
+- CHANGELOG untouched: developer build infrastructure, nothing user-voiced.
+- Environment, third sighting: the machine-profile `DATABASE_URL` still
+  carries the empty password (`postgres://alo:@…`); the explicit
+  `postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` was exported for
+  prune and tests. A human should fix the profile.
+
+Next: none open — the queue is complete; the next iteration writes LOOP COMPLETE.

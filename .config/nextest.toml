@@ -1,14 +1,18 @@
 # cargo-nextest configuration.
 #
-# Why nextest at all: `cargo test` runs each test *binary* one after another,
-# and this workspace has ~185 of them (every file under tests/ links its own).
-# Execution, not compilation, became the cost — a full `alo-store` run took
-# over ten minutes and no longer fitted the build loop's per-command ceiling.
-# nextest runs the binaries across all cores: the same 1 757 tests finish in
-# about 18 seconds (measured 2026-08-12).
+# Why nextest at all: it runs tests across all cores in one process per test,
+# so a full `alo-store` run finishes in seconds where `cargo test`'s
+# binary-at-a-time execution took over ten minutes when every tests/*.rs was
+# its own binary. The big crates' integration tests are consolidated into a
+# handful of suite binaries now (see their Cargo.toml [[test]] targets) —
+# execution parallelism and per-test process isolation still come from here.
 #
 # `cargo test` remains correct and is the fallback where nextest is not
 # installed; nothing here changes what the tests assert.
+#
+# The serial filters below name tests by their module path (`test(...)`), not
+# by binary: the former per-file binaries are modules of the suite binaries,
+# so the file name lives on as the first segment of the test name.
 
 [test-groups]
 # Tests that contend for state which is deliberately NOT tenant-scoped, and so
@@ -24,7 +28,7 @@ serial = { max-threads = 1 }
 # the mechanism working, not a bug in it, so the tests are serialised rather
 # than the product changed. Verified 2026-08-12: parallel fails ~1 in 4 runs,
 # serial passes 3/3.
-filter = 'binary(site_publish_schedule_tenancy)'
+filter = 'test(/^site_publish_schedule_tenancy::/)'
 test-group = 'serial'
 
 [[profile.default.overrides]]
@@ -33,7 +37,7 @@ test-group = 'serial'
 # alo-jmap's end-to-end delivery test — would otherwise claim each other's
 # appointments and each fail on rows the other took. Serialised rather than
 # weakened: both assert exact counts, which is the point of them.
-filter = 'binary(site_bookings_public) or binary(site_booking_notify)'
+filter = 'test(/^site_bookings_public::/) or test(/^site_booking_notify::/)'
 test-group = 'serial'
 
 [[profile.default.overrides]]
@@ -49,7 +53,7 @@ test-group = 'serial'
 # purchase is a row waiting for whichever sweep runs next, and a sweep landing
 # between that suite's settle and its next read would answer for a state it did
 # not choose.
-filter = 'binary(site_domain_purchases) or binary(site_domain_registration) or binary(sites_domain_purchases_http)'
+filter = 'test(/^site_domain_purchases::/) or test(/^site_domain_registration::/) or test(/^sites_domain_purchases_http::/)'
 test-group = 'serial'
 
 [[profile.default.overrides]]
@@ -59,7 +63,7 @@ test-group = 'serial'
 # order is offered — run beside each other, the shop's sweep takes the order
 # the loop is waiting for and the loop starves to its bound (seen 2026-08-28,
 # full-suite run; both binaries pass alone on the same database).
-filter = 'binary(site_ticket_orders) or binary(site_public_shop)'
+filter = 'test(/^site_ticket_orders::/) or test(/^site_public_shop::/)'
 test-group = 'serial'
 
 [[profile.default.overrides]]
@@ -68,5 +72,5 @@ test-group = 'serial'
 # suite asserting an exact delivery count beside it would be counting rows this
 # one took (or vice versa), so the arc joins the serial group rather than the
 # other suites being weakened into inexact assertions.
-filter = 'binary(sites_final_arc)'
+filter = 'test(/^sites_final_arc::/)'
 test-group = 'serial'
