@@ -1236,6 +1236,19 @@ the settlement posted — because unmatching (B4.09c) has to remove one and
 reverse the other, and looking them up by their source keys would mean trusting
 that nothing else ever posted against the same document. Both are `NULL` for a
 kind that produces neither, and a CHECK requires them exactly for `'invoice'`.
+Both keys are `ON DELETE NO ACTION` (B7.02; migration 0174 — 0143 first wrote
+`RESTRICT`, repeating the mistake 0106 taught and 0131 avoided): the rule — a
+line must never claim to be settled by a payment that is gone — is asked at
+the end of the statement, so deleting a matched payment on its own is still
+refused (`delete_billing_payment` maps the SQLSTATE to a refusal naming
+unmatch as the door). For deleting the whole tenant — the erasure path, a
+GDPR obligation — NO ACTION alone is not enough, because `bank_matches` hangs
+two cascade hops from `tenants` (through `bank_statements` and `bank_lines`)
+and Postgres fires queued foreign-key events in order, so the check on a
+deleted payment can run before the cascade reaches the match naming it;
+`delete_tenant` therefore clears `bank_matches` itself, first, in the same
+transaction. The reconcile suite deletes a tenant who reconciled to prove
+the pair works.
 
 **One line, one match**, as `UNIQUE (tenant_id, line_id)`. It is the invariant
 `bank_lines.status` projects: a line is `matched` exactly when a row here names

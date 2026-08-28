@@ -20261,3 +20261,83 @@ psql: fin_entries for wireb701          → invoice 4, credit_note 1, payment 3,
   running the gates.
 
 Next: B7.02 (tenant deletion survives reconciliation).
+
+## 2026-08-28 — B7.02 tenant deletion survives reconciliation
+
+**What shipped.**
+- Migration `0174_bank_matches_tenant_delete.sql`: the two `ON DELETE
+  RESTRICT` keys 0143 gave `bank_matches` (→ `billing_payments`, →
+  `fin_entries`) become `NO ACTION` — the same rule asked at the end of the
+  statement instead of mid-cascade, the move 0131 already made for
+  `fin_postings` → `fin_accounts` after 0106.
+- `delete_tenant` (control.rs) now clears `bank_matches` first, in the same
+  transaction as `DELETE FROM tenants`. NO ACTION alone was **not** enough,
+  and the first attempt proved it on the wire of the test: `bank_matches`
+  carries no key to `tenants`, so its erasure rides the two-hop cascade
+  `bank_statements → bank_lines → bank_matches`, and Postgres fires queued
+  FK events in order — the check on a cascade-deleted payment ran before the
+  two-hop cascade reached the match naming it and refused the whole erasure
+  (23503, reproduced in the first test run). Pre-clearing the matches makes
+  erasure independent of cascade order entirely; with the pre-clear even
+  RESTRICT would pass, but NO ACTION stays as the house pattern so no other
+  multi-path statement inherits the ordering dependence.
+- `delete_billing_payment` maps the 23503 a matched payment's deletion now
+  raises into a typed Conflict naming the door: take the match back on the
+  reconciliation screen — unmatch removes the payment, reverses the books
+  and returns the line, in one act (the route already answers Conflict as
+  409). The unmatch path itself is untouched: it deletes the match row
+  before the payment in the same transaction, so it never trips the key.
+- `docs/design/finance.md` as-built section updated with the two keys and
+  the queue-order caveat; stale `0143 RESTRICT` comment in `bank_unmatch.rs`
+  refreshed; CHANGELOG line in user voice.
+- `.config/nextest.toml`: `site_ticket_orders` + `site_public_shop` join the
+  serial group — discovered mid-gate, not caused by this item (see below).
+
+**How verified.**
+- New `bank_reconcile` test `deleting_a_tenant_who_reconciled_erases_everything_and_only_theirs`:
+  two tenants each live the full life (issued invoice, hand-keyed deposit,
+  two-line statement, confirmed match, receivable exactly zero), one is
+  deleted; a raw `information_schema` sweep then proves **every** `bank_*`,
+  `billing_*` and `fin_*` table with a `tenant_id` column holds zero rows of
+  the deleted tenant (the sweep is asserted to cover the seven core tables so
+  it can never silently match nothing), while the surviving tenant's
+  reconciliation, receivable and balanced journal are intact — the
+  wrong-tenant proof for the erasure path.
+- New test `a_matched_payment_refuses_deletion_and_unmatching_is_the_door`:
+  the refusal names "take the match back", the payment/line/settlement/books
+  are untouched by the refusal, and unmatching still does all three things.
+- `cargo nextest run -p alo-store`: **2527 passed** (2525 + the 2 new), fmt
+  applied, clippy clean, zero warnings.
+- alo-jmap not rebuilt: no jmap file changed; its only contact is the
+  payment-delete route (Conflict already maps to 409) and `grep` shows no
+  jmap test deletes a matched payment or a tenant.
+
+**Cuts and flags.**
+- **Flake fixed in passing (other tracks' suites, additive config only):**
+  the full-suite run failed `site_ticket_orders`' two claiming tests while
+  they passed alone on the same database — `site_public_shop` (sites track,
+  08-16) claims 500 ticket fulfilments in one sweep call and swallows the
+  order the other suite's claim-loop waits for. Same shape as the three
+  sweep races `.config/nextest.toml` already serialises, so both binaries
+  joined the serial group; full suite then green.
+- **Same bug, other wardrobes, for the queue's author:** tenant deletion can
+  still fail on cascade order wherever a tenant-scoped RESTRICT key's
+  referencing table hangs off `tenants` indirectly or self-references:
+  `crm_deals`/`crm_stage_moves` → `crm_stages` (RESTRICT ×3, stages cascade
+  two hops via `crm_pipelines`), `hr_employees.manager_id` → `hr_employees`
+  (self-referential RESTRICT), `site_posts` → `drive_nodes` (RESTRICT,
+  sites' area). None is reachable from this item's tables and none is this
+  queue's to rewrite unasked — but a tenant with deals or employees may
+  refuse deletion the same way this one did. Worth a queue item per owning
+  track.
+- Environment, again: the machine-profile `DATABASE_URL` (empty password)
+  flipped to scram mid-suite and failed 900+ tests with 28P01 before the
+  explicit `postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` re-run —
+  second iteration running into this; the profile should be fixed by a
+  human. Disk was at 5.7 GB free before the gate: the stale-exe sweep (176
+  duplicates) plus the `.pdb` sweep freed ~13 GB. `alo_scratch` had applied
+  the first draft of 0174, so its `_sqlx_migrations` row for version 174 was
+  deleted once to let the reworded file re-apply — the file had never been
+  pushed, so no deployed ledger saw either version.
+
+Next: B7.03 (leave reaches Agenda).

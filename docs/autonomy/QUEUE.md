@@ -190,7 +190,7 @@ without it.
   balance sheet on the wire; issuing into a locked period is a typed refusal
   (B4.10); posting twice is idempotent; the arc from B6.12a is re-run and the
   fourth hop is no longer zero.
-- [ ] B7.02 Tenant deletion survives reconciliation. `bank_matches` holds
+- [x] B7.02 Tenant deletion survives reconciliation. `bank_matches` holds
   `ON DELETE RESTRICT` foreign keys to `billing_payments` and `fin_entries`, so
   deleting a tenant that has ever reconciled a bank line fails on the constraint
   — `delete_tenant` is the erasure path, which makes this a GDPR obligation and

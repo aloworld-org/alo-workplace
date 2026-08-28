@@ -53,6 +53,16 @@ filter = 'binary(site_domain_purchases) or binary(site_domain_registration) or b
 test-group = 'serial'
 
 [[profile.default.overrides]]
+# The ticket-fulfilment sweep is the same shape again: `site_public_shop`
+# claims 500 fulfilments in one call to clear the pool before its own
+# assertions, and `site_ticket_orders`' two claiming tests loop until their
+# order is offered — run beside each other, the shop's sweep takes the order
+# the loop is waiting for and the loop starves to its bound (seen 2026-08-28,
+# full-suite run; both binaries pass alone on the same database).
+filter = 'binary(site_ticket_orders) or binary(site_public_shop)'
+test-group = 'serial'
+
+[[profile.default.overrides]]
 # S2.16d's final arc drives all three notification sweeps — form, order and
 # booking — end to end, and every sweep claims across tenants by design. Any
 # suite asserting an exact delivery count beside it would be counting rows this
