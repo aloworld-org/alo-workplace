@@ -61,4 +61,16 @@ executors returning the routes' own serializers (`summary_json`,
 `member_json`, `message_json`, made `pub(crate)` in `chat.rs`, behaviour
 unchanged). No migration needed (0450–0469 untouched). No web, no i18n, no
 new route prefixes. Shared-list counts updated with the move: `all_tools` 80
-→ 85, declared reads 40 → 43. Next: AC.2 (Meet).
+→ 85, declared reads 40 → 43; after rebasing over agents-a's Sales landing
+the merged counts are 89 and 47 (kept-both on `MOVED`, `MODULES` and the
+`lib.rs` lines, as the queue prescribes).
+
+**Rebase note, and one repair beyond this item's own files.** B7.04
+(`f54867ca`, one test binary per area, `autotests = false`) landed mid-item;
+under it a `tests/*.rs` file not named in a suite root is silently never
+built. `agent_crm_intents_http.rs` (AA.1) and `agent_delegation_http.rs`
+(A9-side) had landed the old way and were orphaned — their wire gates were
+green-looking but not running. Wired all three (this item's chat suite and
+those two) into `agents_http_suite.rs` (`use crate::common`, one `mod` line
+each) and ran them: 117/117 in the suite, alo-ai 276/276, alo-jmap lib
+803/803, clippy clean. Next: AC.2 (Meet).
