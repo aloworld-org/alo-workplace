@@ -34,16 +34,39 @@ migrations.
 theirs. Check the directory again immediately before rebasing, not once at the
 start of the item — that is how the last collision happened.
 
-## Two areas this track must NOT touch
+## Areas and rules for waves A4–A9 (read before any item)
 
-- **`web/src/chat/**` is being rebuilt on Tailwind by another agent right
-  now.** Every item here is store-and-API first. An item needing chat UI is
-  marked `[web]` and stays blocked until that rebuild lands; do not open those
-  files to "just add a badge".
+- **Read ADR 0057, ADR 0058 and `docs/design/complete-agents.md` first**, then
+  `alo_ai::intent` and `alo_ai::billing_intents` (the reference module) and
+  `alo-jmap`'s `billing_intents.rs` (its executors). Every module moves the
+  same way: an `IntentModule` in a new `platform/alo-ai/src/<module>_intents.rs`
+  (verbs, exclusions with reasons, guidance), executors in a new
+  `products/mail/alo-jmap/src/<module>_intents.rs` returning the module's own
+  record views, dispatch lines in `agent.rs`, the hand-written `agent_<module>.rs`
+  tool set in `alo-ai` deleted, `agent_product.rs` pointing the product at the
+  module, and a coverage test that reads `server.rs` — copy Billing's shape.
+- **Web:** `[web]` items may touch `web/src/chat/**` and new `web/src/agents/**`
+  only. `web/src/billing/**`, `web/src/shell/**` and `web/src/ds/**` are being
+  edited by another agent right now — never open them. Store-and-API first;
+  a `[web]` item whose UI cannot be built inside those bounds is marked `[!]`
+  with the reason.
+- **Other modules' route files** (`billing_quotes.rs`, `crm.rs`, …) are edited
+  only to make a route call an intent executor, behaviour unchanged. Their
+  store modules are read, never restructured; a store function an intent needs
+  and does not exist is added as a **new** function in the module's store file,
+  additive.
 - **`alo-ai`'s sites modules** (`sites.rs`, `site_edits.rs`,
-  `site_translation.rs`) belong to the sites track. A2.1 adds a **new**
-  `agent_sites.rs` beside them and reads them; if it cannot be done without
-  editing them, `LOOP HALT` and say so rather than racing.
+  `site_translation.rs`) belong to the sites track; `sites_intents.rs` reads
+  them and the existing `agent_sites.rs` executors.
+- **The gate of every item is the wire.** The scripted-model suites
+  (`tests/agent_*_http.rs`, the `common::model` harness) prove each verb on
+  the real router and store, wrong tenant included. The **real-model
+  evaluation** (`docs/autonomy/agents/STATE.md`, the 2026-08-28 run) is run by
+  the owner after each wave with the tenant's own provider; do not copy an API
+  key anywhere to run it yourself. Quote the scripted transcript in STATE.md.
+- **A migration is `04xx`.** Check the directory immediately before rebasing.
+- **`[~]` for what is not this queue's to build**, with the reason; never leave
+  a `[ ]` you will not build.
 
 ---
 
