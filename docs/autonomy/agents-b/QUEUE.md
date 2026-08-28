@@ -47,7 +47,7 @@ another product (a store function you need and do not find is added as a
 
 ## Queue
 
-- [ ] AB.1 ★ **Drive**: reads — recent files, list a folder, `find_file`/`file_read`/`attachment_read` kept, what is shared with me; writes — `file_rename`, `file_move` kept, create a folder, with previews. `@drive which files do we have?` answers from the record.
+- [x] AB.1 ★ **Drive**: reads — recent files, list a folder, `find_file`/`file_read`/`attachment_read` kept, what is shared with me; writes — `file_rename`, `file_move` kept, create a folder, with previews. `@drive which files do we have?` answers from the record.
 - [ ] AB.2 ★ **Docs**: reads — list documents (recent, by folder), `doc_read`/`doc_answer` kept; writes — `doc_draft_section`, `doc_rewrite` kept, create a document, with previews. `@docs which documents exist?` answers from the record.
 - [ ] AB.3 ★ **Sheets**: reads — list spreadsheets, `sheet_read`/`sheet_answer`/`sheet_formula_explain` kept; writes — `sheet_write_formula`, `sheet_clean_column` kept, with previews.
 - [ ] AB.4 ★ **Tasks**: reads — `my_plate`, `overdue_by_owner`, `thread_actions` kept, plus a board's open tasks, a task lookup; writes — the existing four kept, complete a task, reassign, with previews.
