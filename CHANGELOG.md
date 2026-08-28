@@ -41,6 +41,11 @@ contracts.
 
 ## Unreleased
 
+- In dropdown pickers, the row under the pointer and the row that is the
+  current value no longer share one highlight — the fill follows the pointer,
+  the accent colour and check mark stay on the chosen value — so two rows
+  never look chosen at once.
+
 - Paragraphs and quotes in a quotation can now flow into two or three columns,
   the same "Columns" setting lists already had. One column looks exactly as
   before, and on a phone every block stays single-column — two strips of text
