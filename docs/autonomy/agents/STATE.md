@@ -3865,3 +3865,79 @@ through the new dispatcher list, and the scripted `send_quote` is still
 proposed and not run.
 
 **Next:** A5 — delegation inside a run. The agents-a/b/c tracks may start.
+
+## A4.6 — the event stream: every intent execution leaves one row (2026-08-28)
+
+Taken after marking A4.5 `[!]` per its own prerequisite: the agents-a/b/c
+journals show no `LOOP COMPLETE` yet (all three started today). A4.7 has the
+same gate and stays open.
+
+**Store.** Migration `0406_events.sql`: the append-only `events` table (ADR
+0058 §5) — kind (the verb's registry name), the record it touched when it
+touched exactly one (`record_type` the executor's own record word,
+`record_id`), `actor_user_id` (whose access, from the account door, never a
+parameter), `agent_id` (which agent, when one ran it), effect, created_at.
+`platform/alo-store/src/events.rs` is the whole surface and it writes and
+reads only: `AccountStore::emit_event` (validates the vocabulary — lowercase
+words joined by `.`/`_`, ≤64 bytes, a record reference is a type and an id
+together), `AccountStore::my_events` (the caller's OWN stream, reads
+included — same privacy rationale as `agent_tool_runs`), and
+`TenantStore::list_record_events` (a record's history, **writes only**: what
+was done to a record, never who looked at it; the record is addressed the way
+the audit trail addresses one, `billing.quote` + id, and the emitter's bare
+record word is matched by the address's last segment, so the two vocabularies
+meet without a mapping table that would drift).
+
+**Emission.** One seam: `execute_tool` in `alo-jmap`'s `agent.rs` — the
+boundary every agent-path intent execution already crosses — emits after a
+successful dispatch, best-effort exactly like `record_run` (the act has
+answered; a stream failure is an operator logline, never a rolled-back act,
+and never the arguments or the result). The record reference is read from the
+executor's own reply (`event_record_ref`: `result.kind` + the id at the top
+or on the record filed under the kind's own key — both shapes in use), so no
+per-module table exists to rot as agents-a/b/c land modules.
+
+**Audit reads from it.** `GET /audit?entity=type:id` now merges two sources:
+the route middleware's entries (a person's clicks) and the record's events
+(an agent's executions). One act lands in exactly one of them — the agent
+path never passes the middleware, `/chat` and `/ai` are outside
+`AUDITED_MODULES` — so nothing shows twice. Event items carry `agent` (the
+handle); entry items gained `"agent": null` (additive). An agent's
+`send_quote` finally shows on the quote it sent.
+
+**Cut, recorded:** the person-path route adapters do not emit yet — a
+person's click joins the stream in A8.1, where ADR 0058 §6 makes a click and
+a proposal the same action object; the middleware's audit entries cover that
+side meanwhile, and the merge above is why nothing is lost. Kinds are
+verb-names on the agent path (`send_quote`) and audit-actions on the entry
+side (`billing.quote.send`); A8.1 reconciles the vocabularies.
+
+**Verified.** `cargo fmt`; clippy `-p alo-store -p alo-jmap --all-targets`
+zero warnings; `cargo nextest run -p alo-store` 2527 passed (incl. the new
+`events` suite: a record's history is its writes and never its readers; an
+event never crosses a tenant or a person — tenant B with the exact record id
+gets the empty answer an unissued id gets, and a colleague sees the record's
+history but never the actor's personal stream; the stream refuses a bad
+effect, a bad vocabulary, a half-given record reference). `cargo nextest run
+-p alo-jmap` 1386 passed, incl. the new `agent_events_http` wire suite
+against the real router and store with the scripted model:
+
+- `@billing send Northstar Foods their offer` → the model wants
+  `send_quote {customer: "Northstar Foods BV"}` → a proposal in the room →
+  `POST /chat/proposals/{id} {"approve": true}` 200 → `GET
+  /audit?entity=billing.quote:<id>` answers `entries` containing exactly one
+  `{"action":"send_quote","agent":"billing",…}` beside the person's own
+  `billing.quote.create` from the middleware — merged, in order, never
+  twice; and `my_events` holds the row: kind `send_quote`, effect `write`,
+  record `quote/<id>`, agent `billing`, actor the asker's address.
+- `@billing which quotes are open?` (a read, in-turn) → the stream holds
+  `open_quotes`/`read` with no record reference, and the quote's history is
+  unchanged — a read joins the stream and no record's story.
+- Tenant B reading `billing.quote:<A's id>` over the wire: empty.
+
+One flake noted, not mine: `agent_insights_http::a_report_waits_for_a_tap…`
+failed once under full-suite load (the agent spoke without a proposal),
+passed alone and passed in the full `--no-fail-fast` rerun (1386/1386).
+
+**Next:** A4.7 is gated on agents-a/b/c like A4.5; the first open item after
+it is A5.1 (the `delegate` envelope).

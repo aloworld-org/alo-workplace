@@ -1,5 +1,7 @@
 # Changelog
 
+- A record's History tab now shows what agents did to it, not only what people clicked: when a billing agent sends an offer or records a payment on your say-so, that act appears on the record itself, named after the agent that ran it — and everything an agent does in your workspace now lands on one tamper-proof stream that future notifications and automations will read from, instead of each feature watching the database on its own.
+
 - Each workspace module now registers its agent's abilities in one place, so new module agents can be added side by side without touching each other's code — groundwork for the Sales, Finance, Projects, Drive and other agents that follow.
 
 - Billing's screens and its agent now run through one shared path for every read and write — listing and looking up offers, customers and invoices, raising and issuing drafts, sending offers, accepting them and recording payments — so what the agent reports and what the screen shows can never quietly drift apart, and a build in which they could would fail its own tests.
