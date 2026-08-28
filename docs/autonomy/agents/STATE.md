@@ -4092,3 +4092,13 @@ themselves ran foreground in 202 s. Prune found nothing to trim
 **Next:** A5.3 — delegation isolation (a delegate reaches nothing the asker
 could not; a handle the asker cannot see is dropped; never across a shared
 channel).
+
+**Addendum (same iteration, after the push).** The rebase brought in
+`f54867ca` (one test binary per area, `autotests = false`), whose sweep
+predates A5.1's `agent_delegation_http.rs` — so the delegation suite was
+silently neither built nor run on main, the exact trap the business track's
+addendum names. Adopted it into `agents_http_suite` (one `mod` line, the
+harness imports moved to `crate::common`); the full suite then runs
+**114/114 green**, the five delegation tests inside it. One flake noted, not
+mine: `agent_sites_http::an_approved_edit_rewrites_the_copy…` failed once
+under full-suite load and passed alone and in the `--no-fail-fast` rerun.
