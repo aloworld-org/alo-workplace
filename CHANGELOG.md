@@ -41,6 +41,13 @@ contracts.
 
 ## Unreleased
 
+- Quotation lists now have a style library like a word processor's: six
+  numbering schemes (1./a./i., 1)/a)/i), 1.1/1.2.1 outline, A./a./i.,
+  I./A./1., 01./a./i.) and seven bullet schemes (round, diamonds, squares,
+  arrows, stars, chevrons, checkboxes), each with three nesting levels — items
+  can be indented and outdented. Existing lists keep their plain numbers and
+  round bullets until a style is chosen.
+
 - In dropdown pickers, the row under the pointer and the row that is the
   current value no longer share one highlight — the fill follows the pointer,
   the accent colour and check mark stay on the chosen value — so two rows
