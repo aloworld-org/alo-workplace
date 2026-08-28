@@ -20471,3 +20471,19 @@ test file under `platform/alo-store/tests/` or
 `products/mail/alo-jmap/tests/` must also add its `mod` line to the area's
 suite root — treat those roots like the other deliberately-shared lists
 (one additive line, keep both sides on rebase).
+
+---
+
+## 2026-08-28 — wave B7 complete
+
+All four B7 items are `[x]`: the ledger receives every document in the act
+that makes it real (B7.01), tenant erasure survives reconciliation (B7.02),
+approved leave reaches the team's Agenda (B7.03), and the integration tests
+link as a handful of suite binaries instead of ~175 (B7.04, with the
+rebased-in CRM intents file adopted into its suite the same evening). No
+`[ ]` or `[!]` items remain anywhere in QUEUE.md; nothing was left `[~]`.
+Open human items carried from earlier entries: the machine-profile
+`DATABASE_URL` still carries an empty password, and the deploy-time items
+the wave reviews flagged (Peppol AP account, Caddyfile prefixes).
+
+LOOP COMPLETE
