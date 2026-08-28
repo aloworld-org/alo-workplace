@@ -1,5 +1,7 @@
 # Changelog
 
+- When another agent helps out with your question and the help means changing something — adding a task, sending a mail — that agent now puts the change up for approval right there in the room, under its own name, and everything else waits behind that one button; before, it could only tell you which agent to go and ask yourself. Ask alo's multi-step plans now run on the same footing as any agent asking another for help: one shared limit for the whole run, a step that can bring in a further agent when it needs one, and still never more than one thing waiting for your approval at a time.
+
 - Agents can now ask each other for help inside one question: ask the Billing agent whether anything blocks a quote and it can hand the stock part to the Inventory agent, with the room shown who asked whom for what, the helper's answer cited in the reply, and hard limits — at most four handoffs, never more than two deep, only to agents you could ask yourself, and never a change made on a handoff.
 
 - Approved leave now shows in the team's Agenda: the month and week views and the day panel quietly say who is away on each day — a name and a day, never the kind of leave or the note — and leave that is cancelled disappears from the calendar in the same act, because the calendar draws the absence feed live rather than keeping events of its own.

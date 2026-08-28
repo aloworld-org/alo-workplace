@@ -4014,3 +4014,81 @@ password and fails auth). Pruned before the gate: 2 517 → 1 727 tenants.
 
 **Next:** A5.2 — Ask alo's planner becomes the delegation path; delegated
 writes land on the asker's one approval surface.
+
+## A5.2 — the planner is the delegation path; a delegate's write lands on the one approval surface (2026-08-28)
+
+**One mechanism.** `agent_turn` now owns the whole way a sub-question travels:
+`delegate_turn(env, delegate, ask, …)` grounds the delegate in its own
+product, builds its nested turn and runs it on the run's one `RunEnv` budget —
+and BOTH paths call it. A product agent's handoff calls it at `depth + 1`
+exactly as before; an orchestrated step of Ask alo's plan calls it at depth 1,
+because the plan IS that run's delegation (ADR 0057 §3, the design doc's "Ask
+alo's planner is this mechanism, not a second one"). Consequences, each now
+true rather than asserted: a plan step is offered the roster and may hand off
+once more (A5.1 had steps at `roster: &[]`); each step spends a handoff slot
+from the same four the nested handoffs draw on, with `const _: () =
+assert!(MAX_PLAN_STEPS <= MAX_HANDOFFS)` pinning that a maximal plan always
+fits; a run whose plan wants a step the budget refuses says `OUT_OF_HANDOFFS`
+in the room (Ask alo's own words) instead of quietly running wider than any
+product agent's run could; and the run's six reads are now shared across the
+whole plan rather than six per step — the narrowing is the point of "one
+budget".
+
+**The one approval surface.** A delegate whose nested turn returns `Propose`
+no longer folds the wish into words. It joins the room (the same idempotent,
+module-gated join every speaking agent makes), posts its own `say` under its
+own id — the author of the message is what chat's approval later executes at,
+so it must be the delegate, never the asking agent — records the proposal
+against that message, and the run ends there: `TurnResult::DelegateProposed`
+bubbles up every depth, so at most one proposal can ever be pending per run,
+however deep the write came from. If the room will not take the message (the
+module gate, an archived room) the old A5.1 words are the safe floor — the
+person is pointed at the agent that can do it, and nothing is silently lost.
+`run_plan` treats a step's `DelegateProposed` exactly as a step's own write:
+the run stops, `WAITING_ON_APPROVAL` if steps remain.
+
+**Verified.** `cargo fmt`; clippy `-p alo-jmap --all-targets` zero warnings;
+`cargo nextest run -p alo-jmap` **1396/1396 green** (202 s), with the wire
+suites extended on the real router and store under the scripted model:
+
+- `agent_delegation_http::a_delegates_write_is_proposed_by_the_delegate_and_the_asker_approves_it`:
+  `@billing chase the Northstar quote` → billing hands to tasks → tasks joins
+  and says **"I'll add a follow-up task."** with the pending `create_task`
+  proposal on its own message; billing says nothing after its handoff line;
+  two model calls; exactly one pending proposal; `POST /chat/proposals/{id}
+  {"approve":true}` → 200, state approved, the task actually created — at the
+  Tasks agent's scope, because the proposal is its message.
+- `agent_orchestrate_http::a_plan_step_hands_off_and_the_whole_run_shares_one_budget`:
+  a two-step plan; step one (billing) hands off three times ("You can hand off
+  to:" offered to the step), three handoff lines in the room, its answer cites
+  all three folds; step two is refused with **no model call** — four slots
+  spent: one step + three handoffs — and Ask alo says "as much as I'm allowed
+  to…"; 8 calls total.
+- `agent_orchestrate_http::a_plan_steps_delegate_proposes_on_the_one_approval_surface`:
+  plan → step (billing) → its delegate (tasks) proposes `create_task`; the
+  proposal is the tasks agent's message two levels below Ask alo, the only
+  pending row; the second step (mail) never runs; Ask alo says the rest
+  waits; approving creates the task.
+- The A5.1 suites unchanged and green (drop, depth, cap, fold), and the whole
+  orchestrate suite (plan-first, scope, Stop, fallback) green through the
+  unified path — same call counts, which is the "layer over agent_turn, not a
+  second copy" claim holding under the swap.
+
+**Cuts, recorded.** (1) The asking agent does not get a closing model call
+after its delegate proposes — the room already reads ask → handoff line →
+proposal, and a comment on a change that is not its to make would be a fifth
+hardcoded server string and one more inference spend. (2) The palette's
+`DelegateProposed` arm is a compiler-satisfying null response, unreachable
+while the palette is offered no roster. (3) Room-posted agent strings stay
+hardcoded English — the standing i18n debt, one item, unchanged.
+
+**Environment note.** The test-binary build for `alo-jmap` no longer fits one
+600 s call after a lib change (two foreground attempts cut off mid-link);
+the sanctioned background+marker form with a session-unique path
+(`/tmp/nextest-build-a52-<session>.log`) finished it, and the tests
+themselves ran foreground in 202 s. Prune found nothing to trim
+(2 403 tenants, 48 MB — fine).
+
+**Next:** A5.3 — delegation isolation (a delegate reaches nothing the asker
+could not; a handle the asker cannot see is dropped; never across a shared
+channel).

@@ -174,7 +174,7 @@ against a real model after each item and quote the answers.
 - [x] A5.1 The `delegate` envelope: an agent hands a sub-question to another
   agent inside its run, as the asker, depth ≤ 2, ≤ 4 per run, one budget;
   the room sees the handoff line; the delegate's answer is folded in, cited.
-- [ ] A5.2 Ask alo's planner becomes the delegation path (one mechanism, not
+- [x] A5.2 Ask alo's planner becomes the delegation path (one mechanism, not
   two); writes proposed by a delegate land on the asker's one approval surface.
 - [ ] A5.3 Isolation: a delegate reaches nothing the asker could not; a
   handle the asker cannot see is dropped; never across a shared channel.
