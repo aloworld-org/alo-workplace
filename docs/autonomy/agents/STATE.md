@@ -3941,3 +3941,76 @@ passed alone and passed in the full `--no-fail-fast` rerun (1386/1386).
 
 **Next:** A4.7 is gated on agents-a/b/c like A4.5; the first open item after
 it is A5.1 (the `delegate` envelope).
+
+## A5.1 — the `delegate` envelope: one agent hands a sub-question to another (2026-08-28)
+
+Taken after re-marking A4.7 `[!]` per its own prerequisite (agents-a/b/c
+journals still show no `LOOP COMPLETE`; second check today).
+
+**alo-ai.** `AgentDecision` gains `Delegate { to, ask }`, parsed from a third
+envelope — `{"kind":"delegate","delegate":{"to":"<handle>","ask":"…"}}` — with
+a leading `@` stripped, since models write handles the way people do. The
+offer rides in the **user** message (`delegates_block`), not the system
+prompt, because it is a fact about this run: `AgentAsk` gains `delegates:
+&[PlanAgent]` (the planner's roster row, reused), and with nobody to hand to
+the offer is not made at all.
+
+**alo-jmap (`agent_turn.rs`).** The turn loop became a run: `take_turn` builds
+a `RunEnv` holding one `RunBudget` (atomics: reads ≤ 6, handoffs ≤ 4) and
+recurses through boxed `turn_at(env, turn, depth)`. A handoff resolves its
+handle against `Turn::roster` — the same module-gated
+`agent_orchestrate::roster` the planner routes over, computed in
+`chat_agent::take_turn` for product agents; empty for the palette, for Ask
+alo's fallback turn, and for orchestrated steps (the plan IS their
+delegation; A5.2 unifies) — posts "I'm asking @handle: …" in the room as the
+asking agent (joining the room first when the asker is itself a nested
+delegate, orchestrate's idempotent module-gated join), then takes the
+delegate's ordinary turn: its product's grounding, its prompt, its id at the
+execution boundary, the asker's account door under all of it. The answer
+folds back as a numbered source of kind `delegated answer`, title `@handle`.
+Every bound is code, not prompt: a **refused handoff spends a slot too**
+(that is what makes a model that insists on delegating terminate), the turn
+at depth 2 is offered nobody and a stray envelope there meets the same
+"there is no @x" line an unknown handle does, and the budget is one object
+threaded through the recursion so nesting multiplies nothing.
+
+**Cuts, recorded.** (1) A delegate's *write* is folded in as words ("it
+wanted to make a change first: …") and proposed nowhere — the one approval
+surface for delegated writes is A5.2's own line item; the person is pointed
+at the agent that can do it. (2) No handoffs from the command palette (no
+room to see the line in) or from orchestrated steps. (3) The handoff line is
+hardcoded English like every server-posted agent string (UNCONFIGURED, the
+plan heading) — the i18n of agent room-speech is one debt, not five.
+
+**Verified.** `cargo fmt`; clippy `-p alo-ai -p alo-jmap --all-targets` zero
+warnings; `cargo nextest run -p alo-ai` 275 passed; `cargo nextest run -p
+alo-jmap` **1394 passed** (356 s), including the new
+`agent_delegation_http` wire suite against the real router and store with
+the scripted model:
+
+- `@billing is anything blocking the Northstar quote?` → billing returns the
+  delegate envelope to `tasks` → the room reads **"I'm asking @tasks: what
+  is on my plate this week?"** (said by billing; tasks posts nothing) → the
+  tasks turn runs `my_plate` **for real** against the store, answers
+  "Nothing is due this week." → billing's next call carries `delegated
+  answer "@tasks" — @tasks answered: Nothing is due this week.` → the room
+  reads "Nothing stands in the way — @tasks says nothing is due [1]." Four
+  model calls, no proposal row anywhere.
+- Wrong tenant + module gate, one test: tenant B's `@ghost` and a
+  module-denied `@inventory` are both dropped — no room line, no delegate
+  turn, the model told "there is no @ghost / @inventory", and neither handle
+  ever appeared in the offer.
+- The fifth handoff in one run is refused with no model call for it; the run
+  ends "…as much as I'm allowed to for one question".
+- A three-hop chain: the depth-2 turn gets no offer, its stray envelope is
+  dropped, both answers fold back up the chain (calls == 6, two room lines).
+- A delegate that wants `create_task` yields **zero** proposal rows and the
+  asking agent says who to ask directly.
+
+**Environment note.** This track's database is `alo_agents_test`
+(`DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_agents_test`,
+export per gate — the shell's global points at `alo_scratch` with an empty
+password and fails auth). Pruned before the gate: 2 517 → 1 727 tenants.
+
+**Next:** A5.2 — Ask alo's planner becomes the delegation path; delegated
+writes land on the asker's one approval surface.

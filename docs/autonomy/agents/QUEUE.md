@@ -166,12 +166,12 @@ against a real model after each item and quote the answers.
   intents return it; agents cite it.
 - [x] A4.6 The event stream: `events` table, every intent execution emits;
   audit reads from it.
-- [ ] A4.7 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* The evaluation set grows from the intents' `answers`; the scripted
+- [!] blocked: agents-a/b/c journals show no `LOOP COMPLETE` yet (checked 2026-08-28, second time) — A4.7 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* The evaluation set grows from the intents' `answers`; the scripted
   run records answers verbatim and is the wave's exit gate.
 
 ## Wave A5 — delegation
 
-- [ ] A5.1 The `delegate` envelope: an agent hands a sub-question to another
+- [x] A5.1 The `delegate` envelope: an agent hands a sub-question to another
   agent inside its run, as the asker, depth ≤ 2, ≤ 4 per run, one budget;
   the room sees the handoff line; the delegate's answer is folded in, cited.
 - [ ] A5.2 Ask alo's planner becomes the delegation path (one mechanism, not

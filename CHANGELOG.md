@@ -1,5 +1,7 @@
 # Changelog
 
+- Agents can now ask each other for help inside one question: ask the Billing agent whether anything blocks a quote and it can hand the stock part to the Inventory agent, with the room shown who asked whom for what, the helper's answer cited in the reply, and hard limits — at most four handoffs, never more than two deep, only to agents you could ask yourself, and never a change made on a handoff.
+
 - Approved leave now shows in the team's Agenda: the month and week views and the day panel quietly say who is away on each day — a name and a day, never the kind of leave or the note — and leave that is cancelled disappears from the calendar in the same act, because the calendar draws the absence feed live rather than keeping events of its own.
 
 - A record's History tab now shows what agents did to it, not only what people clicked: when a billing agent sends an offer or records a payment on your say-so, that act appears on the record itself, named after the agent that ran it — and everything an agent does in your workspace now lands on one tamper-proof stream that future notifications and automations will read from, instead of each feature watching the database on its own.
