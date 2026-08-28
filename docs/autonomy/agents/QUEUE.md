@@ -104,32 +104,38 @@ answered.
 
 ---
 
-## Wave A4 — complete over its app (ADR 0057)
+## Wave A4 — one command layer: intents (ADR 0057, ADR 0058)
 
-**Read ADR 0057 and `docs/design/complete-agents.md` first.** The 2026-08-28
-evaluation (STATE.md) is the acceptance test of every item below: run it
+**Read ADR 0057, ADR 0058 and `docs/design/complete-agents.md` first.** The
+2026-08-28 evaluation (STATE.md) is the acceptance test of every item: run it
 against a real model after each item and quote the answers.
 
-- [ ] A4.0 The capability manifest type and the coverage test: `Capability` /
-  `Excluded` in `alo-ai`, a per-module manifest file, a test that walks the
-  module's router and fails on a route that is neither reachable nor excluded.
-  Tools, prompt lines, the execution allow-list and the directory's `tools`
-  all render from the manifest — delete the hand-written sets as each module
-  moves over.
-- [ ] A4.1 ★ Billing's manifest (44 routes): open quotes, quote lookup, unpaid
-  invoices, customer lookup, totals for a period, plus the three existing
-  writes. `@billing which quotes are open?` and `@alo what did we quote
-  Northstar Foods?` answer from the record. Multi-step reads (six per turn).
-- [ ] A4.2 Sales (CRM) and Finance manifests: open deals by stage, deal
-  lookup; invoiced / paid / outstanding for a period, VAT summary.
-- [ ] A4.3 Projects, Drive and Docs manifests: active projects overview,
-  project lookup; recent files, list a folder; list documents, document
-  lookup — the "which files do we have" class that had no tool.
-- [ ] A4.4 Every remaining module's manifest (Inventory, HR, Sites, Tasks,
-  Agenda, Chat, Meet, Insights, Sheets, Mail) with its coverage test green.
-- [ ] A4.5 The evaluation set grows from the manifests' `answers`; the run is
-  scripted (the 2026-08-28 script), records answers verbatim, and is the
-  wave's exit gate.
+- [x] A4.0 `IntentSpec` in `alo-ai` (`intent.rs`): name, purpose, effect,
+  typed args, `answers`, `preview`, `undo`, `route`; `ToolSet` becomes a
+  rendering of intents (prompt lines, tool list, `offers`, directory `tools`);
+  the read budget rises to six per turn. Coverage test: every `/<module>/`
+  route in `server.rs` is an intent's adapter or an `Excluded` with a reason.
+- [x] A4.1 ★ Billing intents, the reference (agent half — see STATE; the route-adapter half is A4.1b): reads `open_quotes`,
+  `quote_lookup`, `customer_lookup`, `unpaid_invoices`, `invoice_lookup`,
+  `billing_totals`; writes `send_quote`, `issue_invoice`, `record_payment`
+  beside the three existing ones, each with a preview; executors return the
+  module's own record views (`document_json`, `customer_json`); routes call
+  the same functions. `@billing which quotes are open?` and `@alo what did we
+  quote Northstar Foods?` answer from the record, on the wire.
+- [ ] A4.1b Billing's routes become adapters: each `/billing/` handler calls the same executor its verb calls, so a route and an intent cannot drift; the coverage test then asserts the call, not just the name.
+- [ ] A4.2 Sales (CRM) and Finance intents: open deals by stage, deal lookup;
+  invoiced / paid / outstanding for a period, VAT summary.
+- [ ] A4.3 Projects, Drive and Docs intents: active projects, project lookup;
+  recent files, list a folder; list documents, document lookup.
+- [ ] A4.4 Every remaining module's intents (Inventory, HR, Sites, Tasks,
+  Agenda, Chat, Meet, Insights, Sheets, Mail), hand-written tool constants
+  deleted, coverage tests green.
+- [ ] A4.5 Provenance (`origin`) on the records the moved modules create;
+  intents return it; agents cite it.
+- [ ] A4.6 The event stream: `events` table, every intent execution emits;
+  audit reads from it.
+- [ ] A4.7 The evaluation set grows from the intents' `answers`; the scripted
+  run records answers verbatim and is the wave's exit gate.
 
 ## Wave A5 — delegation
 
@@ -162,9 +168,22 @@ against a real model after each item and quote the answers.
 - [ ] A7.2 `[web]` The instruction card in the channel with Cancel for the
   author and the owner.
 
-## Wave A8 — exit
+## Wave A8 — actions and goals
 
-- [ ] A8.1 The full evaluation on the wire, every agent, against a real model,
+- [ ] A8.1 The action record: every intent execution, by a person or an agent,
+  leaves one row with preview, actor, on_behalf_of, result, undo; a person's
+  click and an agent's proposal are the same object.
+- [ ] A8.2 Undo an agent with the button that undoes a person; hand an open
+  proposal to an agent; assign a task to an agent (a standing instruction with
+  a due date).
+- [ ] A8.3 Goals: a goal record with Ask alo's plan, steps, progress, one
+  approval surface and Stop; the Northstar demo across Sales, Billing, Mail
+  and Agenda.
+- [ ] A8.4 `[web]` The agent on the record in focus in every moved module.
+
+## Wave A9 — exit
+
+- [ ] A9.1 The full evaluation on the wire, every agent, against a real model,
   quoted in STATE.md; the six that said "I could not find it" answer from
   the record; a standing instruction fires and posts; a delegation is visible
   in a room; a channel's memory is read back and forgotten.

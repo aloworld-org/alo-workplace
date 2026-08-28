@@ -49,6 +49,15 @@ contracts.
 
 ## Unreleased
 
+- The Billing agent now answers from the record: which quotes are open, what
+  was quoted to a customer, a customer's standing, unpaid and overdue
+  invoices, one invoice in full, and what was invoiced, paid and outstanding
+  over a period. It can also propose sending an offer, issuing an invoice and
+  recording a payment — each previewed and run only on your approval. Its
+  verbs are defined once (ADR 0058) and every Billing route is either one of
+  them or excluded with a reason; a turn may now look up to six things up
+  before answering.
+
 - A quotation's designed content — the headings, paragraphs, lists, pictures,
   tables and dividers laid out in the quotation studio, its colours and its
   column choices — is now saved with the quote and printed into the document

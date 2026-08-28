@@ -3705,3 +3705,37 @@ no read tool exists for them — no tool ran at all.
 Verdict: the framework performs (fast, isolated, honest); the business agents do not
 *answer* because their tool sets are writes only (Billing, Sales, Finance) or lack an
 overview read (Projects, Drive, Docs). Wave A4 exists to close exactly this gap.
+
+---
+
+## A4.0 + A4.1 — the intent layer, Billing as the reference (2026-08-28)
+
+**Shipped.** `alo_ai::intent` (`IntentSpec`, `Arg`, `Excluded`, `IntentModule`,
+`render_preview`, `routes_in`); `ToolSet` renders from an `IntentModule` when a
+module has moved; Billing moved (`alo_ai::billing_intents`, twelve verbs: six
+reads that did not exist this morning, the three existing writes, and
+`send_quote`, `issue_invoice`, `record_payment` with previews); executors in
+`alo-jmap`'s `billing_intents.rs` answer with the record views Billing's own
+routes serve; every `/billing/` route is a verb's or excluded with a reason —
+`every_billing_route_is_a_verb_or_an_exclusion` reads the router source and
+fails otherwise; the read budget per turn is six. The hand-written
+`agent_billing.rs` tool set in `alo-ai` is deleted.
+
+**Not yet the whole of A4.1:** the routes do not yet *call* the intent
+executors (they call the same store functions); "routes are adapters" is
+queued as A4.1b so the refactor is a visible item rather than a claim.
+
+**On the wire, same room questions as this morning, same model
+(gpt-4o-mini), my checkout's backend on 8081:**
+
+| Question | This morning | Now | Tool run |
+|---|---|---|---|
+| `@billing which quotes are open right now, and what are they worth?` | *I could not find information about open quotes and their values.* | *Currently, there is one open quote: QUO-2026-00001 for Harbor Logistics NV, worth 7865.00 EUR (gross). It was sent on 2026-08-25 and is valid until 2026-09-24.* | `open_quotes` |
+| `@billing where are we with Northstar Foods — anything open or unpaid?` | — | *Northstar Foods BV has one unpaid invoice, INV-2026-00001, which was issued on 2026-08-25. The total amount is 3472.70 EUR, with 2472.70 EUR still outstanding. The due date for this invoice is 2026-09-24. There are currently no open quotes for this customer.* | `customer_lookup` |
+| `@billing how much have we invoiced this year, and how much is still outstanding?` | — | *This year, we have invoiced a total of 8070.70, and the outstanding amount is 2472.70.* | `billing_totals` |
+| `@alo what did we quote Northstar Foods, and has it been sent?` | *I could not find the information about what was quoted to Northstar Foods.* | *I could not find the quote for Northstar Foods.* — Ask alo delegated to Billing this time, and Billing ran `open_quotes`, which lists **sent** offers; Northstar's offer is a draft, so the sentence is true of open offers and useless as an answer. Fixed in the same item: `open_quotes` asked about one customer now lists that customer's drafts too. The planner still routes on agent descriptions rather than the verbs' `answers` (the earlier run sent the step to `@crm`); A5.2 makes it read the registry. | `open_quotes` |
+
+The scripted-model suite (`agent_billing_intents_http.rs`) holds the same three
+paths — open quotes answered from the record with the draft counted and not
+listed; the customer's sent offer looked up in full with the newer draft
+beside it; `send_quote` proposed and not run, the draft still a draft.

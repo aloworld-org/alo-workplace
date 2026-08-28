@@ -1,214 +1,224 @@
-# Complete agents — one agent per app, delegation, channel memory, standing instructions
+# Complete agents — intents, records, events; delegation, channel memory, standing instructions, goals
 
-*Design note for [ADR 0057](../decisions/0057-one-agent-per-app-complete-over-its-api.md).
-Extends `chat-agents.md`, which stays authoritative for identity, authority,
-approval and the room mechanics. Nothing here is built yet; the agents queue
-(`docs/autonomy/agents/QUEUE.md`, waves A4–A8) executes it.*
+*Design note for [ADR 0057](../decisions/0057-one-agent-per-app-complete-over-its-api.md)
+(what an agent is) and [ADR 0058](../decisions/0058-intents-records-events-one-command-layer.md)
+(how the app and its agent share one command layer). Extends `chat-agents.md`,
+which stays authoritative for identity, authority, approval and the room
+mechanics. The agents queue (`docs/autonomy/agents/QUEUE.md`, waves A4–A9)
+executes it.*
 
-## What this is for
+## The thesis
 
-Sila (silahq.com) set the bar for *where* agents live: in the team's own
-channels and DMs, `@`-mentionable, acting across tools, aware of one another.
-We already have that shape. What we do not have is the substance under it:
-each agent reaches a handful of hand-written tools over an app that can do far
-more. This note is how an agent becomes complete over its app, how agents hand
-work to each other, what an agent may remember, and how a person asks once for
-something recurring.
+Work is a graph of **records**, **verbs** and **events**. People and agents
+operate the same graph through the same verbs. Language is one interface to
+it; screens are another. Nothing an agent does is outside the app, and nothing
+the app does is invisible to the agent. That — not a chat bolted on — is what
+AI-native means here, and it is possible because we own every app on one
+store.
 
 ## Surface
 
 | Who | Sees |
 |---|---|
-| A person in a channel | `@billing which quotes are open?` answered from the record; `@billing invoice the Northstar quote` proposed with one tap; a visible line when Billing hands part of the work to Sales; a **standing instruction** card the author can cancel; a **What I remember** page per agent per channel. |
-| A person in a DM with an agent | The same, with memory scoped to that one person. |
-| A module owner | A **capability manifest** to keep true; a coverage test that fails when a route is neither reachable nor excluded. |
-| An admin | Which agents exist, their manifests, their run record — the directory that exists today, now complete. |
+| A person in a channel or DM | `@billing which quotes are open?` answered from the record with links into it; `@billing invoice the Northstar quote` previewed and proposed with one tap; a visible line when Billing hands part of the work to Sales; a **standing instruction** card the author can cancel; a **What I remember** page per agent per channel. |
+| A person inside an app | The same agent on the **record in focus** — in the quote editor, "chase it", "make this an invoice", "why is the VAT 9 %" without naming anything. |
+| A module owner | One intent registry to keep true; a coverage test that fails when a route is neither an intent's adapter nor an exclusion with a reason. |
+| An admin | The agent directory: every agent, every intent it may run, its run record — complete because it is rendered from the registry. |
 
-## 1. Coverage by construction — the capability manifest
+## 1. Intents — the one command layer
 
-Each module ships one manifest, one file, one responsibility:
-`products/mail/alo-jmap/src/<module>_capabilities.rs` (billing, crm, finance,
-projects, inventory, hr, drive, docs, sheets, sites, tasks, calendar, chat,
-meet, insights, mail).
+Each module defines its verbs once, in `platform/alo-ai/src/<module>_intents.rs`
+(the words the model and the directory read) with executors in
+`products/mail/alo-jmap/src/<module>_intents.rs` (the code that runs them):
 
 ```rust
-Capability {
-    name: "open_quotes",                       // the tool name
-    purpose: "The offers that are still open, newest first, with what each is worth.",
-    route: Route::Get("/billing/quotes?status=sent"),
-    args: &[Arg::opt("customer", "Limit to one customer, by name or id")],
+IntentSpec {
+    name: "open_quotes",
+    purpose: "The offers still open — sent and not yet answered — newest first, each with what it is worth.",
     effect: Effect::Read,
-    answers: &["which quotes are open", "what did we quote X", "what is X worth"],
+    args: &[Arg::optional("customer", "text", "limit to one customer, by name")],
+    answers: &["which quotes are open", "what have we offered lately", "what is X worth"],
+    preview: None,
 }
-Excluded { route: Route::Delete("/billing/quotes/{id}"), why: "A draft is deleted by a person, in the app, on purpose." }
+IntentSpec {
+    name: "send_quote",
+    purpose: "Send an offer: it gets its number, the validity clock starts, and the document is frozen.",
+    effect: Effect::Write,
+    args: &[Arg::required("quote", "text", "the quote's number, or the customer's name for their open draft")],
+    answers: &["send the quote", "send Northstar their offer"],
+    preview: Some("Quote {quote} for {customer} will be numbered and sent; its lines and design will be frozen."),
+}
 ```
 
 Rules:
 
-- **Derived, never duplicated.** The agent's tool set, the prompt's tool
-  lines, the execution boundary's allow-list and the directory's `tools`
-  entry are all renderings of the manifest. There is no second list.
-- **Every route is accounted for.** The coverage test walks the module's
-  router and fails on a route that is neither a capability nor an exclusion.
-  An exclusion is a sentence, not a shrug.
-- **Execution goes through the route.** A capability runs the same handler
-  the web client calls, with the asker's token — so an agent can never do
-  more than the app, and validation, tenancy and audit are the route's own.
-- **Effect is declared once**, on the capability, as ADR 0047 requires.
-- **Examples ground the router.** `answers` are the questions the capability
-  exists for; Ask alo's planner and the agent's own tool choice read them.
-  They are also the seed of the evaluation set.
+- **One registry.** The prompt's `- name: …` lines, the tool set, the
+  execution boundary's allow-list (`offers`) and the directory's `tools` are
+  all rendered from `IntentSpec`s. The hand-written `*_TOOLS` / `*_TOOL_DOC`
+  constants are deleted as each module moves over.
+- **Routes are adapters.** A route handler does argument parsing and calls the
+  same function the intent executor calls. Coverage: every `/<module>/…`
+  route in `server.rs` is named by exactly one intent (`route:`) or by an
+  `Excluded { route, why }`; the test reads the router source and fails on a
+  route that is neither.
+- **Writes preview.** A write's `preview` is rendered with the resolved
+  arguments and shown on the proposal card before anyone taps; it is what the
+  action record keeps as "what this would do". An intent with an inverse
+  declares `undo: Some("discard_invoice_draft")`; one without says so in its
+  purpose ("an issued invoice cannot be un-issued").
+- **Argument resolution is the executor's**, not the model's: a customer may
+  be named; a quote may be named by number *or* by customer; the executor
+  resolves, refuses ambiguity with a sentence ("two customers match 'North'"),
+  and never guesses.
+- **Effect is declared once** (ADR 0047) and read at the boundary.
+- **Multi-step reads**: up to **six** read executions and two model calls per
+  turn; a write ends the turn with one proposal. Constants in code.
 
-The Billing manifest comes first (forty-four routes). Then Sales, Finance,
-Projects, Drive, Docs — the six that failed the evaluation — then the rest.
+### Billing — the reference module
 
-### Multi-step turns
+Reads: `open_quotes`, `quote_lookup` (by number or customer), `customer_lookup`,
+`unpaid_invoices` (overdue flagged), `invoice_lookup`, `billing_totals` (a
+period: invoiced, paid, outstanding, VAT). Writes: `create_invoice_draft`,
+`quote_to_invoice`, `draft_payment_reminder` (existing), `send_quote`,
+`issue_invoice`, `record_payment`. Excluded with reasons: print/PDF/e-invoice
+files (served, not decided), the quote design (the studio's), settings and FX
+rates (a person's configuration), bills import and SEPA export (take or
+produce files), schedules (a later intent set).
 
-A complete agent needs more than one read per turn: "what did we quote
-Northstar" is *find the customer → list their quotes → read the one*. The turn
-loop allows up to **six** read executions and **two** model calls per turn
-(ADR 0047 allowed three and two); a write still ends the turn with one
-proposal. Budgets are constants in code, not prompt text.
+## 2. Record views and provenance
 
-## 2. Delegation between agents
+- A module's **record view** is the JSON its own detail route returns
+  (`document_json` for a quote or an invoice, `customer_json` for a customer).
+  An intent's read returns that shape, trimmed to what the turn needs, so an
+  agent grounds in exactly what a person sees. No separate summary.
+- **Provenance** is a field on the record: `origin` = `{kind, id, label}` —
+  the thread a task came from, the quote an invoice came from, the meeting a
+  decision came from. Modules set it where they create records; intents
+  return it; agents cite it ("from the Northstar thread, 12 Aug").
 
-Inside one run, an agent may **hand off** a sub-question or sub-task:
+## 3. Events as perception
+
+Every intent execution emits `Event { tenant, kind: "quote.sent", record,
+actor, on_behalf_of, at }` on the tenant's event stream (`alo-store`,
+`events` table, append-only). Consumers: notifications, audit, standing
+instructions (module-event triggers) and memory extraction. Nothing polls the
+record tables for change.
+
+## 4. Actions are objects
+
+A proposal is already a row (`chat_proposals`). It grows into the **action
+record** every intent execution leaves, whoever asked: intent, arguments,
+preview, actor, on_behalf_of, result, undo (the inverse intent and its
+arguments, when there is one). A person's click through the UI leaves the same
+row. Consequences that follow from this and nothing else:
+
+- **Hand an action to an agent**: an open proposal can be reassigned
+  ("@billing, you finish this").
+- **Assign a task to an agent**: a task whose assignee is an agent is a
+  standing instruction with a due date; the board is the agents' work queue.
+- **Undo an agent** with the button that undoes a person.
+
+## 5. Delegation
+
+Inside one run, an agent may call another module's intent as the asker:
 
 ```
 { "delegate": { "to": "crm", "ask": "which deal is behind quote Q-2026-00031?" } }
 ```
 
-- Runs as an ordinary turn of the named agent, **with the asker's authority
-  and scope** — the delegate reaches nothing the asker could not.
-- **Depth ≤ 2** (an agent may delegate; its delegate may delegate once more;
-  no further). **At most four delegations per run.** The run's budget is one
-  budget across all of them.
-- **Visible**: the room gets a system line — *Billing asked Sales: which deal
-  is behind quote Q-2026-00031?* — and the delegate's answer is folded into
-  the asking agent's turn, cited.
-- **Only to agents the asker can see** (module gating), exactly as Ask alo's
-  planner already drops unknown handles.
-- A write proposed by a delegate is proposed **to the asker**, in the asking
-  agent's name, with the delegate credited. One approval surface.
-- Never across a shared (cross-company) channel in v1.
+Depth ≤ 2, at most four per run, one budget; the room sees *Billing asked
+Sales: …*; the delegate's answer is folded in and cited; a write proposed by a
+delegate lands on the asker's one approval surface; only agents the asker can
+see; never across a shared channel. Ask alo's planner is this mechanism, not a
+second one.
 
-Ask alo's planner becomes a special case of this: it is the agent whose whole
-job is to delegate.
-
-## 3. Channel memory
+## 6. Channel memory
 
 **The channel is the consent boundary.** What was shared in a channel may be
-remembered by the agents in it, whoever wrote it.
+remembered by the agents in it, whoever wrote it; it is usable in that channel
+and nowhere else. A DM with an agent feeds only that person's memory.
 
-| Scope | Learned from | Usable in |
-|---|---|---|
-| `channel` | messages in that channel | that channel |
-| `person` | the person's DM with the agent | that person's DM with it |
-
-- **What is remembered**: facts and decisions the agent extracted, each with
-  the message it came from — *"Northstar is on net 30 (from Anna, 12 Aug)"* —
-  never transcripts.
-- **When**: at the end of a turn the agent took part in, over the messages it
-  read for that turn; and on an explicit *"@billing remember that …"*, which
-  works even where learning is off.
-- **Switch**: per channel, in room settings, on by default; off means no
-  learning and the existing memories for that channel are hidden (kept for
-  30 days, then deleted). Workspace-level default in the admin console.
-- **Visible**: *What I remember* — per agent, per channel; every member reads
-  it; the owner forgets one item or all; the author of a memory's source
-  message may forget it too.
-- **Deletion follows the source**: deleting a message deletes what was learned
-  from it; archiving a channel deletes its memories; removing an agent from a
-  channel deletes what it learned there.
-- **Retrieval**: a turn may read only memories whose scope the asker is inside
-  — the channel it runs in, or the asker's own DM memory. Nothing cross-channel.
-- **No cross-channel pooling in v1.** A company-wide fact is a "remember
-  that …" in the channel everyone is in.
-
-### Data model
+- Facts and decisions with the message they came from, never transcripts;
+  learned at the end of a turn from what the turn read, or on an explicit
+  *"remember that …"* (which works even where learning is off).
+- Per-channel switch (room settings, on by default); workspace default in the
+  admin console; off hides that channel's memories (deleted after 30 days).
+- *What I remember* — per agent per channel; every member reads; the owner or
+  the source author forgets.
+- Deletion follows the source: message deleted, channel archived, agent
+  removed → its memories go.
+- Retrieval only inside scope: the channel the turn runs in, or the asker's
+  DM memory. No cross-channel pooling in v1. Records are the memory of facts;
+  channel memory is for what is not in a record; **policy memory** ("we
+  invoice net 30", "Anna approves discounts over 10 %") is explicit, per
+  agent, tenant-wide, editable — a later item.
 
 ```sql
 CREATE TABLE agent_memories (
-    tenant_id     TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    id            TEXT NOT NULL,
-    agent_id      TEXT NOT NULL,                 -- chat_agents
-    scope         TEXT NOT NULL,                 -- 'channel' | 'person'
-    channel_id    TEXT,                          -- scope = channel
-    user_id       TEXT,                          -- scope = person
-    fact          TEXT NOT NULL,                 -- one sentence
-    source_msg    TEXT,                          -- chat message id, NULL for "remember that"
-    learned_from  TEXT NOT NULL,                 -- user id of the message's author
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    id TEXT NOT NULL, agent_id TEXT NOT NULL,
+    scope TEXT NOT NULL,             -- 'channel' | 'person'
+    channel_id TEXT, user_id TEXT,
+    fact TEXT NOT NULL, source_msg TEXT, learned_from TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, id)
 );
--- channel settings gain: agent_memory BOOLEAN NOT NULL DEFAULT true
 ```
 
-Memory is tenant data in the tenant's language; it is never sent to a model
-except inside a turn in its own scope.
+## 7. Standing instructions
 
-## 4. Standing instructions
+A person asks once, in advance. A card in the channel with the instruction in
+the author's words, the trigger (a schedule, or a module event the intent
+registry names — `invoice.overdue`, `quote.expiring`), the agent, and
+*Cancel* for the author and the room owner. Each firing is a turn with the
+author as asker: reads post, writes propose to the author. Bounds: one firing
+per instruction per hour, twenty per channel, paused when the author leaves.
+`agent_instructions` (tenant, id, agent, channel, author, text, trigger,
+next_run, paused), run on the scheduled-mail sweeper.
 
-A person asks once, in advance: *"@billing every Monday at 9, post the open
-quotes here"*, *"@finance when an invoice is 14 days overdue, draft the
-reminder"*.
+## 8. Goals
 
-- **A card in the channel**, with the instruction in the author's words, the
-  schedule or trigger, the agent, and *Cancel* — live for the author and the
-  room owner, inert for everyone else.
-- **Runs as the author**: each firing is a turn with the author as asker.
-  Reads post their answer; a write is proposed to the author (a Monday post is
-  a read; drafting a reminder is a write and waits for the author's tap, as
-  any write does). A standing instruction is the author's pre-approval of
-  the *read*, never of a write.
-- **Bounded**: at most one firing per instruction per hour; at most twenty
-  instructions per channel; an instruction whose author leaves the channel is
-  paused and shown as such.
-- **Two kinds of trigger in v1**: a schedule (cron-like, in words the client
-  turns into a schedule) and a module event the manifest names as a trigger
-  (`invoice.overdue`, `quote.expiring`). Nothing else — "when X" over
-  arbitrary conditions is a query the agent runs on a schedule, which the
-  first kind already covers.
-- Lives in `agent_instructions` (tenant, id, agent, channel, author, text,
-  trigger, next_run, paused) and runs on the same background sweeper that
-  sends scheduled mail.
+"Close the Northstar deal by Friday" is a goal record: the plan Ask alo made
+(steps, each an agent and an intent), progress, one approval surface, Stop.
+Agents work its steps; humans approve its writes; the room sees the card.
+Coordination happens through the object, never through agents talking.
 
-## 5. Evaluation is the acceptance test
+## 9. Evaluation is the acceptance test
 
-`docs/autonomy/agents/STATE.md` records the seventeen-question run of
-2026-08-28. That run, extended per manifest with the capability `answers`, is
-the acceptance test of every item in waves A4–A8: run against a real model,
-answers quoted verbatim, with the tool runs behind them. A wave is done when
-its agent answers its questions from the record, not when its tests are green.
+The seventeen-question run of 2026-08-28 (`STATE.md`) plus every intent's
+`answers`, scripted, against a real model, answers quoted verbatim with the
+tool runs behind them — the exit gate of every wave. A green suite proves a
+tool runs; the run proves an agent answered.
 
 ## Errors
 
 | Case | Answer |
 |---|---|
-| Capability the agent was not offered | `403`, refused at the boundary, run recorded (unchanged) |
-| Delegation beyond depth or count | the step is dropped and the agent says which part it could not do |
-| Budget exhausted mid-run | the turn ends with what it has, marked partial in the room |
-| Memory learning off for the channel | turn runs, nothing is remembered, "remember that …" still works |
-| Standing instruction's author gone | paused, card says so |
+| Intent the agent was not offered | `403` at the boundary, run recorded |
+| Ambiguous argument (two customers match) | the read answers with the candidates; a write is not proposed |
+| Delegation beyond depth or count | the step is dropped; the agent says which part it could not do |
+| Budget exhausted | the turn ends with what it has, marked partial in the room |
+| Memory learning off | nothing remembered; "remember that …" still works |
+| Instruction's author gone | paused, the card says so |
 
 ## Tenancy
 
-Every capability runs through the asker's account door via the module's own
-route. Memories carry `tenant_id` and a scope the retrieval joins on; the
-wrong-tenant and wrong-channel tests are mandatory for `agent_memories` and
-`agent_instructions`. A delegate turn is the asker's turn.
+Every intent runs through the asker's account door via the module's own store
+functions; the action record carries tenant and asker; memories and
+instructions carry `tenant_id` and a scope the retrieval joins on. Wrong-tenant
+and wrong-channel tests are mandatory for every new table; a delegate turn is
+the asker's turn.
 
 ## Rollout
 
-Per tenant, default off: `agents.complete` (manifest-derived tools),
-`agents.delegation`, `agents.memory` (with the per-channel switch beneath it),
-`agents.instructions`. Turning one on is a config change; off is the same
-change. Watch: tool runs per agent per day, `ok` ratio, turns hitting a budget,
-delegations per run, memories per channel, instruction firings.
+Per tenant, default off: `agents.intents` (per module as each moves over),
+`agents.delegation`, `agents.memory`, `agents.instructions`, `agents.goals`.
+Watch: tool runs per agent per day and their `ok` ratio, turns that hit a
+budget, delegations per run, memories per channel, instruction firings,
+undo per action kind.
 
 ## Out of scope for this note
 
-Cross-channel or tenant-wide memory; proactive offers; agent-to-agent
-conversation outside a run; delegation across shared channels; voice; bringing
-outside agents (Claude Code, Cursor) into a room; a manifest for the admin
-console (agents do not administer the workspace).
+Cross-channel memory; proactive offers; agent-to-agent conversation outside a
+run; delegation across shared channels; voice; bringing outside agents into a
+room; intents for the admin console.
