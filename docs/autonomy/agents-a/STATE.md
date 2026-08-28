@@ -68,3 +68,94 @@ example, guidance marker "For a CRM tool" → "For a CRM verb".
 
 No migration used (0410–0429 untouched), no new route prefixes, no UI
 strings. Next: AA.2 Finance.
+
+## AA.2 — Finance intents (2026-08-29)
+
+**Shipped.** Finance moved to the intent pattern, copying Billing/CRM: a new
+`alo_ai::finance_intents` (`IntentModule` with 6 reads — `ledger_summary`,
+`vat_summary`, `flag_anomalies`, `unmatched_bank_lines`, `expenses_awaiting`,
+`account_balance` — and 2 writes `categorise_transactions` (kept) and the new
+`approve_expense`, each write with a preview; 30 excluded routes with
+reasons; guidance, marker "For a Finance verb"); new executors in
+`alo_jmap::finance_intents` behind the same `require_finance` gate as the
+finance screens, answering with the store's own figures — `ledger_summary`
+reads the AR-role account's `fin_account_ledger` (invoiced/credit-noted/paid
+split by entry kind, closing balance as outstanding, the queue's "Finance's
+own ledger view, not Billing's"), `account_balance` the same
+`fin_trial_balance` fold as `GET /finance/accounts?from&to`,
+`expenses_awaiting` the approvals inbox's `pending_json` rows,
+`unmatched_bank_lines` the bank page's `line_json`. The hand-written
+`alo_ai::agent_finance` tool set deleted; `alo_jmap::agent_finance` (categorise
++ new approve executor) and `agent_finance_answers` (VAT, anomalies) kept as
+executors reached only from the new dispatch, their answers now flowing
+through `billing_intents::ok` so money displays sit beside integers.
+Registration is one row per shared list (A4.1c):
+`(AgentProduct::Finance, &FINANCE_INTENTS)` in `MOVED`,
+`crate::finance_intents::dispatch` in `agent::MODULES`, one `pub mod` line per
+`lib.rs`. The three Finance arms in `agent.rs`'s legacy match removed with the
+move (unreachable behind the MODULES row).
+
+**Verified.** `cargo fmt`; clippy `-D warnings` clean on alo-ai and alo-jmap;
+nextest green: alo-ai 274/274, alo-jmap 1411/1411 (full suite; test-binary
+rebuild 91 min wall — three loops on this Mac). The new
+`tests/agent_finance_intents_http.rs` covers the queue's demands on the wire
+with a scripted model. The `@finance how much have we invoiced this year, and
+how much is unpaid?` transcript, quoted: user posts the question; model call 1
+returns `{"tool":"ledger_summary","args":{}}` saying "Let me read the
+ledger."; the tool result shown on call 2 carries
+`"invoicedCents":121000` beside `"invoicedDisplay":"1210.00 EUR"`,
+`"paidCents":60500`, `"outstandingCents":60500` beside
+`"outstandingDisplay":"605.00 EUR"` and the `INV-2026-00001` entry trail; the
+agent answers "Invoiced 1210.00 EUR this year; 605.00 EUR is unpaid [1]."
+with no proposal, and the prompt offered all 8 verbs. `approve_expense` comes
+back as a proposal with the claim still `submitted` (re-read from the
+record).
+
+**Isolation.** `another_tenants_waiting_claims_are_unreachable`: two tenants
+on one store; tenant B holds a submitted claim from "Glasshouse Pharma";
+tenant A's agent runs `expenses_awaiting` and is shown `"expenseCount":0` —
+neither B's merchant, amount nor claimant email appears in the sources. The
+queue reads go through `state.store.for_tenant(account.tenant)` exactly as
+the approvals inbox does, behind `require_finance`.
+
+**Cuts (scope, not depth).** (1) `ledger_summary`, `flag_anomalies` and
+`categorise_transactions` stand behind no route (named exceptions in the
+module test): the AR drill-down and the anomaly scan have no `/finance` route
+to adapt, and categorise writes suggestions no route writes. (2) The P&L,
+balance-sheet and aged report screens stay excluded ("a later intent set") —
+`ledger_summary` and `account_balance` answer the questions the queue names.
+(3) `approve_expense` resolves within the pending queue by merchant (+
+optional claimant email / spentOn); rejection and reimbursement stay
+person-only in the app, stated as exclusions. (4) No A4.1b-style
+route-adapter restructuring of the finance route files: executors reuse the
+same store functions and the routes' own JSON views (`pending_json`,
+`line_json`, `account_json` widened to `pub(crate)`), but the "handler calls
+the shared core" drift test remains Billing-only.
+
+**Registry ripples (expected, same shape as AA.1):** 84→89 tools, reads
+44→48 (`agent.rs` reads list + `agent_turn.rs` count), Finance's product
+tool list rewritten in `agent_product.rs`, guidance marker "For a finance
+tool" → "For a Finance verb".
+
+**Rebase note, and three repairs beyond this item's own files.** The Chat
+(AC.1) and Drive (AB.1) moves and the agent-memory item landed on main during
+this item's 91-minute test build, and `origin/main` itself did not compile or
+gate: (1) `agent_product.rs` still held the dead `CHAT_SET`/`DRIVE_SET`
+consts referencing `CHAT_TOOLS`/`DRIVE_TOOLS` that both moves had deleted —
+removed, `Chat`/`Drive => &[]` in `static_sets` (the 93/50 counts upstream
+asserted only hold that way); (2) `chat_intents.rs`'s `post_message` executor
+called `answer_if_asked` with four args while the memory item had made it
+five — the message id now passes through, as `chat.rs` does; (3) the memory
+item's `/chat/channels/{id}/memory` route had no row in Chat's coverage —
+excluded ("the owner's setting in the app"). And the same orphaned-suite trap
+ce8df4ac repaired had reopened: `agent_drive_intents_http.rs` (AB.1) landed
+standalone after B7.04 turned autotests off, silently never built — wired
+into `agents_http_suite` together with this item's
+`agent_finance_intents_http.rs` (which the pre-B7.04 base did run). Kept-both
+on `MOVED`, `MODULES` and the `lib.rs`/CHANGELOG lines; merged counts
+`all_tools` 98, declared reads 54. Full merged-tree gate after the repairs:
+alo-ai 275/275, alo-jmap 1713/1713 (agents_http_suite 134/134 with the
+finance and drive wire tests listed by name), clippy clean on both.
+
+No migration used (0410–0429 untouched), no new route prefixes, no UI
+strings. Next: AA.3 Projects.

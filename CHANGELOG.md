@@ -1,5 +1,7 @@
 # Changelog
 
+- The Finance agent can now answer from your books, not only tidy them: ask @finance how much you have invoiced this year and how much is unpaid (read from your own journal, not from the invoice list), an account's balance, which bank lines are still unreconciled and which expense claims are waiting — with amounts shown readably beside their exact figures. It can also approve a waiting expense claim, always shown as a preview you approve first, and everything it reads stays behind the same admin-or-accountant gate as the Finance screens.
+
 - The Chat agent can now say what is going on across your conversations — which rooms you are in, where something is unread and whether you were mentioned, who is in a room, what a room said while you were away — answered from the same record the sidebar draws. It can also, for the first time, do two things for you: post a message to a room you are in and create a room — always shown to you first, word for word, and posted in your own name only after you approve.
 
 - Agents now use what they remember. Ask in a channel and the agent's answer draws on that channel's remembered facts, cited like any other source; ask in your one-to-one and it draws on what it knows about you — and never the other way round: another room's memories, another person's preferences, and another agent's notes stay out of the answer entirely. Switching a room's memory off hides its memories from answers on the spot, without deleting anything, and switching back on brings them straight back.
