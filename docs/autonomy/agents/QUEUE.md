@@ -101,3 +101,71 @@ queue: **an agent item is not done until its question has been asked and
 answered on the wire**, against the local backend, with the exchange recorded
 in STATE.md. A green test proves the tool runs. It does not prove the agent
 answered.
+
+---
+
+## Wave A4 — complete over its app (ADR 0057)
+
+**Read ADR 0057 and `docs/design/complete-agents.md` first.** The 2026-08-28
+evaluation (STATE.md) is the acceptance test of every item below: run it
+against a real model after each item and quote the answers.
+
+- [ ] A4.0 The capability manifest type and the coverage test: `Capability` /
+  `Excluded` in `alo-ai`, a per-module manifest file, a test that walks the
+  module's router and fails on a route that is neither reachable nor excluded.
+  Tools, prompt lines, the execution allow-list and the directory's `tools`
+  all render from the manifest — delete the hand-written sets as each module
+  moves over.
+- [ ] A4.1 ★ Billing's manifest (44 routes): open quotes, quote lookup, unpaid
+  invoices, customer lookup, totals for a period, plus the three existing
+  writes. `@billing which quotes are open?` and `@alo what did we quote
+  Northstar Foods?` answer from the record. Multi-step reads (six per turn).
+- [ ] A4.2 Sales (CRM) and Finance manifests: open deals by stage, deal
+  lookup; invoiced / paid / outstanding for a period, VAT summary.
+- [ ] A4.3 Projects, Drive and Docs manifests: active projects overview,
+  project lookup; recent files, list a folder; list documents, document
+  lookup — the "which files do we have" class that had no tool.
+- [ ] A4.4 Every remaining module's manifest (Inventory, HR, Sites, Tasks,
+  Agenda, Chat, Meet, Insights, Sheets, Mail) with its coverage test green.
+- [ ] A4.5 The evaluation set grows from the manifests' `answers`; the run is
+  scripted (the 2026-08-28 script), records answers verbatim, and is the
+  wave's exit gate.
+
+## Wave A5 — delegation
+
+- [ ] A5.1 The `delegate` envelope: an agent hands a sub-question to another
+  agent inside its run, as the asker, depth ≤ 2, ≤ 4 per run, one budget;
+  the room sees the handoff line; the delegate's answer is folded in, cited.
+- [ ] A5.2 Ask alo's planner becomes the delegation path (one mechanism, not
+  two); writes proposed by a delegate land on the asker's one approval surface.
+- [ ] A5.3 Isolation: a delegate reaches nothing the asker could not; a
+  handle the asker cannot see is dropped; never across a shared channel.
+
+## Wave A6 — channel memory
+
+- [ ] A6.1 `agent_memories` (migration `04xx`), the per-channel switch, the
+  workspace default; learning at the end of a turn from what the turn read;
+  explicit "remember that …".
+- [ ] A6.2 Retrieval inside scope only: a turn reads its channel's memories or
+  the asker's own DM memories; the wrong-channel test is the one that matters.
+- [ ] A6.3 Deletion follows the source: message, channel archive, agent
+  removed from the channel, switch off (30-day hide then delete).
+- [ ] A6.4 `[web]` **What I remember** — per agent per channel; read by every
+  member, forgotten by the owner or the source author.
+
+## Wave A7 — standing instructions
+
+- [ ] A7.1 `agent_instructions`: schedule and module-event triggers, run as
+  the author on the scheduled-mail sweeper, reads post, writes propose to the
+  author; bounds (one firing per hour, twenty per channel); paused when the
+  author leaves.
+- [ ] A7.2 `[web]` The instruction card in the channel with Cancel for the
+  author and the owner.
+
+## Wave A8 — exit
+
+- [ ] A8.1 The full evaluation on the wire, every agent, against a real model,
+  quoted in STATE.md; the six that said "I could not find it" answer from
+  the record; a standing instruction fires and posts; a delegation is visible
+  in a room; a channel's memory is read back and forgotten.
+

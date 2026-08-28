@@ -33,6 +33,21 @@ propose/approve UI); each agent is a thin, product-scoped tool set + prompt.
 - [L] ★ **The asker's door, always.** An agent reads and writes only what the
   person who asked already could — in a DM, in a private channel, and in a
   cross-org channel. An agent is an identity, never an authority (ADR 0034).
+- [2] ★ **Complete over its app, and nothing more (ADR 0057).** An agent can do
+  everything its app can do: its tools are derived from the module's own
+  capability manifest, every route reachable or explicitly excluded, tested.
+  "I could not find it" for a record the app holds is a bug, not an answer.
+- [2] ★ **Only when asked — then anything.** An agent speaks and acts when a
+  person asks: by mention, in a DM, or by a **standing instruction** ("every
+  Monday, post the open quotes here"), which is asking once, in advance, and
+  cancelling any time. No unsolicited offers.
+- [2] ★ **Agents hand work to each other, visibly.** Billing may ask Sales for
+  the deal behind a quote — inside one run, as the asker, to a depth of two,
+  with the room seeing who asked whom. Never a conversation between agents.
+- [2] ★ **A channel is what an agent may remember.** What was shared in a
+  channel, its agents may remember — whoever wrote it — and use in that
+  channel only. Per-channel switch, a *What I remember* page, and memories
+  that die with the message or the channel.
 
 ### Where you meet an agent
 

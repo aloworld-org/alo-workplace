@@ -143,6 +143,10 @@ RFC 8601 contract) and at submission (DKIM signing). RSA crypto uses
   message feed (avatars, bubbles, timestamps, media previews, presence). See `features.md` → Chat.
 - [ ] ★ Agent-native chat: AI agents as first-class participants (own avatars, @mentionable,
   propose-then-approve replies/reactions) — the AI-native differentiator applied to chat.
+  - [ ] ★ **Complete agents (ADR 0057)**: one agent per app that can do everything the app
+    can do (tools derived from a per-module capability manifest, coverage tested), only when
+    asked; agents delegate to each other inside a run, visibly; a channel is what an agent
+    may remember; standing instructions replace "monitoring". Agents track waves A4–A8.
 - [ ] Application service streaming events to the (future) AI bus
 - [ ] LiveKit deployed; token minting from alo identities; Meet UI on the components SDK
 - [ ] Meeting links native in Agenda; recording to Drive with consent indicators

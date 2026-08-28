@@ -225,6 +225,12 @@ an agent has no account door of its own to widen.
 
 ## Out of scope, deliberately
 
+> **Superseded in part by [ADR 0057](../decisions/0057-one-agent-per-app-complete-over-its-api.md)
+> (2026-08-28):** agent-to-agent *delegation inside one run* and *standing
+> instructions* are now in scope — see `complete-agents.md`. Free agent-to-agent
+> conversation and unsolicited monitoring stay out, for the reasons below.
+
+
 - **Agent-to-agent conversation.** Two agents replying to each other is a loop
   with a bill attached.
 - **Autonomous monitoring** ("tell me when X"). That is a scheduled job wearing
