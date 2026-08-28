@@ -187,3 +187,5 @@ Cuts/flags:
   skips them by decision, recorded here rather than silently.
 
 Queue complete: R1, R2, R3 all `[x]`.
+
+LOOP COMPLETE
