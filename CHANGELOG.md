@@ -8,6 +8,8 @@
 
 - Deleting a company now erases everything, even after bank reconciliation: a tenant who has imported statements, matched lines and booked the money is removed without a trace left in any banking, billing or finance record. Removing a payment that a matched bank line settles is refused with the way out spelled once — take the match back on the reconciliation screen, which removes the payment, reverses the books and returns the line in one act.
 
+- The Sales agent can now answer questions, not only act: ask @crm which deals are open and at what stage, where you stand with a deal or a company (its moves and latest notes included), and what the pipeline is worth — answers come from the board's own records, with amounts shown readably beside their exact figures. Raising a deal, moving one and drafting a follow-up now show a preview of what will change before you approve.
+
 - Each workspace module now registers its agent's abilities in one place, so new module agents can be added side by side without touching each other's code — groundwork for the Sales, Finance, Projects, Drive and other agents that follow.
 
 - Billing's screens and its agent now run through one shared path for every read and write — listing and looking up offers, customers and invoices, raising and issuing drafts, sending offers, accepting them and recording payments — so what the agent reports and what the screen shows can never quietly drift apart, and a build in which they could would fail its own tests.

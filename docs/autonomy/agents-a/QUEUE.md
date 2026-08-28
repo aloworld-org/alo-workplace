@@ -47,7 +47,7 @@ another product (a store function you need and do not find is added as a
 
 ## Queue
 
-- [ ] AA.1 ★ **Sales (CRM)**: reads — open deals by stage and owner, deal lookup by name or company, pipeline summary, a contact's/company's history; writes — the existing `create_deal`, `move_deal_stage`, `draft_followup` with previews. `@crm which deals are open, and at what stage?` answers from the record.
+- [x] AA.1 ★ **Sales (CRM)**: reads — open deals by stage and owner, deal lookup by name or company, pipeline summary, a contact's/company's history; writes — the existing `create_deal`, `move_deal_stage`, `draft_followup` with previews. `@crm which deals are open, and at what stage?` answers from the record.
 - [ ] AA.2 ★ **Finance**: reads — invoiced / paid / outstanding for a period (Finance's own ledger view, not Billing's), VAT summary, unmatched bank lines, expenses awaiting approval, an account's balance; writes — the existing `categorise_transactions`, `vat_summary`, `flag_anomalies` and approving an expense, with previews. `@finance how much have we invoiced this year, and how much is unpaid?` answers from the record.
 - [ ] AA.3 ★ **Projects**: reads — active projects overview, project lookup with status, budget and hours, who is on what, this week's time; writes — the existing `log_time`, `draft_timesheet_from_calendar` with previews. `@projects which projects are active?` answers from the record.
 - [ ] AA.4 ★ **Inventory**: reads — `stock_answer` kept, plus stock below minimum, open purchase orders, a supplier's prices, recent moves; writes — the existing `reorder_proposals` and receiving a delivery, with previews.
