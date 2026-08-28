@@ -3735,6 +3735,22 @@ queued as A4.1b so the refactor is a visible item rather than a claim.
 | `@billing how much have we invoiced this year, and how much is still outstanding?` | — | *This year, we have invoiced a total of 8070.70, and the outstanding amount is 2472.70.* | `billing_totals` |
 | `@alo what did we quote Northstar Foods, and has it been sent?` | *I could not find the information about what was quoted to Northstar Foods.* | *I could not find the quote for Northstar Foods.* — Ask alo delegated to Billing this time, and Billing ran `open_quotes`, which lists **sent** offers; Northstar's offer is a draft, so the sentence is true of open offers and useless as an answer. Fixed in the same item: `open_quotes` asked about one customer now lists that customer's drafts too. The planner still routes on agent descriptions rather than the verbs' `answers` (the earlier run sent the step to `@crm`); A5.2 makes it read the registry. | `open_quotes` |
 
+**Second run, after the registry's example questions reached the prompt and
+the planner's roster (commit `cd9cc2dc`):** `@alo what did we quote Northstar
+Foods, and has it been sent?` → *Here's how I'll do that: 1. @billing — what
+did we quote Northstar Foods? 2. @billing — has the quote for Northstar Foods
+been sent?* → step 1 (`quote_lookup`): *We have quoted Northstar Foods the
+following offers: 1. Managed hosting for 24,900 EUR (net) with a VAT of 5,229
+EUR. This quote is in draft status and was created on 2026-08-27. 2. A draft
+quote with a total of 197,714 EUR (gross) …* → step 2 (`quote_lookup`): *The
+quote for Northstar Foods has not been sent; it is still in draft status.*
+Both steps went to Billing (the previous run sent one to `@crm`), both ran the
+right verb, and the answer is the record's — with one defect: the model read
+`24900` cents as 24,900 EUR despite the guidance. The record views the
+executors return carry integer cents by contract; the fix is to return
+formatted amounts beside them for the turn (queued into A4.1b's follow-up,
+done next).
+
 The scripted-model suite (`agent_billing_intents_http.rs`) holds the same three
 paths — open quotes answered from the record with the draft counted and not
 listed; the customer's sent offer looked up in full with the newer draft
