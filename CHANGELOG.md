@@ -41,6 +41,11 @@ contracts.
 
 ## Unreleased
 
+- Paragraphs and quotes in a quotation can now flow into two or three columns,
+  the same "Columns" setting lists already had. One column looks exactly as
+  before, and on a phone every block stays single-column — two strips of text
+  on a narrow screen are unreadable.
+
 - Adding content to a quotation now opens a proper dialog. The block picker
   used to appear inside the document, pushing everything below it down, growing
   the page while you read it, and scrolling inside a page that was also
