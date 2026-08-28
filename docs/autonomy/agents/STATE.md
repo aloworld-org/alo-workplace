@@ -3821,3 +3821,47 @@ session-unique marker path for background builds.
 
 **Next:** A4.1c — additive registration (module dispatchers as a list), the
 gate of the agents-a/b/c tracks.
+
+## A4.1c — additive registration: a module is one row in each of two lists (2026-08-28)
+
+Built interactively by the owner's session while the loop paused at its
+iteration boundary (the gate the Mac tracks wait on; the loop resumes with A5).
+
+**alo-ai.** `agent_product.rs` no longer carries a `BILLING_SET`, a `BILLING`
+slice or the hand-listed `WORKSPACE` order. A moved module is one row in
+`pub const MOVED: &[(AgentProduct, &IntentModule)]`; `tool_sets(product)` now
+returns `Vec<ToolSet>` — the product's remaining hand-written sets, then its
+`MOVED` rows — and Ask alo is every product once in `ALL_AGENT_PRODUCTS` order,
+derived rather than maintained. The two callers (`system_prompt_for`,
+`registry_asks`) iterate the vector. `MOVED` is exported.
+
+**alo-jmap.** `agent.rs` gains `Dispatched<'a>` (a boxed `Send` future of the
+reply), `ModuleDispatcher` (a `for<'a> fn` over state, account, tool, args) and
+`pub(crate) const MODULES: &[ModuleDispatcher]`; `dispatch()` asks each module
+in turn before its own match, which lost Billing's twelve arms. Each
+`<module>_intents.rs` exposes `pub(crate) fn dispatch(...) -> Option<Dispatched>`
+— Billing's covers its twelve verbs, reaching the three older writes in
+`agent_billing` from there so the agent has one place to look.
+
+**What a module lands as, from now on:** its files, plus one row in
+`alo_ai::agent_product::MOVED`, one row in `alo_jmap::agent::MODULES`, its
+`pub mod` line in each `lib.rs`, and its routes in `server.rs`. A rebase
+conflict on any of those lines is resolved by keeping both sides.
+
+**Tests.** `a_moved_module_is_one_row` (alo-ai): every `MOVED` row's verbs are
+listed and offered by its product and by Ask alo, and `agent_product.rs` names
+`BILLING_INTENTS` exactly twice — import and row. `the_module_is_one_row_in_each_list`
+(alo-jmap): `agent.rs` names `billing_intents::` once, in `MODULES`, and
+`MODULES.len() == alo_ai::MOVED.len()`, so a module registered in one list and
+not the other fails the build's tests. `every_verb_the_registry_offers_is_dispatched`
+now reads the module's own dispatcher. The registry and coverage tests are
+otherwise unchanged and green.
+
+**Verified:** `cargo fmt`; `cargo clippy -p alo-ai -p alo-jmap --tests -D warnings`
+clean; `cargo test -p alo-ai --lib` 273 passed; `cargo test -p alo-jmap --lib`
+792 passed; `--test agent_billing_intents_http` 3 passed and
+`--test agent_orchestrate_http` 6 passed — Billing still answers over the wire
+through the new dispatcher list, and the scripted `send_quote` is still
+proposed and not run.
+
+**Next:** A5 — delegation inside a run. The agents-a/b/c tracks may start.

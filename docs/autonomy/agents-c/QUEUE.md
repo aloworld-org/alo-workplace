@@ -8,6 +8,15 @@ can move modules to intents at once without editing the same lines: it owns
 additive line in each shared list (`A4.1c` in the agents queue made that
 possible; **do not start before it is `[x]` there**).
 
+Since 2026-08-28 (A4.1c `[x]`) those lists are, exactly: one row
+`(AgentProduct::<Product>, &<MODULE>_INTENTS)` in `alo_ai::agent_product::MOVED`,
+one row `crate::<module>_intents::dispatch` in `alo_jmap::agent::MODULES`
+(the module's `pub(crate) fn dispatch(state, account, tool, args) ->
+Option<crate::agent::Dispatched>`, copied from Billing's), the `pub mod` line
+in each `lib.rs`, and the routes in `server.rs`. A test on each side holds the
+two lists to the same length, so a module registered in one and not the other
+fails the gate. A rebase conflict on those rows is resolved by keeping both.
+
 Every module moves the same way — copy Billing (`alo_ai::billing_intents`,
 `alo-jmap`'s `billing_intents.rs`): an `IntentModule` in a new
 `platform/alo-ai/src/<module>_intents.rs` (verbs with purpose, typed args,
