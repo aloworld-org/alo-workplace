@@ -3604,7 +3604,7 @@ ago; the standing warning for the next `alo-store` gate holds.
 a commercially licensed plugin under an ADR, build charts natively as their own
 feature, or drop chart-from-intent. Recommendation unchanged — drop it.
 
-## LOOP HALT — the queue is closed and the wrapper needs stopping (2026-08-15)
+## Waves A1–A3 — LOOP HALT: the queue is closed and the wrapper needs stopping (2026-08-15)
 
 Same three checks as the six entries above, same answers: pull already up to
 date and the tree clean; newest ADR is still `0049` (domain selling, 08-14),
@@ -3638,7 +3638,7 @@ free disk before the next build.
 
 ---
 
-## LOOP COMPLETE — the queue is closed, and both of its blockers with it (2026-08-16)
+## Waves A1–A3 — LOOP COMPLETE: the queue is closed, and both of its blockers with it (2026-08-16)
 
 The halt above named two things a loop could not do for itself. Both are done.
 
@@ -3755,3 +3755,12 @@ The scripted-model suite (`agent_billing_intents_http.rs`) holds the same three
 paths — open quotes answered from the record with the draft counted and not
 listed; the customer's sent offer looked up in full with the newer draft
 beside it; `send_quote` proposed and not run, the draft still a draft.
+
+---
+
+## Reopened 2026-08-28 — waves A4–A9 (ADR 0057, ADR 0058)
+
+The A1–A3 markers above are history, reworded so the wrapper's anchored
+`^#* LOOP COMPLETE|HALT` check no longer reads them as this run's. This run
+ends when every A4–A9 item is `[x]` or `[~]` and a **new** `LOOP COMPLETE`
+line is written below, or a `LOOP HALT` with its reason.
