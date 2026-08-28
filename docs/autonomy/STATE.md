@@ -20152,3 +20152,112 @@ The marker above is reworded so the wrapper's anchored `^#* LOOP COMPLETE|HALT`
 check does not read a finished run's marker as this one's. This run ends when
 every B7 item is `[x]` or `[~]` and a **new** `LOOP COMPLETE` line is written
 below, or a `LOOP HALT` with its reason.
+
+---
+
+## 2026-08-28 — B7.01 ★ Post the document to the ledger
+
+**Shipped.** The posting rules stopped being a library and became the product's
+behaviour: `issue_billing_invoice` re-reads the document inside its own
+transaction after the issue `UPDATE` and books it (`fin_booking::book_issue_in`
+— the invoice rule, or the credit-note mirror with the original backfilled
+first when it predates the wiring); `record_billing_payment` books the
+settlement the same way (`book_payment_in`, backfilling the invoice's issue
+entry when needed, exactly as `bank_reconcile` always has);
+`void_billing_invoice` posts a reversal of the issue entry, dated the
+document's own issue date, so the period nets to zero; and
+`delete_billing_payment` reverses a booked payment's settlement before
+removing the row, refusing to take an older payment out from under a newer one
+(the cumulative-relief rule `bank_unmatch` already enforces). A posting refusal
+fails the document whole — a chart missing a role or a date inside a closed
+period refuses the ISSUE, and the drawn number returns to the sequence. The
+wiring sits on the public doors only; `record_billing_payment_in` stays plain
+because the bank path books for itself. The `post_*` doors remain as the
+explicit backfill and now answer `409 already posted` for anything the wiring
+booked.
+
+New plumbing, all `pub(crate)`: `billing_invoice_in` (the document read
+against the caller's transaction, one loading path behind both doors),
+`fin_account_for_role_on`, `fin_account_required_in`/`invoice_accounts_in`,
+`fin_invoice_entry_in`, `settlement_rate_in`. No route signature changed —
+the intent executors call the same functions and get the same shapes.
+
+**How verified.**
+- `cargo nextest run -p alo-store`: **2525 passed** (was 2519 + 6 broken by
+  the flip). The three fin posting suites now read the entry the document act
+  created; `fin_invoice_posting` proves the chart-missing refusal burns no
+  number (the retry issues as `-00001`); new suite test in
+  `billing_invoice_issue` walks issue-books → void-reverses →
+  closed-period-refuses-whole → reopen-issues-next-number; backfill is proven
+  in `fin_payment_posting` and `fin_credit_note_posting` by test-only surgery
+  (delete the journal, then pay / credit — the issue entry reappears at the
+  document's own date). `bank_manual`/`bank_reconcile` flipped
+  `invoice_booked_now` to false and their receivable baselines to the issued
+  gross. Chart seeding added to 19 store suites' tenant helpers
+  (`common::seed_default_chart`) and two site suites (their paid orders
+  auto-invoice, which now needs the chart).
+- `cargo nextest run -p alo-jmap`: **1379/1380** — 15 HTTP suites seed the
+  chart in setup. The one red, `agent_turn::tests::every_read_runs_and_every_write_waits`
+  (40 ≠ 34), is the agents track's own unit test in their `agent_turn.rs`,
+  broken at HEAD by their intents commit (bb7f2a75) before this item started;
+  their file, their live wave, not touched here. Also repaired in passing: the
+  `audit_routes` golden was red at HEAD because 429f1726 (the interactive
+  billing agent's quotation studio) added `PUT /billing/quotes/{id}/design`
+  without the golden line — added `billing.quote.design.update`, which is the
+  edit that test's own failure message asks for.
+- Clippy clean both crates (zero warnings), fmt applied.
+- **On the wire** (debug `alo-jmap` on `127.0.0.1:8080` over docker `alo-pg`
+  database `alo`, fresh tenants `wireb701` and `wireb701b`, real
+  `/auth/token` bearer):
+
+```
+GET  /finance/reports/pl        before  → incomeCents 0
+GET  /finance/reports/balance   before  → assets 0, balances true
+POST /billing/invoices/{i}/issue        → INV-2026-00001
+GET  /finance/reports/pl        after   → incomeCents 120 000        ← the fourth hop
+GET  /finance/reports/balance   after   → assets 142 800 (AR), liab 22 800 (VAT),
+                                          result 120 000, balances TRUE
+POST …/{i}/issue again                  → 409 only while draft
+POST …/payments ×2                      → settlement entries booked with the rows
+GET  /finance/reports/balance           → assets 142 800 (Bank), balances TRUE
+DELETE …/payments/{newest}              → 200, journal grows a REVERSAL, owed again
+DELETE …/payments/{oldest} (later one stands) → 409 take that one back first
+2nd invoice issued INV-2026-00002       → income 170 000
+credit note issued INV-2026-00003       → income 120 000 — the pair nets out
+POST /finance/periods/{p}/close         → closed
+POST …/{new draft}/issue                → 409 "the books are closed through
+                                          2026-08-31 … Reopen that period" —
+                                          document still draft, number None
+POST …/payments into the closed period  → 409 same sentence
+POST /finance/periods/{p}/reopen        → open
+POST …/{same draft}/issue               → INV-2026-00005 — the refusal burned
+                                          no number
+tenant wireb701b, NO chart: issue       → 422 "no active account for the role
+                                          'ar'; set one on the Accounts screen"
+GET  /finance/accounts (seeds, 20 rows) → issue → INV-2026-00001, P&L 10 000
+psql: fin_entries for wireb701          → invoice 4, credit_note 1, payment 3,
+                                          reversal 1; unbalanced entries 0
+```
+
+**Cuts and flags.**
+- **Product consequence, deliberate (the design note's own rule):** a tenant
+  must open Finance → Accounts once before their first issue; the refusal
+  names the role and the screen. CHANGELOG says this in user voice. Site
+  ticket/stock sales auto-invoice on payment and report `invoiced: false`
+  until the chart exists — same consequence, already surfaced by their
+  outcome flag.
+- Voiding a document whose issue entry lies in a **closed period** is refused
+  (the reversal cannot be written there); the correction for a reported
+  document is a credit note. New sentence in `void_billing_invoice`'s docs.
+- The `agent_turn` unit test is left red for its own track (above): the
+  business gate cannot go green on it without editing a live track's file.
+- `docs/design/finance.md` §B4.04a/b/c updated to as-built; the three
+  "Not yet wired" paragraphs are gone.
+- Environment note for the next iteration: the machine profile's
+  `DATABASE_URL` carries an **empty password** and works only when Docker's
+  port forward takes the trust path — under load it flips to scram and fails
+  auth mid-suite (14 spurious FAILs before this was spotted). Export
+  `postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` explicitly when
+  running the gates.
+
+Next: B7.02 (tenant deletion survives reconciliation).

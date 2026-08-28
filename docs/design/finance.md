@@ -697,13 +697,18 @@ per-rate postings equal to that struct's own rows — checked against a total
 this suite computes independently, and again one layer up in
 `fin_trial_balance`.
 
-**Not yet wired into `issue_billing_invoice`.** The rule above ("the posting
-happens inside the document's own transaction") stands, and this is the
-function that transaction will call — but making it fire today would make
-issuing depend on a chart the tenant has never visited and on a books-opening
-date that does not exist until B4.10. So the wiring lands with the periods and
-the backfill, and until then the caller is explicit. This is a cut with a
-date, not a permanent seam.
+**Wired into `issue_billing_invoice` (B7.01).** The issue transaction re-reads
+the document after its own `UPDATE` and books it through
+`AccountStore::book_issue_in` before committing, so a posting refusal — a
+chart missing a role, an issue date inside a closed period (B4.10) — fails
+the issue whole and the drawn number returns to the sequence. The consequence
+the earlier cut warned about is now the product's rule: a tenant must have
+opened their chart once before their first issue, and the refusal names the
+role and points at the Accounts screen. Voiding an issued document posts a
+**reversal** of its issue entry, dated the document's own issue date, so the
+period nets to zero; voiding a document whose issue entry lies in a closed
+period is refused — that correction is a credit note. The `post_invoice_issue`
+door remains as the explicit backfill for pre-wiring documents.
 
 ### As built (B4.04b), the settlement rule
 
@@ -747,12 +752,16 @@ date, not a permanent seam.
   replaces the constant behind the same signature when the Accounts screen
   grows a place to edit it.
 
-**Not yet wired into `record_billing_payment`**, for the same reason and with
-the same date as the invoice rule. One consequence to carry into that work:
-`delete_billing_payment` is B1's correction path, so once payments book
-automatically, deleting a booked one must post a **reversal** (which
-`fin_journal` already supports) rather than silently leaving its entry
-behind.
+**Wired into `record_billing_payment` (B7.01)** through
+`AccountStore::book_payment_in`, inside the recording's own transaction — and
+an invoice from before the wiring is **backfilled** first, at its own issue
+date, exactly as a confirmed bank match has always done. The consequence the
+earlier paragraph named is honoured: `delete_billing_payment` posts a
+**reversal** of a booked payment's settlement entry before removing the row,
+and — for the same cumulative-relief arithmetic as `bank_unmatch` — only the
+newest payment on a document can be taken back while booked. The bank
+reconciliation path books for itself, which is why the wiring sits on the
+public door and not inside `record_billing_payment_in`.
 
 ### As built (B4.04c), the credit-note rule
 
@@ -794,9 +803,10 @@ VAT-rate group is zero**, which is P4's "per account and per dimension". A
 partial credit note is asserted the other way round: what it leaves standing
 is exactly the uncredited part, on the right rate and the right customer.
 
-**Not yet wired into `issue_billing_invoice`** — which is where a credit note
-is issued too — for the same reason and with the same date as the other two
-rules.
+**Wired into `issue_billing_invoice` (B7.01)** — which is where a credit note
+is issued too: the issue transaction books the mirror, and when the original
+predates the wiring and is not in the books, its issue entry is backfilled
+first in the same transaction, so the pair still nets to zero.
 
 ### When the books open
 

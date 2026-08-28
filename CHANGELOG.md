@@ -4,6 +4,8 @@
 
 - Billing's screens and its agent now run through one shared path for every read and write — listing and looking up offers, customers and invoices, raising and issuing drafts, sending offers, accepting them and recording payments — so what the agent reports and what the screen shows can never quietly drift apart, and a build in which they could would fail its own tests.
 
+- Your books now write themselves: issuing an invoice, recording a payment or issuing a credit note books the matching journal entry in the same act, so the P&L, balance sheet and VAT figures move the moment the document does. An issue that cannot be booked — a chart of accounts still missing the role it needs, or a date inside a closed period — is refused whole and spends no invoice number; voiding a document or removing a payment writes a dated reversal instead of leaving the books pretending nothing changed. One consequence to know: before a company's first invoice can be issued, its chart of accounts must exist — opening Finance → Accounts once creates it.
+
 - Quotation list items and editable table rows and columns now keep their controls in a dedicated toolbar above the text field, so actions no longer compete with the content being written.
 
 - Home now has deliberate breathing room before the Apps launcher and workspace modules, keeping the sidebar groups easy to scan on desktop and mobile.

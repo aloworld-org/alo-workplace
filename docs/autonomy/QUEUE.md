@@ -177,7 +177,7 @@ not new features: each is a stated intention that was never wired, and each was
 demonstrated end to end rather than read off the source. Ordered by what breaks
 without it.
 
-- [ ] B7.01 ★ Post the document to the ledger. `billing_invoices::issue`,
+- [x] B7.01 ★ Post the document to the ledger. `billing_invoices::issue`,
   the payment path and the credit-note path never call the posting functions,
   so `GET /finance/reports/pl` and the balance sheet read zero after a real
   invoice and a real payment (B6.12a, on the wire). The rules are not missing —
