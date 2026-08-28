@@ -1,5 +1,7 @@
 # Changelog
 
+- Tasks now works on a phone: on a small screen the project sidebar tucks away into a drawer — opened from a button in the header, closed by picking a project or tapping outside, exactly as Mail's folders already behave — so your tasks get the whole screen and "Create your first task" fits comfortably at 360 px.
+
 - Quotation dividers now keep their controls on the line and open a focused visual settings dialog for solid, dashed, or dotted styles, line weight, width, and colour.
 
 - Quotation headers now align the company-number and issue-date dividers on one shared visual baseline.

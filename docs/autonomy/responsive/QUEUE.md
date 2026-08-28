@@ -50,7 +50,7 @@ npm script for R3, and `web/src/i18n/**` for any additive key. It never edits
 
 ## The queue
 
-- [ ] R1 Tasks/Projects on a phone: below 768 px the projects sidebar becomes a
+- [x] R1 Tasks/Projects on a phone: below 768 px the projects sidebar becomes a
   drawer (toggle in the header, opens over the content, closes on selection —
   the exact behaviour `MailModule` has for folders), and the content column
   gets the full width. The empty state and its call-to-action fit at 360 px
