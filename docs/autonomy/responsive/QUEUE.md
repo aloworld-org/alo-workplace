@@ -59,7 +59,7 @@ npm script for R3, and `web/src/i18n/**` for any additive key. It never edits
   default, opens on the toggle, closes on selecting a project, and that no
   element in the content column is wider than the viewport; and the existing
   tasks/projects vitest suites still green.
-- [ ] R2 The phone layout as a design-system contract: `ModuleSidebar` in
+- [x] R2 The phone layout as a design-system contract: `ModuleSidebar` in
   `web/src/ds` — a sidebar that is a column at ≥768 px and a drawer below,
   with its toggle, backdrop, focus trap and Escape-to-close, built by lifting
   the mail module's implementation rather than writing a second one (then
