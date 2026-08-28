@@ -35,6 +35,13 @@ contracts.
 
 ## Unreleased
 
+- Adding content to a quotation now opens a proper dialog. The block picker
+  used to appear inside the document, pushing everything below it down, growing
+  the page while you read it, and scrolling inside a page that was also
+  scrolling. It is now the same modal every other dialog uses: over the page,
+  the page untouched, Escape or the backdrop to dismiss, the search box focused
+  as it opens, and the list scrolling within the panel.
+
 - **Destructive confirmations now use alo's clear, spacious dialog pattern,** with the safe action focused first, and the quotation list keeps breathing room beneath its final row instead of meeting the viewport edge.
 - **Repeating events now keep their local time across daylight-saving
   changes.** A weekly 9:00 in Brussels stays 9:00 after the clocks change —
