@@ -1,5 +1,7 @@
 # Changelog
 
+- The app launcher now uses one calm, responsive tile system for favourites and the wider catalogue: app names can wrap in every language, icons and spacing stay consistent, and hover, keyboard-focus and current-app states remain clear without moving cards.
+
 - The app launcher is quieter and easier to scan: favourite apps appear once, the remaining catalogue is separated clearly, and only the current app receives the terracotta selection treatment.
 
 - Every screen now proves it fits your screen: an automated check signs into the real app in a real browser, visits every module at phone, tablet, laptop and desktop widths, and fails the build if anything scrolls sideways or spills off the edge — and the sweep already tidied what it found, so Finance's and HR's tabs now glide sideways under a finger on a phone instead of running off the screen, and the Projects list pans smoothly instead of overflowing.
