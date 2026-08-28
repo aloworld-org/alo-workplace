@@ -1,5 +1,7 @@
 # Changelog
 
+- The Apps launcher is visible again in the dark sidebar: all nine dots and its label now use explicit light colours, with clear hover, keyboard-focus and open states instead of depending on inherited browser styling.
+
 - The app launcher now uses one calm, responsive tile system for favourites and the wider catalogue: app names can wrap in every language, icons and spacing stay consistent, and hover, keyboard-focus and current-app states remain clear without moving cards.
 
 - The app launcher is quieter and easier to scan: favourite apps appear once, the remaining catalogue is separated clearly, and only the current app receives the terracotta selection treatment.
