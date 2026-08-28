@@ -146,18 +146,27 @@ against a real model after each item and quote the answers.
   the same functions. `@billing which quotes are open?` and `@alo what did we
   quote Northstar Foods?` answer from the record, on the wire.
 - [ ] A4.1b Billing's routes become adapters: each `/billing/` handler calls the same executor its verb calls, so a route and an intent cannot drift; the coverage test then asserts the call, not just the name.
-- [ ] A4.2 Sales (CRM) and Finance intents: open deals by stage, deal lookup;
+- [ ] A4.1c Additive registration, so several loops can land modules at once:
+  each `<module>_intents.rs` in `alo-jmap` exposes `dispatch(tool, account,
+  args, state) -> Option<Reply>` and `agent.rs`'s central match becomes a loop
+  over a list of module dispatchers; `agent_product.rs` builds each product's
+  set from a list of `IntentModule`s; `lib.rs` and `server.rs` stay one line
+  per module. A module then lands as new files plus one line in three lists,
+  and a rebase conflict on those lines is resolved by keeping both. Tests:
+  the registry and coverage tests unchanged and green; Billing still answers.
+  **This item gates the agents-a/b/c tracks (LOOP-MAC.md).**
+- [~] A4.2 *(moved to track agents-a, 2026-08-28 — runs on the Mac in parallel)* Sales (CRM) and Finance intents: open deals by stage, deal lookup;
   invoiced / paid / outstanding for a period, VAT summary.
-- [ ] A4.3 Projects, Drive and Docs intents: active projects, project lookup;
+- [~] A4.3 *(moved: Projects → agents-a; Drive, Docs → agents-b)* Projects, Drive and Docs intents: active projects, project lookup;
   recent files, list a folder; list documents, document lookup.
-- [ ] A4.4 Every remaining module's intents (Inventory, HR, Sites, Tasks,
+- [~] A4.4 *(moved: Inventory, HR → agents-a; Sheets, Tasks, Agenda → agents-b; Chat, Meet, Insights, Mail, Sites → agents-c)* Every remaining module's intents (Inventory, HR, Sites, Tasks,
   Agenda, Chat, Meet, Insights, Sheets, Mail), hand-written tool constants
   deleted, coverage tests green.
-- [ ] A4.5 Provenance (`origin`) on the records the moved modules create;
+- [ ] A4.5 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* Provenance (`origin`) on the records the moved modules create;
   intents return it; agents cite it.
 - [ ] A4.6 The event stream: `events` table, every intent execution emits;
   audit reads from it.
-- [ ] A4.7 The evaluation set grows from the intents' `answers`; the scripted
+- [ ] A4.7 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* The evaluation set grows from the intents' `answers`; the scripted
   run records answers verbatim and is the wave's exit gate.
 
 ## Wave A5 — delegation
@@ -206,7 +215,7 @@ against a real model after each item and quote the answers.
 
 ## Wave A9 — exit
 
-- [ ] A9.1 The full evaluation on the wire, every agent, against a real model,
+- [ ] A9.1 *(prerequisite: every other item here and in agents-a/b/c is `[x]` or `[~]`; otherwise `[!]` with the reason)* The full evaluation on the wire, every agent, against a real model,
   quoted in STATE.md; the six that said "I could not find it" answer from
   the record; a standing instruction fires and posts; a delegation is visible
   in a room; a channel's memory is read back and forgotten.
