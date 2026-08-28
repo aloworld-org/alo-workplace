@@ -1,5 +1,7 @@
 # Changelog
 
+- Quotation list items and editable table rows and columns now keep their controls in a dedicated toolbar above the text field, so actions no longer compete with the content being written.
+
 - Home now has deliberate breathing room before the Apps launcher and workspace modules, keeping the sidebar groups easy to scan on desktop and mobile.
 
 - The Apps launcher is visible again in the dark sidebar: all nine dots and its label now use explicit light colours, with clear hover, keyboard-focus and open states instead of depending on inherited browser styling.
