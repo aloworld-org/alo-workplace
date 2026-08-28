@@ -26,6 +26,27 @@ backend on 8080 and Vite on 5173, waits for `/health/ready`, checks OIDC
 discovery through the Vite proxy, and checks the login page. Logs are written
 beneath ignored `.localdev/logs/`.
 
+### Billing demo corpus
+
+With the stack's loopback `DATABASE_URL` exported, seed the explicitly named
+development login with interconnected Billing records:
+
+```sh
+ALO_ENV=development cargo run -p alo-identity --bin identityctl -- billing-demo seed disan@alomails.com
+```
+
+The command is deterministic and idempotent. It resolves the login to its
+tenant; no tenant or user id is compiled into the seed. To remove only the
+versioned demo namespace and immediately rebuild it:
+
+```sh
+ALO_ENV=development cargo run -p alo-identity --bin identityctl -- billing-demo reset disan@alomails.com
+ALO_ENV=development cargo run -p alo-identity --bin identityctl -- billing-demo seed disan@alomails.com
+```
+
+Both operations refuse production mode, a non-loopback PostgreSQL host, and a
+development database whose name is not `alo`.
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -Action Check
 powershell -ExecutionPolicy Bypass -File scripts\dev.ps1 -Action Stop
