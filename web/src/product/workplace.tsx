@@ -6,7 +6,7 @@
 // This is the ONE file that imports the suite-only areas (`../control`,
 // `../authoring`). alomails ships the `mail` surface instead and deletes this
 // file together with those areas — nothing else in the web app references them.
-import { Suspense, lazy, type ComponentType } from "react";
+import { Suspense, lazy, type ComponentType, type ReactNode } from "react";
 import {
   BarChart3,
   Boxes,
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 import { strings } from "../i18n";
+import { AgendaAbsenceProvider } from "../hr/AgendaAbsences";
 import { ApprovalsWidget } from "../hr/ApprovalsWidget";
 import { TimerWidget } from "../projects/TimerWidget";
 import type { ComposeInsert, ProductModule, ProductSurface } from "./types";
@@ -87,7 +88,23 @@ const suiteModules: ProductModule[] = [
   // workspace adds Drive (alodrives, with its file-hosted documents) and the
   // not-yet-built Chat and Meet. This is why Drive shows on aloworkplace.com but
   // not on the standalone alomails app.
-  ...sharedModules,
+  //
+  // The workspace's Agenda additionally carries the HR absence layer (B7.03):
+  // the shared module declares the seam, and only the product that has an HR
+  // provides the feed — the standalone mail app renders the same calendar with
+  // the layer empty.
+  ...sharedModules.map((module): ProductModule => {
+    if (module.id !== "agenda" || module.element === undefined) return module;
+    const Agenda = module.element;
+    return {
+      ...module,
+      element: (): ReactNode => (
+        <AgendaAbsenceProvider>
+          <Agenda />
+        </AgendaAbsenceProvider>
+      ),
+    };
+  }),
   {
     id: "drive",
     path: "/drive",

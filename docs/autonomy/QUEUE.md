@@ -200,7 +200,7 @@ without it.
   Done when: a tenant with bank lines, matches and postings deletes cleanly and
   leaves no rows behind in any `bank_*`, `billing_*` or `fin_*` table; a test
   proves it; deleting a matched payment on its own is still refused.
-- [ ] B7.03 Leave reaches Agenda. Approved absences surface only under
+- [x] B7.03 Leave reaches Agenda. Approved absences surface only under
   People → Who's away; `grep -rn "/hr/" web/src/agenda/` finds nothing, so the
   "team absence feed into Agenda" line in B6.03 and the `[B6]` feature it comes
   from are not met (B6.12b, finding 3). Done when: an approved absence appears

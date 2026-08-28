@@ -1,5 +1,7 @@
 # Changelog
 
+- Approved leave now shows in the team's Agenda: the month and week views and the day panel quietly say who is away on each day — a name and a day, never the kind of leave or the note — and leave that is cancelled disappears from the calendar in the same act, because the calendar draws the absence feed live rather than keeping events of its own.
+
 - A record's History tab now shows what agents did to it, not only what people clicked: when a billing agent sends an offer or records a payment on your say-so, that act appears on the record itself, named after the agent that ran it — and everything an agent does in your workspace now lands on one tamper-proof stream that future notifications and automations will read from, instead of each feature watching the database on its own.
 
 - Deleting a company now erases everything, even after bank reconciliation: a tenant who has imported statements, matched lines and booked the money is removed without a trace left in any banking, billing or finance record. Removing a payment that a matched bank line settles is refused with the way out spelled once — take the match back on the reconciliation screen, which removes the payment, reverses the books and returns the line in one act.

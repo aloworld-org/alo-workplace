@@ -20341,3 +20341,62 @@ Next: B7.02 (tenant deletion survives reconciliation).
   pushed, so no deployed ledger saw either version.
 
 Next: B7.03 (leave reaches Agenda).
+
+## 2026-08-28 — B7.03 leave reaches Agenda
+
+**What shipped.**
+- The calendar draws the absence layer, the way `hr_absences.rs` and
+  `docs/design/hr.md` always said it would ("the Agenda draws this read
+  *behind* its week and month views") — the feed, its tenancy and its
+  wrong-tenant test existed since B6.03b; what was missing was the web wiring
+  the B6.12b grep exposed.
+- `web/src/agenda/absences.ts` (new): the seam. Agenda is shared with the
+  standalone mail product, which has no HR, so the module declares an
+  `AbsenceLayerContext` (a source of `{day, people:[{id,name}]}` windows) and
+  a `useAbsenceLayer` hook that answers an empty map with no provider or on a
+  failed feed — the `ProductRailWidget` reasoning applied to a data layer.
+  No HR import anywhere under `web/src/agenda/`.
+- `web/src/hr/AgendaAbsences.tsx` (new): the workspace's provider, adapting
+  `useHrApi().absences` to the seam. Imported by `workplace.tsx` directly by
+  file (the `ApprovalsWidget` precedent — `hr/index.ts` would drag the whole
+  HR module into the main bundle), wrapping only the agenda module's element.
+- The three surfaces: month cells show a dashed neutral pill (first name
+  `+N`, every name in the title), the week view gets a non-sticky absence
+  strip above the all-day strip (two rows pinned to the same offset would
+  overlap on scroll), and the day panel names everyone away on the selected
+  day. Nothing is clickable: an absence is a fact, not an event to open —
+  no colour, no hover, exactly the fields the feed serves.
+- i18n: `agendaAway` + `agendaAwayTitle(names)` in all four catalogs
+  (en/fr/nl/de) — nothing through UNTRANSLATED.
+- Store test extended (`hr_leave_requests_tenancy.rs`): cancelled leave
+  leaves the layer in the same act — the feed reads `status='approved'` and
+  nothing else, so there is no event anywhere to take back. That plus the
+  existing "A approves, B sees nobody" is the item's disappearing act and
+  wrong-tenant proof at the only place they are decided.
+
+**How verified.**
+- New `web/src/agenda/absences.test.tsx` (3 tests): an approved absence
+  appears on its day named in month grid and day panel; a feed that no
+  longer serves it (withdrawn/cancelled) shows nothing on the next look; the
+  same module with no provider draws no layer and asks nobody. All agenda +
+  i18n suites: 105 passed (parity test proves the four catalogs carry the
+  new keys).
+- `npx tsc --noEmit`, `eslint` on all changed files, `npm run build`: clean.
+- `cargo nextest run -p alo-store`: **2531 passed** (full suite; the first
+  call hit the 600 s ceiling mid-link and the harness backgrounded it — the
+  until-grep poll read its real exit, then the tenancy binary re-ran alone
+  in the foreground: 7/7 incl. the extended absence-layer test). fmt + 
+  clippy --all-targets clean.
+- No new HTTP route, no migration, no route signature change: the wire
+  surface is B6.03b's, already curl-verified then; this item is its missing
+  consumer.
+
+**Cuts and flags.**
+- The agenda list view (day/agenda tabs) shows absences through the day
+  panel beside it, not inline in the list — the design note names the week
+  and month views, and the panel covers the selected day; noted as a
+  possible polish item, not a gap in the acceptance.
+- `alo_scratch` held 1 977 tenants / 102 MB before the gate; prune found
+  nothing stale to delete — healthy, for once.
+
+Next: B7.04 (consolidate the integration-test binaries).
