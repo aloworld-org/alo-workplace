@@ -4159,3 +4159,80 @@ in this suite next to the module-gate one.
 **Next:** A6.1 — `agent_memories` (migration `04xx`), the per-channel
 switch, the workspace default, learning at the end of a turn, explicit
 "remember that …".
+
+## A6.1 — channel memory: the table, the switches, the two ways to learn (2026-08-29)
+
+**What shipped.** Migration `0407_agent_memories.sql`: the `agent_memories`
+table exactly as `complete-agents.md` §6 sketched it, with the two scopes made
+exclusive by a CHECK (`channel` names a room and no person, `person` names a
+person and no room — there is no cross-channel pool for a wide query to fall
+into); `chat_channels.agent_memory BOOLEAN` (NULL = follow the workspace
+default) as the per-room switch; and `agent_memory_defaults` (no row = ON) as
+the admin default. New `alo-store/src/agent_memories.rs`:
+`remember_in_channel` / `remember_for_me` (fact trimmed and capped at 400
+chars — "facts, never transcripts" as a store property, not an extractor's
+promise; 200 per agent per scope, oldest dropped), `channel_memories` /
+`my_memories` (the person read is bound to the caller's own id — there is no
+argument with which to read a colleague's), `set_channel_memory` (owner in a
+named room, either side of a one-to-one), `memory_learning_enabled` (room →
+workspace → ON), and the default's get/set. `remember_in_channel` refuses an
+agent DM outright: a one-to-one feeds the person, structurally.
+
+**The two ways in.** (1) *Explicit:* `chat_agent_memory::explicit_fact` — a
+message to an agent whose text (after its mention) starts "remember that", any
+case, word-boundary checked — is an instruction, not a question: stored
+verbatim, confirmed with **no model call and no turn registered**, and it
+works with no provider configured and the switches off, because a person
+asking by name IS the consent the switches approximate. (2) *End of turn:*
+`agent_turn::take_turn` now returns what the turn read beside its result (the
+final sources — grounding, tool results, folded delegate answers; a delegate's
+own list stays with the delegate, the palette drops its list on purpose), and
+after an answered room turn `learn_from_turn` makes one extraction call
+(`alo_ai::agent_memory`, at most 3 facts, JSON array, "most exchanges teach
+nothing: return []") and stores what comes back against the asker's message —
+only where `memory_learning_enabled` says so. Routes:
+`GET/POST /chat/channels/{id}/memory` (tri-state body; response says resolved
++ override + default) and `GET/POST /admin/agent-memory` (`require_admin`,
+like every `/admin/*`). No new top-level prefix.
+
+**Verified.** Pruned first (4 628 → 2 651 tenants). `cargo fmt`; clippy
+`-p alo-store -p alo-ai -p alo-jmap --all-targets` zero warnings; store+ai
+lib suites 1871/1871; `cargo nextest run -p alo-jmap` **1413/1413 green**
+(197 s) with six new wire tests in `agents_http_suite::agent_memory_http`.
+Scripted transcripts, from the suite on the real router and store:
+`@billing remember that Northstar Foods invoices are net 30` →
+**"Noted — I'll remember that."** — zero model calls, one row
+`{scope: channel, fact: "Northstar Foods invoices are net 30", learned_from:
+explicit, source_msg: the asker's message}`. Then `@billing which quotes are
+open?` → *"Two quotes are open, both Northstar [1]."* → one extraction call
+(shown the question and the answer, asserted) → row `{learned_from: turn,
+fact: "Northstar Foods buys quarterly"}`; the same path in an agenda DM lands
+`{scope: person, channel: NULL}` and the DM's channel read stays empty. A room
+switched off answers and spends **no** extraction call; a room that never
+chose follows the workspace default; a room's ON beats a workspace OFF. A
+member (non-owner) setting a named room's switch gets 403, a non-admin on the
+default gets 403; a non-member and another tenant both get the same NotFound
+for a private room's memories, and the other tenant cannot write one either.
+
+**One test-harness interaction, decided deliberately.** Learning-on-by-default
+adds one extraction call after every answered turn, which broke the scripted
+suites' exact model-call counts (delegation/orchestrate) — and would have
+raced them forever, since extraction lands after the answer is already in the
+room. Fix: `common::model::use_model` now switches the harness tenant's
+workspace default OFF, and a memory test opts its one room back in (which
+doubles as the override-beats-default proof). Production default stays ON, as
+§6 says.
+
+**Cuts, recorded.** (1) Turns that end in a proposal (or a delegate's
+proposal) do not learn — only answered turns do; the exchange is not over
+until the tap, and wave A8's action records are the natural place to revisit.
+(2) Ask alo's orchestrated runs do not learn (its fallback plain turn does);
+the plan's per-step exchanges belong to the step agents and folding them into
+one extraction is a design question for A6.2's retrieval work, not a default
+to guess at. (3) Retrieval into later turns is A6.2, deliberately untouched.
+(4) The agent's confirmation and refusal lines join the standing
+hardcoded-English debt.
+
+**Next:** A6.2 — retrieval inside scope only: a turn reads its channel's
+memories or the asker's own DM memories; the wrong-channel test is the one
+that matters.

@@ -181,7 +181,7 @@ against a real model after each item and quote the answers.
 
 ## Wave A6 — channel memory
 
-- [ ] A6.1 `agent_memories` (migration `04xx`), the per-channel switch, the
+- [x] A6.1 `agent_memories` (migration `04xx`), the per-channel switch, the
   workspace default; learning at the end of a turn from what the turn read;
   explicit "remember that …".
 - [ ] A6.2 Retrieval inside scope only: a turn reads its channel's memories or
