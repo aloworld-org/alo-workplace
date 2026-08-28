@@ -53,6 +53,9 @@ contracts.
   before this release are moved from the browser to the server the first time
   the quotation is opened. A sent offer's design is frozen with it.
 
+- The nine-dot app launcher is reliably visible in the main rail again and
+  keeps its place between Home and the user's favourite apps.
+
 - Quotation lists now have a style library like a word processor's: six
   numbering schemes (1./a./i., 1)/a)/i), 1.1/1.2.1 outline, A./a./i.,
   I./A./1., 01./a./i.) and seven bullet schemes (round, diamonds, squares,

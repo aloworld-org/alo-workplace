@@ -43,6 +43,10 @@ was formerly named Ficina — see ADR 0016.)
   subject`.
 - **User-facing strings are externalized (i18n) from day one.**
   Hardcoded English is a bug in a European product.
+- **Preserve existing product surfaces.** Never remove, hide, or replace an
+  existing control, capability, navigation item, or content surface unless the
+  user explicitly asks for that removal; scoped changes must leave unrelated UI
+  and behaviour intact.
 - **`../engines/` is read-only reference material; code changes there
   are never part of any task.** It holds the pinned engine sources
   fetched by `scripts/fetch-engines.sh` for reading alongside our code.
