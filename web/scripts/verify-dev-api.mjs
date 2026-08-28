@@ -4,8 +4,7 @@
 // password is wrong. The full-stack launcher starts the API first; this guard
 // waits for it and refuses to serve a misleading login screen if it never
 // becomes ready.
-const configured = process.env.VITE_DEV_API;
-if (configured === undefined || configured.trim() === "") process.exit(0);
+const configured = process.env.VITE_DEV_API?.trim() || "http://localhost:8080";
 
 let target;
 try {
