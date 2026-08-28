@@ -20460,3 +20460,14 @@ Next: B7.04 (consolidate the integration-test binaries).
   prune and tests. A human should fix the profile.
 
 Next: none open — the queue is complete; the next iteration writes LOOP COMPLETE.
+
+**Addendum (same evening).** The agents track's `agent_crm_intents_http.rs`
+landed between this item's gate and its push; the rebase kept both sides
+cleanly, but with `autotests = false` a `tests/*.rs` file not named by a
+suite root is silently neither built nor run. Adopted into
+`agents_http_suite` (one `mod` line + the same harness-import rewrite);
+its 4 tests pass inside the suite. **For every track from now on:** a new
+test file under `platform/alo-store/tests/` or
+`products/mail/alo-jmap/tests/` must also add its `mod` line to the area's
+suite root — treat those roots like the other deliberately-shared lists
+(one additive line, keep both sides on rebase).
