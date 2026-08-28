@@ -20142,4 +20142,13 @@ missing settlement and the employment append route (here), the five HR screens
 (B6.11), and the wave-review flags each entry above names. A human picks the
 next queue.
 
-LOOP COMPLETE
+Waves B1–B6 and BI-1 — LOOP COMPLETE (2026-08-11)
+
+---
+
+## Reopened 2026-08-28 — wave B7
+
+The marker above is reworded so the wrapper's anchored `^#* LOOP COMPLETE|HALT`
+check does not read a finished run's marker as this one's. This run ends when
+every B7 item is `[x]` or `[~]` and a **new** `LOOP COMPLETE` line is written
+below, or a `LOOP HALT` with its reason.

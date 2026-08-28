@@ -26,6 +26,14 @@ primitives are restyled to Tailwind first (wave D1.5), and every module
 migration after that adopts components which are already Tailwind — so a
 migration deletes a stylesheet instead of trading one for another.
 
+## Who is where right now (2026-08-28, read before any item)
+
+Another agent is editing `web/src/billing/**` and `web/src/shell/**`
+interactively, and the agents loop owns `web/src/chat/**`. The remaining items
+(inventory, platform, tasks, the review) do not need those areas: never open
+them. D3.01's product walk reads every screen and edits none of those three.
+`web/src/sites/**` stays the sites track's (ADR 0045).
+
 ## The loop for every migration item
 
 The same four steps, every time:

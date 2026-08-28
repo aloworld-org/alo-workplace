@@ -7,6 +7,18 @@ Detail source: `docs/features.md` → Business modules. Do not reorder; do not
 invent items — a discovered prerequisite becomes part of the current item if
 small, or a `[!]` note for the human if large.
 
+## Rules for wave B7 (2026-08-28, read before any item)
+
+- **Two other agents are live.** One is editing `web/src/billing/**` and
+  `web/src/shell/**` interactively — never open those files; every B7 item is
+  store, API and tests. The agents loop owns `platform/alo-ai/**`,
+  `chat_agents.rs`, `alo-jmap`'s `agent*.rs`, `chat_agent*.rs`, `*_intents.rs`
+  and `web/src/chat/**` — never edit those either; a route this wave changes
+  is called by an intent executor, so keep its function signature.
+- Migrations stay in this track's block; check the directory immediately
+  before rebasing.
+- `[~]` for what is not this queue's to build, with the reason.
+
 ## Wave B1 — alo Billing (Quotes & Invoices, EU e-invoicing)
 
 - [x] B1.01 Design note `docs/design/billing.md`: surface (routes), data model (customers, products, quotes, invoices, lines, payments), error map, tenancy, numbering approach, out-of-scope. Done when: the note answers the implement-skill's four blocks and names the rejected alternative for numbering.
