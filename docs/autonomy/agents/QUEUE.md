@@ -145,7 +145,7 @@ against a real model after each item and quote the answers.
   module's own record views (`document_json`, `customer_json`); routes call
   the same functions. `@billing which quotes are open?` and `@alo what did we
   quote Northstar Foods?` answer from the record, on the wire.
-- [ ] A4.1b Billing's routes become adapters: each `/billing/` handler calls the same executor its verb calls, so a route and an intent cannot drift; the coverage test then asserts the call, not just the name.
+- [x] A4.1b Billing's routes become adapters: each `/billing/` handler calls the same executor its verb calls, so a route and an intent cannot drift; the coverage test then asserts the call, not just the name.
 - [ ] A4.1c Additive registration, so several loops can land modules at once:
   each `<module>_intents.rs` in `alo-jmap` exposes `dispatch(tool, account,
   args, state) -> Option<Reply>` and `agent.rs`'s central match becomes a loop

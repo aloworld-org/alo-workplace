@@ -3764,3 +3764,60 @@ The A1–A3 markers above are history, reworded so the wrapper's anchored
 `^#* LOOP COMPLETE|HALT` check no longer reads them as this run's. This run
 ends when every A4–A9 item is `[x]` or `[~]` and a **new** `LOOP COMPLETE`
 line is written below, or a `LOOP HALT` with its reason.
+
+---
+
+## A4.1b — Billing's routes are adapters of their verbs (2026-08-28)
+
+**Shipped.** Twelve shared cores in `alo-jmap`'s `billing_intents.rs` — one per
+verb, each returning exactly what its route answers (`customers`, `quote_list`,
+`quote_record`, `invoice_list`, `invoice_record`, `send_quote`, `accept_quote`,
+`create_invoice_draft`, `issue_invoice`, `record_payment`, and `draft_reminder`
+already shared in `billing_reminder.rs`) — and both callers now run them: the
+`/billing/` handler with the id from its path, the executor after resolving a
+name. Route responses are byte-identical; the handlers in `billing_quotes.rs`,
+`billing_invoices.rs`, `billing_customers.rs` and `billing_payments.rs` are
+thin adapters. The two hand-rolled second renderings the executors carried
+(`quote_summary_json`, `invoice_summary_json`) are deleted — an agent's list
+entry is now the screen's own `summary_json` plus `customerName`, and
+`execute_billing_totals` sums over the same record views the invoice list
+serves, so the totals and the list cannot disagree. The two older writes in
+`agent_billing.rs` (`create_invoice_draft`, `quote_to_invoice`) call the cores
+too and now answer with the module's record views through the shared `ok()`
+envelope, money displays included.
+
+**The coverage test asserts the call, not just the name.**
+`every_verbs_route_handler_calls_the_executors_core` reads `server.rs` to find
+each verb's registered handlers, extracts each handler's body from its module
+source, and fails unless one of them contains the verb's qualified core call
+(`billing_intents::<core>(`) — signature excluded, so a handler cannot match
+its own name. Registry honesty in `alo-ai`: `billing_totals` never adapted the
+by-rate VAT report, so its `routes` now name `/billing/invoices` (what it sums
+over) and `/billing/reports/vat` is an exclusion with its reason.
+
+**Verified:** clippy clean on both crates; `cargo nextest run -p alo-ai -p
+alo-jmap` — **1653/1653 green**, including the scripted wire suite
+(`agent_billing_intents_http.rs`: open quotes answered with the draft counted,
+the sent offer looked up with the draft beside it, `send_quote` proposed and
+not run) and every billing HTTP suite, which is what proves the adapted routes
+unchanged on the real router and store. No new routes, so no fresh
+local-server session; the wire evidence is those suites.
+
+**Two pre-existing failures fixed in passing (both landed before this item):**
+`agent_turn`'s read checksum still said 34 — A4.1's six Billing reads were
+never counted; now 40, with the comment updated. And `audit_routes`' golden
+vocabulary lacked `PUT /billing/quotes/{id}/design -> billing.quote.design.update`
+(the quotation studio's route, `429f1726`); the action reads right, pasted in
+as the test instructs.
+
+**Environment notes for the next iteration.** The shell's global
+`DATABASE_URL` points at `alo_scratch` with an empty password, which the
+DB-backed suites fail to authenticate with; this track's `alo_agents_test` had
+been dropped. Recreated it and gated with
+`DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_agents_test` —
+export that per gate. And `/tmp/nextest-build.log` is shared by every loop on
+this machine (the mail track's build interleaved into mine mid-poll): use a
+session-unique marker path for background builds.
+
+**Next:** A4.1c — additive registration (module dispatchers as a list), the
+gate of the agents-a/b/c tracks.
