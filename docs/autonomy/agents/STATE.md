@@ -4236,3 +4236,58 @@ hardcoded-English debt.
 **Next:** A6.2 — retrieval inside scope only: a turn reads its channel's
 memories or the asker's own DM memories; the wrong-channel test is the one
 that matters.
+
+## A6.2 — retrieval inside scope only (2026-08-29)
+
+**What shipped.** The read-back half of channel memory: a turn is now
+grounded in what its agent remembers, inside the turn's own scope and
+nowhere wider. New `chat_agent_memory::remembered` resolves the scope the
+same way learning feeds it — a room turn reads that agent's memories **of
+that room** (`channel_memories`), a turn in the agent's own one-to-one reads
+what it remembers **about the asker** (`my_memories`, which the store binds
+to the caller's id, so there is no argument with which to reach a
+colleague's), and a delegate taking a turn inside somebody else's one-to-one
+reads nothing, because no memory in that room is its. The newest 8 join the
+turn's numbered sources as kind `remembered` (`[3] remembered "Northstar
+invoices are net 30"`), citable like anything else. Wired at both turn
+surfaces: the room/DM turn in `chat_agent.rs` and `delegate_turn` in
+`agent_turn.rs` — which covers handoffs and Ask alo's orchestrated steps in
+one place; the command palette has no room and reads nothing. **Off hides**
+(design §6): retrieval is gated on the room's resolved memory switch, so a
+room switched off stops surfacing its memories without deleting a row —
+`memory_learning_enabled` was renamed `memory_enabled` because it now gates
+learning and retrieval alike, and its rustdoc says so.
+
+**Verified.** Pruned first (3 367 → 721 tenants). `cargo fmt`; clippy
+`-p alo-store -p alo-ai -p alo-jmap --all-targets` zero warnings; store+ai
+suites **2812/2812**; `cargo nextest run -p alo-jmap` **1416/1416 green**
+(201 s) with three new wire tests in `agents_http_suite::agent_memory_http`.
+The wrong-channel test: one agent, two rooms, "Northstar invoices are net
+30" remembered in the first — the first room's prompt carries `remembered
+"Northstar invoices are net 30"` and the answer cites it; the same agent
+asked the same question by the same person one room over gets a prompt with
+no trace of it (asserted on the model's actual user content, positive beside
+negative, per the A1.6 pattern); switching the first room off then hides the
+fact from its own next turn while both rows stay in the store. The
+wrong-user test: two people, each with a one-to-one to the same Agenda
+agent — each DM turn is grounded in its own person's preference and never
+the other's, and a room turn with that agent sees neither person's DM facts
+even with the room's switch on. The delegation test: Billing hands to Tasks
+in a room where both have remembered a fact — each turn's prompt carries its
+own agent's fact and not the other's (memories are per agent even inside one
+room), through the real handoff path.
+
+**Decisions, recorded.** (1) Retrieval is newest-first, capped at 8 — no
+relevance ranking against the question in v1; the design's "no
+cross-channel pooling" rules out a search radius, and 200 facts of one room
+would drown the prompt. (2) The switch that hides is the *resolved* one
+(room override, else workspace default), the same value that gates
+learning — one switch, one meaning. (3) A delegate in a foreign one-to-one
+reads nothing rather than its own person-scope memories of the asker: the
+strictest reading of "the channel the turn runs in, or the asker's DM
+memory", chosen deliberately — widening later is additive. (4) The planner's
+routing call for Ask alo is not memory-grounded; its steps are, through
+`delegate_turn`.
+
+**Next:** A6.3 — deletion follows the source: message, channel archive,
+agent removed from the channel, switch off (30-day hide then delete).
