@@ -1,5 +1,7 @@
 # Changelog
 
+- Every screen now proves it fits your screen: an automated check signs into the real app in a real browser, visits every module at phone, tablet, laptop and desktop widths, and fails the build if anything scrolls sideways or spills off the edge — and the sweep already tidied what it found, so Finance's and HR's tabs now glide sideways under a finger on a phone instead of running off the screen, and the Projects list pans smoothly instead of overflowing.
+
 - Every module now fits a phone: the sidebar-drawer that Tasks and Mail use is one shared component — openable from the header, dismissed by tapping outside or pressing Escape, with the keyboard kept inside while it is open — and the screens that broke at 360 px are fixed: the sales board shows one full-width stage at a time with a picker to switch, Inventory's tabs scroll instead of running off the screen and its actions share a full-width row, a board's actions in Insights wrap instead of clipping, and a chat room's name stays readable in its header.
 
 - Tasks now works on a phone: on a small screen the project sidebar tucks away into a drawer — opened from a button in the header, closed by picking a project or tapping outside, exactly as Mail's folders already behave — so your tasks get the whole screen and "Create your first task" fits comfortably at 360 px.

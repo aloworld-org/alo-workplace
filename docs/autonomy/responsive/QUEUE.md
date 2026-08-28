@@ -72,7 +72,7 @@ npm script for R3, and `web/src/i18n/**` for any additive key. It never edits
   real browser, and every module's existing vitest suite stays green. Record
   in STATE.md any module whose phone layout needs a product decision rather
   than a layout fix — do not guess at a redesign.
-- [ ] R3 The audit that found R1, as a test that never needs a human: add
+- [x] R3 The audit that found R1, as a test that never needs a human: add
   Playwright as a `web` dev dependency (browsers from the local cache — no
   network download in the gate), a `web/e2e/responsive.spec.ts` that logs in
   against a local stack, visits every module at 360/768/1024/1440 px and
