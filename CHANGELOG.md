@@ -45,6 +45,14 @@ contracts.
 
 ## Unreleased
 
+- A quotation's designed content — the headings, paragraphs, lists, pictures,
+  tables and dividers laid out in the quotation studio, its colours and its
+  column choices — is now saved with the quote and printed into the document
+  the customer receives: the printable page and the new PDF download
+  (**Download PDF** in the quotation editor) both carry it. Designs made
+  before this release are moved from the browser to the server the first time
+  the quotation is opened. A sent offer's design is frozen with it.
+
 - Quotation lists now have a style library like a word processor's: six
   numbering schemes (1./a./i., 1)/a)/i), 1.1/1.2.1 outline, A./a./i.,
   I./A./1., 01./a./i.) and seven bullet schemes (round, diamonds, squares,

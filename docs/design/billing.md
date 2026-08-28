@@ -272,6 +272,8 @@ extractor, registered in `server.rs`):
 | `GET /billing/settings`, `PATCH /billing/settings` | the issuer's own identity, bank details and accounting currency (B1.16, B1.21) — **as built** |
 | `GET /billing/fx/rates`, `PUT /billing/fx/rates`, `POST /billing/fx/rates/import` | the exchange rates a tenant's foreign-currency documents are converted at (B1.21) — **as built** |
 | `GET /billing/invoices/{id}/print[?lang=]`, `GET /billing/quotes/{id}/print[?lang=]` | the printable document as one self-contained HTML page (B1.16) — **as built** |
+| `GET /billing/quotes/{id}/pdf[?lang=]` | the offer as a PDF file, its designed content set on the sheet — **as built** |
+| `GET /billing/quotes/{id}/design`, `PUT /billing/quotes/{id}/design` | the quotation studio's design of the offer — blocks, colours, column choices — kept with the quote and rendered by `/print` and `/pdf`; `PUT` on a sent offer is `409` — **as built** |
 
 As-built (B1.10), for the invoice routes specifically:
 
@@ -645,6 +647,47 @@ period, and a second parser is a second thing to be wrong), a per-tenant choice
 of credit-note rate, and ISO 4217 minor-unit exponents — every amount is stored
 in hundredths, which is right for conversion and is a *display* question the
 e-invoice of B1.22 has to answer.
+
+### The designed quotation (as built)
+
+The quotation studio lets a salesperson lay out content around the price
+table — headings, paragraphs (in up to three columns), pull quotes, numbered
+and bulleted lists with the studio's numbering library and three levels of
+nesting, pictures with captions and text beside them, information tables,
+dividers — and choose colours and which columns of the price table show.
+Until this change that design lived only in the browser that composed it
+(IndexedDB), so the document the customer received carried none of it.
+
+- **The design is a record of the quote.** `billing_quote_designs` holds one
+  JSON document per quote, whole; the web client owns its shape, the store
+  bounds it (a JSON object, at most 12 MB — pictures travel inside it as data
+  URLs, scaled down to 1600 px by the browser before they are stored) and
+  freezes it with the offer: a `PUT` on a sent quote is a `409`, because the
+  paper the customer holds does not change after the fact. A design the
+  browser saved before this change is moved to the server the first time the
+  quote is opened, then forgotten locally.
+- **Both renderers read it** (`quote_design.rs`, read leniently — an unknown
+  block kind is skipped, never a failed print). The page
+  (`quote_design_print.rs`) renders every block as HTML in the print
+  stylesheet's idiom; the PDF (`quote_design_pdf.rs`) sets the same blocks on
+  the sheet with the document's own layout engine, pictures placed as JPEGs
+  (`alo-pdf` places JPEGs and nothing else, so PNG and WebP are converted in
+  `quote_design_images.rs` with the decoder Sites already trusts). Blocks
+  before the studio's price-table block print above the table; the rest print
+  after the totals. Hidden columns are absent from both.
+- **Rich text is sanitised on the server** with the studio's own allow-list
+  (`rich_text.rs`): bold and emphasis, paragraphs, headings and lists survive
+  with no attributes; every character of text is escaped; nothing stored can
+  become markup the list does not name.
+
+What the printed forms do **not** yet carry, deliberately: the studio's
+header styles, logo and contact QR, its table presentation options (totals
+placement and detail, product images and descriptions), bold-within-a-
+paragraph in the PDF (the standard fonts set one face per run), dashed and
+dotted dividers in the PDF (drawn solid), and the split of one price table
+into several — the studio keys those splits by on-screen rows, which have no
+server identity, so the page prints one table. Each is a renderer change, not
+a data change: the design already holds the fields.
 
 ### Sending an invoice (as built, B1.18)
 
