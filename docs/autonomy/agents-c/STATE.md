@@ -213,3 +213,66 @@ alo-jmap 1465/1465, clippy clean. Mid-push again, agents-a landed Projects
 the CHANGELOG, merged the counts once more (`all_tools` 108, declared reads
 61), gates re-run green on that merge too: alo-ai 281/281, alo-jmap
 1476/1476, clippy clean. Next: AC.4 (Mail with Contacts).
+
+## AC.4 — Mail (with Contacts) moves to intents, and learns its mailbox (2026-08-29)
+
+**Shipped.** `alo_ai::mail_intents` (`MAIL`, fifteen verbs) and its executors
+in `alo-jmap`'s `mail_intents.rs`, registered as one row in `MOVED`, one row
+in `MODULES`, one `pub mod` line in each `lib.rs`; the hand-written
+`agent_mail.rs` and `agent_contacts.rs` tool sets in `alo-ai` deleted — one
+module for one product, the address book Mail's as before. Reads:
+`correspondence`, `message_read`, `find_contact` kept word for word (the
+exchange over the snippet, `"opened": false` never quoted, several matches
+named never resolved), plus `unread_summary` — the folders' own unread
+counters, Drafts/Sent/internal roles left out, the Inbox always listed —
+`thread_lookup` — one message's whole conversation off the store's own
+`thread_id`, oldest first, each line saying whose side it came from — and
+`who_i_emailed` — the Sent folder over `query_emails`, grouped by address,
+newest first. Writes: the nine kept, each executor untouched in `agent.rs`
+(made `pub(crate)`; the draft/submission/folder plumbing they reuse lives
+there) and each now carrying a preview; the send preview names the subject
+(filled from the resolved source) and says in so many words that it goes to
+everyone the draft is addressed to and cannot be undone. Exclusions with
+reasons: `/contacts/import`, `/contacts/export`, `/mail/config-v1.1.xml` —
+Mail's app surface is JMAP, so fourteen verbs are ROUTELESS by declaration
+and the coverage test walks the `/contacts` and `/mail` prefixes. A
+structural test holds the module to one send path (`execute_send` via the
+audited JMAP submission; nothing here composes-and-sends).
+
+**Verified.** `cargo fmt`; clippy `-p alo-ai -p alo-jmap --all-targets`
+clean; nextest **1768/1768** (alo-ai 285, alo-jmap 1483), including the new
+`agent_mail_intents_http` (3 tests, wired into `agents_http_suite`) and
+`mail_intents` coverage on both sides. Counts: `all_tools` 108 → 111,
+declared reads 61 → 64. Wire transcript, as the suite pins it (scripted
+model, real router and store):
+
+- `@mail how much unread mail do I have?` → `unread_summary {}` → the
+  sources contained `"totalUnread":2`, the Inbox by name, `"unread":2` —
+  the same counters the mail screen's folder list shows → answer in the
+  room, `proposal: null`; the prompt offered all fifteen verbs from the
+  intent registry.
+- `@mail draft an email to ilse@… saying the March price holds` →
+  `draft_email` proposed and NO draft exists anywhere; after
+  `POST /chat/proposals/{id} {"approve":true}` the draft is in the asker's
+  own Drafts with the proposed subject, and Sent is still empty — a draft
+  never sends itself.
+- **Wrong tenant:** tenant B's inbox carries `the secret merger`; tenant
+  A's `thread_lookup` on B's message id earns `no message of yours has
+  that id` — the words an invented id earns — and B's subject appears
+  nowhere in what A's model was shown.
+
+**Cuts and notes.** No migration (0450–0469 untouched), no web, no i18n, no
+new route prefixes. One flag for the wave review (AC.6): a mail write
+proposed in a *room* stores `{"source": n}` verbatim — the palette resolves
+a source number to a message id (`resolve_email_source`), the room approval
+path does not, so a room-proposed `mark_read`/`send_email` still refuses at
+`message_id_arg`. Pre-existing behaviour, unchanged by this item (the room
+suite's write goes through `draft_email`, whose args are complete in
+themselves); fixing it belongs with the wave review rather than inside a
+module move. Mid-push, agents-b landed Sheets (AB.3, `6869fe30`) and
+agents-a landed Inventory (AA.4, `34981ef7`) — kept-both on `MOVED`,
+`MODULES`, the intent imports and the CHANGELOG; on the static sets and
+match arms each side had deleted its own module's, so the resolution
+deletes all of them; merged the counts (`all_tools` 117, declared reads
+69) and re-ran the gates on the merge: clippy clean, alo-ai 286/286,
+alo-jmap 1496/1496. Next: AC.5 (Sites).
