@@ -286,3 +286,81 @@ one non-additive merge point, resolved by summing the deltas: final
 106→111/60→64 figures above were against the pre-rebase base. Full merged-
 tree gate re-run after each rebase: finally alo-ai green, alo-jmap green
 with the three inventory wire tests listed by name, clippy clean on both.
+
+## 2026-08-29 — AA.5 HR (People) moved to intents
+
+**Shipped.** `alo_ai::hr_intents` (seven verbs) and `alo-jmap`'s
+`hr_intents.rs` executors + dispatch. Reads: `who_is_off` kept (its executor
+stays in `agent_hr.rs`, reached only from the new dispatch); `who_works_here`
+NEW — the member directory as everybody reads it (`hr_directory()`, the same
+public projection `/hr/org` folds its chart from: name, job title, team,
+manager with the manager's name resolved), narrowable to one team (a miss
+refuses naming the teams that exist) or one person; `my_leave_balance` NEW —
+the ASKER's own balance only (`LeaveDoor::require_me`, no argument can name a
+colleague), the route's own `balance_json` with the whole working;
+`open_leave_requests` NEW — the requested-status queue over exactly the people
+the asker may see (HR everybody, else me + reports, the same exact-people
+query the list route builds); `open_checklists` NEW — unfinished checklist
+runs for the people the asker may read, the route's own `progress_json` fold.
+Writes with previews: `draft_letter_from_template` kept (same executor, now
+carrying a preview; still the one routeless verb — the fill-in deliberately
+has no /hr route); NEW `approve_leave_request` — resolves ONE waiting request
+by the person's name (optional from-date to disambiguate; several matches
+refuse listing names and days), passes `LeaveDoor::require_decide` (manager
+for reports, HR for anybody, nobody for their own unless admin), then the
+route's own `decide_hr_leave_request`. Rejection is deliberately not a verb
+(exclusion: a no deserves the manager's own words in the app).
+`alo_ai::agent_hr` (tool set) deleted; registration one row per shared list;
+the two legacy arms in jmap `agent.rs` removed. Every `/hr` route is a verb's
+or excluded with a reason (29 exclusions — records, policies, payroll,
+hiring, letters and checklist templates all stay person-only, each with its
+sentence; the payroll export and every recruitment route refused by name, the
+AI Act posture kept in the module tests).
+
+**Privacy narrowing (deliberate, tested).** What the model is shown of a
+leave request strips `note` and `decisionNote` (`request_row`, held by a
+module test asserting the raw view is called exactly once, inside the
+stripper): the sentence under "why I need the time" stays in the app even for
+the manager who could read it there. The wire test seeds a request with
+"hospital appointment on the Tuesday" and asserts "hospital" never appears in
+the model's sources.
+
+**Verified.** fmt; clippy `-D warnings`-clean both crates; nextest green:
+alo-ai 282/282, alo-jmap full suite 1497/1497 with
+`agent_hr_intents_http` (3) listed by name — "@hr who works here?" answered
+from the directory (both names, jobTitle, team and `peopleCount:2` in the
+model's sources, all 7 verbs offered, no proposal), `approve_leave_request`
+proposed and NOT run (request still `requested`, `decidedBy` null), and
+tenant B's "Greta Nachtigall"/"Kontor" absent from tenant A's sources
+(`peopleCount:0`).
+
+**Environment note.** This checkout's `DATABASE_URL` names `alo_scratch_a`,
+which did not exist in `alo-pg` (prune reported it missing); created it with
+`CREATE DATABASE alo_scratch_a OWNER alo` and the suite migrated it from
+zero. Wire-test seeding needed `h.ts.set_admin(&h.user, true)` — the harness
+user is not admin by default and `/hr/employees` sits behind the HR door.
+The seeded handle is `@hr` (display name "People"), not `@people`.
+
+**Registry ripples (expected, same shape as AA.4):** `all_tools` 114→119,
+declared reads 66→70 (`agent.rs` reads list + `agent_turn.rs` count);
+HR's row joins `MOVED`/`MODULES` (both still same length by test); guidance
+marker "For an HR tool" → "For an HR verb"; `agent_plan` roster test: HR
+(@people in that hand-built roster) now carries "Ask it for:" hints, Tasks is
+the still-static example.
+
+No migration used (0410–0429 untouched), no new route prefixes, no UI
+strings. Next: AA.6 wave review.
+
+**Mid-item rebase (AC.4 Mail, AB.4 Tasks, and the standing-instruction
+items, landed during the gates).** Both moves are the mirror image of this
+change — they deleted `alo_ai::agent_mail`/`agent_contacts`/`agent_tasks`, I
+deleted `alo_ai::agent_hr` — so every shared-list conflict resolved by
+keeping both deletions and both new rows (`lib.rs` twice, `agent_product.rs`
+imports/sets, CHANGELOG). The registry counts are the one non-additive merge
+point, resolved by summing the deltas: final `all_tools` 126 (121 + HR 5),
+declared reads 75 (71 + 4) — the 114→119/66→70 figures above were against
+the pre-rebase base. One real merged-tree repair: this item's roster test
+had made Tasks the still-static example just as AB.4 moved Tasks to intents
+— Agenda is the example now. Full merged-tree gate re-run after the rebase:
+alo-ai 287/287, alo-jmap 1517/1517 with the three HR wire tests in, clippy
+clean on both.
