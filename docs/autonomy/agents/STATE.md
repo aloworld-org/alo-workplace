@@ -4641,3 +4641,82 @@ promise and should say it the same way.
 with preview, actor, on_behalf_of, result, undo; a person's click and an
 agent's proposal are the same object. (A4.5 and A4.7 stay `[!]`:
 agents-a/b/c journals showed no LOOP COMPLETE at this iteration's pull.)
+
+## A8.1 — the action record (2026-08-29)
+
+**What shipped.** Every intent execution — an agent's read inside a turn, an
+agent's write from an approved proposal, a person's own tap in the palette —
+already left exactly one row in `agent_tool_runs` through the one acting
+boundary (`execute_tool`). A8.1 grows that row into the action record of
+ADR 0058 §6 rather than starting a third log beside it and `events` (the
+tool-runs module note forbids two half-histories; that was the alternative
+rejected). Migration `0470` adds, additively: `preview` (the write's registry
+template rendered with the resolved arguments — the sentence the proposal
+card shows, kept even for a refused write because it says what *would have*
+changed), `record_type`/`record_id` (the record the execution touched — the
+"result" the design names, kept as a pointer, never a payload: law #1, no
+second store of content), `undo_tool`/`undo_args` (the registry's inverse
+verb with the arguments that would undo THIS run — `{"invoice": id}` — stored
+only when the run succeeded touching a record for the undo to name), and
+`proposal_id` (the `chat_proposals` row the execution settled). Actor and
+on_behalf_of were already on the row: `asked_by` is whose access the run
+carried, `agent_id` the agent that acted, a bare `asked_by` is a person
+acting for themselves. Store validation mirrors the event stream's: no
+preview/undo on a read, record ref both-or-neither in the stream vocabulary,
+undo args never without their verb, preview ≤1000 bytes. `alo_ai` gains
+`intent_spec(tool)` — the registry lookup behind preview and undo — and the
+boundary's `ToolRun` carries the proposal id (threaded from chat's
+`decide_proposal`; palette and in-turn runs carry none). The directory's
+`recent` entries gain `record`, `preview`, `undoable`, `proposal`, additive.
+
+**A pre-existing drop found and fixed.** `message_read`'s reply names its
+record `"kind":"messageRead"` — a client-facing camelCase word the stream
+vocabulary refuses. Before this item that silently killed the verb's *event*
+(emit_event warned and moved on); with the action fields it would have killed
+the whole run row, and `agent_correspondence_http` caught it. Fix:
+`event_record_ref` now treats an out-of-vocabulary kind as *no* record
+reference rather than a wrong one (`alo_store::valid_event_name` made pub for
+it) — the row and the event land without a pointer instead of not landing.
+
+**Verified.** `bash scripts/prune-test-db.sh` (118 MB, nothing older than the
+cutoff). fmt applied; clippy zero warnings on alo-store, alo-ai, alo-jmap.
+`cargo nextest run`: alo-store + alo-ai **2822/2822**, alo-jmap
+**1507/1507** — including the new store round-trip/validation test and the
+new `agent_actions_http` suite on the real router and store with the scripted
+model. The suite's exchange, as asserted: `@billing invoice Northstar for the
+consulting` → model wants `create_invoice_draft {customer, lines}` → proposal
+card → `POST /chat/proposals/{id} {"approve":true}` → the action row reads
+back `preview = "A draft invoice for Northstar Foods BV will be raised —
+unnumbered, unsent, for the user to issue."` (verbatim from the registry
+template), `record = invoice/{the raised draft's id}`, `undo_tool =
+discard_invoice_draft`, `undo_args = {"invoice": id}`, `proposal = {the
+card's id}`, agent = billing; then `POST /ai/agent/execute` with the same
+verb and args leaves the same object field for field with no agent and no
+proposal ("the person acted"); a turn's `open_quotes` read leaves its row
+with nothing to preview, invert or join; another tenant reads no rows and
+gets 404 from the directory with our agent id guessed exactly. The directory
+route answers `preview`/`record`/`undoable:true`/`proposal` for the caller.
+
+**Cut, recorded.** A module-UI click on a route (the Send button in Billing's
+own screen) does not yet leave an action row: the route files belong to the
+business track and the web's dispatch-to-intents is A8.4's surface. The
+palette tap is the person's click that exists inside this track's bounds, and
+it leaves the full object. The undo verbs the registry declares
+(`discard_invoice_draft`, `delete_payment`) have no executors yet — A8.2
+builds the button and its verbs; the rows already carry what it will need.
+
+**Environment note (for the next iteration).** The overnight suites hit
+bursts of `password authentication failed for user "alo"` (86 in 12 h,
+pre-dating this iteration): the profile's `DATABASE_URL` carries an empty
+password, which works only while Docker's proxy presents connections as
+loopback (`trust` in pg_hba); when a connection arrives from the gateway it
+hits `scram-sha-256` and dies. Exporting
+`DATABASE_URL=postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch` for
+the gate satisfies both paths; the run went green with it. Consider fixing
+the profile.
+
+**Next:** A8.2 — undo an agent with the button that undoes a person; hand an
+open proposal to an agent; assign a task to an agent. (A4.5 and A4.7 stay
+`[!]`: agents-a/b/c journals showed no LOOP COMPLETE at this iteration's
+pull — a/b/c tails read AA: inventory wire tests, AB: next Tasks, AC: next
+Sites.)

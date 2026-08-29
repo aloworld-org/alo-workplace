@@ -202,7 +202,7 @@ against a real model after each item and quote the answers.
 
 ## Wave A8 — actions and goals
 
-- [ ] A8.1 The action record: every intent execution, by a person or an agent,
+- [x] A8.1 The action record: every intent execution, by a person or an agent,
   leaves one row with preview, actor, on_behalf_of, result, undo; a person's
   click and an agent's proposal are the same object.
 - [ ] A8.2 Undo an agent with the button that undoes a person; hand an open
