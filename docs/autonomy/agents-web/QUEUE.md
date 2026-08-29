@@ -76,7 +76,7 @@ No migrations.
 
 ## Wave AW — the panel, then every module
 
-- [ ] AW.1 `[web]` `RecordAgentPanel` + the reference mount: **Tasks**. The
+- [x] AW.1 `[web]` `RecordAgentPanel` + the reference mount: **Tasks**. The
   component with its three parts and its tests; mounted in the task detail
   (the task's origin — "captured from the Friday room by @tasks", "created by
   Disan" — its verbs — chase, set priority — and ask). Screenshot of a real

@@ -7,6 +7,15 @@
   9:00 meeting at 9:00 on both sides of a clock change, without needing its
   own copy of the zone database for the lookup.
 
+- **A task now shows its agent, on the task itself.** Open a task and its
+  detail panel says where the task came from — the conversation it was
+  captured from, the email it was raised from, or who created it — and
+  offers what @tasks can do with it: chase it, set its priority, mark it
+  done, hand it over. Each button opens your conversation with the agent
+  with the words ready to send — nothing happens until you send, and a
+  change still waits for your approval — and a question box answers about
+  this task in place.
+
 - **Editing one occurrence of a repeating event on your phone now sticks.**
   Move next Tuesday's standup, rename one instance, or delete a single
   occurrence in Apple Calendar or an Android CalDAV app, and Agenda records
