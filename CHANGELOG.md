@@ -1,5 +1,14 @@
 # Changelog
 
+- **The task detail panel now works from a keyboard.** The slide-over that
+  opens when you click a task keeps the caret inside it — Tab no longer walks
+  out onto the board behind, Escape closes it, and closing hands focus back
+  to the task you came from; none of that worked before. The panel now says
+  what it is to a screen reader, the status, assignee and priority fields are
+  the workspace's shared controls, clicking a subtask's words now ticks its
+  box, and the label and blocker menus no longer risk sliding underneath the
+  content they should float over.
+
 - **Creating a task, and picking a file from Drive, now work from a
   keyboard.** The "New task" form and the Drive picker it opens keep the
   caret inside them — Tab no longer walks out onto the page behind, Escape

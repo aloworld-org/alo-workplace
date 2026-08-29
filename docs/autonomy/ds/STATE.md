@@ -3017,3 +3017,78 @@ bundle all trace to `src/billing/**`, the interactive agent's area, which
 this track does not open (noted for D3.01, not actioned).
 
 **Next:** D2.11b — the task detail panel, findings enumerated in the item.
+
+## D2.11b — the task detail panel joins the stack (2026-08-29)
+
+**The decision the item asked for: the trap moved into a hook, not `Modal`
+into a `side` variant.** Reading `Modal` settled it — a side variant would
+have replaced the header (the detail's is a status select and two icon
+buttons, no title text), the title (an editable input, not an `<h2>`), the
+width, the height and the radius, leaving `Modal` expressing nothing of
+itself but the effect. So the effect is what moved: `ds/useModalStack.ts`
+now owns focus-in/focus-back, the tab trap, and Escape-for-the-top-layer,
+with `Modal` and `TaskDetail` both calling it. The stack semantics are
+unchanged and `Modal.test.tsx` is unedited and green. One deliberate
+improvement while extracting: the close handler is read through a ref
+rather than being an effect dependency — `TasksModule` passes an inline
+arrow, and the old shape would have re-pushed the panel and yanked focus
+to its first control on every parent re-render, mid-edit.
+
+**The panel itself.** `TaskDetail` had no Escape, no trap, no `role`, no
+name. It now renders one dialog shell (`role="dialog"`, `aria-modal`,
+`aria-label` via new `taskDetailDialog` key in all four catalogs) for both
+its loading and loaded states — same shape in both returns, so React keeps
+one DOM node and the stack's mount-read panel stays valid — and joins the
+modal stack. Backdrop dismissal got Modal's target test (a text-selection
+drag that ends on the scrim no longer closes it).
+
+**Controls adopted:** the header's status `<select>` → `ds/Select` (named
+via new `taskStatus` key); delete/close → `ds/IconButton`, with a `danger`
+tone added to IconButton for the delete (`Button` already had the variant;
+the hand-rolled button's red hover was the screen needing it); assignee →
+`ds/Input variant="cell"` (the quiet in-grid editor, exactly this row);
+priority → `ds/Select variant="ghost"`; the new-label and new-subtask
+inputs → `ds/Input`; the create-label button → `ds/Button`. A subtask's
+checkbox is now inside a wrapping `<label>` with its title, so clicking
+the words ticks the box and the box has a name. The two textareas stay
+bare per the standing cut (tasks remains the ninth area waiting on a
+multi-line control).
+
+**The class-that-isn't, found a third time in this area:** `z-dropdown`
+(TaskDetail's label and blocker popovers, FilesView's move listbox)
+generates nothing — all three popovers shipped with no z-index. Respelled
+to `z-[var(--z-overlay)]`, the token Menu and ChoicePicker use.
+
+**TaskToolbar: neither Menu nor ChoicePicker absorbs the Dropdown.** Read
+all three as ordered: `ds/Menu` is a menu of actions — closes on every
+choice, items carry no checked state; `ds/ChoicePicker` is a form field
+holding one value. The toolbar's dropdown stays open across choices and
+holds `menuitemradio`/`menuitemcheckbox` with a section heading — right
+semantics already, wrong shape for either component to express without
+growing a second personality. What it shares with every popover — dismiss
+on outside-press or Escape — now comes from `ds/useDismiss` instead of a
+hand-rolled copy of it, and its popover's raw `z-40` became
+`z-[var(--z-overlay)]`. Decision recorded in the file.
+
+**Known limits, stated rather than hidden:** Escape with a label/blocker
+popover open closes the panel too (the stack's capture listener answers
+first; the popovers are not layers). `ds/Dialog` still handles Escape at
+the element level and is not in the stack — a confirm opened over a
+stacked layer would lose Escape to it; no live call site does this today.
+Noted for D3.01: `chat/ChatModule.tsx:331` writes `bg--tint` (generates
+nothing) — the agents track's area, not touched.
+
+**Gate:** `npx tsc --noEmit` clean; eslint clean on the 11 changed files;
+`npx vitest run src` **241 files / 1337 tests green** (`Modal.test.tsx`
+unedited; one first-pass timeout flake in `sites/SectionPalette.test.tsx`
+— the sites track's file, untouched — passed alone and in the full
+re-run); `node scripts/gen-tailwind-theme.mjs --check` current (77
+utilities); `npm run build` clean in 76 s.
+
+**Cut for the eighteenth time: no screenshot** — still no browser package
+in `web/`. The bundle probe ran both directions on the CSS `dist/index.html`
+references: `z-dropdown` appears nowhere; `z-\[var\(--z-overlay\)\]`,
+`justify-self-start`, `hover\:bg-danger-tint` and `min-h-control` are all
+present.
+
+**Next:** D3.01 — the wave review.
