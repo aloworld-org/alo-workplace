@@ -208,7 +208,7 @@ against a real model after each item and quote the answers.
 - [x] A8.2 Undo an agent with the button that undoes a person; hand an open
   proposal to an agent; assign a task to an agent (a standing instruction with
   a due date).
-- [ ] A8.3 Goals: a goal record with Ask alo's plan, steps, progress, one
+- [x] A8.3 Goals: a goal record with Ask alo's plan, steps, progress, one
   approval surface and Stop; the Northstar demo across Sales, Billing, Mail
   and Agenda.
 - [ ] A8.4 `[web]` The agent on the record in focus in every moved module.

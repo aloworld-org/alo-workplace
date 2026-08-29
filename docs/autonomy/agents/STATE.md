@@ -4935,3 +4935,78 @@ no CHANGELOG line, no i18n, no new routes, no deploy note.
 **Wave A4 is now fully `[x]`/`[~]`** — A4.7 was its last open item.
 **Next:** A8.3 — goals: the goal record with Ask alo's plan, steps,
 progress, one approval surface and Stop; the Northstar demo.
+
+## A8.3 — goals: the plan becomes an object, and an approval resumes it (2026-08-29)
+
+**What shipped.** ADR 0058 §7 made real: multi-step work across agents is a
+goal record — plan, steps, progress, one approval surface, Stop — not a
+conversation between agents, and not a room message that dies at the first
+write.
+
+*The record.* Migration `0473_agent_goals` + `alo_store::agent_goals`: the
+plan Ask alo made (steps fixed at creation), a forward-only cursor, status
+`working|waiting|done|stopped|failed`, and — exactly while waiting — the one
+proposal it waits behind, a column with a CHECK so the two facts cannot
+disagree. Every transition is a conditional UPDATE (two writers, one winner);
+only the asker moves a goal, everyone the room admits reads it.
+
+*The run writes it.* `agent_orchestrate` records the goal before the plan
+runs, advances it as steps answer, parks it `waiting` on a step's proposal —
+including a write wanted two levels down: `TurnResult::DelegateProposed` now
+carries its proposal id — and ends it done/stopped/failed with the reason.
+
+*The approval resumes it.* "The rest of this waits until you approve that"
+was, until now, a sentence with nothing behind it — the remaining steps were
+simply dropped. `POST /chat/proposals/{id}` (and `/hand`) now asks
+`goal_waiting_on(card)` after settling: approved-and-ran → the goal resumes
+past that step and the remaining steps run through the same `run_steps`
+machinery under a freshly registered turn (Stop reaches it) with a fresh run
+budget (an approval is a person back in the loop — deliberate); turned down →
+goal `stopped` ("the proposal was turned down"); approved-but-failed → goal
+`failed` (the rest would build on a step that did not happen).
+
+*The room reads it.* `GET /chat/channels/{id}/goals` — the card's data
+source: request, per-step states derived from cursor+status, the waited-on
+proposal, timestamps. Registered in the intent registry's exclusions (the
+runtime's own surface). `MAX_PLAN_STEPS` 3→4 — the goal shape is four
+products wide — still equal to the run's handoff budget (const assert holds).
+
+**Verified.** `prune-test-db` (5193→3423); fmt; clippy zero warnings on all
+three crates; nextest alo-store+alo-ai **2839/2839** (three new suites in
+`tests/agent_goals.rs`: lifecycle forward-only, ends-from-both-live-states,
+wrong tenant/wrong colleague reach nothing), alo-jmap **1567/1567** with
+three new wire tests in `agent_goals_http`. The Northstar demo, as asserted
+on the real router and store: `@alo close the Northstar deal by Friday` →
+plan `1. @crm … 4. @agenda` in the room, CRM answers ("Northstar Foods is at
+the proposal stage"), Billing proposes `create_invoice_draft` and the goal
+card reads `waiting, cursor 1, [done, waiting, pending, pending]` naming that
+card → approve → invoice really raised, **"Carrying on — step 3 of 4."**,
+Mail proposes `draft_email`, card `waiting, cursor 2` → approve → "Carrying
+on — step 4 of 4.", Agenda proposes `create_event` → approve → goal **done,
+cursor 4, all steps done, nothing pending anywhere**, five model calls total
+(resuming replays nothing). Declining instead leaves the goal `stopped`
+("the proposal was turned down"), the second step never runs. And Stop
+pressed during a resumed segment ends it: the segment is a registered turn
+(`mine: true`), the room gets "Stopped — I did 1 of 3 steps.", the goal says
+`stopped`, the last step's turn is never taken.
+
+**Cuts and flags, recorded.** (1) Goal bookkeeping around the run is
+best-effort by design: a failed insert degrades to the pre-A8.3 run (nothing
+to resume), and a process killed mid-segment leaves a goal `working` with no
+turn behind it — stale, readable, and the A8.4 card can say so; the same
+staleness class the in-memory turn registry already accepts. (2) A resumed
+segment gets a fresh run budget — deliberate, an approval is a person back in
+the loop. (3) No goal UI and no i18n: the room speech uses the existing
+English-constant pattern of agent speech, the card is `[web]` A8.4. (4) New
+route sits under the existing `/chat` prefix — no Caddyfile change needed.
+(5) Environment note for the next iteration: mid-gate, every new connection
+began failing `28P01 password authentication failed` because the profile's
+`DATABASE_URL` carries an **empty password** (`postgres://alo:@…`); the gate
+was run with `postgres://alo:alo-dev-only@127.0.0.1:5432/alo_scratch`
+exported explicitly, and all 4406 tests pass under it. If a future gate fails
+at connect, export the password before debugging anything else.
+
+**Next:** A8.4 `[web]` — the agent on the record in focus in every moved
+module. Bounds check first: this track's `[web]` writ runs to
+`web/src/chat/**` and new `web/src/agents/**` only; if the item cannot be
+built inside that, it is marked `[!]` with the reason, per the wave rules.

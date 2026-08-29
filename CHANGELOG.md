@@ -24,6 +24,14 @@
   reader and scrollable from the keyboard. The forms, dropdowns, tick-boxes
   and status words are the workspace's shared controls now, so Projects reads
   as the same product as Billing, Inventory and HR.
+- **Multi-step work you ask alo for is now a goal that survives its own
+  approvals.** When Ask alo plans across the product agents — look the deal
+  up, raise the invoice, draft the mail, book the review — the plan is kept as
+  a goal with its progress visible to the room. Approving the one pending step
+  now genuinely continues the rest ("the rest of this waits until you approve
+  that" used to be the end of the run); turning it down leaves it there, and
+  Stop works mid-run and mid-wait alike. One thing waits for your approval at
+  a time, and the goal card names it.
 
 - **The warehouse screens can now be worked from a keyboard, and they say what
   they are.** The two sheets Inventory opens over a screen — the movement
