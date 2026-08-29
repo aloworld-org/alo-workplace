@@ -262,3 +262,99 @@ agents-web track's; the three new component tests cover the picker and AS.5's
 review walks the screens.
 
 **Next:** AS.4b (a room's calendar over CalDAV).
+
+## AS.4b — a room's calendar over CalDAV (2026-08-29)
+
+**Shipped.** A room is now a CalDAV collection of its own at
+`calendars/<uid>/<resourceId>/`, read-only to every member of the tenant.
+`PROPFIND` on calendar-home lists it beside the personal and shared calendars
+(name, location as `calendar-description` per RFC 4791 §5.2.1, `read` alone in
+`current-user-privilege-set`); its members are the meetings that booked it,
+whoever owns them. The href seam AS.4 flagged is closed: `event_propstat` takes
+the **collection being listed** rather than deriving one from the event's own
+calendar, so a room's client is never handed a colleague's collection. `GET`,
+`calendar-multiget`, `calendar-query` (`time-range`) and `free-busy-query` all
+answer on a room; a booking is readable there and nowhere else the caller
+cannot already see. Every write is `403` — `PUT` and `DELETE` refuse before the
+store is touched, because a room's schedule is written by booking it. The
+served `ATTENDEE` for a room carries `CUTYPE=ROOM;RSVP=FALSE;PARTSTAT=ACCEPTED`
+(RFC 5545 §3.2.3); an incoming `CUTYPE` is still ignored — what a room *is* is
+the tenant's resource list, not a parameter a client sends. And a resource
+attendee arriving on a **CalDAV PUT** now books the room through the same
+`book_resources` check the Agenda and the JSON API use, taken before the write,
+so a collision is `409` (RFC 4791 §5.3.2) carrying the store's own sentence and
+leaves nothing behind; a room dropped from the guest list is released by the
+same PUT.
+
+**Design notes.** One new store read, `event_in_calendar`, over the existing
+`calendar_scope_pred` — the predicate AS.4 already wrote for
+`events_of_calendar`, so the room case and the visible-calendar case stay one
+rule rather than two. A room's `sync-token`/`getctag` is a **hash of its
+members' ETags** (`urn:alo:room:<hash>`) instead of the account modseq: a
+room's members are other people's meetings, and their writes never bump this
+caller's modseq, so a modseq token would sit still while the room filled up.
+That token cannot answer "what changed", so it answers only what it honestly
+can (RFC 6578 §3.2): no token → every member; the current token → nothing
+changed; anything else → `403 DAV:valid-sync-token`, which sends the client to
+a full listing. `to_ics_series_with_rooms` carries the tenant's room addresses
+into the serializer, which has no database and must not grow one; with an empty
+set it is byte-identical to `to_ics_series`, which is what keeps the round-trip
+corpus pinned. The lazy-override branch in `report_events` was removed: it
+loaded the overrides on the next line regardless, so it was two paths spelling
+one, and the window test is now the shared `in_window`.
+
+**Verified.** `cargo nextest run -p alo-store` 2584 passed (3 new: the
+`CUTYPE=ROOM` unit test incl. the empty-set identity and the parse-back, a room
+serving a colleague's booking as its own member while their private event and a
+guessed id stay `None`, and the wrong-tenant/forged-door proof for
+`event_in_calendar`); `-p alo-jmap` + `-p alo-ai` 1880 passed (3 new wire
+tests: the read-only collection with hrefs under the room, `CUTYPE=ROOM`, the
+403s and the untouched booking; the PUT booking with its 409, back-to-back and
+release; the sync-token's three answers). Clippy clean on all three, fmt done.
+No web changes, so no screenshot pass was needed this iteration. Live wire pass
+(debug `alo-jmap` on **:8092** — the agents-web track's server is still up, so
+a third port rather than killing theirs — db `alo` confirmed via
+`pg_stat_activity`, tenant `AS4b Wire`, users `as4b@` and `mate@`):
+
+```
+PROPFIND /dav/calendars/<uid>/ Depth:1
+→ .../default/            | Personal   | -                    | urn:alo:calendar:1
+  .../9K2Ahp…/            | Board room | 2nd floor, east wing | urn:alo:room:df6dd6642f5bedf9 | read-only
+
+PROPFIND .../9K2Ahp…/ Depth:1  → 207, href .../9K2Ahp…/nMM2hs….ics  (the COLLEAGUE's booking)
+GET      .../9K2Ahp…/nMM2hs….ics → 200, ETag "20e36f1c69bed596" (= the propstat's)
+  ATTENDEE;CUTYPE=ROOM;ROLE=REQ-PARTICIPANT;RSVP=FALSE;PARTSTAT=ACCEPTED:mailto:board@wire.test
+GET      .../default/nMM2hs….ics → 404   (readable through the room, not through mine)
+PUT      .../9K2Ahp…/squat-1.ics → 403 ; DELETE .../9K2Ahp…/nMM2hs….ics → 403 ; GET again → 200
+REPORT   free-busy-query on the room → 200 FREEBUSY;FBTYPE=BUSY:20260902T100000Z/20260902T110000Z
+                                        (no SUMMARY — the serializer has no field for one)
+
+PUT .../default/clash-1.ics  10:30–11:30, ATTENDEE:board@wire.test
+→ 409 "Board room is already booked from 2026-09-02T10:00:00Z to 2026-09-02T11:00:00Z"
+   GET clash-1 → 404 (a refusal leaves nothing behind)
+PUT .../default/after-1.ics  11:00–12:00, same room → 201; db: bookings(9K2Ahp… ← after-1)
+PUT .../default/after-1.ics  same times, ATTENDEE removed → 204; db: 0 rows for after-1
+PUT .../default/clash-2.ics  11:00–12:00, the room again → 201 (the released slot is free)
+
+REPORT sync-collection (no token) → 207, both members + urn:alo:room:ee06f930d70e581f
+REPORT sync-collection (that token) → 207, no members, same token
+  …a third booking lands…
+REPORT sync-collection (that token) → 403 <d:error><d:valid-sync-token/></d:error>
+GET /calendar/calendars → ["cal_personal_…"] only — no room booking in the week grid
+```
+
+**Cuts/flags.** Cut (recorded in `interop.md`): a room's sync reports deletions
+by absence from a full listing rather than as `404` responses — the price of a
+state-hash token, and revisitable if a room ever holds enough bookings for the
+listing to hurt. Flags: a room's collection shows the **titles** of colleagues'
+bookings — how a shared room calendar works everywhere, and the reason
+free/busy (times only) stays what the grid and Sites see; it is written down in
+`interop.md` as a disclosure rather than left implicit. The room's ctag reads
+all of a room's bookings on every PROPFIND (O(members)); fine at a room's scale,
+worth an index-backed tag if a room ever collects years of history.
+`scripts/prune-test-db.sh` ended with an FK error deleting a tenant whose
+`billing_products` are referenced by `billing_invoice_lines` (the billing demo
+seeds — another track's area, reported not fixed); it still pruned to 5464
+tenants / 93 MB and the gate ran in under a minute.
+
+**Next:** AS.5 (wave review).

@@ -1,5 +1,14 @@
 # Changelog
 
+- **Your phone can see the meeting rooms too.** Every room in the workspace now
+  appears in the calendar app on your phone or desktop alongside your own
+  calendars — its name, where it is, and everything currently booked into it,
+  including colleagues' meetings. It is read-only there, as a room should be:
+  you book it by inviting it to a meeting, and that now works from the phone as
+  well. Invite a room from any calendar app and it is held for that hour; if
+  somebody already has it, the save is refused and says which room is taken and
+  when. Remove the room from the guest list and the hour is free again.
+
 - **Quotation totals now offer four professional visual treatments.**
   Keep the existing soft summary or choose a minimal, framed, or Alo-accented
   total while independently controlling its placement and VAT detail. Visual

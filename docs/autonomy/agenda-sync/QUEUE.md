@@ -91,7 +91,7 @@ directory immediately before rebasing.
   visible, never editable, through the existing `can_edit` refusal). Cut and
   recorded if too wide: approval workflows for resources, recurring bookings'
   partial conflicts (refuse the whole series, say which instances collide).
-- [ ] AS.4b **A room's calendar over CalDAV** (the half AS.4 cut, so its
+- [x] AS.4b **A room's calendar over CalDAV** (the half AS.4 cut, so its
   slice shipped whole). Each resource is served as a read-only collection to
   every tenant member: `PROPFIND` on calendar-home lists it beside the
   personal and shared calendars, its objects are the events that booked it

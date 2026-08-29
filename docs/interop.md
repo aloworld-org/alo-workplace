@@ -571,18 +571,53 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
 - **Rooms and resources (AS.4):** a bookable resource is a `calendars` row of
   kind `resource` with an address of its own; a meeting books it by carrying
   that address as an `ATTENDEE`, and the store refuses the save when any
-  occurrence collides with a booking the room already holds. Two consequences
-  on the wire, both deliberate: a resource calendar is **outside** every
-  visibility predicate, so it is not listed as a CalDAV collection and its
-  bookings never appear in another calendar's collection; and a resource
-  attendee arriving on a **CalDAV PUT** is stored as a plain attendee — it
-  does **not** book the room and is not conflict-checked. Booking over CalDAV
-  and serving each room as a read-only collection (with `CUTYPE=ROOM` on the
-  served `ATTENDEE`) is AS.4b, the next item; until it lands, a room is booked
-  from Agenda or the JSON API. A refusal is `409` with the room's name and the
-  taken slot as RFC 3339 UTC. `POST /calendar/freebusy` answers for a room's
-  address exactly as for a person's, tagged `"kind":"resource"` with an empty
-  `outsideHours` — a room keeps no working hours.
+  occurrence collides with a booking the room already holds. A refusal is `409`
+  with the room's name and the taken slot as RFC 3339 UTC.
+  `POST /calendar/freebusy` answers for a room's address exactly as for a
+  person's, tagged `"kind":"resource"` with an empty `outsideHours` — a room
+  keeps no working hours. A resource calendar stays **outside** every
+  visibility predicate, so a room's bookings never land in a colleague's week
+  grid; the room's own collection (below) is the one door onto them.
+- **A room's collection (AS.4b):** each resource is served as a **read-only**
+  calendar collection to every member of the tenant, at
+  `calendars/<uid>/<resourceId>/`. `PROPFIND` on calendar-home lists it beside
+  the personal and shared calendars, with the room's name as `displayname`, its
+  location as `calendar-description` (RFC 4791 §5.2.1) and only `read` in
+  `current-user-privilege-set`. Its members are the meetings that booked it,
+  whoever owns them, with hrefs under the **room's** segment — an href is built
+  from the collection being listed, not from the calendar the event sits on, so
+  a room's client is never pointed at a colleague's collection. `GET`,
+  `calendar-multiget`, `calendar-query` (with `time-range`) and
+  `free-busy-query` all answer there; a booking is readable through the room
+  and stays unreadable through anything else. Every write is refused **`403`**:
+  a room's schedule is written by booking it, not by PUTing into it, and that
+  holds for the admin whose row created it. Deliberate consequence, recorded
+  because it is a disclosure: a room's collection shows the **titles** of
+  colleagues' bookings, which is how a shared room calendar works everywhere —
+  free/busy (times only) remains what the week grid and Sites see.
+  - The served `ATTENDEE` for a room carries `CUTYPE=ROOM` (RFC 5545 §3.2.3),
+    with `RSVP=FALSE;PARTSTAT=ACCEPTED` — a room was booked, and the booking is
+    the answer; every other attendee is unchanged. The match is on the address,
+    case-insensitively. Incoming `CUTYPE` is ignored: what a room *is* is the
+    tenant's resource list, never a parameter a client sends.
+  - A resource attendee arriving on a **CalDAV PUT** now books the room through
+    the same `book_resources` check the Agenda and the JSON API use, taken
+    *before* the write, so a refusal leaves nothing behind. A collision answers
+    **`409`** (RFC 4791 §5.3.2 leaves the code to the server) with the store's
+    own sentence — the room's name and the taken slot — as a `text/plain` body.
+    The PUT body is the whole resource, so a room dropped from the guest list is
+    released by the same PUT.
+  - **Sync:** a room's `sync-token` and `getctag` are a **hash of its members'
+    ETags** (`urn:alo:room:<hash>`), not the account modseq every other
+    collection uses — a room's members are other people's meetings, whose writes
+    never touch this caller's modseq, so a modseq token would sit still while
+    the room filled up. Consequences, per RFC 6578 §3.2: an initial
+    `sync-collection` (no token) returns every member; the current token returns
+    no changes; any other token is answered `403 DAV:valid-sync-token`, sending
+    the client to a full listing — the same round a changed ctag would cause.
+    Deletions are therefore reported by absence from that listing, not as `404`
+    responses. Revisit if a room ever holds enough bookings for a full listing
+    to hurt.
 - **Round-trip corpus** (`alo-store/tests/ical_corpus.rs`): client fixtures —
   plain UTC, all-day, `TZID=Europe/Brussels` zoned, floating, §3.3.11-escaped
   text, folded long lines, (M3.2) weekly-with-exceptions, monthly-by-day
