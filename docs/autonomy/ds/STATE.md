@@ -3092,3 +3092,77 @@ references: `z-dropdown` appears nowhere; `z-\[var\(--z-overlay\)\]`,
 present.
 
 **Next:** D3.01 — the wave review.
+
+## D3.01 — the wave review (2026-08-29)
+
+**The walk happened.** After eighteen iterations of "no browser in `web/`",
+the responsive track's Playwright landed (`@playwright/test` 1.62.1, cached
+Chromium, and its throwaway e2e stack in `web/e2e/`), so the queue's "look at
+it" step ran as written for the first time: a one-off spec reused
+`stack.setup.ts` (throwaway `alo_e2e` database, backend on 8199, Vite on
+5199 — nobody's real stack touched), signed in, and screenshotted all sixteen
+modules at 1440×900 and 390×844. All 32 screenshots were opened and read.
+The spec lived in a temp dir for the run and was deleted; teardown dropped
+`alo_e2e` and killed both servers (verified).
+
+**Ratchet:** `redefined.ts` lists exactly one file — `sites/SitesModule.module.css`,
+the track boundary the queue predicted — and `primitives.test.ts` is green
+(7 tests). 31 stylesheets remain under `web/src` but none outside sites
+declares a primitive; they are module layout, which was never this queue's
+target.
+
+**CSS, re-derived as ordered.** The 252 KB figure matches nothing measurable
+and D2.02 already said so; it stays dead. Today's production build ships
+**913.7 KB raw / 155.5 KB gzipped across 20 CSS files**, of which ~500 KB raw
+is vendored editor surface (DocEditor 261 KB, SheetEditor 114 KB, MeetRoom
+65 KB, CodeBlock 40 KB…). The app's own main stylesheet is **271.7 KB raw /
+42.3 KB gzipped**. No before/after claim is honest without rebuilding a
+17-day-old tree against today's dependencies, so these numbers are recorded
+as the baseline the next wave measures against.
+
+**What the walk found (filed, not fixed — none of it is this track's area
+to edit, and a review that starts redesigning is the thing the queue
+forbids):**
+
+- **Campaigns, phone: real defect.** The audience screen's empty state and
+  the "Nothing is sent from this screen…" footnote render superimposed —
+  two paragraphs of text on top of each other, unreadable. Campaigns
+  track's area.
+- **Billing, phone:** the documents toolbar crushes its search input to
+  ~3 characters beside the "Show" select. Billing's interactive owner.
+- **Mail, desktop:** the folder pane still shows six skeleton bars (no
+  folder names) well after settle — loading state that never resolves on an
+  empty account, or folders missing; either way worth a look. Mail track.
+- **Insights, phone:** the board toolbar wraps into a tall stack of loose
+  text actions (New board / refresh / Add a chart / Ask for a chart /
+  Rename / Delete board) — functional, untidy. A future responsive item.
+- **Drift observation, no owner yet:** module-header tab styles vary —
+  chip tabs (Billing, Finance, Inventory, People), underline tabs
+  (Campaigns, Projects, Tasks), plain text links (Sales, Insights). All
+  are ds-styled, but the *pattern* choice is per-module judgment; if the
+  suite wants one answer it is a new primitive (`Tabs`) and its own item.
+- Cosmetic: Meet's greeting wraps its hand emoji onto its own line at
+  desktop. Carried from D2.11b: `chat/ChatModule.tsx:331` writes
+  `bg--tint`, which generates nothing — agents track's area.
+
+**What the walk showed working:** one visual system across all sixteen
+modules — same buttons, chips, cards, tables, selects and empty-state shape
+everywhere; the phone width holds (bottom tab bar, drawer sidebars, boards
+collapsing to a select-plus-column, toolbars stacking); empty states read as
+onboarding in every module, in the product's voice.
+
+**Environment note, one-database rule:** `alo_scratch` and `alo_agents_test`
+exist on this box beside `alo`. Not this track's to delete unattended;
+flagged for their owners.
+
+**Gate:** `npx vitest run src/ds/primitives.test.ts` green; `npm run build`
+clean (41.5 s); walk run against the real wire on the throwaway stack. No
+production code changed this iteration — the deliverables are this entry,
+the CHANGELOG line, and the findings above.
+
+**Queue state: every item is `[x]`.** Sites' stylesheet stays on
+`redefined.ts` by design until that track migrates it (ADR 0045); the
+findings above belong to other tracks' queues. Nothing is left for this
+loop to build.
+
+LOOP COMPLETE

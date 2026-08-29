@@ -1,5 +1,14 @@
 # Changelog
 
+- **The whole workplace now draws from one set of controls.** The buttons,
+  text boxes, drop-downs, tags, tables, toolbars and dialogs you meet in
+  Mail, Agenda, Tasks, Drive, Billing, Sales, Projects, Finance, Inventory,
+  People, Insights, Campaigns, Chat and Meet are now the same controls
+  everywhere — the same colours, the same spacing, the same behaviour from a
+  keyboard and a screen reader. Screens that used to look subtly unlike
+  their neighbours no longer do, and an improvement to a control now reaches
+  every module at once instead of one copy of it.
+
 - **The task detail panel now works from a keyboard.** The slide-over that
   opens when you click a task keeps the caret inside it — Tab no longer walks
   out onto the board behind, Escape closes it, and closing hands focus back
