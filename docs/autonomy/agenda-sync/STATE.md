@@ -358,3 +358,123 @@ seeds — another track's area, reported not fixed); it still pruned to 5464
 tenants / 93 MB and the gate ran in under a minute.
 
 **Next:** AS.5 (wave review).
+
+## AS.5 — wave review (2026-08-29)
+
+**Shipped.** The three things the item asked for, and one bug the review was
+written to find.
+
+*The bug.* `docs/interop.md`'s scripted **CalDAV and CardDAV transcripts had
+silently stopped regenerating.** `scripts/wire-transcripts.sh` selects its tests
+with `-E 'binary(transcripts)'`; when `alo-jmap`'s `tests/` was consolidated
+into suite binaries on 2026-08-28 (the change that removed the 40-minute
+relink), `transcripts.rs` became a *module of* `mail_http_suite` and stopped
+matching. The script's own missing-transcript check would have caught it — but
+only after the earlier splice had already been written, so a run that "passed"
+left the old bytes in place. The checked-in CalDAV transcript therefore showed a
+`TZID=Europe/Brussels` object served **without a `VTIMEZONE`**: the server
+described in the docs was two features out of date. Filter fixed
+(`+ test(transcripts::caldav_transcript)`, and the CardDAV one), transcripts
+regenerated: the CalDAV section now carries the `VTIMEZONE` with the
+2026-10-25 and 2027-03-28 transitions. The only other churn is the
+nondeterministic UIDVALIDITY/ETag/DTSTAMP values in the mail transcripts.
+
+*`interop.md` reads true.* Audited the whole § CalDAV against the code. Three
+statements were false and are corrected: the opening said **one** collection per
+account at `default/` (it is one per calendar the caller can see, rooms
+included); it said the sync-token is always the account modseq (a room's is a
+state hash — the AS.4b note said so 100 lines further down and the opening
+contradicted it); and a scope-cut bullet still claimed `calendar-query`
+**time-range** filters are not evaluated, which the "Time-range filtering"
+bullet on the same page had already contradicted since M3.1 — only the
+non-range parts of the filter (`comp-filter`, `prop-filter`, `text-match`) are
+unevaluated. Everything else checked out against the source: `PROPPATCH`/
+`MKCALENDAR`/`MOVE` are `405` (the method match has five arms), `VTODO`/
+`VJOURNAL`/`TRANSP` are unmodelled, `RDATE;VALUE=PERIOD` is skipped,
+`BYMONTH`/`BYSETPOS`/`WKST` are ignored with Monday assumed.
+
+*`ROADMAP.md` Phase 2 § Agenda* now says what is built: the events/invitations/
+free-busy/recurrence row and the shared-calendars/rooms row are `[x]` with the
+detail behind them; `alo-dav` keeps `[~]` but the remainder is **only the crate
+extraction** (CalDAV itself is built); the Mail-integration row is `[~]` —
+invite cards built, the Meet half waits on Meet. All four `[L]` rows of
+`features.md` § Agenda are now built.
+
+**Verified.** `cargo nextest run -p alo-store -p alo-jmap` → **4167 passed**,
+1 skipped, 239 s. Transcript regeneration green (7 tests, incl. the two that
+had been skipped for a day). Live wire pass against the local backend (debug
+`alo-jmap` on **:8092**, db `alo` confirmed via `pg_stat_activity`, tenant
+`AS5 Wave`, users `as5@`/`mate5@wire.test`; the server was killed by pid, never
+`pkill`, because another track's binary was up). Raw curl with the literal XML —
+the python `caldav` library is not installed on this machine, which the queue
+allows.
+
+AS.1 — a phone's per-occurrence edits, all four shapes, one resource:
+
+```
+PUT  as5-standup.ics  master (weekly ×4, TZID=Europe/Brussels) + one VEVENT
+                      with RECURRENCE-ID:20261026T090000 moved to 11:00
+→ 201 ETag "60ca6c1e5a4967a5"
+GET → both VEVENTs, the override carrying its RECURRENCE-ID at the ORIGINAL slot
+PUT  the same instance moved again (14:00)        → 204; GET → 14:00, new summary
+PUT  the instance with STATUS:CANCELLED           → 204; GET → no override VEVENT,
+                                                    EXDATE;TZID=Europe/Brussels:20261026T090000
+PUT  the master alone (the body is the resource)  → 204; GET → master only, EXDATE gone
+```
+
+AS.2 — `VTIMEZONE`, from the same GET and two more objects:
+
+```
+GET as5-standup.ics →  BEGIN:VTIMEZONE / TZID:Europe/Brussels
+   DAYLIGHT 20260329T020000 +0100→+0200 CEST
+   STANDARD 20261025T030000 +0200→+0100 CET     (the switch the series crosses)
+   DAYLIGHT 20270328T020000 +0100→+0200 CEST    (one year past the last instant)
+PUT TZID=Etc/GMT-5 → one STANDARD block at 19700101T000000, +0500→+0500, TZNAME +05
+PUT TZID=Eastern Standard Time (Outlook's display name)
+   → served as DTSTART:20261110T090000Z, no VTIMEZONE — the documented fallback
+```
+
+The room collection (AS.4/AS.4b), re-driven end to end by a second user:
+
+```
+POST /calendar/resources {"Wave room","3rd floor, north",8,wave-room@wire.test} → 200
+as5:   PUT default/as5-review.ics with ATTENDEE:mailto:wave-room@wire.test → 201
+mate5: PROPFIND calendars/<mate5>/ Depth:1
+   → .../default/            Personal    urn:alo:calendar:0
+     .../w3eCBR7…/           Wave room   calendar-description "3rd floor, north"
+                             urn:alo:room:f9ec8840dc767c6a   privilege: read only
+mate5: PROPFIND .../w3eCBR7…/ Depth:1 → the href is .../w3eCBR7…/as5-review.ics
+       (under the ROOM, not under as5's collection)   ETag "65eb86127aea00ae"
+mate5: GET  that href → 200, ATTENDEE;CUTYPE=ROOM;ROLE=REQ-PARTICIPANT;RSVP=FALSE;
+                              PARTSTAT=ACCEPTED:mailto:wave-room@wire.test
+mate5: GET  .../default/as5-review.ics → 404   (readable through the room alone)
+mate5: PUT into the room → 403 ; DELETE from it → 403 ; as5 (its admin) PUT → 403
+       GET again → 200 (a refusal changed nothing)
+mate5: PUT default/mate5-clash.ics 09:30–10:30, same room
+   → 409 "Wave room is already booked from 2026-09-10T09:00:00Z to …T10:00:00Z"
+     GET the refused event → 404
+mate5: REPORT free-busy-query → 200, FREEBUSY;FBTYPE=BUSY:20260910T090000Z/…T100000Z
+       (no SUMMARY — the serializer has no field for one)
+mate5: REPORT calendar-query, time-range 2026-10-01…10-30 → 0 hrefs (range honoured)
+mate5: REPORT sync-collection: no token → the member + urn:alo:room:f9ec8840dc767c6a;
+       that token → 0 hrefs, same token; a stranger token → 403 <d:valid-sync-token/>
+mate5: GET /calendar/calendars → ["cal_personal_…"] only — a room is not in the grid
+```
+
+**Cuts/flags.** No CHANGELOG line: nothing user-facing changed this iteration
+(docs, a ROADMAP status, and a test-selection filter). Follow-on, not built
+because the item is a review: the scripted CalDAV transcript still exercises the
+personal collection only — a room leg would keep AS.4b honest the way the
+regenerated `VTIMEZONE` now keeps AS.2 honest, and it belongs in
+`transcripts.rs` next to the existing legs. Flag for whoever owns the harness:
+`scripts/wire-transcripts.sh` checks for a missing transcript only *after*
+splicing, so a silent skip leaves stale bytes in the doc looking fresh — the
+check should run before the splice. `scripts/prune-test-db.sh` needs
+`DATABASE_URL` naming `alo_scratch` here (that is `alo-test-db`'s fallback, and
+the biggest database on the box at 158 MB); run so, it reported 4072 tenants and
+removed none — all of them are younger than its 2-hour cutoff, i.e. another
+track's suites, so nothing was stale rather than nothing was found.
+
+**Next:** none — the queue is finished.
+
+LOOP COMPLETE

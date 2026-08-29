@@ -103,7 +103,7 @@ directory immediately before rebasing.
   books the room through the same `book_resources` check — a collision is
   `409`, which RFC 4791 §5.3.2 allows a PUT to answer. Real-client evidence as
   the rules above require; `docs/interop.md`'s AS.4 note loses both cuts.
-- [ ] AS.5 Wave review: `docs/interop.md` § CalDAV reads true against the
+- [x] AS.5 Wave review: `docs/interop.md` § CalDAV reads true against the
   code; `python -m caldav` (or the raw exchanges) against the local backend
   for AS.1, AS.2 and the resource collection, quoted in STATE.md; `ROADMAP.md`
   Phase 2 § Agenda rows updated to what is actually built; then

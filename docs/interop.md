@@ -466,12 +466,16 @@ today it is a module in alo-jmap, reusing its auth + store wiring.
 
 The calendar syncs natively to Apple Calendar / iOS, Android (via a CalDAV
 app), and Thunderbird, riding the **same handler, auth, and discovery** as
-CardDAV — one calendar collection per account at
-`/dav/calendars/<user>/default/` (objects are `<eventId>.ics`), and the
+CardDAV — a collection per calendar the caller can see under
+`/dav/calendars/<user>/` (the personal one keeps the `default` segment; a
+shared calendar and a room are their own, see below — objects are
+`<eventId>.ics`), and the
 principal advertises `calendar-home-set` alongside `addressbook-home-set` so a
 client discovers whichever it asks for. `.well-known/caldav` → `/dav/`. The
 sync-token is the account modseq (`urn:alo:calendar:<modseq>`) filtered to
-`Event` changes, so `sync-collection` maps onto `AccountStore::changes`.
+`Event` changes, so `sync-collection` maps onto `AccountStore::changes` — the
+one exception is a room, whose token is a hash of its members' ETags because a
+room fills up without the caller's modseq ever moving (AS.4b, below).
 Per-object ETags hash the event **fields** plus its per-occurrence override
 set (not the serialized iCalendar, whose `DTSTAMP` changes each render —
 hashing that would churn every sync; leaving the overrides out would let an
@@ -487,10 +491,13 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   the time-zones note below), or all-day (`VALUE=DATE`). A floating time is
   read as **UTC** (documented cut). Recurrence (`RRULE`/`RDATE`/`EXDATE`),
   attendees, and display alarms are modelled; `VTODO`/`VJOURNAL` are not.
-- `calendar-query` time-range/component filters are **not** evaluated — the
-  REPORT returns the whole collection (a valid, unfiltered result the client
-  narrows), exactly as CardDAV does for `addressbook-query`.
-- No `PROPPATCH`/`MKCALENDAR`/`MOVE`: the single calendar is fixed.
+- A `calendar-query`'s `<C:time-range>` **is** evaluated (see "Time-range
+  filtering" below); the rest of its filter — nested `comp-filter`,
+  `prop-filter`, `text-match` — is not, so a query narrowed by anything else
+  gets the whole (range-filtered) collection back, a valid result the client
+  narrows further, exactly as CardDAV does for `addressbook-query`.
+- No `PROPPATCH`/`MKCALENDAR`/`MOVE`: the set of collections is what the
+  account can see, not what a client creates (`405 Method Not Allowed`).
 - **Per-occurrence overrides (`RECURRENCE-ID`) sync both ways.** A series is
   served as the master `VEVENT` plus one `VEVENT` per edited instance (its own
   `RECURRENCE-ID` at the original slot), so phones render "this event" edits
@@ -765,7 +772,7 @@ hand) are owner-gated and tracked in the mail track's STATE.md.
 
 <!-- wire-transcripts:begin -->
 
-Generated 2026-08-27 by `bash scripts/wire-transcripts.sh`.
+Generated 2026-08-29 by `bash scripts/wire-transcripts.sh`.
 TLS transcripts show the decrypted stream of a real rustls session; the
 DAV exchanges are the literal HTTP/1.1 bytes (the production proxy
 terminates TLS in front of them). Credentials and bearer blobs are
@@ -783,7 +790,7 @@ S: * 1 EXISTS
 S: * 0 RECENT
 S: * FLAGS (\Answered \Flagged \Deleted \Seen \Draft)
 S: * OK [PERMANENTFLAGS (\Answered \Flagged \Deleted \Seen \Draft \*)] Limited
-S: * OK [UIDVALIDITY 4763] UIDs valid
+S: * OK [UIDVALIDITY 1142] UIDs valid
 S: * OK [UIDNEXT 2] Predicted next UID
 S: * OK [UNSEEN 1] First unseen
 S: a2 OK [READ-WRITE] SELECT completed
@@ -818,7 +825,7 @@ S: * 0 EXISTS
 S: * 0 RECENT
 S: * FLAGS (\Answered \Flagged \Deleted \Seen \Draft)
 S: * OK [PERMANENTFLAGS (\Answered \Flagged \Deleted \Seen \Draft \*)] Limited
-S: * OK [UIDVALIDITY 4762] UIDs valid
+S: * OK [UIDVALIDITY 1143] UIDs valid
 S: * OK [UIDNEXT 1] Predicted next UID
 S: a3 OK [READ-WRITE] SELECT completed
 C: a4 LOGOUT
@@ -1008,7 +1015,7 @@ C: N:Lovelace;Ada;;;
 C: EMAIL:ada@eng.uk
 C: END:VCARD
 S: HTTP/1.1 201 Created
-S: etag: "0011bcb5fcad27c8"
+S: etag: "3e93621538f12ad4"
 S: connection: close
 S: content-length: 0
 S: date: <date>
@@ -1034,7 +1041,7 @@ S: <d:response>
 S: <d:href>/dav/addressbooks/ACCOUNT/default/ada-ACCOUNT.vcf</d:href>
 S: <d:propstat>
 S: <d:prop>
-S: <d:getetag>"0011bcb5fcad27c8"</d:getetag>
+S: <d:getetag>"3e93621538f12ad4"</d:getetag>
 S: <d:getcontenttype>text/vcard; charset=utf-8</d:getcontenttype>
 S: </d:prop>
 S: <d:status>HTTP/1.1 200 OK</d:status>
@@ -1057,7 +1064,7 @@ C: N:Sander;Bob;;;
 C: EMAIL:ada@eng.uk
 C: END:VCARD
 S: HTTP/1.1 201 Created
-S: etag: "4891710672d8eecd"
+S: etag: "8931bdbf37cbc7dd"
 S: connection: close
 S: content-length: 0
 S: date: <date>
@@ -1092,7 +1099,7 @@ S: <d:response>
 S: <d:href>/dav/addressbooks/ACCOUNT/default/bob-ACCOUNT.vcf</d:href>
 S: <d:propstat>
 S: <d:prop>
-S: <d:getetag>"4891710672d8eecd"</d:getetag>
+S: <d:getetag>"8931bdbf37cbc7dd"</d:getetag>
 S: <d:getcontenttype>text/vcard; charset=utf-8</d:getcontenttype>
 S: </d:prop>
 S: <d:status>HTTP/1.1 200 OK</d:status>
@@ -1217,7 +1224,7 @@ C: </c:comp-filter></c:comp-filter></c:filter>
 C: </c:calendar-query>
 S: HTTP/1.1 207 Multi-Status
 S: content-type: application/xml; charset=utf-8
-S: content-length: 835
+S: content-length: 1206
 S: connection: close
 S: date: <date>
 S:
@@ -1232,9 +1239,30 @@ S: <d:getcontenttype>text/calendar; charset=utf-8; component=VEVENT</d:getconten
 S: <cal:calendar-data>BEGIN:VCALENDAR
 S: VERSION:2.0
 S: PRODID:-//alo//calendar//EN
+S: BEGIN:VTIMEZONE
+S: TZID:Europe/Brussels
+S: BEGIN:DAYLIGHT
+S: DTSTART:20260329T020000
+S: TZOFFSETFROM:+0100
+S: TZOFFSETTO:+0200
+S: TZNAME:CEST
+S: END:DAYLIGHT
+S: BEGIN:STANDARD
+S: DTSTART:20261025T030000
+S: TZOFFSETFROM:+0200
+S: TZOFFSETTO:+0100
+S: TZNAME:CET
+S: END:STANDARD
+S: BEGIN:DAYLIGHT
+S: DTSTART:20270328T020000
+S: TZOFFSETFROM:+0100
+S: TZOFFSETTO:+0200
+S: TZNAME:CEST
+S: END:DAYLIGHT
+S: END:VTIMEZONE
 S: BEGIN:VEVENT
 S: UID:standup-wire
-S: DTSTAMP:20260827T113010Z
+S: DTSTAMP:20260829T210522Z
 S: DTSTART;TZID=Europe/Brussels:20261019T090000
 S: DTEND;TZID=Europe/Brussels:20261019T093000
 S: RRULE:FREQ=WEEKLY;COUNT=3
@@ -1268,7 +1296,7 @@ S: VERSION:2.0
 S: PRODID:-//alo//calendar//EN
 S: BEGIN:VFREEBUSY
 S: UID:freebusy-cal_personal_ACCOUNT
-S: DTSTAMP:20260827T113011Z
+S: DTSTAMP:20260829T210522Z
 S: DTSTART:20261001T000000Z
 S: DTEND:20261130T000000Z
 S: FREEBUSY;FBTYPE=BUSY:20261019T070000Z/20261019T073000Z

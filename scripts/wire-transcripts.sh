@@ -16,10 +16,18 @@ doc="$root/docs/interop.md"
 rm -rf "$out"
 mkdir -p "$out"
 
+# alo-imap and alo-smtp keep a `transcripts` test binary of their own; alo-jmap's
+# transcripts became a module of `mail_http_suite` when that crate's tests/ was
+# consolidated into suite binaries (2026-08-28), so a `binary(transcripts)`
+# filter alone silently stopped regenerating the CardDAV and CalDAV sections —
+# they then sat in interop.md describing a server two features out of date.
+# Match the test names too, and let the missing-transcript check below be the
+# backstop it was written to be.
 (
   cd "$root"
   ALO_WIRE_TRANSCRIPTS="$out" SQLX_OFFLINE=true \
-    cargo nextest run -p alo-imap -p alo-smtp -p alo-jmap -E 'binary(transcripts)'
+    cargo nextest run -p alo-imap -p alo-smtp -p alo-jmap \
+      -E 'binary(transcripts) + test(transcripts::carddav_sync_transcript) + test(transcripts::caldav_transcript)'
 )
 
 # Assemble the section: each transcript file's first line is its title.
