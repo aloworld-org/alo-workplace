@@ -79,7 +79,7 @@ directory immediately before rebasing.
   additively — existing clients see the same busy periods as before); the
   Agenda settings surface to edit them; `EventModal`'s availability check
   shows both. CalDAV is untouched. Tenant-isolation test.
-- [ ] AS.4 **Rooms and resources** (`features.md` [L]). A resource is a
+- [x] AS.4 **Rooms and resources** (`features.md` [L]). A resource is a
   calendar of kind `resource` owned by the tenant, with a name, location and
   capacity, managed by an admin (`/calendar/resources` CRUD, role-gated as
   the admin routes are); an event books it by naming it as a resource
@@ -91,6 +91,18 @@ directory immediately before rebasing.
   visible, never editable, through the existing `can_edit` refusal). Cut and
   recorded if too wide: approval workflows for resources, recurring bookings'
   partial conflicts (refuse the whole series, say which instances collide).
+- [ ] AS.4b **A room's calendar over CalDAV** (the half AS.4 cut, so its
+  slice shipped whole). Each resource is served as a read-only collection to
+  every tenant member: `PROPFIND` on calendar-home lists it beside the
+  personal and shared calendars, its objects are the events that booked it
+  (hrefs under the room's own segment, not the booker's — `event_propstat`
+  takes the collection it is being listed in), `GET` of one object works for a
+  booking somebody else owns, and every write is the existing `can_edit`
+  refusal. The served `ATTENDEE` for the room carries `CUTYPE=ROOM`
+  (RFC 5545 §3.2.3), and a resource attendee arriving on a CalDAV **PUT**
+  books the room through the same `book_resources` check — a collision is
+  `409`, which RFC 4791 §5.3.2 allows a PUT to answer. Real-client evidence as
+  the rules above require; `docs/interop.md`'s AS.4 note loses both cuts.
 - [ ] AS.5 Wave review: `docs/interop.md` § CalDAV reads true against the
   code; `python -m caldav` (or the raw exchanges) against the local backend
   for AS.1, AS.2 and the resource collection, quoted in STATE.md; `ROADMAP.md`

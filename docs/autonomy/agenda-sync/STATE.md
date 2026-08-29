@@ -172,3 +172,93 @@ the screens in a real browser. Freebusy now does 2 extra queries per person
 (schedule + profile zone, ≤50 people) — fine for the scheduling UI.
 
 **Next:** AS.4 (rooms and resources).
+
+## AS.4 — rooms and resources (2026-08-29)
+
+**Shipped.** A bookable resource is a `calendars` row of kind `resource` in
+the tenant's name plus its facts (migration 0911: `calendar_resources` —
+address, location, capacity — and `calendar_resource_bookings`, the
+event↔room link). Store module `calendar_resources.rs`: tenant-wide list /
+by-id / by-address reads, admin CRUD, and `book_resources`, which in ONE
+transaction locks the named rooms (`FOR UPDATE`), clears the event's previous
+holds, expands every occurrence of the event over the booking window and
+refuses (`Conflict`) if any collides with what the room already holds. Routes:
+`GET/POST /calendar/resources`, `PUT/DELETE /calendar/resources/{id}` (new
+`calendar_resources.rs`; writes `require_admin`, the list open to any member
+because you cannot pick a room you cannot see). `POST/PUT /calendar/events`
+read the guest list for room addresses and book **before** writing the event,
+so a 409 leaves nothing behind; `unbook_event` undoes the reservation if the
+write then fails. `POST /calendar/freebusy` answers for a room's address like
+a person's, additively tagged `"kind": "user" | "resource" | "unknown"`. An
+iMIP invitation is never mailed to a room (it has no mailbox). Web: a Room
+picker in `EventModal` (name — location, seats N), the chosen room riding out
+as an attendee, a room already on the event shown in the picker rather than
+the guest box, the availability check reporting a taken room as its own
+finding, and a 409 save saying *which* room is taken. i18n en/de/fr/nl.
+
+**Design notes.** The room is a `calendars` row so it inherits the stable id
+that is also a CalDAV collection segment and, more importantly, the *refusal*:
+`visible_pred` and `editable_pred` now both exclude kind `resource`, so no
+owner and no grant can write into a room's calendar and a room's bookings can
+never flood a colleague's week grid. The link row carries no times — *when* a
+room is taken is always read back from the event, so moving a meeting moves
+its booking and the two cannot disagree; a link whose event is gone occupies
+nothing (every read joins the event). The expansion was factored out of
+`events_in_range` as `calendar::expand_masters` and is what the room's
+schedule uses — still one expansion, as the memory note requires. New
+`create_event_at` lets the route choose the id before the row exists, which is
+what makes "reserve, then write" possible; `create_event` is now one line over
+it. The two new routes got their additive exclusion entries in `alo-ai`'s
+`agenda_intents.rs` (the route-coverage test's shared list).
+
+**Verified.** `cargo nextest run -p alo-store` 2582 passed (11 new: 4 unit —
+validation, back-to-back vs overlap, the booking window for one-offs and
+series, refusal formatting — plus 7 DB: round-trip, one-address-one-thing
+incl. a person's, a room being neither visible nor writable as a calendar,
+the clash rule with release and self-re-save, a series holding every
+occurrence incl. EXDATE-freed and moved-instance slots, delete giving the room
+back, and tenant isolation across a forged `(tenantB, userA)` door for all
+eight verbs); `-p alo-jmap`+`-p alo-ai` 1877 passed (6 new HTTP: admin CRUD,
+role gate + 401, verbatim 422/409 refusals, booking + refusal + move +
+release, free/busy for a room beside a stranger, a recurring booking);
+clippy clean on all three, fmt done. Web: `tsc`, eslint, `npm run build`
+clean; vitest 1356 passed incl. 3 new (picker sends the room out, a held room
+sits in the picker not the guest box, a 409 names the room). Live wire pass
+(debug `alo-jmap` on **:8091** — 8080 was held by the agents-web track's
+server, so a second port rather than killing theirs — db `alo`, tenant
+`AS4 Wire`):
+
+```
+POST /calendar/resources {"name":"Board room","email":"board@as4-wire.test",…}
+→ 200 {"id":"AjMXEkaHXoUAeIx6A_GC0w",…}   db: calendars.kind='resource' + calendar_resources row
+POST /calendar/events  10:00–11:00, attendees ["board@as4-wire.test"] → 200
+   db: calendar_resource_bookings(AjMX…, ixgh…) ; event 10:00–11:00
+POST /calendar/events  10:30–11:30, same room
+→ 409 {"detail":"Board room is already booked from 2026-09-02T10:00:00Z to 2026-09-02T11:00:00Z"}
+POST /calendar/events  11:00–12:00, same room → 200 (back-to-back is not a clash)
+POST /calendar/freebusy → {"kind":"resource","busy":[10:00Z–12:00Z],"outsideHours":[]}
+GET  /calendar/calendars → ["cal_personal_…"] only — the room is not in the week grid
+POST /calendar/events with calendarId = the room → 404 (can_edit refuses)
+PUT  the first meeting to 14:00–15:00 → 200; the freed 10:30 slot then saves → 200
+DELETE /calendar/resources/{id} → 200; list empty; bookings cascaded to 0 rows,
+   and the three meetings are still in the diary (they lost a room, not their time)
+```
+
+**Cuts/flags.** Cut to a shippable whole and queued as **AS.4b**: the CalDAV
+half — serving each room as a read-only collection and booking from a CalDAV
+PUT. It is a real seam (hrefs must be built against the collection being
+listed, and `event_propstat`/`fetch_event` have to take one), and shipping it
+half-done would have put ghost hrefs in phones. Recorded in `interop.md` so
+nobody reads today's behaviour as final. Cut as the item allowed: approval
+workflows for rooms, and per-instance conflict reporting (a colliding series
+is refused whole, naming the first taken slot). Also cut: a room's own colour
+and a rooms admin screen — rooms are created through the API this iteration;
+the picker reads them. Flags: a room's collection shows the *titles* of
+colleagues' bookings, which is how a shared room calendar works everywhere and
+is why free/busy (times only) is what Sites and the grid see. An open-ended
+series reserves its room 400 days out (`MAX_BOOKING_DAYS`), re-checked on each
+later save. The web screenshot pass again could not run — port 5173 is the
+agents-web track's; the three new component tests cover the picker and AS.5's
+review walks the screens.
+
+**Next:** AS.4b (a room's calendar over CalDAV).

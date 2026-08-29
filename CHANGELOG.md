@@ -5,6 +5,15 @@
   total while independently controlling its placement and VAT detail. Visual
   previews make each treatment clear before it is applied to the quotation.
 
+- **Meeting rooms can now be booked, and cannot be double-booked.** An admin
+  adds the workspace's rooms and resources — a name, an address, where it is
+  and how many it seats — and everyone else picks one from the event editor.
+  The room is invited with the meeting and held for its time: if it is already
+  in another meeting, even one occurrence of a repeating one, the save is
+  refused and says which room is taken and when. Move the meeting and its room
+  moves with it; drop the room and the hour is free again. Availability checks
+  and free/busy answer for a room exactly as they do for a colleague.
+
 - **Quotation list styles now open as a polished, fully contained gallery.**
   The chooser stays inside narrow screens, uses clear visual previews instead
   of clipped browser tooltips or repetitive labels, and marks the selected

@@ -568,6 +568,21 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   name (`Eastern Standard Time`) or a floating time still falls back to
   UTC-fixed behaviour (no `VTIMEZONE` — nothing zoned is served), and the
   fallback drops the unknown name so expansion and serving agree.
+- **Rooms and resources (AS.4):** a bookable resource is a `calendars` row of
+  kind `resource` with an address of its own; a meeting books it by carrying
+  that address as an `ATTENDEE`, and the store refuses the save when any
+  occurrence collides with a booking the room already holds. Two consequences
+  on the wire, both deliberate: a resource calendar is **outside** every
+  visibility predicate, so it is not listed as a CalDAV collection and its
+  bookings never appear in another calendar's collection; and a resource
+  attendee arriving on a **CalDAV PUT** is stored as a plain attendee — it
+  does **not** book the room and is not conflict-checked. Booking over CalDAV
+  and serving each room as a read-only collection (with `CUTYPE=ROOM` on the
+  served `ATTENDEE`) is AS.4b, the next item; until it lands, a room is booked
+  from Agenda or the JSON API. A refusal is `409` with the room's name and the
+  taken slot as RFC 3339 UTC. `POST /calendar/freebusy` answers for a room's
+  address exactly as for a person's, tagged `"kind":"resource"` with an empty
+  `outsideHours` — a room keeps no working hours.
 - **Round-trip corpus** (`alo-store/tests/ical_corpus.rs`): client fixtures —
   plain UTC, all-day, `TZID=Europe/Brussels` zoned, floating, §3.3.11-escaped
   text, folded long lines, (M3.2) weekly-with-exceptions, monthly-by-day
