@@ -99,6 +99,8 @@
 
 - The Insights agent now works on your boards, not only your figures: ask @insights what is on the dashboard and it lists each board's charts with the question each one asks, and it can pin one more chart to a board for you — shown as a preview first, checked and answered before anything is saved, and pinned only after you approve. Asking what the numbers say, what moved between two periods, and building a whole new report work as before.
 
+- A tenant's first paid ticket sale can now create the localized default chart of accounts as part of fulfilment, so checkout raises and settles its Billing invoice without requiring somebody to visit Finance first; an existing or customized chart remains untouched.
+
 - PDF text extraction and HTTP/2 dependencies now use security-fixed releases, removing the known denial-of-service vulnerabilities reported by the dependency audit without weakening its policy.
 
 - What an agent remembers now leaves when its reason does: withdraw a message and the facts learned from it are forgotten in the same act, archive a room and its agents' memories of it go, remove an agent from a room and what it learned there goes too — and a memory switch left off doesn't just hide any more: after thirty days off, what it was hiding is deleted for good, each fact given its own thirty days.

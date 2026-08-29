@@ -279,6 +279,18 @@ fn crm_seed() -> PipelineSeed {
     }
 }
 
+fn chart_seed() -> alo_store::ChartSeed {
+    alo_store::ChartSeed {
+        names: alo_store::CHART
+            .iter()
+            .map(|account| alo_store::ChartName {
+                code: account.code.to_owned(),
+                name: format!("Account {}", account.code),
+            })
+            .collect(),
+    }
+}
+
 /// The whole item in one walk: ask → offer at the seam's price → pay →
 /// ticket, contact and invoice.
 #[tokio::test]
@@ -405,7 +417,7 @@ async fn the_bot_offers_the_seams_price_and_the_sale_makes_everything_exist() {
     };
     let outcome = v
         .store
-        .fulfil_claimed_ticket(&claim, &fulfil_words(), &crm_seed())
+        .fulfil_claimed_ticket(&claim, &fulfil_words(), &crm_seed(), &chart_seed())
         .await
         .unwrap();
     assert!(outcome.invoiced, "the invoice exists");
