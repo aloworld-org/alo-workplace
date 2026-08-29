@@ -472,8 +472,11 @@ principal advertises `calendar-home-set` alongside `addressbook-home-set` so a
 client discovers whichever it asks for. `.well-known/caldav` → `/dav/`. The
 sync-token is the account modseq (`urn:alo:calendar:<modseq>`) filtered to
 `Event` changes, so `sync-collection` maps onto `AccountStore::changes`.
-Per-object ETags hash the event **fields** (not the serialized iCalendar,
-whose `DTSTAMP` changes each render — hashing that would churn every sync).
+Per-object ETags hash the event **fields** plus its per-occurrence override
+set (not the serialized iCalendar, whose `DTSTAMP` changes each render —
+hashing that would churn every sync; leaving the overrides out would let an
+instance-only edit keep the old tag and strand every other device on its
+cached copy).
 
 Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
 `PROPFIND` (principal / calendar-home / calendar / object), `REPORT`
@@ -488,14 +491,21 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   REPORT returns the whole collection (a valid, unfiltered result the client
   narrows), exactly as CardDAV does for `addressbook-query`.
 - No `PROPPATCH`/`MKCALENDAR`/`MOVE`: the single calendar is fixed.
-- **Per-occurrence overrides (`RECURRENCE-ID`) sync one way (server → client).**
-  A series is served as the master `VEVENT` plus one `VEVENT` per edited instance
-  (its own `RECURRENCE-ID` at the original slot), so phones now render "this
-  event" edits (GET and the `calendar-data` in multiget/REPORT). Reminders sync
-  as a `VALARM` (display, negative `TRIGGER`). Still a cut: a phone-*originated*
-  per-occurrence edit is not captured — `from_ics` reads only the first `VEVENT`,
-  so a client PUT of a multi-`VEVENT` series keeps the master and drops the
-  client's override. `EXDATE` (skip-one) round-trips both ways.
+- **Per-occurrence overrides (`RECURRENCE-ID`) sync both ways.** A series is
+  served as the master `VEVENT` plus one `VEVENT` per edited instance (its own
+  `RECURRENCE-ID` at the original slot), so phones render "this event" edits
+  (GET and the `calendar-data` in multiget/REPORT). A phone-*originated* edit
+  is captured too: `from_ics_series` reads every `VEVENT` of a PUT (RFC 5545
+  §3.8.4.4, RFC 4791 §4.1) — the one without a `RECURRENCE-ID` is the master,
+  each one with a `RECURRENCE-ID` upserts an override at that slot, an
+  instance marked `STATUS:CANCELLED` becomes an `EXDATE`, and an override the
+  client no longer sends is removed (the PUT body is the whole resource).
+  Tolerances, chosen over guessing: a document holding only override
+  instances keeps the first as the event; a duplicated slot keeps the last
+  `VEVENT`; a `RANGE=THISANDFUTURE` parameter is read as a single-instance
+  override (splitting a series is what mainstream clients do instead —
+  revisit if a real client sends it). Reminders sync as a `VALARM` (display,
+  negative `TRIGGER`). `EXDATE` (skip-one) round-trips both ways.
 - **Recurrence rules:** `FREQ`+`INTERVAL`+`COUNT`/`UNTIL`+`BYDAY`+`BYMONTHDAY`
   expand (weekly Mon/Wed/Fri, monthly n-th/last weekday, month-day incl. `-1`);
   `BYMONTH`/`BYSETPOS`/`WKST` are ignored (Monday week-start assumed).
@@ -552,14 +562,12 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   Windows display name (`Eastern Standard Time`) or a floating time still
   falls back to UTC-fixed behaviour, and the fallback drops the unknown name
   so expansion and serving agree.
-- **Remaining cut:** a phone-*originated* per-occurrence edit is still not
-  captured — `from_ics` reads only the first `VEVENT`, so a client PUT of a
-  multi-`VEVENT` series keeps the master and drops the client's override
-  (server → client override sync works).
 - **Round-trip corpus** (`alo-store/tests/ical_corpus.rs`): client fixtures —
   plain UTC, all-day, `TZID=Europe/Brussels` zoned, floating, §3.3.11-escaped
-  text, folded long lines, and (M3.2) weekly-with-exceptions, monthly-by-day
-  with an `RDATE`, and a Europe/Brussels DST-crossing recurring series — each
+  text, folded long lines, (M3.2) weekly-with-exceptions, monthly-by-day
+  with an `RDATE`, a Europe/Brussels DST-crossing recurring series, and
+  (AS.1) an Apple-style two-`VEVENT` series with a shipped `VTIMEZONE` and a
+  moved instance plus a DAVx⁵-style cancelled instance — each
   parse → store (real Postgres, the CalDAV PUT path) → serialize to checked-in
   canonical bytes, and the canonical form is a fixed point of another full
   cycle. `DTSTAMP` is the one property that derives from nothing in the event

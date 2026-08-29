@@ -55,7 +55,7 @@ directory immediately before rebasing.
 
 ## Wave AS — the cuts, then the launch-tier rows
 
-- [ ] AS.1 **Phone-originated per-occurrence edits.** `from_ics` reads every
+- [x] AS.1 **Phone-originated per-occurrence edits.** `from_ics` reads every
   `VEVENT` of a PUT: the one without `RECURRENCE-ID` is the master; each one
   with a `RECURRENCE-ID` becomes an override at that slot
   (`override_occurrence`), a `STATUS:CANCELLED` instance becomes an `EXDATE`,

@@ -1,5 +1,13 @@
 # Changelog
 
+- **Editing one occurrence of a repeating event on your phone now sticks.**
+  Move next Tuesday's standup, rename one instance, or delete a single
+  occurrence in Apple Calendar or an Android CalDAV app, and Agenda records
+  exactly that change — the rest of the series stays put, every other device
+  picks the edit up on its next sync, and an instance edit undone on the
+  phone is cleared on the server too. Before, such an edit silently reverted
+  on the next sync.
+
 - **The whole workplace now draws from one set of controls.** The buttons,
   text boxes, drop-downs, tags, tables, toolbars and dialogs you meet in
   Mail, Agenda, Tasks, Drive, Billing, Sales, Projects, Finance, Inventory,
