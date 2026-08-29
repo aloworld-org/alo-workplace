@@ -150,3 +150,66 @@ merged the counts (`all_tools` 101, declared reads 56, three copies of the
 `/chat/channels/{id}/memory` exclusion deduplicated to the memory item's
 own), and re-ran the gates on the merge: alo-ai 276/276, alo-jmap 1449/1449,
 clippy clean. Next: AC.3 (Insights).
+
+## AC.3 — Insights moves to intents, and learns its boards (2026-08-29)
+
+**Shipped.** `alo_ai::insights_intents` (`INSIGHTS`, six verbs) and its
+executors in `alo-jmap`'s `insights_intents.rs`, registered as one row in
+`MOVED`, one row in `MODULES`, one `pub mod` line in each `lib.rs`; the
+hand-written `agent_insights.rs` tool set in `alo-ai` deleted (the same-named
+executor file in `alo-jmap` is kept — the figures are its subject matter —
+and is dispatched from the module row; its match arms in `agent.rs`
+removed). Reads: `insight_catalog`, `insight_answer`, `insight_change` kept
+word for word (vocabulary looked up never remembered, figures repeated never
+recomputed, a change is what moved not why), plus `dashboard_tiles` — the
+boards by name with each tile's caption and the question it asks, rendered
+through the route's own `dashboard_json` (made `pub(crate)`) and the shared
+`asked()` rendering, via the store rather than the listing route on purpose:
+`GET /insights/dashboards` seeds a first-time tenant with the Business
+overview, and an agent *reading* must not leave a board behind. Writes, each
+with a preview: `insight_report` kept, and `pin_chart` — one more chart on a
+board that exists, its spec read through the report's own `spec_arg` gate
+(made `pub(crate)`) and **evaluated before the tile is written**, the same
+answered-before-saved rule the report enforces, held by a structural test on
+the source order. Five exclusions with reasons (tile PATCH/DELETE/move —
+changing a board colleagues read is done on the board; `tiles/{id}/data` —
+the screen's rendering; the gallery — the screen's picker; `/insights/ask` —
+the screen's own model turn), held by the coverage test over `/insights`.
+
+**Verified.** `cargo fmt`; clippy `-p alo-ai -p alo-jmap --all-targets`
+clean; nextest **1737/1737** (alo-ai 278, alo-jmap 1459), including the new
+`agent_insights_intents_http` (3 tests, wired into `agents_http_suite`) and
+`insights_intents` coverage on both sides. Counts: `all_tools` 101 → 103,
+declared reads 56 → 57. Wire transcript, as the suite pins it (scripted
+model, real router and store):
+
+- `@insights what is on the sales board?` → `dashboard_tiles
+  {"board":"Sales"}` → the sources contained the tile's caption `Billed
+  lately`, its question's own words `billing.documents`, and
+  `"tileCount":1` → answer in the room, `proposal: null` — a read, no
+  button; the prompt offered all six verbs from the intent registry.
+- `@insights pin billed lately to the overview` → `pin_chart` proposed and
+  the board has NO tiles; after `POST /chat/proposals/{id}
+  {"approve":true}` the tile is on the board over the same route the screen
+  reads, caption `Billed lately`.
+- **Wrong tenant:** tenant B's board `warroom figures` carries a tile
+  captioned `the secret plan`; tenant A's `dashboard_tiles` earns `no board
+  of yours is called warroom figures` — the words an invented name earns —
+  and `the secret plan` appears nowhere in what A's model was shown.
+
+**Cuts and notes.** No migration (0450–0469 untouched), no web, no i18n, no
+new route prefixes. `insight_change` and `insight_catalog` are the module's
+two deliberately routeless verbs (the catalog renders from the product's
+enums, a change is two evaluations of `insight_answer`'s route), named in the
+ROUTELESS list so a new verb cannot join them silently. The old
+`agent_insights_http` suite (A2.4) still passes unchanged — the four kept
+verbs' executors and names did not move. Mid-push, agents-b landed Docs
+(AB.2, `e8658e89`) — kept-both on `MOVED`, `MODULES` and the two deleted
+static sets (the conflict was two tracks each deleting their own module's
+`*_SET` const; the resolution deletes both), merged the counts (`all_tools`
+105, declared reads 58), and re-ran the gates on the merge: alo-ai 279/279,
+alo-jmap 1465/1465, clippy clean. Mid-push again, agents-a landed Projects
+(AA.3, `ee13092c`) and the room's memory panel (`eb41a261`) — kept-both on
+the CHANGELOG, merged the counts once more (`all_tools` 108, declared reads
+61), gates re-run green on that merge too: alo-ai 281/281, alo-jmap
+1476/1476, clippy clean. Next: AC.4 (Mail with Contacts).
