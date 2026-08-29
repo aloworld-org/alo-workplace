@@ -1,5 +1,10 @@
 # Changelog
 
+- **Quotation totals now offer four professional visual treatments.**
+  Keep the existing soft summary or choose a minimal, framed, or Alo-accented
+  total while independently controlling its placement and VAT detail. Visual
+  previews make each treatment clear before it is applied to the quotation.
+
 - **Quotation list styles now open as a polished, fully contained gallery.**
   The chooser stays inside narrow screens, uses clear visual previews instead
   of clipped browser tooltips or repetitive labels, and marks the selected
