@@ -2953,3 +2953,67 @@ tokens.css, referenced by no utility.
 
 **Next:** D2.11 — tasks, audit-first (the area left the ratchet by outside
 hands; read `web/src/tasks/**` before believing it done).
+
+## D2.11 — tasks adopts the components (2026-08-29)
+
+The audit the item ordered, then the adoption. Tasks left the ratchet by
+outside hands with no stylesheet remaining, and reading `web/src/tasks/**`
+found billing's problem a third time — Tailwind recipes the ratchet cannot
+see. What the read found and what was done:
+
+**Two hand-rolled overlays, both broken the same way.** `NewTaskModal` and
+`DriveAttachmentPicker` each wrote `z-modal` (the picker also `bg-scrim`),
+classes the theme does not generate — so both shipped with **no z-index**,
+the picker with **no scrim tint** — home's class-that-isn't bug, found
+again by reading classes against theme.css. The form had no Escape and no
+focus trap; the picker had Escape but no trap. Both are rebuilt on
+`ds/Modal` (the projects D2.10b pattern: form in the body tied to the
+footer's submit by id, subtitle as the body's first line; the picker takes
+`tall`, the fixed-height browser shape built for exactly this). Their bare
+controls became `ds/Input`/`ds/Select`/`ds/Field`/`ds/Checkbox`/`ds/Chip`
+(removable attachment chips)/`ds/Button`/`ds/IconButton`; the description
+`textarea` stays bare per the standing cut but takes its Field's id and
+description.
+
+**One Escape closed both dialogs.** The picker opens over the form — two
+`ds/Modal`s at once — and both listen on the document, where
+`stopPropagation` does not stop the other listener on the same node; the
+`useDialogs` confirm-over-Modal case has the same latent shape. `Modal`
+now keeps a module-level stack and the top modal alone answers Escape and
+owns the tab trap. Additive; `Modal.test.tsx` unedited and green.
+
+**The warning tone existed twice as hex.** `parts.tsx`'s `PriorityChip`
+and `ListView`'s `PriorityCell` — twins — hand-drew medium priority as
+`#fdf0d8`/`#9a6a12` and `#fdf0d8`/`#8a5a08` because no warning tint
+exists, the same story `--success-tint`'s comment tells. Folding onto
+Badge's `danger` (inventory's move) would have made high and medium one
+colour, so the tokens were added instead: `--warning-tint` and
+`--warning-ink` (amber is a mark colour, ~2:1 on a tint — it cannot be
+text, which is why this is two tokens where danger is one doing both
+jobs). `ds/Badge` gains a `warning` tone, and both chips are now Badges:
+danger/warning/neutral (the two files disagreed on low — greenish vs grey
+— an accident, reconciled to neutral). The local seven-hex `Avatar` is
+`ds/Avatar` with a `title` prop added (additive) for the tooltip the
+local one had. All `bg-[var(--…)]` escapes across seven view files were
+respelled onto semantic utilities (`bg-accent-soft`, `bg-danger-tint`,
+`bg-success-tint`, `bg-accent-tint`, `bg-subtle`).
+
+**Cut to D2.11b, filed in the queue:** `TaskDetail.tsx` — a slide-over
+with no Escape and no trap that `ds/Modal` cannot express yet (anchors
+right, editable title), ~10 bare inline-edit controls — and
+`TaskToolbar`'s hand-rolled Dropdown beside `ds/Menu`/`ds/ChoicePicker`.
+
+**Gate:** `npx tsc --noEmit` clean; eslint clean on the 13 changed files;
+`npx vitest run src` **241 files / 1337 tests green** (ratchet and
+`Modal.test.tsx` included, 354 s); `node scripts/gen-tailwind-theme.mjs
+--check` current (**77** utilities, was 75); `npm run build` clean in 80 s.
+
+**Cut for the seventeenth time: no screenshot** — still no browser package
+in `web/`. The bundle probe ran both directions: `.bg-warning-tint` and
+`.text-warning-ink` are in the shipped CSS with their token definitions
+(`#fdf0d8`/`#8a5a08`), and the tasks-origin arbitrary classes are gone —
+the `[var(--accent-soft)]`/`[var(--danger-tint)]` occurrences still in the
+bundle all trace to `src/billing/**`, the interactive agent's area, which
+this track does not open (noted for D3.01, not actioned).
+
+**Next:** D2.11b — the task detail panel, findings enumerated in the item.

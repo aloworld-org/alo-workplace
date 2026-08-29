@@ -1,5 +1,15 @@
 # Changelog
 
+- **Creating a task, and picking a file from Drive, now work from a
+  keyboard.** The "New task" form and the Drive picker it opens keep the
+  caret inside them — Tab no longer walks out onto the page behind, Escape
+  closes the one on top (the picker first, the form still standing), and
+  closing hands focus back to what you were doing; none of that worked
+  before. Every label in the create form is now bound to its own box, and
+  a task's priority reads in the product's shared colours — high, medium
+  and low each distinct, with "medium" on a new amber that is the same
+  wherever a warning appears next.
+
 - **Every dialog in Projects can now be worked from a keyboard, and every
   table says what it is.** All nine of the module's overlays — the engagement
   form, the project details, the time entry, the milestone, the new-project
