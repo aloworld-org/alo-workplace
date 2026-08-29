@@ -4468,3 +4468,109 @@ with `npm install`; nothing of billing's was touched.
 run as the author on the scheduled-mail sweeper, reads post, writes propose
 to the author; bounds; paused when the author leaves. (A4.5 and A4.7 stay
 `[!]`: agents-a/b/c journals still show no LOOP COMPLETE.)
+
+## A7.1 — standing instructions (2026-08-29)
+
+**What shipped.** A person asks once, in advance (design §7). Migration
+`0409_agent_instructions.sql`: one row per instruction — agent, channel,
+author, the words verbatim, and a trigger that is either a schedule
+(`repeat_minutes`, ≥ 60 by schema CHECK — "one firing per instruction per
+hour" as a property of the table) or a module event (`event_kind`, a verb
+the intent registry names). Store (`agent_instructions.rs`):
+`create_agent_instruction` (member-only, agent must be in the room and
+awake, twenty per channel, words ≤ 400 chars), `channel_instructions`
+(readable by everyone who can read the room), `cancel_agent_instruction`
+(author or room owner, Forbidden with the rule named, NotFound as the
+no-oracle answer everywhere else), and `Store::claim_due_instructions` —
+the same claim-then-act shape as scheduled sends, with fire-time guards
+(room live, author still a member, agent still present and awake) as belt
+beside the hooks' braces. Routes: `POST`/`GET
+/chat/channels/{id}/instructions`, `DELETE /chat/instructions/{id}`, all
+three `Excluded` in `CHAT_EXCLUDED` (an agent must not commission itself;
+Cancel is a person's brake). **The firing** rides the scheduled-mail
+sweeper's own tick in `main.rs` (`agent_instructions::run_due`): each
+claimed row builds the author's account door (`access_facts`, module gate
+through the author's own view of the room), then runs the instruction's
+text through the ordinary `take_turn` — reads post into the room, a write's
+proposal lands with `asked_by` = the author, so the existing
+decide-proposal rule already refuses everyone else. `take_turn` gained
+`asked: Option<&ChatMessageId>`; a firing passes `None` and learns no
+memories — an instruction is past words replayed, not new consent.
+Hooks: `remove_member` pauses the leaver's instructions in that room
+("paused, the card says so" — nothing unpauses in v1); `archive_channel`
+and `remove_agent_from_channel` delete theirs outright.
+
+**Verified.** Pruned first (6 960 → 0 tenants; the 2h default found nothing
+— the tenants were younger — so it ran with cutoff 0 while no suite was
+live). `cargo fmt`; clippy `-p alo-store -p alo-ai -p alo-jmap
+--all-targets` zero warnings; `cargo nextest run -p alo-store -p alo-ai`
+**2813/2813**; `-p alo-jmap` **1476/1476 green** (219 s) with seven new
+wire tests in `agents_http_suite::agent_instructions_http`. From the suite,
+on the real router and store: a member posts `{"agentId":…,"text":"list the
+invoices that fell overdue","trigger":{"kind":"schedule","everyMinutes":60,
+"firstAt":<5 min ago>}}` → 200 with the card (`nextRun` set, `paused:false`,
+`canCancel:true`); `run_due` → the Billing agent posts *"Two invoices fell
+overdue this week: INV-7 and INV-9."* into the room, the scripted model's
+request contains the instruction's own words as the question, `nextRun`
+moves a whole repeat into the future, and a second `run_due` posts nothing.
+The write firing (`wants send_quote`) → the agent's message carries a
+proposal with `askedBy` = the author; the room's **owner** deciding it gets
+**403** "only the person who asked can decide this", the author's decline →
+200. The event trigger (`"event":"issue_invoice"`): `run_due` before any
+event fires nothing; two `emit_event` executions then one `run_due` fire
+**once** (coalesced); a third event inside the hour fires nothing; after
+backdating `last_fired_at` two hours the held-back event fires it again.
+Author removed by the owner → the card lists `paused:true` and a `run_due`
+with the clock forced past fires nothing; removing the agent empties the
+room's list; archiving a second room deletes its rows (asserted in SQL).
+Wrong tenant (two harnesses, one store): GET, POST and DELETE on the first
+tenant's room and card all **404**, and the row still stands. Refusals at
+create: unknown trigger kind, `everyMinutes:30`, an event verb the registry
+does not name (`summon_dragons`), empty words, an agent not in the room,
+and the twenty-first instruction — all **422** with the rule named.
+One pre-existing flake seen once under full-suite load
+(`agent_sites_http::an_approved_edit_rewrites_the_copy_and_leaves_the_link_alone`
+— same family the 2026-08-29 A6.2 entry recorded), passed alone and passed
+in the final full green run.
+
+**Decisions, recorded.** (1) "Twenty per channel" is read as twenty
+*instructions* per channel, enforced at create — together with the ≥ 60 min
+repeat and the event trigger's one-hour claim cooldown this also bounds
+firings per channel per hour at twenty, so both readings of the design
+sentence hold. (2) An event trigger names a verb the intent registry knows
+(`alo_ai::offers` over Ask alo's all-module set) — the stream's kinds are
+the registry's names today (`agent.rs::emit_event`), and a trigger nobody
+can fire is refused at create rather than left to rot. (3) A firing with no
+AI provider configured is skipped quietly (claim stamped): a mention gets
+the "not configured" excuse because a person is waiting, but posting it
+into a room on a clock would make an unconfigured workspace look haunted.
+(4) A schedule with no `firstAt` first fires one full repeat from now —
+"asked in advance" means the first run is in the future; a `firstAt` in the
+past is allowed and simply due at once. (5) A sweeper down for a day fires
+once and resumes (`next_run = now() + repeat`), never replays the backlog.
+(6) Firings do not learn memories (`take_turn` with `asked: None`) —
+memory rests on a person's words in the room, and a replayed instruction is
+not new consent. (7) The claim is cross-tenant on `Store` (like
+`claim_due_sends`) with every guard joined on `tenant_id`; the wrong-tenant
+wire test covers the routes, the guards cover the sweep.
+
+**Cuts, flagged.** The card's UI is A7.2 (`[web]`), so no i18n strings this
+item. No unpause surface in v1 — the author re-creates instead; if a wave
+review wants resume-on-rejoin it is one additive UPDATE away. Event kinds
+are limited to registry verbs; derived state events (`invoice.overdue`,
+`quote.expiring`) need an emitter that watches the record tables and belong
+to a later item — the design names them as examples of the *shape*, and
+nothing emits them yet.
+
+**Next:** A7.2 — `[web]` the instruction card in the channel with Cancel
+for the author and the owner; judged against the `[web]` bounds
+(`web/src/chat/**`, `web/src/agents/**`) at pickup.
+
+**Addendum, same iteration.** The Insights and Sheets intent moves
+(agents-c `0eaa4d59`, agents-b `6869fe30`) landed under the push; the
+conflicts were the CHANGELOG's top line and neighbouring `mod` lines in
+`agents_http_suite.rs` — different modules on both sides, resolved
+keep-both per the shared-lists rule. The final gate ran on the rebased
+tree: clippy zero warnings, `alo-store` + `alo-ai` **2815/2815**,
+`alo-jmap` **1489/1489 green** (224 s) with both new intent suites inside
+it. Migration `0409` still unique after the rebase.

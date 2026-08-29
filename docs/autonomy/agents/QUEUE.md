@@ -193,7 +193,7 @@ against a real model after each item and quote the answers.
 
 ## Wave A7 — standing instructions
 
-- [ ] A7.1 `agent_instructions`: schedule and module-event triggers, run as
+- [x] A7.1 `agent_instructions`: schedule and module-event triggers, run as
   the author on the scheduled-mail sweeper, reads post, writes propose to the
   author; bounds (one firing per hour, twenty per channel); paused when the
   author leaves.
