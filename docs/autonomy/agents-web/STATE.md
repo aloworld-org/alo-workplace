@@ -333,3 +333,101 @@ customer view live in Codex's directory). Every moved module's record walked
 at desktop and phone width with screenshots, the strings checked in every
 language file, `A8.4` flipped to `[x]` in the agents queue with a pointer
 here, and `A9.1` noted as the owner's to run.
+
+## AW.6 — the wave review (2026-08-29)
+
+**What shipped.** No product code: this item is the review itself. The whole
+wave was walked in a real browser at both widths, the strings were checked in
+every language file, and the two queues were closed out.
+
+*The walk.* A throwaway stack per `web/e2e/stack.ts` (db `alo_e2e`, jmap
+:8199, vite :5199 — created, then dropped and killed), seeded through the real
+HTTP surface with a real access token taken through the app's own PKCE flow:
+a task, a deal (its pipeline and stage read from the tenant, not invented), an
+expense claim, a project, a supplier and its purchase order, an opening and a
+candidate, a Drive file, a document, a sheet, a calendar event, a room, an
+ended meeting attached to it, a board, a contact and an inbox message (both
+over JMAP), and a site. Then sixteen modules opened the way a person opens
+them — a query parameter where the module has one, a click where it does not
+— and each was held to the same assertion: `section[data-record]` visible
+(the panel is one component, so one selector), scrolled into view,
+screenshotted, and the document must not scroll sideways.
+
+**Verified. 16/16 at 1440px, 15/16 at 360px, 32 screenshots read**
+(`web/e2e/.artifacts/record-agent-aw6/`, local; `desktop-*.png`,
+`phone-*.png`, plus a `*-report.json` per width). Read one by one: the task
+detail says **"Created by admin@e2e.test."** and offers Chase it / Set its
+priority / Mark it done / Hand it over; the deal drawer **"From Referral."**
+with Move its stage / Draft a follow-up; the Edit-claim dialog offers Suggest
+categories; the project overview Sum up its status / Log time on it; the
+purchase-order editor Receive its delivery; the candidate drawer **"From
+LinkedIn."** with Draft a letter; the Drive details pane Rename it / Move it;
+the document's side column Draft a section / Rewrite a passage; the sheet's
+rail Write a formula / Tidy a column; the day panel's meeting in focus
+Prepare for it / Move it / Cancel it; the Who's-here dialog **"Created by
+admin@e2e.test."** with Catch me up / Find something in it; the ended meeting
+**"Captured from the “release-8e72c4” conversation. Open it"** with What
+happened in it / Write the minutes; the board Pin a chart to it; the message
+**"Sent by Ilse Vermeer."** with Draft a reply / Catch me up on it; the
+contact What we've said to them / Write to them; the site How it stands /
+Review it for search engines / Publish it. Every panel names its own agent
+(@tasks, @crm, @finance, @projects, @inventory, @hr, @drive, @docs, @sheets,
+@agenda, @chat, @meet, @insights, @mail, @sites) and shows the ask box; no
+verb was pressed and **no model was called anywhere in this iteration**.
+
+*Phone (360px).* Fifteen modules stack their panel under the content and none
+of the sixteen pages scrolls sideways (asserted, not eyeballed:
+`documentElement.scrollWidth - innerWidth ≤ 1` at every stop). The dialogs
+(Edit claim, Who's here, Contacts) carry the panel inside them and stay
+inside the viewport.
+
+**The one gap, and why it is not this track's to close.** **Agenda has no
+record-in-focus surface at phone width.** `AgendaModule.module.css` hides
+`.dayPanel` outright under 1100px (`@media (max-width: 1100px) { display:
+none }`), and the day panel is where the meeting in focus and its agent live;
+at 360px the entry opens `EventModal` instead, which carries no panel. Both
+files belong to the **agenda-sync** track (this track's writ is `DayPanel`
+itself, nothing else under `web/src/agenda/**`), so this is reported, not
+patched — the walk records it as `knownAbsent` with that reason rather than
+skipping it silently (`phone-agenda-FAILED.png` is the evidence). For the
+owner or the agenda-sync queue: either the day panel earns a phone form, or
+`EventModal` mounts the panel.
+
+**Strings.** All **97** `recordAgent*` keys exist in `en`, `fr`, `nl` and
+`de`, and the four catalogs are at parity (5935 keys each) — checked directly
+and held by the ratchet in `src/i18n/locale.test.ts`, which fails the build
+for any English key missing from the other three. The fr/nl/de wordings were
+drafted by this loop across AW.1–AW.4 and are **still flagged for native
+review** — that flag is a human's to clear, and it is the one thing this wave
+hands on.
+
+**Gates.** `tsc --noEmit` clean; `eslint` clean on the one file this iteration
+touched; `vitest` **1377/1377** (249 files); `npm run build` clean. No Rust,
+no migrations, no new route prefixes, no deploy note, no CHANGELOG line —
+nothing user-facing changed in this item.
+
+**Bookkeeping.** `AW.6` is `[x]` above. In `docs/autonomy/agents/QUEUE.md`,
+`A8.4` is now `[x]` with a pointer to this track and its journal, and `A9.1`
+carries a note that its prerequisite is met and it is **the owner's session to
+run, never a loop's** (a real model against a live tenant's provider). `AW.5`
+stays `[~]`: Billing's editor and customer view are in Codex's directory, and
+the mount there is the owner's to make.
+
+**Decisions and flags.** (1) The walk's spec, `web/e2e/recordAgentAw6.spec.ts`,
+was deleted after it was read — as AW.3's and AW.4's were, and for the same
+reason: the e2e config's `testDir` is the whole folder, so a kept file changes
+what `npm run test:responsive` runs. (2) Three seeding facts worth keeping:
+a deal needs `pipelineId` **and** `stageId` from the tenant's own pipeline; a
+purchase order needs a supplier, so the review created one (`POST
+/inventory/suppliers`); and a **document must be a Drive node** (`POST
+/drive/files` with `kind: "doc"`) — `POST /docs` writes a record the file
+manager does not list, so a doc seeded that way is invisible in Drive.
+(3) Two Playwright facts: a failed test recycles the worker and re-runs
+`beforeAll`, so seeds carry a per-run suffix or collide on the second pass;
+and a panel below the fold of a scrolling dialog is "visible" to the
+assertion but absent from the screenshot — the walk scrolls it into view, so
+the evidence shows what the assertion checked.
+
+**LOOP COMPLETE** — every item in `docs/autonomy/agents-web/QUEUE.md` is `[x]`
+or `[~]`. The record in focus shows its agent in all sixteen moved modules;
+Billing's mount and the full real-model evaluation (`A9.1`) are the owner's.

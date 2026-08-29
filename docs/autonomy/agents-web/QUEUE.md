@@ -98,7 +98,7 @@ No migrations.
 - [~] AW.5 **Billing** — *(owner's item: `web/src/billing/**` is Codex's
   directory; the owner mounts the panel in the document editor and customer
   view when it is free)*.
-- [ ] AW.6 Wave review: every moved module's record shows its agent, one
+- [x] AW.6 Wave review: every moved module's record shows its agent, one
   browser walk at desktop and phone width with screenshots in STATE.md; the
   strings are in every language file; `A8.4` in `docs/autonomy/agents/QUEUE.md`
   becomes `[x]` with a pointer to this journal, and a note that `A9.1` (the
