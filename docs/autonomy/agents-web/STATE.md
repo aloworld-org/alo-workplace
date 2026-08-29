@@ -160,3 +160,89 @@ review at the wave review. (6) No new route prefixes, no deploy note.
 
 **Next:** AW.3 — the personal work modules (Drive, Docs, Sheets, Agenda),
 four screenshots.
+
+## AW.3 — the personal work modules (2026-08-29)
+
+**What shipped.** The panel in Drive, Docs, Sheets and Agenda — four record
+surfaces, three of which had to be built before a panel could stand on them.
+
+*The catalogue grows four products.* `drive` (rename / move on a file, doc or
+sheet; **list_folder** on a folder — a folder is something to look inside, not
+to rename through an agent), `docs` (draft a section / rewrite a passage),
+`sheets` (write a formula / tidy a column), `agenda` (prepare for it / move it
+/ cancel it). Every verb is a name from the intent registry, so the directory
+∩ catalogue rule still decides what appears.
+
+*The mounts.* **Drive** had no record view at all — a file manager is a list —
+so the item's work was building one: selecting exactly one item (outside the
+Trash) opens a **details pane**, a third grid column with the node's name,
+size and last change, then its agent. The row menu gained a "Details" entry
+that selects the node, so the pane is reachable without hunting for the
+checkbox. **Docs**: `DocEditor` gained a `workArea` — the writing surface and
+a real 340px column beside it — and an "Its agent" toggle in the header;
+docked rather than floating, so no line of text is ever hidden behind it.
+**Sheets**: `SheetEditor` already floats a right-hand rail for charts, so the
+panel joins that rail (one absolutely-positioned column holding the agent then
+the charts — two panels at the same corner would have sat on top of each
+other) behind the same "Its agent" toggle. **Agenda**: `DayPanel` only — the
+tracks table reserves it for this loop and `EventModal` belongs to
+agenda-sync — where every entry gained a focus button beside it; one meeting
+at a time goes in focus and its agent appears under the list it was picked
+from. Opening the entry still opens the event editor, unchanged.
+
+*Origin.* Drive nodes carry `sourceKind`/`sourceId` (ADR 0021: the email an
+attachment was filed from, the room a shared file was kept from), read by new
+`driveNodeOrigin` in `drive/parts.tsx` and passed into the editors on the
+`openDoc`/`openSheet`/`openOffice` state, so a document's panel costs no
+second read. `createdBy` is again refused as a fallback (AW.2 decision 2): it
+holds the account id, an opaque string nobody can follow.
+
+**Verified.** `tsc` clean; `eslint` on `src/drive`, `src/agenda`, `src/agents`
+and `src/i18n` clean; `vitest` **1360/1360** (7 new: three DayPanel tests —
+quiet until a meeting is put in focus, focusing does not open the editor and
+the entry still does, the focus is one at a time and lets go; two panel tests
+— a folder is offered folder verbs and a file file verbs, a meeting's verbs
+propose in the room and execute nothing; two `driveNodeOrigin` tests);
+`npm run build` clean. **On the wire, looked at:** throwaway stack per
+`web/e2e/stack.ts` (db `alo_e2e`, jmap :8199, vite :5199 — dropped and killed
+after; `cargo build -p alo-jmap -p alo-identity --bins` first, 2m26s warm),
+signed in, seeded a file with `sourceKind: "email"`, a document and a meeting
+through the real API and made the sheet in the app. Read all seven screenshots
+(`web/e2e/.artifacts/record-agent-aw3/`, local): the Drive details pane says
+**"Raised from an email."** with the source link and offers Rename it / Move
+it; the document's side column offers Draft a section / Rewrite a passage; the
+sheet's rail offers Write a formula / Tidy a column; the day panel's meeting
+offers Prepare for it / Move it / Cancel it — and **Cancel it** landed in the
+@agenda one-to-one with the composer holding `Cancel "Delaunay review".` and
+nothing sent. Phone width (360px) walked for both new panes: they stack under
+the content and the document does not scroll sideways. No live model call
+anywhere.
+
+**Decisions and flags.** (1) **A calendar event carries no origin the API
+serves** — nothing in `/calendar/events` says which mail, person or room a
+meeting grew out of — so Agenda's panel shows the honest empty state. Not a
+`[!]`: the panel's other two parts work, and the sentence arrives when the
+read adopts A4.5's `record_origins` join. (2) **A doc's panel is @docs, not
+@drive.** The same node has two record views: in the file manager it is a
+file (@drive: rename, move), in the editor it is a document (@docs: draft,
+rewrite). Each surface talks to the agent of the product that surface is.
+(3) **The editors' toggles default closed** and make their two reads only when
+opened — the queue's "quiet until asked" applied to a writing surface, where a
+permanent 340px column would cost the page more than it gives. The button is
+in the editor's own header beside the view switch, not behind a menu.
+(4) **Two bugs caught by looking, both fixed here:** Drive's header actions
+did not wrap, so with a third column they were drawn *over* the record's own
+facts (`.actions` now wraps and right-aligns); and the editors' toggles took
+their name from a `<span>` the phone stylesheet hides, leaving an unnamed
+button at 360px (both now carry `aria-label`). The panel's ask row also wraps
+now, so a 300px day panel no longer clips the placeholder mid-word.
+(5) `DocEditor`/`SheetEditor` flush a pending save before the panel navigates
+to a room, so starting a verb never loses the last edit. (6) i18n keys in all
+four catalogs; fr/nl/de drafted here, flagged for native review at the wave
+review. (7) No new route prefixes, no deploy note. (8) The browser walk ran
+from a temporary `web/e2e/recordAgentAw3.spec.ts`, deleted after — the e2e
+config's `testDir` is the whole folder, and a kept file would change what
+`npm run test:responsive` runs.
+
+**Next:** AW.4 — the communication and insight modules (Chat, Meet, Insights,
+Mail, Contacts, Sites), six screenshots.

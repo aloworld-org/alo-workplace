@@ -86,7 +86,7 @@ No migrations.
   and the timesheet), **Inventory** (product, purchase order, sales order
   editors), **People/HR** (applicant drawer, leave, directory record). Five
   screenshots.
-- [ ] AW.3 `[web]` The personal work modules: **Drive** (the node's detail —
+- [x] AW.3 `[web]` The personal work modules: **Drive** (the node's detail —
   origin of a file an agent created), **Docs**, **Sheets** (the editor's
   panel/side area), **Agenda** (`DayPanel`/the event view). Four screenshots.
 - [ ] AW.4 `[web]` The communication and insight modules: **Chat** (a room's

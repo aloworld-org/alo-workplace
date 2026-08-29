@@ -14,6 +14,18 @@
   moves with it; drop the room and the hour is free again. Availability checks
   and free/busy answer for a room exactly as they do for a colleague.
 
+- **Your files, documents, sheets and meetings now show their agent too.**
+  Select a file in Drive and a details pane opens beside the list with its
+  size, when it changed, and where it came from — “Raised from an email”, with
+  a link to that email — plus what @drive can do with it. A document and a
+  sheet each have an “Its agent” button in their editor that opens the same
+  panel alongside the page: draft a section, rewrite a passage, write a
+  formula, tidy a column. In the calendar's day panel, the button beside a
+  meeting shows what @agenda can do with that one — prepare for it, move it,
+  cancel it — and lets you ask a question about it in place. As everywhere
+  else, a button opens your conversation with the agent with the words ready
+  to send; nothing runs until you send and approve.
+
 - **Quotation list styles now open as a polished, fully contained gallery.**
   The chooser stays inside narrow screens, uses clear visual previews instead
   of clipped browser tooltips or repetitive labels, and marks the selected
