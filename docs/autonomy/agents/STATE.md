@@ -5010,3 +5010,35 @@ at connect, export the password before debugging anything else.
 module. Bounds check first: this track's `[web]` writ runs to
 `web/src/chat/**` and new `web/src/agents/**` only; if the item cannot be
 built inside that, it is marked `[!]` with the reason, per the wave rules.
+
+## A8.4 — blocked at the bounds check, as the previous entry ordered (2026-08-29)
+
+**What happened.** The bounds check the A8.3 entry called for was run first
+and it settles the item: "the agent on the record in focus in **every moved
+module**" renders provenance in the module detail views — `web/src/billing`,
+`web/src/crm`, `web/src/inventory`, `web/src/tasks`, `web/src/projects` and
+the rest — and every one of those directories is outside this track's web
+writ (`web/src/chat/**` and new `web/src/agents/**` only, per the wave A4–A9
+rules). The writ is not stale caution: the ds loop is live in exactly those
+directories today — its journal pushed at 09:07, and its last three commits
+(046d0be7, c32e1757, 1993d3df) edited the tasks, projects and inventory web
+files this item would have to open.
+
+**What was considered and rejected.** (1) A shared `<RecordAgent>` component
+in `web/src/agents/**` with no module importing it — a stub with no consumer,
+law 2 forbids it. (2) A chat-only slice — chat's records are not the moved
+modules' records, and "every moved module" is the deliverable. (3) Editing
+the module dirs anyway — forbidden twice, by the writ and by one-agent-per-
+area with ds mid-wave in them.
+
+**Marked** `[!] blocked` in QUEUE.md with the reason. Retryable, not dropped:
+the item is this queue's to build, and everything it needs below the web is
+already shipped — `origin` on the moved modules' records and intents
+returning it (A4.5), the action record (A8.1). When the module web dirs are
+free and the writ is widened (the follow-up `[web]` queue the A3 note
+promised), the item is a rendering exercise.
+
+**Next:** A9.1 — whose prerequisite ("every other item here and in
+agents-a/b/c is `[x]` or `[~]`") now fails on A8.4 `[!]`; per its own clause
+it will be marked `[!]` with that reason, leaving only blocked items, and the
+loop's stuck rule takes over from there.
