@@ -110,6 +110,26 @@ deleted — one line per module, added by the track that reviewed it:
   `my_leave_balance`, `open_leave_requests`, `open_checklists`; writes
   `draft_letter_from_template`, `approve_leave_request` — the personal note
   on a leave request stays in the app, stripped from what the model reads.
+- **Chat** — 2026-08-29 (AC.1): reads `my_rooms`, `unread_rooms`,
+  `room_members`, `catch_up_room`, `find_in_chat`; writes `post_message` (the
+  asker's words, in the asker's name), `create_room`, each with a preview.
+- **Meet** — 2026-08-29 (AC.2): reads `meetings_recent`, `meeting_record`,
+  `upcoming_meetings`, `meeting_lookup`; writes `meeting_minutes`,
+  `schedule_meeting` — the diary entry made by Agenda's one shared executor.
+- **Insights** — 2026-08-29 (AC.3): reads `insight_catalog`, `insight_answer`,
+  `insight_change`, `dashboard_tiles`; writes `insight_report`, `pin_chart` —
+  a chart is answered before it is ever saved.
+- **Mail (with Contacts)** — 2026-08-29 (AC.4): reads `correspondence`,
+  `message_read`, `find_contact`, `unread_summary`, `thread_lookup`,
+  `who_i_emailed`; writes `mark_read`, `flag_email`, `archive_email`,
+  `trash_email`, `snooze_email`, `move_to_folder`, `draft_email`,
+  `draft_reply`, `send_email` — one send path, and the send preview names
+  every recipient and says it cannot be undone.
+- **Sites** — 2026-08-29 (AC.5): reads `site_answer`, `site_page_read`,
+  `site_pages`, `site_status`, `site_orders`, `site_bookings`,
+  `site_seo_review`, `site_translation_status`; writes `site_page_draft`,
+  `site_page_edit`, `site_publish` — a draft publishes nothing until a
+  publish is separately approved.
 
 ## 2. Record views and provenance
 

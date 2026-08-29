@@ -345,3 +345,61 @@ hr/sites` lines each side had deleted its own module's, so the resolution
 deletes all of them; merged the counts (`all_tools` 126 + 4 = 130, declared
 reads 75 + 4 = 79) and re-ran the gates on the merge: clippy clean, nextest
 **1816/1816** (alo-ai 292, alo-jmap 1524).
+
+## AC.6 — Wave review (2026-08-29)
+
+**Reviewed, four checks, all pass — and the AC.4 flag is fixed, not filed.**
+(1) *Suites answer the `answers` questions*: each of the five modules carries
+`every_verb_has_a_route_a_purpose_and_a_question_it_answers` (every verb:
+route or named exception, sentence purpose, non-empty `answers`, preview on
+every write), and the five wire suites ask the queue's flagship questions
+against the scripted model — **19 tests** (chat 4, meet 4, insights 3, mail 4,
+sites 3, plus this review's new mail test), each suite covering a read
+answered from the record, a write proposed and not run, and a wrong-tenant
+denial, all in `agents_http_suite`. (2) *Hand-written tool sets gone*:
+`alo_ai::agent_{chat,meet,insights,mail,contacts,sites}` no longer exist; the
+kept jmap executor files are reached only from the module dispatches. All
+five rows sit in `MOVED` and `MODULES` (15 modules moved across the tracks,
+the two lists held to one length by test). (3) `complete-agents.md`'s **Moved
+modules** section now lists the five with their verbs, appended additively
+under agents-a's five. (4) `CHANGELOG.md` opens with the wave line: what a
+user can now ask the five communication and insight agents, and that every
+write previews first.
+
+**The carried AC.4 flag is closed in code.** A write proposed in a *room*
+that named its email as `{"source": n}` was stored verbatim, so approving it
+refused at `message_id_arg` ("message required") — the palette resolved
+source numbers (`agent.rs`'s `resolve_email_source`), the room paths never
+did. Fixed at the root: `chat_agent::ground` now returns the hits'
+`(kind, id, title)` beside the numbered sources (ids still never reach the
+model), the direct room turn resolves before `propose_action`
+(`chat_agent.rs`), and `delegate_turn` resolves against its own numbering
+before returning its `Propose` — which covers both an orchestrated step and
+a handoff's room proposal, since both store what `delegate_turn` returns.
+`resolve_email_source` made `pub(crate)`; behaviour elsewhere unchanged (args
+without `source`, or a source that is not a message, pass through untouched —
+same as the palette). Proven on the wire by the new
+`a_room_write_naming_a_source_lands_on_the_concrete_message`: the scripted
+model proposes `mark_read {"source": 1}` in a room, the stored proposal
+already names the concrete `message_id` (and no `source`), the message is
+still unread before the tap, and after `POST /chat/proposals/{id}
+{"approve":true}` the Inbox's own unread counter goes 1 → 0.
+
+**Verified.** Pruned `alo_scratch` (4705 tenants, 123 MB — healthy, nothing
+older than the cutoff); `cargo fmt`; clippy `-p alo-ai -p alo-jmap
+--all-targets` clean; nextest green on the reviewed tree: alo-ai **290/290**,
+alo-jmap full suite **1527/1527** (302 s; the run crossed the 600 s harness
+ceiling with the build in front of it and was carried across two calls, as
+the loop prescribes), the 19 wire tests above confirmed by a named re-run
+(19/19). No migration (0450–0469 never used by this track), no web, no new
+route prefixes, no UI strings — so no fr/nl catalog work falls due at this
+review.
+
+Mid-push, agents-b landed Agenda (AB.5, `3dc7fed8`) — the one conflict was
+the CHANGELOG's top, resolved by keeping both wave lines; gates re-run green
+on the merge: clippy clean, alo-ai 292/292, alo-jmap 1534/1534 (the merged
+tree's counts, Agenda's new tests included).
+
+Queue complete: AC.1–AC.6 all `[x]`.
+
+LOOP COMPLETE

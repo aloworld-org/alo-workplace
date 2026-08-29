@@ -52,4 +52,4 @@ another product (a store function you need and do not find is added as a
 - [x] AC.3 ★ **Insights**: reads — `insight_catalog`, `insight_answer`, `insight_change` kept, plus the dashboard's tiles as a list; writes — `insight_report` kept, pin a tile, with previews.
 - [x] AC.4 ★ **Mail** (with Contacts): reads — `correspondence`, `message_read`, `find_contact` kept, plus unread summary, a thread lookup, who I emailed last week; writes — the nine existing kept, with previews (a send is previewed with recipients and subject).
 - [x] AC.5 ★ **Sites**: the existing seven kept as intents with previews, plus reads — the site's pages, its published state, orders and bookings summary (`site_answer` stays the grounding).
-- [ ] AC.6 Wave review, as AA.6, for these five. Then `LOOP COMPLETE`.
+- [x] AC.6 Wave review, as AA.6, for these five. Then `LOOP COMPLETE`.
