@@ -1,5 +1,11 @@
 # Changelog
 
+- **Invoice drafts are now clearly named and open from anywhere on their
+  row.** Recurring runs still create reviewable drafts without spending a
+  legal invoice number, but the list now says “Draft invoice” instead of
+  showing a bare dash. Click the customer, dates, status or amount — or use
+  Enter or Space from the keyboard — to open that exact invoice for review.
+
 - **Calendar apps that ask for a time-zone definition now get one.** Events
   served to a phone or desktop calendar in a named time zone now carry that
   zone's summer/winter-time rules inside the file itself, as the iCalendar
