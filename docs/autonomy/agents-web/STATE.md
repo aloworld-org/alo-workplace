@@ -246,3 +246,90 @@ config's `testDir` is the whole folder, and a kept file would change what
 
 **Next:** AW.4 — the communication and insight modules (Chat, Meet, Insights,
 Mail, Contacts, Sites), six screenshots.
+
+## AW.4 — the communication and insight modules (2026-08-29)
+
+**What shipped.** The panel on the record in focus in all six, seven mounts
+across six modules, each with its origin derivation and its product's verbs.
+
+*The catalogue grows five products.* `chat` (catch me up / find something in
+it — the two verbs that name one room), `meet` (what happened in it /
+write the minutes), `insights` (kind `board`: pin a chart to it; kind `tile`:
+how has it changed — a board and a chart are different records with different
+verbs), `mail` (kind `message`: draft a reply / catch me up on it; kind
+`contact`: what we've said to them / write to them — one agent works in the
+mail *and* the address book, ADR 0034), `sites` (how it stands / review it for
+search engines / publish it). Every verb is a name from the intent registry,
+so the directory ∩ catalogue rule still decides what appears.
+
+*The mounts.* **Chat:** `RoomPeople` — the "Who's here" dialog, beside the
+agents that are in it and what they remember (A6.4) — with the room as the
+record, under the people, since who is here is what the dialog was opened for.
+**Meet** had no record surface: the recent list was six lines with nothing to
+open, so the item's work was building one — new `meet/RecentMeetings.tsx`
+(extracted from `MeetModule`, which keeps its dashboard job) where each ended
+meeting has a focus button and one at a time shows its agent under the list.
+**Insights:** one panel under the grid, the board's by default and the chart's
+when a reader picks one from the tile's own menu (new `TileActions.focus`) —
+two records on one screen, never two panels. **Mail:** `ReadingPane`, under
+the thread. **Contacts:** the detail pane, as `ContactForm`'s sibling — the
+panel carries its own ask `<form>` and HTML forbids nesting — and only for a
+saved card. **Sites:** `SiteView`, directly under how the site stands.
+
+*Origin.* Two modules carry one and four honestly do not. A **meeting** knows
+the conversation it was started from or the calendar entry it was scheduled as
+(`channel`/`event` on the record), so the panel cites the room by name with a
+link to it. A **room** knows who opened it (`createdBy` resolved through the
+room's own members to a readable address; unresolvable → no origin, never the
+id). A **message**'s provenance is its sender, which is the new `sender` origin
+kind — "Sent by Ilse Vermeer." A contact, a board, a chart and a site keep no
+provenance the API serves, so those say so.
+
+**Verified.** `tsc` clean; `eslint` on the touched trees clean; `vitest`
+**1377/1377** (7 new: three panel tests — mail's two kinds and the sender
+origin, board-verb vs chart-verb, a room's verb proposes and searches nothing;
+three `RecentMeetings` tests — quiet until focus, one at a time and lets go,
+the origin is what the meeting carries; one `ChatModule` test — the Who's-here
+room panel says who opened it and offers @chat's verb); `npm run build` clean.
+**On the wire, looked at:** throwaway stack per `web/e2e/stack.ts` (db
+`alo_e2e`, jmap :8199, vite :5199 — dropped and killed after), signed in,
+seeded a room, an ended meeting attached to it, a board with a chart, a
+contact, an inbox message and a site through the real API, and read all ten
+screenshots (`web/e2e/.artifacts/record-agent-aw4/`, local): mail says **"Sent
+by Ilse Vermeer."** and offers Draft a reply / Catch me up on it; the contact
+says it does not know where it came from and offers What we've said to them /
+Write to them; the room says **"Created by admin@e2e.test."** and offers Catch
+me up / Find something in it; the meeting says **"Captured from the "release"
+conversation."** with its link and offers What happened in it / Write the
+minutes; the board offers Pin a chart to it and the chart in focus How has it
+changed (and the board's panel gives way to it); the site offers How it stands
+/ Review it for search engines / Publish it — and **Review it for search
+engines** landed in the @sites one-to-one with the composer holding `Review
+"Delaunay Studio" for search engines.` and nothing sent. Phone width (360px)
+walked for Meet and Mail: both panels stack under the content and neither page
+scrolls sideways. No live model call anywhere.
+
+**Decisions and flags.** (1) **A DM gets no panel.** Chat's verbs name a room
+(`catch_up_room` takes a room name) and a direct message has no name to name,
+so the panel is a named room's; the dialog is unchanged for DMs. (2) **A chart
+and a board are two records, not one screen.** Offering `pin_chart` on a chart
+or `insight_change` on a board would be a verb the boundary would refuse, so
+`kinds` splits them and the panel below the grid follows the focus. (3) **The
+sender is an origin.** New origin kind `sender` rather than reusing `person`
+("Created by …" is wrong for mail you received) — and it links nowhere,
+because the record *is* the message. (4) `createdBy` refused again as a
+fallback on rooms, boards and meetings (AW.2 decision 2): a readable address
+comes from the room's members, and an unresolvable id shows no origin at all.
+(5) Two suites needed the app's own context now that a panel stands in them —
+`contacts/adoption.test.tsx` gained a router and the workspace's authorized
+fetch. (6) i18n keys in all four catalogs; fr/nl/de drafted here, flagged for
+native review at the wave review. (7) No new route prefixes, no deploy note.
+(8) The browser walk ran from a temporary `web/e2e/recordAgentAw4.spec.ts`,
+deleted after — as AW.3's was, and for the same reason: the e2e config's
+`testDir` is the whole folder.
+
+**Next:** AW.6 — the wave review (AW.5 is the owner's: Billing's editor and
+customer view live in Codex's directory). Every moved module's record walked
+at desktop and phone width with screenshots, the strings checked in every
+language file, `A8.4` flipped to `[x]` in the agents queue with a pointer
+here, and `A9.1` noted as the owner's to run.

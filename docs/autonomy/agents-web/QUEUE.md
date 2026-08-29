@@ -89,7 +89,7 @@ No migrations.
 - [x] AW.3 `[web]` The personal work modules: **Drive** (the node's detail —
   origin of a file an agent created), **Docs**, **Sheets** (the editor's
   panel/side area), **Agenda** (`DayPanel`/the event view). Four screenshots.
-- [ ] AW.4 `[web]` The communication and insight modules: **Chat** (a room's
+- [x] AW.4 `[web]` The communication and insight modules: **Chat** (a room's
   panel — the room's agents and what they remember is A6.4; this is the
   record-of-the-room, so mount beside `AgentMemoryPanel`), **Meet** (a
   meeting's record), **Insights** (a board/chart), **Mail** (a message's view

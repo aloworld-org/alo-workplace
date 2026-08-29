@@ -1,5 +1,20 @@
 # Changelog
 
+- **Conversations, meetings, boards, mail, contacts and websites now show
+  their agent too.** Open “Who's here” in a room and, under the people, the
+  room itself says who opened it and what @chat can do with it — catch me up,
+  find something in it. In Meet, the button beside a meeting that has ended
+  shows where it was started from — the conversation it came out of, with a
+  link to it — and offers what @meet can do: what happened in it, write the
+  minutes. A board in Insights offers @insights a chart to pin, and a chart
+  put in focus from its own menu offers to say how it has changed. An open
+  email says who sent it and offers a reply drafted or the thread summed up,
+  a contact offers what you have said to them or a letter to them, and a
+  website offers how it stands, a check for search engines, or publishing.
+  As everywhere else, a button only opens the agent's conversation with the
+  words already written — nothing runs until you send it and approve what it
+  proposes.
+
 - **Your phone can see the meeting rooms too.** Every room in the workspace now
   appears in the calendar app on your phone or desktop alongside your own
   calendars — its name, where it is, and everything currently booked into it,
