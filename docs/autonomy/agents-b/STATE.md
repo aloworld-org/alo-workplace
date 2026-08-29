@@ -225,4 +225,14 @@ bumped: registry reads 62→64, all tools 109→113). Wire suite
   then by first name lands on Ben with priority untouched, and "Zelda" is
   refused with "no colleague on your boards".
 
+**Rebase at the push.** While AB.4 gated, agents-c landed Mail's move to
+intents plus standing instructions, and Inventory's move was already on main
+— so the first push was rejected and the rebase conflicted exactly where
+A4.1c predicts: the set constants (both sides deleting different rows — kept
+neither), and three counts, resolved by adding both sides' deltas rather
+than picking one (workspace tools 117+4 = 121, registry reads 69+2 = 71).
+Full clippy + nextest re-run on the rebased tree before the push: alo-ai
+287, alo-jmap 1509, all green — the suite counts in the entry above describe
+the pre-rebase tree.
+
 Next: AB.5 (Agenda).
