@@ -1,5 +1,12 @@
 # Changelog
 
+- **Calendar apps that ask for a time-zone definition now get one.** Events
+  served to a phone or desktop calendar in a named time zone now carry that
+  zone's summer/winter-time rules inside the file itself, as the iCalendar
+  standard strictly requires — so even a strict or offline client shows a
+  9:00 meeting at 9:00 on both sides of a clock change, without needing its
+  own copy of the zone database for the lookup.
+
 - **Editing one occurrence of a repeating event on your phone now sticks.**
   Move next Tuesday's standup, rename one instance, or delete a single
   occurrence in Apple Calendar or an Android CalDAV app, and Agenda records

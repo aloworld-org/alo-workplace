@@ -554,20 +554,28 @@ Implemented methods mirror CardDAV: `OPTIONS` (advertises `calendar-access`),
   **kept** on the event so recurrence expands in its wall-clock. Serving goes
   the other way: a zoned event's date-times are written back as
   `;TZID=<zone>:<local>` so the client's own expansion is DST-correct too.
-  **No `VTIMEZONE` block is emitted or parsed** — the IANA name is the
-  definition. RFC 5545 §3.2.19 strictly wants a matching `VTIMEZONE`;
-  mainstream clients (Apple, Thunderbird, DAVx5) ship the IANA database and
-  resolve the bare name — to be confirmed in the owner-gated GUI pass, and if
-  one balks, emitting `VTIMEZONE` is the follow-up. A client that writes a
-  Windows display name (`Eastern Standard Time`) or a floating time still
-  falls back to UTC-fixed behaviour, and the fallback drops the unknown name
-  so expansion and serving agree.
+  Since AS.2 a served document whose date-times carry a `TZID` also includes
+  one `VTIMEZONE` per zone (RFC 5545 §3.6.5, §3.2.19), built from jiff's zone
+  data: the `STANDARD`/`DAYLIGHT` observances in force across the object's
+  span — the rule holding at its start plus each transition inside it, never
+  the zone's whole history. An open-ended (or `COUNT`-bounded) recurrence
+  extends that span one year past the last instant the object references, so
+  a client's near-future expansion finds every switch defined; beyond it the
+  IANA name remains the definition, as it always was. A fixed-offset zone is
+  one `STANDARD` block dated at the epoch. **Incoming `VTIMEZONE` blocks stay
+  ignored** — the IANA name in the `TZID` parameter is authoritative, and a
+  shipped block is never echoed back. A client that writes a Windows display
+  name (`Eastern Standard Time`) or a floating time still falls back to
+  UTC-fixed behaviour (no `VTIMEZONE` — nothing zoned is served), and the
+  fallback drops the unknown name so expansion and serving agree.
 - **Round-trip corpus** (`alo-store/tests/ical_corpus.rs`): client fixtures —
   plain UTC, all-day, `TZID=Europe/Brussels` zoned, floating, §3.3.11-escaped
   text, folded long lines, (M3.2) weekly-with-exceptions, monthly-by-day
   with an `RDATE`, a Europe/Brussels DST-crossing recurring series, and
   (AS.1) an Apple-style two-`VEVENT` series with a shipped `VTIMEZONE` and a
-  moved instance plus a DAVx⁵-style cancelled instance — each
+  moved instance plus a DAVx⁵-style cancelled instance, and (AS.2) a
+  fixed-offset-zone event, with every zoned canonical form carrying the
+  served `VTIMEZONE` — each
   parse → store (real Postgres, the CalDAV PUT path) → serialize to checked-in
   canonical bytes, and the canonical form is a fixed point of another full
   cycle. `DTSTAMP` is the one property that derives from nothing in the event

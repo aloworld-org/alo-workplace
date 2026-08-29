@@ -63,7 +63,7 @@ directory immediately before rebasing.
   RFC 4791 §4.1. Corpus fixtures from what Apple Calendar and DAVx⁵ actually
   write; a `caldav.rs` wire test PUTs a two-`VEVENT` series and reads it back
   moved; the interop cut is deleted.
-- [ ] AS.2 **`VTIMEZONE` emitted.** A served object whose date-times carry a
+- [x] AS.2 **`VTIMEZONE` emitted.** A served object whose date-times carry a
   `TZID` includes one `VTIMEZONE` per zone (RFC 5545 §3.6.5, §3.2.19), built
   from `jiff`'s zone data — the `STANDARD`/`DAYLIGHT` rules in force across
   the object's span (a bounded set of transitions, not the whole history).
