@@ -162,11 +162,11 @@ against a real model after each item and quote the answers.
 - [~] A4.4 *(moved: Inventory, HR → agents-a; Sheets, Tasks, Agenda → agents-b; Chat, Meet, Insights, Mail, Sites → agents-c)* Every remaining module's intents (Inventory, HR, Sites, Tasks,
   Agenda, Chat, Meet, Insights, Sheets, Mail), hand-written tool constants
   deleted, coverage tests green.
-- [!] blocked: agents-a/b/c journals show no `LOOP COMPLETE` yet (checked 2026-08-28) — A4.5 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* Provenance (`origin`) on the records the moved modules create;
+- [ ] *(unblocked 2026-08-29: all three journals show `LOOP COMPLETE`)* A4.5 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* Provenance (`origin`) on the records the moved modules create;
   intents return it; agents cite it.
 - [x] A4.6 The event stream: `events` table, every intent execution emits;
   audit reads from it.
-- [!] blocked: agents-a/b/c journals show no `LOOP COMPLETE` yet (checked 2026-08-28, second time) — A4.7 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* The evaluation set grows from the intents' `answers`; the scripted
+- [ ] *(unblocked 2026-08-29: all three journals show `LOOP COMPLETE`)* A4.7 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* The evaluation set grows from the intents' `answers`; the scripted
   run records answers verbatim and is the wave's exit gate.
 
 ## Wave A5 — delegation
@@ -205,7 +205,7 @@ against a real model after each item and quote the answers.
 - [x] A8.1 The action record: every intent execution, by a person or an agent,
   leaves one row with preview, actor, on_behalf_of, result, undo; a person's
   click and an agent's proposal are the same object.
-- [ ] A8.2 Undo an agent with the button that undoes a person; hand an open
+- [x] A8.2 Undo an agent with the button that undoes a person; hand an open
   proposal to an agent; assign a task to an agent (a standing instruction with
   a due date).
 - [ ] A8.3 Goals: a goal record with Ask alo's plan, steps, progress, one

@@ -4720,3 +4720,92 @@ open proposal to an agent; assign a task to an agent. (A4.5 and A4.7 stay
 `[!]`: agents-a/b/c journals showed no LOOP COMPLETE at this iteration's
 pull — a/b/c tails read AA: inventory wire tests, AB: next Tasks, AC: next
 Sites.)
+
+## A8.2 — undo an agent with the button that undoes a person; hand a proposal; assign a task (2026-08-29)
+
+**What shipped.** The three consequences ADR 0058 §6 says follow from actions
+being objects, each on the one mechanism that already exists rather than a
+new one beside it.
+
+*Undo.* The registry's two declared inverses become real verbs:
+`discard_invoice_draft` and `delete_payment` are Billing intents (writes with
+previews, no inverse of their own), their executors resolve by the raw id an
+action record's `undo_args` carries — and also by number or customer, so a
+person can ask for them in a room — and their shared cores are what the
+existing `DELETE /billing/invoices/{id}` and `DELETE
+/billing/invoices/{id}/payments/{payment_id}` handlers now call (the
+payments route left the exclusion list for the intent's `routes`; the A4.1b
+adapter test asserts both calls). `GET /ai/actions` lists the caller's own
+action record in the directory's exact `run_json` shape (one shape, shared
+fn), and `POST /ai/actions/{id}/undo` reads the caller's own row (new
+tenant+asker-scoped `agent_tool_run` store read; anyone else's id is 404),
+422s when there is no inverse, and otherwise runs `undo_tool`+`undo_args`
+through `execute_tool` with palette-tap semantics — so the undo is itself an
+intent execution: allowlisted, audited as the person's own act, event
+emitted, refused at the executor when the record is already gone (undo twice
+= 422 in the domain's own words). `alo-store`'s `billing_payment_invoice`
+(additive) finds the document a bare payment id sits on.
+
+*Hand.* `POST /chat/proposals/{id}/hand {agent}`: the asker's decision (the
+store's `decide_proposal` enforces asker-only and once-only, unchanged), the
+named agent's execution — the `ToolRun` carries the handed agent, so the
+action row reads "the agent did it, on the asker's behalf", settling the
+same card. The agent must be visible (module gate, else 404), awake, in the
+room, and one whose product owns the verb — that last checked **before**
+deciding, so a mis-hand leaves the card open (proved: handed to @tasks →
+422 and still pending; then to @billing → executed).
+
+*Assign.* A task whose assignee is an agent is a standing instruction with a
+due date, literally: `POST /chat/agents/{id}/tasks {task}` reads the task
+through the caller's own visibility, opens their DM with the agent
+(idempotent, refuses retired), and stands up a new `once` trigger —
+migration `0471` widens the two CHECK constraints and adds the partial
+index; the store's third claim query is `DELETE … RETURNING`, so claiming a
+one-shot and removing it are one atomic step and it cannot fire twice or
+linger as a card. The instruction's words are the task's own title (no
+invented English on a card), its moment the task's due date; overdue or
+dateless fires on the next sweep. The firing is the ordinary instruction
+turn as the caller in the DM.
+
+**Verified.** `prune-test-db` (9129→5303 tenants); fmt; clippy zero warnings
+on alo-store/alo-ai/alo-jmap; nextest: alo-store+alo-ai **2828/2828**,
+alo-jmap **1545/1545**, including six new wire tests in `agent_actions_http`
+/ `agent_instructions_http` on the real router and store with the scripted
+model. The exchanges, as asserted: `@billing invoice Northstar for the
+consulting` → proposal card → approve → the action row's `undoable: true` →
+`POST /ai/actions/{id}/undo` → 200 `{"ok":true}` → `GET
+/billing/invoices/{id}` **404**, and the undo's own row reads
+`discard_invoice_draft / record invoice/{id} / undoable:false`; the payment
+flow (draft→issue→record_payment by palette, then undo) ends with the
+document `status:"issued"`, `settlement.paidCents: 0`; the handoff answers
+`state:"approved", handedTo:{billing}` with the raised draft in `result` and
+an action row whose agent is the handed one; the assigned dateless task
+fires on `run_due` and the agent speaks in the DM ("On it — I'll sort the
+filing today.") with the task's own words as the model's question, after
+which only the dated one-shot still stands. Wrong tenant: undo of our row id
+404 (draft untouched), assignment across tenants 404 from both sides,
+another tenant's directory read 404 (pre-existing test still green).
+
+**Registry census** moved 134→136 (the two inverse verbs), asserted in
+`alo-ai`'s own tests; the two new `/chat/` routes are excluded from the chat
+agent's verbs with reasons (an agent must not approve or commission work).
+No new top-level route prefix — `/ai/` and `/chat/` already deployed.
+
+**Cuts and flags, recorded.** (1) The board does not yet *show* a task as
+agent-assigned and the modules' Send buttons still bypass the action record —
+both are A8.4's `[web]` surface; the API halves are done. (2) Handing is
+in-room only (the agent must be in the channel) — a deliberate rule, not a
+gap: a handoff the room cannot see is not a handoff. (3) A `once` firing on
+a workspace with **no AI provider** is claimed (deleted) and skipped quietly,
+same as schedules — for an assignment this means it silently evaporates;
+noted for the owner rather than special-cased, since an agent-less workspace
+assigning work to agents is already broken upstream. (4) Asker-only on
+`/hand` rides on `decide_proposal`'s existing Forbidden (tested in the
+proposal suites); no duplicate test written.
+
+**Next:** A4.5 — provenance. Checked at the end of this iteration: the
+agents-a, agents-b and agents-c journals **all show `LOOP COMPLETE`**, so
+the prerequisite of A4.5 and A4.7 is met and both moved back from `[!]` to
+`[ ]` in the queue (with the unblock dated). The iteration rule then picks
+A4.5 before A8.3, which is also the right build order — provenance and the
+grown evaluation set underpin the goals demo and the A9.1 exit.
