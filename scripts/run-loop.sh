@@ -61,10 +61,20 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   # prefix keeps prose out (the journal quotes these markers mid-sentence,
   # always behind a quote or a backtick) while seeing a real one whichever way
   # it was written.
-  if grep -qE '^#{0,6} *LOOP COMPLETE' <<<"$state"; then
+  #
+  # Bold is the third spelling, and it cost sixteen no-op iterations on
+  # 2026-08-29: the agents-web track finished its queue and ended its journal
+  # with `**LOOP COMPLETE** — every item … is [x]`, which the heading-only
+  # pattern could not see. The wrapper restarted a finished loop every few
+  # seconds, each restart spending a model call to be told there was no work —
+  # on a day the account had already hit its credit ceiling once. The pattern
+  # now accepts the emphasis these markers are naturally written with; prose is
+  # still excluded by the anchor, because the journal's own references sit
+  # behind a list bullet or a backtick and never start a line.
+  if grep -qE '^#{0,6} *\*{0,2}LOOP COMPLETE' <<<"$state"; then
     echo "[loop] queue complete — stopping."; break
   fi
-  if grep -qE '^#{0,6} *LOOP HALT' <<<"$state"; then
+  if grep -qE '^#{0,6} *\*{0,2}LOOP HALT' <<<"$state"; then
     echo "[loop] halted by the agent — fix the reason in STATE.md, remove the marker, restart."; break
   fi
 
