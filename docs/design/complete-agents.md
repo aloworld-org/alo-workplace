@@ -130,6 +130,26 @@ deleted — one line per module, added by the track that reviewed it:
   `site_seo_review`, `site_translation_status`; writes `site_page_draft`,
   `site_page_edit`, `site_publish` — a draft publishes nothing until a
   publish is separately approved.
+- **Drive** — 2026-08-28 (AB.1): reads `recent_files`, `list_folder`,
+  `shared_with_me`, `find_file`, `file_read`, `attachment_read`; writes
+  `create_folder`, `file_rename`, `file_move`, each with a preview.
+- **Docs** — 2026-08-29 (AB.2): reads `list_documents`, `doc_read`,
+  `doc_answer`; writes `create_document`, `doc_draft_section`, `doc_rewrite`
+  — cited blocks, translation-is-the-rewrite, nothing deletes.
+- **Sheets** — 2026-08-29 (AB.3): reads `list_spreadsheets`, `sheet_read`,
+  `sheet_answer`, `sheet_formula_explain`; writes `sheet_write_formula`,
+  `sheet_clean_column` — every figure cited to its cell, a formula written
+  and a fact never.
+- **Tasks** — 2026-08-29 (AB.4): reads `board_tasks`, `task_lookup`,
+  `my_plate`, `overdue_by_owner`, `thread_actions`; writes `complete_task`,
+  `reassign_task`, `create_task`, `set_task_priority`, `chase_task`,
+  `capture_actions` — completing is the user's word, a handover changes the
+  owner and nothing else.
+- **Agenda** — 2026-08-29 (AB.5): reads `event_lookup`, `colleague_free`,
+  `whats_on`, `am_i_free`, `find_a_time`, `meeting_prep`; writes
+  `create_event`, `reschedule_event`, `cancel_event`,
+  `respond_to_invitation` — a colleague's diary only where shared, an
+  invitation answered with the answer the user gave, never chosen.
 
 ## 2. Record views and provenance
 

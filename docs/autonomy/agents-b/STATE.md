@@ -330,3 +330,49 @@ Paula's ACCEPTED through `set_attendee_status` (the inbound-REPLY path)
 rather than seeding it on the event row.
 
 Next: AB.6 (wave review).
+
+## 2026-08-29 — AB.6 Wave review
+
+**Reviewed, four checks, all pass.** (1) *Suites answer the `answers`
+questions*: each of the five modules carries its verb-coverage module test
+(every verb: route or named exception, sentence purpose, non-empty
+`answers`, preview on every write — named per the module's shape:
+`every_verb_has_a_route_a_purpose_and_a_question_it_answers` in Drive,
+`…and_no_authoring_route` / `…and_no_route` in Docs/Sheets whose records are
+Drive nodes, `…a_write_its_preview` in Tasks/Agenda), and the five wire
+suites ask the queue's flagship questions against the scripted model —
+17 tests total (`agent_drive_intents_http` 4, docs/sheets/tasks 3 each,
+agenda 4), each suite covering a read answered from the record, a write
+proposed and not run, and a wrong-tenant denial (seeded and asserted absent
+inside the read tests), all listed by name in `agents_http_suite`.
+(2) *Hand-written tool sets gone*: `alo_ai::agent_{drive,docs,sheets,tasks,
+agenda}` no longer exist — only the infrastructure files (`agent_tool`,
+`agent_product`, `agent_plan`, `agent_memory`) and intent modules remain in
+`alo-ai`; the kept jmap executor files are reached only from the new
+dispatches. All five rows sit in `MOVED` and `MODULES` (16 modules moved
+across the tracks, the two lists held to one length by test).
+(3) `complete-agents.md`'s **Moved modules** section now lists the five with
+their verbs, appended additively under AA.6's business five, each line
+carrying the rule its move preserved (figures cited to cells, completing is
+the user's word, diaries only where shared). (4) `CHANGELOG.md` opens with
+the wave line: what a user can now ask the five personal work agents, and
+that every change previews first.
+
+**Verified.** Pruned `alo_scratch_b` (1529 tenants, 37 MB — healthy);
+nextest green on the reviewed tree: alo-ai + alo-jmap 1825/1825 in one run
+(309 s), the 17 wire tests above confirmed present by `cargo nextest list`.
+Docs-only diff — no Rust or web code changed by the review itself, no
+migration (0430–0449 never used by this track), no new route prefixes, no
+UI strings.
+
+**Rebase at the push.** AC.6 (the communication wave review) landed while
+this review gated, so the first push was rejected and the rebase conflicted
+on the two deliberately-shared docs — the Moved modules list and the
+changelog's top — both purely additive, both resolved by keeping both
+sides (their five lines and wave line, then ours). This review's diff is
+docs-only, so the merged tree needed no re-gate; the code AC.6 carried was
+gated by its own track.
+
+Queue complete: AB.1–AB.6 all `[x]`.
+
+LOOP COMPLETE
