@@ -4314,3 +4314,74 @@ prune script must be run with the same value). (4) One flake seen once and
 not reproduced, before the final green run: `agent_sites_http::
 publishing_waits_for_the_owner_and_only_then_is_the_site_live` failed under
 full-suite load, passed alone and passed in both later full runs.
+
+## A6.3 — deletion follows the source (2026-08-29)
+
+**What shipped.** The four ways the consent behind a memory can be withdrawn
+now take the rows with them. Three are synchronous, inside the store call
+that withdrew the consent: `delete_message` forgets every fact whose
+`source_msg` is the withdrawn message (both scopes — a room's facts and a
+person's alike, found by the new `agent_memories_source` index);
+`archive_channel` forgets every agent's channel memories of the room; and
+`remove_agent_from_channel` forgets that one agent's memories of that room —
+its past messages stay, they are the room's, but what it learned there was
+licensed by its presence. The deletion SQL lives in `agent_memories.rs` as
+three `pub(crate)` hooks, one line each in the chat files (Law 3). The
+fourth source is time: migration `0408_agent_memory_deletion.sql` adds
+`chat_channels.agent_memory_set_at` (stamped by `set_channel_memory` only
+when the choice actually changes, so re-saving "off" grants no new grace;
+backfilled to now() for rooms that chose before the column existed), and
+`Store::sweep_agent_memories` — an hourly background sweep in `main.rs`
+beside the snooze sweeper — deletes what a switch that has resolved OFF for
+30 days is hiding. A room's own OFF runs on `agent_memory_set_at`; a room
+following a workspace default OFF runs on the later of the default's change
+and the room's return to following it; a one-to-one's OFF sweeps the person
+scope through `(c.agent_id, c.created_by)` — the only door person memories
+are ever surfaced through. The clock is per row (`GREATEST(off-since,
+created_at)`), so a fact stored while a room was already off — an explicit
+"remember that …" ignores switches — gets its own thirty days rather than
+dying on the room's tail.
+
+**Verified.** Pruned first (5 909 → 0 tenants, 110 MB). `cargo fmt`; clippy
+`-p alo-store -p alo-jmap --all-targets` zero warnings (146 s); `cargo
+nextest run -p alo-store` **2533/2533**; `-p alo-jmap` **1431/1431 green**
+(212 s) with three new wire tests in `agents_http_suite::agent_memory_http`.
+From the suite, on the real router and store: `@billing remember that
+Northstar invoices are net 30` → *"Noted — I'll remember that."* →
+`DELETE /chat/messages/{id}` (204) → only the second fact ("the X100 ships
+from Ghent") remains, and the same withdrawal in an agenda one-to-one
+empties `my_memories`. `DELETE /chat/channels/{deals}/agents/{billing}`
+(204) → billing's memories of deals gone while tasks' memory of the same
+room, billing's memory of another room, and billing's memory of the person
+all stay; `POST /chat/channels/{deals}/archive` then takes tasks' too, and
+still not the person's. The sweep test: rooms off/on/following-default plus
+a switched-off DM, all seeded; a sweep before the clock runs deletes
+nothing ("hidden is not deleted until the thirty days pass"); after
+backdating switch, default and rows 31 days, the sweep deletes the off
+room's aged facts, the default-follower's, and the DM's person facts, while
+the ON room keeps everything, a fact stored fresh into the already-off room
+survives on its own clock — and a second tenant on the same store, default
+untouched, keeps its equally-aged rows: one tenant's OFF reaches no other
+tenant's rows.
+
+**Decisions, recorded.** (1) The 30-day clock is per row, not per room —
+`GREATEST(off-since, created_at)` — chosen so explicit facts said into an
+off room are never deleted younger than thirty days. (2) `set_channel_memory`
+stamps `agent_memory_set_at` only on an actual change (`IS DISTINCT FROM`),
+so re-saving the same OFF neither restarts nor extends the clock. (3) A
+person's memories follow their one-to-one's switch — the strictest mapping,
+since that DM is the only surface they ground; nothing else deletes the
+person scope but their own withdrawn messages. (4) Rooms that chose before
+the migration start their clock at migration time — the honest reading of a
+moment that was never recorded. (5) `remove_member` (a person leaving)
+deletes nothing: memories are the room's, not the leaver's, per design §6.
+
+**Next:** A6.4 — `[web]` "What I remember", per agent per channel; judged
+against the `[web]` bounds (`web/src/chat/**`, new `web/src/agents/**`) at
+pickup.
+
+**Addendum, same iteration.** The Finance intents (agents-a, `76bcb488`)
+landed under the push; the only conflict was the CHANGELOG's top line,
+resolved keep-both. The final gate ran on the rebased tree: clippy zero
+warnings, `alo-store` **2533/2533**, `alo-jmap` **1444/1444 green** (230 s)
+with the Finance suite inside it.

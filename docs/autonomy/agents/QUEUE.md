@@ -186,7 +186,7 @@ against a real model after each item and quote the answers.
   explicit "remember that …".
 - [x] A6.2 Retrieval inside scope only: a turn reads its channel's memories or
   the asker's own DM memories; the wrong-channel test is the one that matters.
-- [ ] A6.3 Deletion follows the source: message, channel archive, agent
+- [x] A6.3 Deletion follows the source: message, channel archive, agent
   removed from the channel, switch off (30-day hide then delete).
 - [ ] A6.4 `[web]` **What I remember** — per agent per channel; read by every
   member, forgotten by the owner or the source author.
