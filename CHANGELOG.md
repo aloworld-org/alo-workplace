@@ -1,5 +1,14 @@
 # Changelog
 
+- **Business records now show their agent, on the record.** Open a deal, an
+  expense claim (or its row in the approvals queue), a bank statement, a
+  project or its timesheet week, a purchase or sales order, a candidate, a
+  leave request, or a person in the directory, and the same panel says where
+  the record came from and offers what that module's agent can do with it —
+  approve the claim, move the deal's stage, receive the order's delivery,
+  draft the letter. Every button opens your conversation with the agent with
+  the words ready to send, and nothing runs until you send and approve.
+
 - **A quotation past its validity date now reads as a warning, not an
   application error.** The list keeps the clear “Past its date” label but no
   longer paints the whole quotation row red; warning badges now use alo's

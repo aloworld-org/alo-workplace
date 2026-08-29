@@ -81,7 +81,7 @@ No migrations.
   (the task's origin — "captured from the Friday room by @tasks", "created by
   Disan" — its verbs — chase, set priority — and ask). Screenshot of a real
   task with the panel.
-- [ ] AW.2 `[web]` The five business modules: **Sales** (`DealDrawer`),
+- [x] AW.2 `[web]` The five business modules: **Sales** (`DealDrawer`),
   **Finance** (the expense/approval/bank detail), **Projects** (the project
   and the timesheet), **Inventory** (product, purchase order, sales order
   editors), **People/HR** (applicant drawer, leave, directory record). Five
