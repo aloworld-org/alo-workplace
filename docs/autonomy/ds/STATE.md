@@ -2899,3 +2899,57 @@ renders identically — there is nothing a user would notice.
 
 **Next:** D2.10b — adopt the components in projects, findings enumerated in
 the item.
+
+## D2.10b — projects adopts the components (2026-08-29)
+
+The audit's five findings, all closed. **(a)** `parts.tsx`'s `DialogFrame` is
+rebuilt on `ds/Modal` (hr's D2.08b pattern: form in the body tied to the
+footer's submit by id, subtitle as the body's first line, `extraAction` kept
+at the far left) — all six dialogs that ride it gain the focus trap,
+Escape-from-anywhere and focus-return in one change. Three more hand-rolled
+overlays the item's list did not count were converted the same way:
+`TemplateDialog`'s first-run screen, `InvoiceHandoffDialog` (which had **no
+Escape handling at all**) and `WeekView`'s "choose a project" picker. Two of
+those spelled utilities that do not exist — `z-modal` and `bg-scrim`
+generate nothing from the theme, so the invoice handoff shipped with no
+z-index and **no scrim** — the same class-that-isn't bug home's `bg--soft`
+taught in D2.06b, found this time by reading the classes against theme.css.
+**(b)** The local `Field` is deleted; every form column is `ds/Field`'s
+render-prop, so labels are bound and hints/errors announced (the `textarea`s
+stay bare per the standing cut — projects is the eighth area waiting for a
+multi-line control — but even they now get an id and `aria-describedby`
+through the Field). `WeekChip` draws as `ds/Badge`, statuses folded
+neutral/accent/success/danger; PlanView's three chip recipes became Badges
+the same way. **(c)** ~20 bare controls are `ds/Input`/`ds/Select`
+(EntryDialog's billable tick is a `ds/Checkbox`); `NewProjectDialog`'s
+custom combobox stays — it is a composite that names itself, and rebuilding
+it as a native select is a different decision than this item's. **(d)** All
+five tables are `ds/Table` with `Th`/`Td` (`numeric` for the figure columns,
+`hideLabel` for the action columns): every one is now named via `<caption>`
+and its scroll region keyboard-reachable. The timesheet grid keeps its
+today-column accent via a span inside the `Th`, whose own colour wins over
+the table's header ink. **(e)** All fifteen `[var(--…)]` escapes are
+respelled onto semantic utilities (`bg-accent-soft`, `bg-danger-tint`,
+`bg-success-tint`); the two `--navy-*` raw-scale reaches fold into Badge's
+accent tone. One i18n key added (`projectsWeekEntriesLabel`, en+fr+nl+de —
+the ratchet now demands all four at once; the queue's "fr/nl at wave
+reviews" note predates it).
+
+**Gate:** `npx tsc --noEmit` clean; eslint clean on the 16 changed
+files + 3 catalogs; `npx vitest run src` **241 files / 1337 tests green**
+(ratchet and i18n suites included, 334 s); `node
+scripts/gen-tailwind-theme.mjs --check` current (75 utilities); `npm run
+build` clean in 81 s.
+
+**Cut for the sixteenth time: no screenshot** — still no browser package in
+`web/`. The bundle probe ran both directions on `dist/assets/index-*.css`:
+the whole shipped CSS now contains **zero** `[var(--accent-soft)]`,
+`[var(--danger-tint)]`, `[var(--success-tint)]` and `[var(--navy-*)]`
+arbitrary classes (projects' were the last); every utility the migration
+turns on probed present individually (`!pl-10`, `min-w-64`,
+`bg-danger-tint`, `bg-accent-soft`, `bg-success-tint`). The `--navy-50/600`
+strings still in the bundle are the private scale's definitions in
+tokens.css, referenced by no utility.
+
+**Next:** D2.11 — tasks, audit-first (the area left the ratchet by outside
+hands; read `web/src/tasks/**` before believing it done).

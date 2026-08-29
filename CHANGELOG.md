@@ -1,5 +1,20 @@
 # Changelog
 
+- **Every dialog in Projects can now be worked from a keyboard, and every
+  table says what it is.** All nine of the module's overlays — the engagement
+  form, the project details, the time entry, the milestone, the new-project
+  and template forms, the invoice handoff, the "choose a project" picker and
+  the template list's first-run screen — now keep the caret inside them: Tab
+  no longer walks out onto the page behind, Escape closes them wherever the
+  caret is, and closing hands focus back to what you were doing. Every label
+  in those forms is now bound to its own box and read out with its hint, an
+  error is announced when it appears rather than only shown, and the five
+  tables — the engagement list, the timesheet grid, the week's entries, the
+  approvals inbox and the profitability report — are named for a screen
+  reader and scrollable from the keyboard. The forms, dropdowns, tick-boxes
+  and status words are the workspace's shared controls now, so Projects reads
+  as the same product as Billing, Inventory and HR.
+
 - **The warehouse screens can now be worked from a keyboard, and they say what
   they are.** The two sheets Inventory opens over a screen — the movement
   history behind every stock row, and the scanner — now keep the caret inside
