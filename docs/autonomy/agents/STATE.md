@@ -4809,3 +4809,72 @@ the prerequisite of A4.5 and A4.7 is met and both moved back from `[!]` to
 `[ ]` in the queue (with the unblock dated). The iteration rule then picks
 A4.5 before A8.3, which is also the right build order — provenance and the
 grown evaluation set underpin the goals demo and the A9.1 exit.
+
+## A4.5 — provenance: records carry where they came from (2026-08-29)
+
+**What shipped.** ADR 0058 §4 / `complete-agents.md` §2, built as one
+mechanism rather than a column per module.
+
+*Store.* `record_origins` (migration `0472`): one row per record —
+`(tenant, record_type, record_id)` primary key, `origin = {kind, id,
+label?}` in the event stream's vocabulary, first-writer-wins made
+structural (`ON CONFLICT DO NOTHING`; `set_record_origin` returns whether
+this call was the one that said it). The label is a citation (trimmed,
+cut at 200 bytes on a char boundary, blank → none, nullable for a source
+with no name); the row is a pointer that outlives its source, like
+`events`. New `record_origins.rs` in `alo-store`, tenant-scoped reads
+only — by the time a record view joins the origin in, the module's own
+read path has decided access.
+
+*The funnel.* `execute_tool` now does two things after a successful
+dispatch: a **write** that ran in a room and touched exactly one record
+is stamped `{kind:"thread", id: the channel, label: its name}` — so
+everything any agent creates from a room carries the conversation it was
+asked in, every module at once — and **any** reply naming one record
+(reads included) gets the stored origin injected as `result.origin`,
+which is how "intents return it" holds without each module joining by
+hand. An executor's own `origin` field is never overwritten. Both halves
+best-effort like `record_run`.
+
+*Modules set it where they create.* `accept_quote`'s shared core (route
+and verb alike) stamps the raised invoice — and a goods quote's sales
+order — with the quote and its number; `create_deal` stamps a deal raised
+out of an email with the message and its subject, beating the generic
+thread stamp by writing first. `invoice_lookup`'s reply now carries its
+record word (`kind: "invoice"`), which is what lets the funnel answer it
+with the origin and point the read's action row at the document.
+
+*Agents cite it.* One sentence in the shared `AGENT_SYSTEM_RULES`: an
+`origin` on a returned record is where it came from — cite it by its
+label, never invent one for a record that has none.
+
+**Verified.** `prune-test-db` (7087→6048); fmt; clippy zero warnings on
+all three crates; nextest alo-store+alo-ai **2832/2832** (three new
+store tests: first-writer-wins + label hygiene, event-vocabulary bounds,
+and the wrong-tenant read/squat test), alo-jmap **1548/1548** with three
+new wire tests in `agent_origins_http` on the real router and store. The
+exchange, as asserted: `@billing invoice Northstar for the consulting` →
+approve → the reply's `result.origin` is `{kind:"thread", id:<room>,
+label:"finance"}` and the store keeps it; then `@billing where did
+Northstar's draft come from?` → the turn's `invoice_lookup` grounding
+contains the origin and the room answer is **"Northstar's draft is at
+242.00 EUR — raised from the #finance thread."** The quote path on the
+person's own route: `POST /billing/quotes/{id}/accept` → the raised
+invoice's origin is `{kind:"quote", id:<quote>, label:"QUO-…"}`, and a
+palette `invoice_lookup` returns it on the record view. A palette-made
+draft has no origin anywhere — nothing invents one.
+
+**Cuts and flags, recorded.** (1) The funnel's read-side enrichment fires
+only where a single-record reply names its record word; billing's lookup
+now does, and the other moved modules' single-record reads adopt the same
+one-line `kind` as they are touched — the mechanism is total, the
+adoption is per-view and additive (their origin rows are already being
+written by the thread stamp meanwhile). (2) A sales order's origin is
+stored but not yet returned (inventory's views use `salesOrder`, outside
+the vocabulary) — same adoption path. (3) The real-model evaluation of
+the citation sentence is the owner's run per the queue's rule; the
+scripted transcript above is this iteration's quotable evidence. (4) No
+new routes, no deploy note needed.
+
+**Next:** A4.7 — the evaluation set grows from the intents' `answers`;
+the scripted run records answers verbatim as the wave's exit gate.
