@@ -4574,3 +4574,70 @@ keep-both per the shared-lists rule. The final gate ran on the rebased
 tree: clippy zero warnings, `alo-store` + `alo-ai` **2815/2815**,
 `alo-jmap` **1489/1489 green** (224 s) with both new intent suites inside
 it. Migration `0409` still unique after the rebase.
+
+## A7.2 — `[web]` the instruction card in the channel (2026-08-29)
+
+**Bounds check at pickup.** The `[web]` areas are clear: the last commits
+under `web/src/chat/**` and `web/src/agents/**` are this track's own A6.4
+(`eb41a261`); the live loops (agents-a/b/c, last push 04:01) are
+backend-only. Built inside the bounds — `web/src/chat/**` plus
+`web/src/agents/**` — and nothing else touched.
+
+**What shipped.** The visible half of standing instructions (design §7).
+New `web/src/agents/AgentInstructionsPanel.tsx`: a dialog per room listing
+the cards from `GET /chat/channels/{id}/instructions` — each with the
+agent's handle, the instruction in the author's words, the trigger as a
+sentence (hourly/daily/weekly, N hours, N minutes, or "runs after every
+'verb'"), the next run, who asked, and the design's own answer to an
+absent author: a "paused" line the card states plainly. Cancel renders
+only where the server said it would be honoured (`canCancel` — the
+author's own, or the room owner's), calls `DELETE /chat/instructions/{id}`
+and redraws from the server's fresh answer; a refusal reaches the user in
+the server's sentence verbatim (UX law 8). The same panel stands a new
+one up: agent picked from the room's awake agents, the words (400-char
+input, matching the store's bound), an interval select (hourly / 4-hourly
+/ daily / weekly — the server's ≥60 floor respected by construction), via
+`POST /chat/channels/{id}/instructions`. Empty state as onboarding.
+Entry point: an alarm-clock button in `ConversationHeader`, both
+variants (channel and DM/agent-DM), beside the people button; dialog
+state in `ChatModule` exactly like RoomPeople's. `chat/types.ts` gains
+`AgentInstruction`/`InstructionTrigger`/`NewInstruction` mirroring
+`instruction_json` field for field (`author` nullable — `author_email` is
+`Option<String>`); `chat/api.ts` gains the three methods. Strings in all
+four catalogs (en/fr/nl/de, formal address; drafted this iteration,
+flagged for native review at the wave review).
+
+**Verified.** No Rust touched — no migration, no cargo gate. Web gate:
+`npx tsc --noEmit` clean; `npx eslint` on the eleven touched files clean;
+`vitest` — six new tests in `AgentInstructionsPanel.test.tsx` (cards
+listed with Cancel only where honoured; paused card says so and hides
+next-run; cancel is DELETE + redraw, asserted on the request; the form
+POSTs `{agentId, text, trigger:{kind:"schedule",everyMinutes:60}}` and the
+new card appears; a 422's own sentence lands in the alert; a room with no
+agents offers no form) plus i18n parity (86 locale tests) and ChatModule's
+20 — 115/115, `userFacingLiterals` green; `npm run build` clean (73 s;
+the chunk-size note is the pre-existing advisory). The fetch fakes were
+written against `agent_instructions.rs`'s actual `instruction_json`, and
+the routes themselves were wire-proven in A7.1's suite last iteration.
+
+**Decisions, recorded.** (1) The create form is schedule-only; event cards
+render and cancel but are not created here. The events the design names
+as examples (`invoice.overdue`) have no emitter yet (A7.1's recorded cut),
+and a dropdown of raw registry verbs (`issue_invoice`, …) would read as a
+debugger, not a product surface — when derived-state events land, the
+picker is one `<Select>` away. Recorded as a cut, not half-built. (2) The
+card's Cancel has its own i18n key (`agentInstructionCancel`) rather than
+reusing the shared `cancel`: in German the shared "Abbrechen" reads as
+"abort this dialog" while taking a standing instruction down is "Beenden"
+— one English word, two meanings, two keys. (3) The panel loads the
+room's agents itself (like RoomPeople) rather than taking them as a prop:
+ChatModule holds no agent list, and threading one through for a dialog
+would couple the header to data it never renders. (4) The intro sentence
+states the transparency rule ("everyone here can read this list") the
+same way the memory panel's does — the two surfaces make the same
+promise and should say it the same way.
+
+**Next:** A8.1 — the action record: every intent execution leaves one row
+with preview, actor, on_behalf_of, result, undo; a person's click and an
+agent's proposal are the same object. (A4.5 and A4.7 stay `[!]`:
+agents-a/b/c journals showed no LOOP COMPLETE at this iteration's pull.)

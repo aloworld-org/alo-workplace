@@ -197,7 +197,7 @@ against a real model after each item and quote the answers.
   the author on the scheduled-mail sweeper, reads post, writes propose to the
   author; bounds (one firing per hour, twenty per channel); paused when the
   author leaves.
-- [ ] A7.2 `[web]` The instruction card in the channel with Cancel for the
+- [x] A7.2 `[web]` The instruction card in the channel with Cancel for the
   author and the owner.
 
 ## Wave A8 — actions and goals
