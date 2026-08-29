@@ -4385,3 +4385,86 @@ landed under the push; the only conflict was the CHANGELOG's top line,
 resolved keep-both. The final gate ran on the rebased tree: clippy zero
 warnings, `alo-store` **2533/2533**, `alo-jmap` **1444/1444 green** (230 s)
 with the Finance suite inside it.
+
+## A6.4 — `[web]` What I remember (2026-08-29)
+
+**Bounds check at pickup, as the previous entry ordered.** Nobody else is in
+the `[web]` areas: the last commit under `web/src/chat/**` is `c363f474`
+(08-28 03:12, a header fix), the responsive queue closed with LOOP COMPLETE
+on 08-28, and the live loops (agents-a/b/c) are backend-only. So the item's
+UI could be built inside its bounds — `web/src/chat/**` plus the new
+`web/src/agents/**` — and was.
+
+**What shipped.** The transparency half of channel memory, on the wire and
+on the screen. **API:** `GET /chat/channels/{id}/agents/{agent}/memories`
+lists what one agent remembers in one conversation — readable by everyone
+who can read the room, exactly like the messages the facts came from; in the
+agent's own one-to-one it lists what it remembers about the caller (another
+agent's name there yields an empty list, a colleague gets the same 404 the
+room itself gives them). Each fact carries `learnedFrom`, `createdAt` and
+`canForget`, answered server-side so the screen offers only buttons the
+server will honour. `DELETE /chat/memories/{id}` forgets one fact:
+`AccountStore::forget_memory` allows the room's owner (either side of a
+direct room), or the author of the message the fact was learned from —
+their words licensed it, and taking back one fact must not cost the whole
+message. Everyone else: 403 with the rule named, or 404 where the memory
+was never theirs to see (person-scoped rows and other tenants' rows do not
+exist for anyone else — no oracle). The listing knows its source authors
+through a LEFT JOIN on `chat_messages` (`AgentMemory.source_author`, new,
+additive; a tombstoned message still names its author). Both routes are
+`Excluded` in `CHAT_EXCLUDED` with reasons — reading the panel is the
+members' window, forgetting is a person's withdrawal of consent; neither is
+an agent's verb. **Web:** new `web/src/agents/AgentMemoryPanel.tsx` (first
+file of the follow-up-queue area), a dialog listing the facts with
+provenance and date, a Forget button only where `canForget`, empty state as
+onboarding, server sentences shown verbatim (UX law 8); opened from a new
+Brain icon on each agent row in RoomPeople — reachable in rooms and in
+agent one-to-ones alike, since an agent DM lists its counterpart in the
+people dialog. Strings in all four catalogs (en/fr/nl/de, formal address;
+drafted by this iteration, flagged for native review at the wave review).
+No migration — the tables already carry everything.
+
+**Verified.** Pruned first (3 380 tenants, script ran against the gate's own
+`DATABASE_URL`). `cargo fmt`; clippy `-p alo-store -p alo-ai -p alo-jmap
+--all-targets` zero warnings; `cargo nextest run -p alo-store -p alo-ai`
+**2808/2808**, `-p alo-jmap` **1446/1446 green** (219 s) with two new wire
+tests in `agents_http_suite::agent_memory_http`. Web: `tsc --noEmit`,
+`eslint` on the ten touched files, `vitest` (panel tests, i18n parity,
+ChatModule — 110/110), `npm run build`, all clean. From the suite, on the
+real router and store: owner teaches `@billing remember that Northstar
+invoices are net 30`, member joins and teaches `…the X100 ships from
+Ghent`; `GET /chat/channels/{ch}/agents/{billing}/memories` as the member →
+`{"memories":[{"fact":"the X100 ships from Ghent","canForget":true,…},
+{"fact":"Northstar invoices are net 30","canForget":false,…}]}` (newest
+first); member `DELETE /chat/memories/{owner's fact}` → **403**
+`"only the room's owner, or the person whose words taught it, can forget
+this"`, row still present; member deletes their own fact → **204**; owner
+deletes the rest → **204**, list empty. In the one-to-one: the person's
+fact listed with `canForget:true`, a colleague's GET → 404, colleague's
+DELETE → 404, wrong tenant's GET and DELETE → 404 — and after every
+refusal the row was still there; the person's own DELETE → 204.
+
+**Decisions, recorded.** (1) The panel shows a switched-off room's memories:
+"off hides" (A6.2) governs what grounds a *turn*, and the panel is how a
+person sees what a switched-off room is still holding — hiding it here
+would hide exactly what the transparency surface exists to show. (2)
+`canForget` is computed by the route from the same facts the store's
+judgement reads (role, room kind, source author), not stored — one rule,
+two renderings, and the wire test asserts DELETE enforces what the listing
+said. (3) A public room's mere reader (no membership row) reads the list
+but gets Forbidden on forget — reading is the room's transparency,
+forgetting is a member's standing. (4) A fact whose source message is gone
+(tombstoned rows keep authorship, but a fact stored with no source at all)
+can only be forgotten by the owner — there is no author to widen it to.
+(5) One i18n key serves as both the row-button label and the dialog title
+(`agentMemoryTitle`); the per-fact a11y label quotes the fact itself.
+
+**Environment note.** `web/node_modules` was stale — `qrcode.react` is in
+`package.json` (the billing rework) but was not installed, so `tsc` failed
+on `web/src/billing/…` before this item's files were even reached. Fixed
+with `npm install`; nothing of billing's was touched.
+
+**Next:** A7.1 — `agent_instructions`: schedule and module-event triggers,
+run as the author on the scheduled-mail sweeper, reads post, writes propose
+to the author; bounds; paused when the author leaves. (A4.5 and A4.7 stay
+`[!]`: agents-a/b/c journals still show no LOOP COMPLETE.)

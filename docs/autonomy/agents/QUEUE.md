@@ -188,7 +188,7 @@ against a real model after each item and quote the answers.
   the asker's own DM memories; the wrong-channel test is the one that matters.
 - [x] A6.3 Deletion follows the source: message, channel archive, agent
   removed from the channel, switch off (30-day hide then delete).
-- [ ] A6.4 `[web]` **What I remember** — per agent per channel; read by every
+- [x] A6.4 `[web]` **What I remember** — per agent per channel; read by every
   member, forgotten by the owner or the source author.
 
 ## Wave A7 — standing instructions
