@@ -2849,3 +2849,53 @@ standing instruction to read `web/src/projects/**` (and now `tasks` too)
 rather than trust the list: two areas have left the ratchet by hands outside
 this loop, and satisfying the ratchet is not the same as adopting the
 components.
+
+## D2.10 — platform migrated, projects audited (2026-08-29)
+
+The narrowest migration of the wave and the last line off `redefined.ts`
+that this queue can remove: `platform/StackBadge.module.css` (20 lines, one
+rule) is deleted and the dev-only stack badge carries its styling as
+utilities in `StackBadge.tsx`. Only `sites/SitesModule.module.css` remains
+on the list, and it stays until that track migrates it (queue preamble).
+
+Nothing was adopted, deliberately: the badge is not a `ds/Badge` — it is a
+fixed-position developer diagnostic, `aria-hidden`, dev-build-only, and its
+black-scrim-white-ink colours are intentionally theme-independent (it must
+say which stack is on screen even when theming is the thing being
+debugged). So the exact values moved into arbitrary utilities rather than
+being respelled onto semantic tokens — `bg-[rgb(0_0_0/0.72)]` instead of
+`bg-overlay`, which is a 0.48 warm-charcoal scrim and would have been a
+restyle. Argued in the commit as the queue requires. `rounded-sm` and
+`font-mono` do come from the theme; the stylesheet's two comments moved
+into the component file.
+
+**The projects audit the item ordered** (area taken off the ratchet by
+`c41851be`, outside the loops): the area satisfied the ratchet without
+adopting the components — billing's problem again, recipes
+`primitives.test.ts` cannot see. Found and filed as **D2.10b** rather than
+fixed here: a hand-rolled `DialogFrame` under all six dialogs with **no
+focus trap**; a local `Field` that binds and announces nothing; ~20 bare
+form controls; five hand-rolled tables; fifteen `var(--…)` escapes, some
+reaching the raw scale (`--navy-50`). D2.11 (tasks) got the same warning
+appended: tasks also left the ratchet by outside hands, so that item is now
+an audit-first item too.
+
+**Gate:** `npx tsc --noEmit` clean; eslint clean on the two changed files;
+`npx vitest run src` **241 files / 1337 tests green** (ratchet included,
+354 s); `node scripts/gen-tailwind-theme.mjs --check` current (75
+utilities); `npm run build` clean in 65 s.
+
+**Cut for the fifteenth time: no screenshot** — still no browser package in
+`web/`. The bundle probe ran both directions: `_badge_` under StackBadge's
+hash is absent from the shipped CSS (the one `_badge_18k8n` remaining is
+sites', allow-listed); every utility the migration turns on is present and
+probed individually — `z-index:2147483647`, `background-color:#000000b8`
+(the minifier's spelling of rgb(0 0 0/0.72)), `right:6px`, `bottom:6px`,
+`padding-inline:7px`, `padding-block:2px`, `font-size:11px`,
+`letter-spacing:.02em`, `leading-normal`.
+
+No CHANGELOG line: the badge is dev-only, `import.meta.env.DEV`-gated, and
+renders identically — there is nothing a user would notice.
+
+**Next:** D2.10b — adopt the components in projects, findings enumerated in
+the item.
