@@ -216,3 +216,73 @@ No migration used (0410–0429 untouched), no new route prefixes, no UI strings.
 Registry ripples as expected: prompt ordering test now pins `create_deal <
 active_projects < log_time`; guidance marker "For a projects tool" → "For a
 Projects verb". Next: AA.4 Inventory.
+
+## 2026-08-29 — AA.4 Inventory moved to intents
+
+**Shipped.** `alo_ai::inventory_intents` (seven verbs) and `alo-jmap`'s
+`inventory_intents.rs` executors + dispatch. Reads: `stock_answer` kept (its
+executor stays in `agent_inventory.rs`, reached only from the new dispatch,
+now answering through `billing_intents::ok` so money and quantity displays sit
+beside the integers); `stock_below_minimum` NEW — the shortage report exactly
+as `GET /inventory/shortages` serves it (`shortage_json` widened to
+`pub(crate)`), narrowable to one supplier or one place, a shortage nobody
+quotes for kept supplier-less; `open_purchase_orders` NEW — the order list as
+`GET /inventory/purchase-orders` serves it (`summary_json` widened), default
+everything not closed, exact-status filter, optional supplier narrowing,
+`lateCount` stated; `supplier_prices` NEW — one supplier's price list as
+`GET /inventory/suppliers/{id}/products` serves it (`price_json` widened),
+effective lead time included; `recent_moves` NEW — the ledger's tail as
+`GET /inventory/moves` serves it (`move_json` widened), product/location
+narrowing. Writes with previews: `reorder_proposals` kept (same executor, no
+new argument — still no quantity or price the model can state); NEW
+`receive_delivery` — books everything still outstanding on ONE placed order
+into a named place through the store's own
+`receive_inv_purchase_order` (goods move + order advances + DRAFT bill, one
+transaction); the order resolves by number exactly, else by supplier name
+among receivable orders with an ambiguity refusal listing numbers.
+`alo_ai::agent_inventory` (tool set) deleted; registration is one row per
+shared list; the two legacy arms in jmap `agent.rs` removed. Every
+`/inventory` route is a verb's or excluded with a reason (29 exclusions —
+counts, adjustments, sending, sales orders, configuration all stay
+person-only, each with its sentence).
+
+**Verified.** fmt; clippy clean both crates; nextest green: alo-ai 280/280,
+alo-jmap full suite 1474/1474 with `agent_inventory_intents_http` (3) listed
+by name — "@inventory what is on order?" answered from the order book (draft
+with supplier name, status and server totals in the model's sources, all 7
+verbs offered), `receive_delivery` proposed and NOT run (no receipt, order
+still an unnumbered draft), and tenant B's supplier "Nightingale Timber"
+absent from tenant A's sources (`orderCount:0`).
+
+**Cuts (scope, not depth).** (1) `receive_delivery` books the WHOLE
+outstanding delivery (`lines: None`, the store's own "everything still
+outstanding"); a short/part/damaged delivery is booked line by line in the
+app, stated in the verb's purpose. (2) No PO-lookup-by-number read:
+`open_purchase_orders` answers where each order stands;
+`/inventory/purchase-orders/{id}` is excluded as the order screen's. (3) No
+route-adapter restructuring of the inventory route files: executors reuse the
+routes' own store functions and JSON views; the drift test stays Billing-only.
+
+**Registry ripples (expected, same shape as AA.3):** `all_tools` 106→111,
+declared reads 60→64 (`agent.rs` reads list + `agent_turn.rs` count);
+Inventory's row joins `MOVED`/`MODULES` (both still same length by test);
+guidance marker "For an inventory tool" → "For an Inventory verb";
+`agent_plan` roster test: Inventory now carries "Ask it for:" hints, HR
+(@people) is the still-static example.
+
+No migration used (0410–0429 untouched), no new route prefixes, no UI
+strings. Next: AA.5 HR (People).
+
+**Two mid-item rebases (AC.3, then AB.3, landed during the gates).**
+agents-c pushed the Insights move + the memory-panel item while this item
+built, and agents-b's Sheets move landed between my first gate and my push
+— each the mirror image of this change (they deleted
+`alo_ai::agent_insights` / `alo_ai::agent_sheets`, I deleted
+`alo_ai::agent_inventory`), so every shared-list conflict resolved by
+keeping both deletions and both new rows (`MOVED`, `MODULES`, both
+`lib.rs`, `agents_http_suite.rs`, CHANGELOG). The registry counts are the
+one non-additive merge point, resolved by summing the deltas: final
+`all_tools` 114 (109 + Inventory 5), declared reads 66 (62 + 4) — the
+106→111/60→64 figures above were against the pre-rebase base. Full merged-
+tree gate re-run after each rebase: finally alo-ai green, alo-jmap green
+with the three inventory wire tests listed by name, clippy clean on both.
