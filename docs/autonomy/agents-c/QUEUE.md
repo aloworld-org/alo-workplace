@@ -48,7 +48,7 @@ another product (a store function you need and do not find is added as a
 ## Queue
 
 - [x] AC.1 ★ **Chat**: reads — `catch_up_room`, `find_in_chat` kept, plus my rooms, unread by room, who is in a room; writes — post a message to a room the asker is in, create a room, with previews.
-- [ ] AC.2 ★ **Meet**: reads — `meetings_recent`, `meeting_record` kept, plus upcoming meetings, a meeting lookup with its notes; writes — `meeting_minutes` kept, schedule a meeting (Agenda's intent called as the asker), with previews.
+- [x] AC.2 ★ **Meet**: reads — `meetings_recent`, `meeting_record` kept, plus upcoming meetings, a meeting lookup with its notes; writes — `meeting_minutes` kept, schedule a meeting (Agenda's intent called as the asker), with previews.
 - [ ] AC.3 ★ **Insights**: reads — `insight_catalog`, `insight_answer`, `insight_change` kept, plus the dashboard's tiles as a list; writes — `insight_report` kept, pin a tile, with previews.
 - [ ] AC.4 ★ **Mail** (with Contacts): reads — `correspondence`, `message_read`, `find_contact` kept, plus unread summary, a thread lookup, who I emailed last week; writes — the nine existing kept, with previews (a send is previewed with recipients and subject).
 - [ ] AC.5 ★ **Sites**: the existing seven kept as intents with previews, plus reads — the site's pages, its published state, orders and bookings summary (`site_answer` stays the grounding).

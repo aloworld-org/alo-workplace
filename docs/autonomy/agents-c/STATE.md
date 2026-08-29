@@ -74,3 +74,79 @@ green-looking but not running. Wired all three (this item's chat suite and
 those two) into `agents_http_suite.rs` (`use crate::common`, one `mod` line
 each) and ran them: 117/117 in the suite, alo-ai 276/276, alo-jmap lib
 803/803, clippy clean. Next: AC.2 (Meet).
+
+## AC.2 — Meet moves to intents, and learns the diary ahead (2026-08-29)
+
+**Shipped.** `alo_ai::meet_intents` (`MEET`, six verbs) and its executors in
+`alo-jmap`'s `meet_intents.rs`, registered as one row in `MOVED`, one row in
+`MODULES`, one `pub mod` line in each `lib.rs`; the hand-written
+`agent_meet.rs` tool set in `alo-ai` deleted (the same-named executor file in
+`alo-jmap` is kept — the record of a sitting is its subject matter — and is
+dispatched from the module row; its match arms in `agent.rs` removed). Reads:
+`meetings_recent` and `meeting_record` kept, plus `upcoming_meetings` (the
+asker's own diary ahead, `events_in_range`, default 14 days, max 60) and
+`meeting_lookup` (one diary meeting by title with the invitation's notes,
+place and guests, plus whether a sitting already left a record —
+`meeting_for_event`). The lookup resolves a title through
+`agent_meeting::resolve_meeting` made `pub(crate)` — the Agenda agent's own
+resolution rule, reused rather than restated, so a lookup and a reschedule can
+never disagree about which sitting a name means. Writes, each with a preview:
+`meeting_minutes` kept, and `schedule_meeting` — the queue's "Agenda's intent
+called as the asker" — whose executor is one line: `crate::agent::
+execute_create_event` (made `pub(crate)`), so a diary entry is made in exactly
+one place whichever agent proposed it, held by a structural test. Every
+`/meet` route is a verb's route or an `Excluded` with a reason — 14
+exclusions, most of them one reason worn many ways: nothing touches a call
+while it is running (join, end, moderate, record, vote, workspace). A3.2's
+"no calendar entry" doctrine is retired as the queue orders, the same way
+AC.1 retired "no write at all": the objection (a second mechanism beside
+Agenda's) is answered by sharing the one mechanism, previewed and approved.
+
+**Verified.** `cargo fmt`; clippy `-p alo-ai -p alo-jmap --all-targets`
+clean; nextest **1714/1714** (alo-ai 277, alo-jmap 1437), including the new
+`agent_meet_intents_http` (4 tests) and `meet_intents` coverage on both
+sides. Counts: `all_tools` 93 → 96, declared reads 50 → 52. Wire transcript,
+as the suite pins it (scripted model, real router and store):
+
+- `@meet what meetings do I have coming up?` → `upcoming_meetings {}` → the
+  sources contained `Q3 budget review` and `Design kickoff` from the asker's
+  own diary → answer in the room, `proposal: null` — a read, no button.
+- `@meet when is the design kickoff?` → `meeting_lookup {"meeting":"design
+  kickoff"}` → sources contained the invitation's notes `Bring the Q3
+  figures`, `Room 2`, and `"record":null` (no sitting has run).
+- `@meet schedule a budget review for tomorrow` → `schedule_meeting` proposed
+  and the diary has NO such entry; after `POST /chat/proposals/{id}
+  {"approve":true}` the event exists in the asker's personal calendar at the
+  exact proposed start — made by Agenda's shared `execute_create_event`.
+- **Wrong tenant:** tenant B's diary holds `warroom sync` with notes `the
+  secret plan`; tenant A's `meeting_lookup` earns exactly the words an
+  invented title earns (`no meeting of yours in the diary is called warroom
+  sync`) and `the secret plan` appears nowhere in what A's model was shown.
+
+**Main was broken, and this iteration repaired it before it could build.**
+Four faults, all artifacts of the 08-28/08-29 cross-track rebases, none
+caught because they prevented the very builds that would have caught them:
+(1) `agent_product.rs` still defined `CHAT_SET`/`DRIVE_SET` from
+`CHAT_TOOLS`/`DRIVE_TOOLS` and mapped `static_sets` to them, though
+`agent_chat.rs`/`agent_drive.rs` were deleted when those modules moved —
+alo-ai did not compile at `ce8df4ac`, so neither did alo-jmap; fixed by
+finishing both moves' intent (moved modules carry no static set). (2)
+`chat_intents.rs` called `answer_if_asked` with the pre-memory 4-argument
+shape; the memory item added a fifth. (3) The memory item's
+`/chat/channels/{id}/memory` route had neither verb nor exclusion, failing
+Chat's coverage test the moment the crate could build — excluded with its
+reason. (4) `agent_drive_intents_http.rs` (AB.1) was orphaned outside the
+consolidated binary, the same fault ce8df4ac fixed for three other suites —
+converted to a suite module (`use crate::common`) and wired in. The lesson
+already in this journal stands: a gate that "passed" on a tree that cannot
+compile passed nothing.
+
+**Cuts and notes.** No migration (0450–0469 untouched), no web, no i18n, no
+new route prefixes. `meeting_lookup` validates `day` itself so the refusal
+names this module's argument before translating it to the shared resolver's
+`on`. Mid-push, agents-a landed Finance (AA.2) plus its own fix for the same
+broken main (`4c6fa402`) — kept-both on `MOVED`, `MODULES` and the CHANGELOG,
+merged the counts (`all_tools` 101, declared reads 56, three copies of the
+`/chat/channels/{id}/memory` exclusion deduplicated to the memory item's
+own), and re-ran the gates on the merge: alo-ai 276/276, alo-jmap 1449/1449,
+clippy clean. Next: AC.3 (Insights).
