@@ -9,6 +9,11 @@
   draft the letter. Every button opens your conversation with the agent with
   the words ready to send, and nothing runs until you send and approve.
 
+- **Billing table separators now run cleanly across every row.** Status badges
+  in Quotes, Invoices and Recurring Billing still wrap when needed, but no
+  longer change their table cell into an inline element that shortened and
+  staggered the horizontal lines between records.
+
 - **A quotation past its validity date now reads as a warning, not an
   application error.** The list keeps the clear “Past its date” label but no
   longer paints the whole quotation row red; warning badges now use alo's
