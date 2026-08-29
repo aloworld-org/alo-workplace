@@ -105,3 +105,70 @@ database's future rules (they already depended on its conversions; noted
 here in case a tzdata update ever moves an EU switch).
 
 **Next:** AS.3 (working hours and zone per person).
+
+## AS.3 — working hours and zone per person (2026-08-29)
+
+**Shipped.** A person's working schedule — weekday set, one daily wall-clock
+window, IANA zone — in new table `calendar_working_hours` (migration 0910;
+no row = the default Mon–Fri 09:00–17:00). Store module
+`calendar_working_hours.rs`: `working_hours`/`set_working_hours` on the
+account door (validated: day bits, window order, zone known), and the pure
+`outside_hours_spans(hours, fallback_zone, from, to)` — the schedule's
+complement over a window, computed day by day in the schedule's zone through
+the existing `tz` seam, so DST moves the UTC window and never the local one.
+Routes: `GET/PUT /calendar/working-hours` (new `calendar_hours.rs`; wire
+spelling ISO weekday numbers + `"HH:MM"` + zone-or-null); `POST
+/calendar/freebusy` now serves `outsideHours: [{start,end}]` per known
+person **additively beside** `busy` — busy is byte-identical to before, the
+two kinds never merge. Web: a Working hours dialog off the Agenda sidebar
+(day toggles, time fields, zone select with "My time zone" = null);
+EventModal's availability check reports two findings apart — busy guests and
+outside-hours guests. i18n keys in en/de/fr/nl. CalDAV untouched.
+
+**Design notes.** Alternative rejected: columns on `user_settings` (mail's
+row) — Agenda's schedule gets its own table/module so neither file gains a
+second reason to change. The queue's "default … in the tenant's zone" names
+a fact the schema does not have (there is no tenant zone); the zone fallback
+is the person's profile zone (`users.timezone`, 0152), else UTC — recorded
+here as the deliberate deviation. The agents' route-coverage test requires
+every `/calendar/*` route to be an intent verb or an exclusion; the new
+route got the additive exclusion entry in `alo-ai`'s `agenda_intents.rs`
+(the shared-list, keep-both mechanism).
+
+**Verified.** `cargo nextest run -p alo-store` 2571 passed (13 new: 9 unit —
+default schedule, UTC/zone/DST complements incl. the 2026-10-25 Brussels
+switch, 24:00 end, empty windows, validation — plus 3 DB: roundtrip,
+refused-write leaves default, tenant isolation with a forged
+(tenantB, userA) door reading the default and writing past A's row);
+`-p alo-jmap` 1574 passed (5 new HTTP: default served, wire round-trip,
+4×422 verbatim refusals, 401s, freebusy outsideHours beside untouched busy
+in UTC and Brussels); `-p alo-ai` 297 passed; clippy clean on all three;
+fmt done. Web: `tsc`, eslint, `npm run build` clean; vitest 107 passed
+incl. 2 new dialog tests (schedule loads into controls and edits return in
+wire spelling; backwards window refused in place, no request). Live wire
+pass (debug `alo-jmap` on :8080, db `alo` — confirmed via
+`pg_stat_activity` — tenant `as3-wire`):
+
+```
+GET /calendar/working-hours → 200 {"days":[1,2,3,4,5],"start":"09:00","end":"17:00","zone":null}
+PUT {"days":[1,2,3,4],"start":"08:30","end":"16:00","zone":"Europe/Brussels"} → 200 (echoed)
+PUT {"start":"17:00","end":"09:00"} → 422 "working hours must end after they start, within one day"
+GET without token → 401
+POST /calendar/freebusy (self, 2026-09-01 UTC day) → busy [10:00Z–11:00Z] (the event, untouched);
+  outsideHours [00:00Z–06:30Z, 14:00Z–24:00Z]  (= 08:30–16:00 CEST, UTC+2)
+db: calendar_working_hours row days=15 start=510 end=960 zone=Europe/Brussels
+```
+
+**Cuts/flags.** Cut (recorded): per-day distinct windows and split shifts
+(one window for all working days); admin editing others' schedules; tenant
+default zone (above); shading one's own off-hours in the week grid — the
+"scheduling grid" surface that exists today is EventModal's availability
+check, which now shows both kinds. Flag: the web screenshot pass could not
+run — port 5173 (the only registered redirect URI) is held by the
+agents-web track's dev server from its own checkout, and screenshotting
+that stack would show code without this change; the two touched screens are
+covered by the new component tests instead, and AS.5's wave review walks
+the screens in a real browser. Freebusy now does 2 extra queries per person
+(schedule + profile zone, ≤50 people) — fine for the scheduling UI.
+
+**Next:** AS.4 (rooms and resources).

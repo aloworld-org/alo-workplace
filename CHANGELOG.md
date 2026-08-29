@@ -12,6 +12,14 @@
   showing a bare dash. Click the customer, dates, status or amount — or use
   Enter or Space from the keyboard — to open that exact invoice for review.
 
+- **Agenda knows your working hours — and your colleagues' clocks.** Set
+  your working days, hours and time zone under Working hours in the
+  calendar's sidebar (Mon–Fri 09:00–17:00 in your own zone until you do).
+  When you check guests' availability on an event, Agenda now tells you two
+  things apart: who already has a meeting, and for whom the slot falls
+  outside their working hours — so a 16:00 Brussels call stops landing at a
+  Lisbon colleague's lunch or a Helsinki colleague's evening unnoticed.
+
 - **Calendar apps that ask for a time-zone definition now get one.** Events
   served to a phone or desktop calendar in a named time zone now carry that
   zone's summer/winter-time rules inside the file itself, as the iCalendar

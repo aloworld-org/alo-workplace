@@ -71,7 +71,7 @@ directory immediately before rebasing.
   a `TZID` that is not an IANA name still falls back as today. Corpus tests
   round-trip a Europe/Brussels series across a DST switch and a fixed-offset
   zone; the interop note moves from "follow-up if a client balks" to "done".
-- [ ] AS.3 **Working hours and zone per person** (`features.md` [L] "working
+- [x] AS.3 **Working hours and zone per person** (`features.md` [L] "working
   hours, time-zone sanity for cross-border teams"). A person's working days,
   hours and zone (migration; default Mon–Fri 09:00–17:00 in the tenant's
   zone); `GET/PUT /calendar/working-hours`; free/busy and the scheduling grid
