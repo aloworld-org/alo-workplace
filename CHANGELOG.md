@@ -1,5 +1,11 @@
 # Changelog
 
+- **A quotation past its validity date now reads as a warning, not an
+  application error.** The list keeps the clear “Past its date” label but no
+  longer paints the whole quotation row red; warning badges now use alo's
+  amber warning treatment instead of the danger treatment reserved for
+  failures and destructive states.
+
 - **Invoice drafts are now clearly named and open from anywhere on their
   row.** Recurring runs still create reviewable drafts without spending a
   legal invoice number, but the list now says “Draft invoice” instead of
