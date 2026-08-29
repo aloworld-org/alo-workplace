@@ -4878,3 +4878,60 @@ new routes, no deploy note needed.
 
 **Next:** A4.7 — the evaluation set grows from the intents' `answers`;
 the scripted run records answers verbatim as the wave's exit gate.
+
+## A4.7 — the evaluation set grows from the registry; the scripted run is the exit gate (2026-08-29)
+
+**What shipped.** ADR 0057's standing acceptance test, made structural.
+
+*The set.* New `alo_ai::evaluation`: `evaluation_set()` derives one
+`EvalCase` per intent per `answers` entry from the `MOVED` registry —
+**369 questions over 136 verbs, sixteen agents** — so a verb cannot be
+added without adding the question that proves it, and the set grows with
+zero editing. `STANDING` keeps the seventeen questions of 2026-08-28
+verbatim as the regression baseline. `placeholder_args` fills a spec's
+required arguments by declared kind (text/date/integer/number/boolean/
+array/object; an unknown kind word is refused by a test, not repaired).
+Census pinned at 369 like the registry's own 136.
+
+*The run.* New `agent_evaluation_http` in the agents suite: sixteen
+tests, one per moved product, each driving **every verb of that product
+through a real room** — its own agent, the real router and store, the
+scripted model, one turn per verb asked as the verb's own first
+`answers` question. Per verb it holds what 2026-08-28 found missing:
+the prompt offers the verb; a read answers in the room, never proposes,
+is never turned away at its own boundary (`is not a tool the` /
+`unknown tool` / `waits for you to approve` may not appear), and its
+result reaches the model as a numbered `tool result "<verb>"` source; a
+write proposes — the card carries the verb — and never runs. What each
+verb returned is written verbatim to `target/tmp/agent-evaluation/
+<handle>.md`, one transcript per agent.
+
+**Verified.** `prune-test-db` (7821→4335); fmt; clippy zero warnings on
+alo-ai + alo-jmap; nextest alo-ai **297/297**, alo-jmap **1564/1564**
+with the 16 new tests (136 scripted turns) green. Transcript rows, as
+recorded: `@billing which quotes are open` → `open_quotes` →
+`{"customerFilter":null,"draftCount":0,"drafts":[],"open":[],
+"openCount":0}`; `@tasks what have I got on` → `my_plate` →
+`{"comingUp":[],"dueToday":[],…"overdue":[]…}`; `@crm which deals are
+open, and at what stage` → `open_deals` → *"this lookup did not run:
+you have no sales board yet — open CRM once and one is made for you"*;
+`@billing send the quote` → `send_quote` → *proposed, waiting for
+approval* — every write of every module ends on that same line.
+
+**Cuts and flags, recorded.** (1) The scripted run asks one question
+per verb (the verb's first `answers` entry); the full 369 plus
+`STANDING` are the owner's real-model run, per the queue's rule — no
+API key was copied, no live model called. (2) Seven modules' overview
+reads answer an empty workspace with their lazy-init words ("you have
+no sales board yet") rather than an empty view — design-conformant
+(verbatim helpful errors), so the gate asserts reachability and
+records the words; answer *quality* on seeded data stays with the
+per-module suites and the owner's run. (3) The room feed is
+newest-first: the suite's ask-helper waits for the newest agent message
+after its own post, since the per-module suites' "first agent message"
+shortcut breaks in a reused room. (4) No user-visible behaviour change:
+no CHANGELOG line, no i18n, no new routes, no deploy note.
+
+**Wave A4 is now fully `[x]`/`[~]`** — A4.7 was its last open item.
+**Next:** A8.3 — goals: the goal record with Ask alo's plan, steps,
+progress, one approval surface and Stop; the Northstar demo.

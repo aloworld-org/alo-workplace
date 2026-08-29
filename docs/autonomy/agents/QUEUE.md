@@ -166,7 +166,7 @@ against a real model after each item and quote the answers.
   intents return it; agents cite it.
 - [x] A4.6 The event stream: `events` table, every intent execution emits;
   audit reads from it.
-- [ ] *(unblocked 2026-08-29: all three journals show `LOOP COMPLETE`)* A4.7 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* The evaluation set grows from the intents' `answers`; the scripted
+- [x] *(unblocked 2026-08-29: all three journals show `LOOP COMPLETE`)* A4.7 *(prerequisite: agents-a, agents-b and agents-c journals all show `LOOP COMPLETE`; if not, mark this item `[!]` with that reason and take the next item)* The evaluation set grows from the intents' `answers`; the scripted
   run records answers verbatim and is the wave's exit gate.
 
 ## Wave A5 — delegation
