@@ -42,11 +42,13 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
   git pull --rebase origin main 2>&1 | Out-Null
 
   $state = Get-Content $StateFile -Raw -ErrorAction SilentlyContinue
-  # Anchored to the start of a line ((?m) makes ^ mean that), because the
+  # Case-sensitive (-cmatch): -match is not, and on 2026-08-28 the ds loop
+  # stopped on the prose "LOOP halts on a broken environment" with four items
+  # open. Anchored to the start of a line ((?m) makes ^ mean that), because the
   # journal is prose and quotes its own markers -- an unanchored match found
   # "- **Next:** `LOOP COMPLETE`" mid-file and stopped with 58 items open.
-  if ($state -match "(?m)^#{0,6} *LOOP COMPLETE") { Write-Host "[loop] queue complete - stopping."; break }
-  if ($state -match "(?m)^#{0,6} *LOOP HALT")     { Write-Host "[loop] halted by the agent - fix the reason in STATE.md, remove the marker, restart."; break }
+  if ($state -cmatch "(?m)^#{0,6} *LOOP COMPLETE") { Write-Host "[loop] queue complete - stopping."; break }
+  if ($state -cmatch "(?m)^#{0,6} *LOOP HALT")     { Write-Host "[loop] halted by the agent - fix the reason in STATE.md, remove the marker, restart."; break }
 
   # One iteration, with an IDLE-based hang guard: a truly hung worker goes
   # silent (its session transcript stops growing), while an honest long item

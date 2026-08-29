@@ -2735,7 +2735,7 @@ iterations, and three sites tests timed out at 5000 ms and then passed alone.
 None of that is a code fault and all of it is the same fault.
 
 **Not a `LOOP HALT`, and here is the reasoning rather than just the verdict.**
-LOOP halts on a broken environment so a human can fix it. The environment is
+The loop halts on a broken environment so a human can fix it. The environment is
 not broken for the work that remains: **every item left in this queue —
 D2.09b, D2.10, D2.11, D3.01 — is `web/src` only**, and a web gate needs the
 ~480 MB it now has, which it just demonstrated by passing one. Halting would
