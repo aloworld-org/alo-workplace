@@ -85,6 +85,32 @@ files (served, not decided), the quote design (the studio's), settings and FX
 rates (a person's configuration), bills import and SEPA export (take or
 produce files), schedules (a later intent set).
 
+### Moved modules
+
+`alo_ai::agent_product::MOVED` is authoritative for what is moved at any
+moment (a test holds it to the same length as the executor list). This list
+records what a **wave review** has confirmed — the module's scripted suite
+answering its `answers` questions on the wire, the hand-written tool set
+deleted — one line per module, added by the track that reviewed it:
+
+- **Sales (CRM)** — 2026-08-28 (AA.1): reads `open_deals`, `deal_lookup`,
+  `pipeline_summary`, `company_history`; writes `create_deal`,
+  `move_deal_stage`, `draft_followup`, each with a preview.
+- **Finance** — 2026-08-29 (AA.2): reads `ledger_summary`, `vat_summary`,
+  `flag_anomalies`, `unmatched_bank_lines`, `expenses_awaiting`,
+  `account_balance`; writes `categorise_transactions`, `approve_expense`,
+  behind the same gate as the Finance screens.
+- **Projects** — 2026-08-29 (AA.3): reads `active_projects`,
+  `project_status_summary`, `who_is_on_what`, `time_this_week`; writes
+  `log_time`, `draft_timesheet_from_calendar` — both still land proposals.
+- **Inventory** — 2026-08-29 (AA.4): reads `stock_answer`,
+  `stock_below_minimum`, `open_purchase_orders`, `supplier_prices`,
+  `recent_moves`; writes `reorder_proposals`, `receive_delivery`.
+- **HR (People)** — 2026-08-29 (AA.5): reads `who_is_off`, `who_works_here`,
+  `my_leave_balance`, `open_leave_requests`, `open_checklists`; writes
+  `draft_letter_from_template`, `approve_leave_request` — the personal note
+  on a leave request stays in the app, stripped from what the model reads.
+
 ## 2. Record views and provenance
 
 - A module's **record view** is the JSON its own detail route returns

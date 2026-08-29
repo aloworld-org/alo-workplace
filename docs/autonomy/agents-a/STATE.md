@@ -364,3 +364,34 @@ had made Tasks the still-static example just as AB.4 moved Tasks to intents
 — Agenda is the example now. Full merged-tree gate re-run after the rebase:
 alo-ai 287/287, alo-jmap 1517/1517 with the three HR wire tests in, clippy
 clean on both.
+
+## 2026-08-29 — AA.6 Wave review
+
+**Reviewed, four checks, all pass.** (1) *Suites answer the `answers`
+questions*: each of the five modules carries the module test
+`every_verb_has_a_route_a_purpose_and_a_question_it_answers` (every verb:
+route or named exception, sentence purpose, non-empty `answers`, preview on
+every write), and the five wire suites ask the queue's flagship questions
+against the scripted model — 16 tests total (`agent_crm_intents_http` 4,
+finance/projects/inventory/hr 3 each), each suite covering a read answered
+from the record, a write proposed and not run, and a wrong-tenant denial,
+all listed by name in `agents_http_suite`. (2) *Hand-written tool sets
+gone*: `alo_ai::agent_{crm,finance,projects,inventory,hr}` no longer exist;
+the kept jmap executor files are reached only from the new dispatches. All
+five rows sit in `MOVED` and `MODULES` (14 modules moved across the tracks,
+the two lists held to one length by test). (3) `complete-agents.md` now has
+a **Moved modules** section under §1 listing the five with their verbs —
+one line per module so AB.6/AC.6 append additively. (4) `CHANGELOG.md`
+opens with the wave line: what a user can now ask the five business agents,
+and that every write previews first.
+
+**Verified.** Pruned `alo_scratch_a` (1589 tenants, 37 MB — healthy);
+nextest green on the reviewed tree: alo-ai 287/287, alo-jmap full suite
+1517/1517 (287 s), the 16 wire tests above confirmed present by
+`cargo nextest list`. Docs-only diff — no Rust or web code changed by the
+review itself, no migration (0410–0429 never used by this track), no new
+route prefixes, no UI strings.
+
+Queue complete: AA.1–AA.6 all `[x]`.
+
+LOOP COMPLETE
