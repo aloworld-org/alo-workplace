@@ -276,3 +276,72 @@ match arms each side had deleted its own module's, so the resolution
 deletes all of them; merged the counts (`all_tools` 117, declared reads
 69) and re-ran the gates on the merge: clippy clean, alo-ai 286/286,
 alo-jmap 1496/1496. Next: AC.5 (Sites).
+
+## AC.5 — Sites moves to intents, and learns the business behind the site (2026-08-29)
+
+**Shipped.** `alo_ai::sites_intents` (`SITES`, eleven verbs) and its executors
+in `alo-jmap`'s `sites_intents.rs`, registered as one row in `MOVED`, one row
+in `MODULES`, one `pub mod` line in each `lib.rs`; the hand-written
+`agent_sites.rs` tool set in `alo-ai` deleted, its seven executors kept in
+`alo-jmap`'s `agent_sites` (the resolver and the site renderer made
+`pub(crate)` for the new reads to share). Reads: `site_answer`,
+`site_page_read`, `site_seo_review`, `site_translation_status` kept word for
+word (published-not-draft, positions from the read, no rankings, CANNOT
+translate), plus `site_pages` — the draft's page list as the page-list route
+renders it — `site_status` — live or draft, page count, the newest publishes
+off `site_publish_history` — `site_orders` — the order inbox counted by
+status with the newest orders listed, integer minor units with the readable
+amount beside each, and the customer's phone/note/email deliberately kept off
+the summary — and `site_bookings` — the bookable services with duration,
+windows and whether each is taking bookings. Writes: the three kept, each now
+carrying a preview whose draft ones say "not on the internet until a publish
+is separately approved" and whose publish says the whole draft goes out,
+including others' changes. Coverage: the largest exclusion list of any module
+— 85 `/sites` routes each with a reasoned sentence (builder, theming, money,
+domains, posts, the public assistant, translation flow…) — and the coverage
+test also refuses a stale exclusion whose route no longer exists. A
+structural test holds this module to reads only: needles assembled at runtime
+so the test's own literals cannot self-match in the included source (the
+first run failed exactly that way).
+
+**Verified.** `cargo fmt`; clippy `-p alo-ai -p alo-jmap --all-targets`
+clean; nextest **1801/1801** (alo-ai 289, alo-jmap 1512), including the new
+`agent_sites_intents_http` (3 tests, wired into `agents_http_suite`) and
+`sites_intents` coverage on both sides; the old `agent_sites_http` suite
+(A2.1/A2.1b) passes unchanged — the seven kept verbs' executors and names did
+not move, and the prompt still carries "CANNOT translate anything". Counts:
+`all_tools` 117 → 121, declared reads 69 → 73. Wire transcript, as the suite
+pins it (scripted model, real router and store):
+
+- `@sites what pages does the site have?` → `site_pages {}` → the sources
+  contained `"kind":"sitePages"`, `"total":2`, both titles and
+  `"home":true` — the page-list route's own record — answer in the room,
+  `proposal: null`; the prompt offered all eleven verbs from the registry.
+- `@sites draft a services page` → `site_page_draft` proposed and the draft
+  still has its two pages; after `POST /chat/proposals/{id}
+  {"approve":true}` the page is third in the draft's own list and the site
+  is still not Live — an approved draft publishes nothing.
+- **Wrong tenant:** tenant B's site carries a page titled `The secret
+  merger`; tenant A's `site_pages` on B's site name earns `there is no
+  website in this workspace yet` — indistinguishable from a siteless
+  workspace — and B's title appears nowhere in what A's model was shown.
+
+**Cuts and notes.** No migration (0450–0469 untouched), no web, no i18n, no
+new route prefixes, no server.rs edits at all (the module registers through
+the two lists alone). The orders/bookings summaries reuse the routes' own
+store reads; no new store function was needed. `site_answer` and
+`site_seo_review` are the module's two deliberately routeless verbs (the
+published corpus is the public site's grounding; the review is computed over
+the page list), named in the ROUTELESS list so a new verb cannot join them
+silently. One wording note: the guidance keeps the old set's opening phrase
+"For a website tool" because `agent.rs`'s prompt-order test pins it. Next:
+AC.6 (wave review — carry the AC.4 flag about room-proposed mail writes and
+`{"source": n}`). Mid-push, agents-b landed Tasks (AB.4, `67b7c0f4`)
+and agents-a landed the People agent (AA.5, `11e50a3b`) — both also module
+moves, so the rebase was three moves meeting on the shared lists: kept-both
+on `MOVED`, `MODULES`, the intent imports, the `pub mod` lines and the
+CHANGELOG; on the static sets, the tool-set imports and the old `use … as
+hr/sites` lines each side had deleted its own module's, so the resolution
+deletes all of them; merged the counts (`all_tools` 126 + 4 = 130, declared
+reads 75 + 4 = 79) and re-ran the gates on the merge: clippy clean, nextest
+**1816/1816** (alo-ai 292, alo-jmap 1524).
