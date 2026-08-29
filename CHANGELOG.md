@@ -3,8 +3,9 @@
 - **Quotation list styles now open as a polished, fully contained gallery.**
   The chooser stays inside narrow screens, uses clear visual previews instead
   of clipped browser tooltips or repetitive labels, and marks the selected
-  style with an Alo-accented check. On narrow layouts it opens as a contained
-  viewport sheet; wider layouts keep the compact anchored gallery.
+  style with a comfortably inset Alo-accented check. Its dedicated overlay
+  layer keeps the workspace, logo and document height stable at every scroll
+  position while desktop and narrow layouts use the same visual chooser.
 
 - **Business records now show their agent, on the record.** Open a deal, an
   expense claim (or its row in the approvals queue), a bank statement, a
