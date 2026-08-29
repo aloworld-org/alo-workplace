@@ -99,6 +99,8 @@
 
 - The Insights agent now works on your boards, not only your figures: ask @insights what is on the dashboard and it lists each board's charts with the question each one asks, and it can pin one more chart to a board for you — shown as a preview first, checked and answered before anything is saved, and pinned only after you approve. Asking what the numbers say, what moved between two periods, and building a whole new report work as before.
 
+- PDF text extraction and HTTP/2 dependencies now use security-fixed releases, removing the known denial-of-service vulnerabilities reported by the dependency audit without weakening its policy.
+
 - What an agent remembers now leaves when its reason does: withdraw a message and the facts learned from it are forgotten in the same act, archive a room and its agents' memories of it go, remove an agent from a room and what it learned there goes too — and a memory switch left off doesn't just hide any more: after thirty days off, what it was hiding is deleted for good, each fact given its own thirty days.
 
 - The Meet agent now works on the meetings ahead, not only the ones that ended: ask @meet what is coming up and it answers from your own diary, look one meeting up by name and it reads out the invitation's notes, place and guests — and it can schedule a new meeting for you, shown as a preview and put in your diary, through the calendar's own write, only after you approve. Reading a sitting's record and writing its minutes work as before.
