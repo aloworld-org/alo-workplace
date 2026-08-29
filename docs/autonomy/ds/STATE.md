@@ -2759,3 +2759,93 @@ trust the list — an area that stops *declaring* a primitive has satisfied the
 ratchet, which is not the same as having adopted the components. This is the
 third time this queue has been taught to read the files rather than the list
 (billing, home, and now projects).
+
+## D2.09b — inventory adopts the design system (2026-08-29)
+
+**Shipped.** Ten `.tsx` over the 626-line stylesheet, now 384 lines of layout
+and text roles only; `inventory/InventoryModule.module.css` is off
+`ds/redefined.ts` and the ratchet's list is **3**: `platform` (StackBadge),
+`sites` (another track's), and `tasks` is already gone — somebody outside this
+loop migrated it between D2.09 and this item, the projects story again. The
+whole change is a net deletion: 1,140 insertions against 1,358 deletions.
+
+What was adopted, and what each adoption fixed on the way:
+
+- **The two hand-rolled dialogs are `ds/Modal`** — the movement history
+  (`.modalWide`), the scanner (`.scanModal`), and the fulfilment sheet all
+  drew their own scrim with no focus trap: Tab walked out onto the list
+  behind, and Escape worked only once the caret was already inside. The
+  queue item called this the reason the item is a migration rather than a
+  restyle, and it was. The scanner keeps its wedge-scanner focus: its own
+  effect runs after `Modal`'s (child effects first), so the code field still
+  owns the caret the moment the dialog opens.
+- **Six tables are `ds/Table`** — catalog, stock, both order lists, the order
+  book (tfoot and all), the line grid, the fulfilment sheet's lines. Each was
+  `overflow: auto` on a plain div: scrollable by mouse, unreachable by
+  keyboard, and nameless to a screen reader. The actions columns' `srOnly`
+  spans are `Th hideLabel` now, and the numeric columns' right-alignment
+  reaches their headers, which the old `.table th { text-align: left }` never
+  let it do.
+- **`StatusChip` draws with `ds/Badge`**, exactly as hr's `StateBadge` did:
+  the five-tone vocabulary (`neutral/info/good/warn/muted`) stays the
+  module's — `format.ts` maps eleven order states onto it — and only the
+  drawing is the design system's. `muted` folds into `neutral`, whose ink is
+  already tertiary. The module's `.chip_good` border-green and `.chip_warn`
+  danger-tint are the same success/danger tokens as Billing's badges now.
+- **The module's own `Field` is gone**; the editors, the fulfilment sheet and
+  the scanner use `ds/Field` + `ds/Input` + `ds/Select`. The local one put
+  the label beside the control without binding it; the hint and error were
+  never announced. The line grid's per-cell inputs use `Input`'s `invalid`
+  prop where they set `aria-invalid` by hand before.
+- **Toolbars are `ds/Toolbar`** (named groups over bare divs), checkboxes are
+  `ds/Checkbox`, the searches are `ds/Input`, the filters `ds/Select`.
+
+Prerequisites honoured as written in the item: **(a)** `.textarea` stays
+local, now carrying its own box instead of composing with the deleted
+`.input` (hr's precedent, byte for byte the same move); **(d)** `.search` was
+indeed a plain input with no icon — adopted, not exempted. The stylesheet's
+two phone rules moved into the class strings: the search's full-width row is
+`max-[48rem]:basis-full`, and "every toolbar button stretches on a phone" is
+`max-[48rem]:[&>button]:flex-auto` on the editors' toolbars — read back out
+of the built CSS as `@media not all and (min-width:48rem){…>button{flex:auto}}`,
+which is the old media block exactly.
+
+One deliberate divergence, recorded rather than hidden: row hover is now only
+on the tables whose rows respond to a click (catalog, stock, the two order
+lists, the book) — the history, the line grid and the fulfilment sheet lose
+it, because `ds/Table` makes hover an opt-in promise and those rows answer
+nothing. The old stylesheet hovered all seven.
+
+**Gate:** `npx tsc --noEmit` clean; eslint clean on the fourteen changed
+files; `npx vitest run src` **241 files / 1337 tests green** (ratchet
+included, 339 s under the post-incident disk); `node
+scripts/gen-tailwind-theme.mjs --check` current (75 utilities); `npm run
+build` clean in 87 s.
+
+**Cut for the fourteenth time: no screenshot** — still no browser package in
+`web/`. The D1.53 substitute ran in its strong form against the shipped
+bundle. Inventory's module hash is `m59ki`:
+
+- **Absent from the whole shipped CSS**, which is what proves the
+  `redefined.ts` line was earned: `_toolbar_m59ki`, `_search_m59ki`,
+  `_select_m59ki`, `_table_m59ki`, `_tableWrap_m59ki`, `_chip_m59ki`,
+  `_chips_m59ki`, `_field_m59ki`, `_input_m59ki`, `_toggle_m59ki`,
+  `_scrim_m59ki`, `_modalWide_m59ki`, `_scanModal_m59ki`, `_srOnly_m59ki` —
+  every one probed individually, none found.
+- **Present**, proving nothing was deleted that a screen still needs: thirty
+  kept classes probed individually — `_page_`, `_filterField_`, `_numeric_`,
+  `_code_`, `_rowName_`, `_textarea_`, `_headerGrid_`, `_lines_`,
+  `_fulfilEntry_`, `_scanForm_`, `_scanResult_`, `_tabs_`, `_inventory_` and
+  the rest — all found under `m59ki`.
+- **Each utility the migration turns on, read out of the bundle**:
+  `basis-[260px]`, `basis-[220px]`, `w-[8ch]`, `max-[48rem]:basis-full`,
+  `max-[48rem]:flex-auto`, `max-[48rem]:[&>button]:flex-auto`.
+
+**Disk:** C: recovered from last iteration's zero to **22 GB free** — a human
+cleared it, as that entry said one would have to. No sweep was needed here.
+
+**Next:** D2.10 — **platform**, narrowed to `StackBadge.module.css`, with the
+standing instruction to read `web/src/projects/**` (and now `tasks` too)
+rather than trust the list: two areas have left the ratchet by hands outside
+this loop, and satisfying the ratchet is not the same as adopting the
+components.

@@ -1,5 +1,19 @@
 # Changelog
 
+- **The warehouse screens can now be worked from a keyboard, and they say what
+  they are.** The two sheets Inventory opens over a screen — the movement
+  history behind every stock row, and the scanner — now keep the caret inside
+  them: Tab no longer walks out onto the list behind, Escape closes them
+  wherever the caret is, and closing hands focus back to what you were doing;
+  neither did any of that before. The same is true of booking an arrival or a
+  consignment against an order. Every table in the module — the catalog, the
+  stock list, the two order lists, the order book, the line grid — is now
+  named for a screen reader and scrollable from the keyboard, every label on
+  an order's header is bound to its own box, and the status words on orders
+  are the same colours as everywhere else in the product. The search fields,
+  filters and switches above the lists are the workspace's shared controls
+  now, so Inventory reads as the same product as Billing and Finance.
+
 - The one Undo button, and work you can hand over. Any action whose domain has an inverse — an agent's approved proposal or your own tap alike — can now be taken back with one press: the draft invoice is discarded leaving no gap in the numbering, the mistaken payment is removed with its reversal kept in the books, and the undo itself goes on the record like everything else, with a clean refusal if the record is already gone. An open proposal in a room can be handed to an agent — "@billing, you finish this" — decided by you as ever, carried out and signed by the agent you named, and refused before anything is decided if the verb is not that agent's to run. And assigning a task to an agent now works like assigning it to a colleague: it becomes a one-time standing instruction in your own conversation with that agent, runs when the task is due (immediately, if it has no date), and the agent reports back to you there — anything it would change still waits for your approval.
 
 - Every action now leaves one full record, whoever took it: when an agent's proposal is approved or you run a verb yourself from the palette, the row that is kept carries the preview you decided on, the record it touched, which proposal card it settled, and — where the domain has an inverse — the exact undo that would take it back. An agent's directory entry shows the same: each recent run with what it touched, the sentence it previewed, and whether it can be undone. Your click and an agent's proposal are the same object now, which is what will let a later release put one Undo button on both.
