@@ -159,3 +159,60 @@ finance and drive wire tests listed by name), clippy clean on both.
 
 No migration used (0410–0429 untouched), no new route prefixes, no UI
 strings. Next: AA.3 Projects.
+
+## 2026-08-29 — AA.3 Projects moved to intents
+
+**Shipped.** `alo_ai::projects_intents` (six verbs) and `alo-jmap`'s
+`projects_intents.rs` executors + dispatch. Reads: `active_projects` the
+portfolio exactly as `GET /projects` serves it (`project_json` widened to
+`pub(crate)`), unfinished by default with an exact-status filter;
+`project_status_summary` kept; `who_is_on_what` NEW — open tasks grouped per
+colleague across the asker's visible boards (counts + boards, labels via
+`emails_of`, unassigned last, no titles, no hours); `time_this_week` the
+asker's own `GET /projects/time` week (default Monday–Sunday of today's week,
+a stated `from` runs to its own week's Sunday), totals via `week_totals` with
+suggestions counted apart. Writes kept with previews: `log_time`,
+`draft_timesheet_from_calendar` — both still land `proposed` entries; their
+kept executors (`agent_projects.rs`, `agent_timesheet.rs`) now answer through
+`billing_intents::ok` so money displays sit beside integers, reached only from
+the new dispatch. `alo_ai::agent_projects` (tool set) deleted; registration is
+one row per shared list; the three legacy arms in jmap `agent.rs` removed.
+Every `/projects` route is a verb's or excluded with a reason (coverage prefix
+`/projects`, so the bare list route is covered too); `who_is_on_what` is the
+one named routeless verb.
+
+**Verified.** fmt; clippy `-D warnings`-clean both crates; nextest green:
+alo-ai 278/278, alo-jmap full suite 1461/1461 with
+`agent_projects_intents_http` (3) listed by name. The `@projects which
+projects are active?` transcript: model call 1 returns
+`{"tool":"active_projects","args":{}}`; the sources on call 2 carry the
+running board with `"status":"active"` and its `openTasks`, and the
+`completed` board is absent; the agent answers with no proposal, and the
+prompt offered all 6 verbs. `log_time` comes back as a proposal with
+`/projects/time/proposals` still empty (nothing ran without a tap).
+
+**Isolation.** `another_tenants_boards_are_unreachable`: tenant B's board
+"Project Nightingale" never appears in what tenant A's agent is shown.
+
+**Cuts (scope, not depth).** (1) `who_is_on_what` is counts per person per
+board, not task listings — allocation, not somebody's worklist; overdue_by_owner
+(Tasks) already lists late tasks. (2) No route-adapter restructuring of the
+projects route files: executors reuse the routes' own store functions and JSON
+views; the drift test stays Billing-only. (3) The unbilled/profitability/plan
+screens stay excluded ("a later intent set" where applicable).
+
+**Two mid-item rebases (AC.2, then AB.2, landed during the gates).** agents-c
+pushed the Meet move + the 0408 memory-deletion migration while this item
+built; the shared scratch DB was already at 408, which surfaced as
+`Migrate(VersionMissing(408))` in `readiness` — the fix was the rebase itself.
+Then the Docs move (AB.2) landed between my gate and my push. Keep-both on
+`MOVED`, `MODULES`, both `lib.rs`; the registry counts are the one
+non-additive merge point, resolved by summing the deltas: final `all_tools`
+106 (98 + Meet 3 + Docs 2 + Projects 3), declared reads 60 (54 + 2 + 1 + 3).
+`agent_plan` roster test updated: Projects now carries "Ask it for:" hints,
+Inventory is the still-static example. Full gate re-run after each rebase.
+
+No migration used (0410–0429 untouched), no new route prefixes, no UI strings.
+Registry ripples as expected: prompt ordering test now pins `create_deal <
+active_projects < log_time`; guidance marker "For a projects tool" → "For a
+Projects verb". Next: AA.4 Inventory.
