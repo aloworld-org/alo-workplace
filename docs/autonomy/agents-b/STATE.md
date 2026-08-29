@@ -236,3 +236,97 @@ Full clippy + nextest re-run on the rebased tree before the push: alo-ai
 the pre-rebase tree.
 
 Next: AB.5 (Agenda).
+
+## AB.5 — Agenda moves to intents (2026-08-29)
+
+**Shipped.** Agenda is the sixth module of this track on the intent layer:
+
+- `platform/alo-ai/src/agenda_intents.rs` — the `AGENDA` `IntentModule`: six
+  reads (`event_lookup` — one meeting in full, replies included — and
+  `colleague_free` — one shared diary's span — new; `whats_on`, `am_i_free`,
+  `find_a_time`, `meeting_prep` kept) and four writes with previews
+  (`cancel_event` and `respond_to_invitation` new; `create_event`,
+  `reschedule_event` kept). The old set's rules survive as purpose sentences
+  and tests: a day is a date never a phrase, an unreadable diary is never
+  free, a meeting is named and a day disambiguates it, a move keeps the
+  length — and the two new writes carry their own: cancelling is the user's
+  word ("only when the user SAID to cancel", guests told, no undo), an
+  invitation is answered with the answer the user gave, never chosen. The
+  hand-written `agent_agenda.rs` tool set is deleted; registration is one row
+  in `MOVED` and one in `alo-jmap`'s `MODULES`, per A4.1c. Every `/calendar`
+  route is a verb's or excluded with its reason (7 exclusions: the two
+  mail-side iMIP taps, diary management, sharing grants, the share dialog's
+  group list, and the tenant-wide freebusy row — which is NOT the agent's way
+  around the shared-diaries-only reach; `colleague_free` was deliberately
+  built on `find_a_time`'s shared-diary resolution instead, because the queue
+  says "where shared").
+- `products/mail/alo-jmap/src/agenda_intents.rs` — executors for the four new
+  verbs over cores extracted A4.1b-style, handlers unchanged in behaviour:
+  `calendar::event_json` (the route's record view) now `pub(crate)` for the
+  lookup; `calendar::cancel_core` (the DELETE handler's body — occurrence
+  `EXDATE` + one-instance `CANCEL` mails, or whole-series delete +
+  cancellations) shared by route and executor; `calendar::rsvp_core` (the
+  RSVP handler's body — REQUEST parse, personal-calendar upsert unless
+  declined, `METHOD:REPLY` to the organizer) likewise, the handler now
+  loading the blob and calling it. `respond_to_invitation` finds the
+  invitation in the asker's own mail by title (the same account-scoped
+  `workspace_search` sweep `meeting_prep` reads, REQUEST parts only, deduped
+  by UID; several distinct matches are a question listing them).
+  `colleague_free` resolves the colleague through
+  `agent_agenda::shared_diaries` (find_a_time's diary-gathering extracted as
+  a helper, behaviour unchanged) and the shared `resolve_person`, so an
+  unshared diary and a stranger get the identical sentence. `cancel_event`
+  checks `can_edit_calendar` first and refuses a read-only diary by name.
+  Dispatch reaches the six kept executors where they live (`agent_reads`,
+  `agent_agenda`, `agent_meeting`, and `agent.rs`'s `execute_create_event`,
+  which stays put because Meet's `schedule_meeting` runs that same shared
+  write); the dead Agenda match arms in `agent.rs` are removed. No migration
+  (0430–0449 untouched), no new store function, no new route.
+
+**Verified.** `cargo fmt`; clippy clean on alo-ai + alo-jmap, all targets;
+nextest: alo-ai 289 + alo-jmap 1516 in one run, 1805/1805 green (counts
+bumped: registry reads 71→73, all tools 121→125). Wire suite
+`tests/agent_agenda_intents_http.rs`, 4/4, adopted into `agents_http_suite`:
+
+- *Read from the record*: "@agenda when is the Board review?" →
+  `event_lookup` → "The Board review is in Room 2, and Paula has accepted
+  [1]." lands in the room; sources contain `eventLookup` with the route's own
+  record (location, ACCEPTED reply); the prompt offers all ten verbs and no
+  other product's.
+- *Wrong tenant*: a second tenant's "Their secret ceremony" and colleague
+  Ben's unshared "Bens private appraisal" are seeded and asserted ABSENT
+  from the model's sources.
+- *Write proposed, not run*: "@agenda cancel the vendor demo" →
+  `proposal.tool == "cancel_event"`, and the meeting is still in the diary
+  until a tap. Verb tests over the approval route: the lookup is exact,
+  treats two sittings as a question and a day settles it; `colleague_free`
+  names Ben's clash, says free when free, and refuses Marta's unshared diary
+  with the same sentence a non-existent person gets; a one-off cancel removes
+  the event (scope "series", guests named), a series cancel skips one sitting
+  and next week's survives, a viewer-only shared diary is refused ("read but
+  not change"); accepting an invitation lands the organizer's UID in the
+  diary, declining does not, and a made-up answer or an invitation nobody
+  received is a 422 by name.
+
+**Rebase at the push.** While AB.5 gated, another loop landed HR's and
+Sites' moves plus a wave review — so the first push was rejected and the
+rebase conflicted exactly where A4.1c predicts: the static-set imports and
+constants (both sides deleting different rows — kept neither, and with the
+last static set gone the now-unused `set()` helper and the dead per-tool
+match in `alo-jmap`'s `dispatch` went too), and three counts, resolved by
+adding both sides' deltas (workspace tools 121+9+4 = 134, registry reads
+71+8+2 = 81). One upstream test flipped meaning: `agent_plan`'s roster test
+used Agenda as its example of "a product still on hand-written tools" — no
+such product exists any more, so it now asserts Agenda's line carries its
+hints. Full clippy + nextest re-run on the rebased tree before the push:
+1825/1825 green — the suite counts in the entry above describe the
+pre-rebase tree.
+
+**Flags.** `alo_scratch_b` (this checkout's DATABASE_URL database) did not
+exist on this machine; created empty, suites migrate it themselves — same as
+AB.1's flag, new name. One test-only correction during the gate:
+`create_event` deliberately stores an empty reply map, so the suite records
+Paula's ACCEPTED through `set_attendee_status` (the inbound-REPLY path)
+rather than seeding it on the event row.
+
+Next: AB.6 (wave review).
