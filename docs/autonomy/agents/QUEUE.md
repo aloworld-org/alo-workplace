@@ -215,7 +215,7 @@ against a real model after each item and quote the answers.
 
 ## Wave A9 — exit
 
-- [ ] A9.1 *(prerequisite: every other item here and in agents-a/b/c is `[x]` or `[~]`; otherwise `[!]` with the reason)* The full evaluation on the wire, every agent, against a real model,
+- [!] A9.1 *(prerequisite: every other item here and in agents-a/b/c is `[x]` or `[~]`; otherwise `[!]` with the reason)* *(blocked 2026-08-29: A8.4 is `[!]` — the prerequisite fails on it, and it stays failed until the module web dirs are free and the writ is widened)* The full evaluation on the wire, every agent, against a real model,
   quoted in STATE.md; the six that said "I could not find it" answer from
   the record; a standing instruction fires and posts; a delegation is visible
   in a room; a channel's memory is read back and forgotten.

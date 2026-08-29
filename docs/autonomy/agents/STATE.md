@@ -5042,3 +5042,32 @@ promised), the item is a rendering exercise.
 agents-a/b/c is `[x]` or `[~]`") now fails on A8.4 `[!]`; per its own clause
 it will be marked `[!]` with that reason, leaving only blocked items, and the
 loop's stuck rule takes over from there.
+
+## A9.1 blocked, A8.4 re-attempted once — the queue closes with blockers (2026-08-29)
+
+**A9.1, taken as the first non-done non-blocked item.** Its prerequisite —
+"every other item here and in agents-a/b/c is `[x]` or `[~]`" — fails on
+A8.4 `[!]`. Per its own clause it is marked `[!]` in QUEUE.md with that
+reason. Nothing about the evaluation itself was attempted: running the exit
+gate with a `[web]` item outstanding would certify a wave that is not done.
+
+**Only blocked items then remain, so the stuck rule ran: the oldest `[!]`
+(A8.4) was re-attempted once with fresh eyes.** The finding is unchanged,
+verified against origin/main this hour rather than remembered: the ds loop
+is live in exactly the directories the item must open — its journal pushed
+at 09:07 today, its last commits (046d0be7 tasks, c32e1757 projects,
+1993df3d-era inventory) edited those modules' web files, and its journal's
+"Next" is D2.11b, the TaskDetail panel in `web/src/tasks`. The writ
+(`web/src/chat/**` + new `web/src/agents/**` only) is set in LOOP.md's
+track table and this queue's wave rules, and an unattended loop does not
+widen its own boundary while another loop is mid-wave inside it. Second
+failure → the stuck rule's exit.
+
+**`LOOP COMPLETE (with blockers)` appended below.** Two blockers for the
+human: (1) A8.4 — everything below the web is shipped (origin on records
+A4.5, the action record A8.1); it needs the module web dirs free and the
+follow-up `[web]` queue the A3 note promised. (2) A9.1 — falls out of A8.4;
+when A8.4 lands, the full-wire evaluation is the wave's exit gate and
+should run last.
+
+LOOP COMPLETE (with blockers)
