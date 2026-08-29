@@ -92,3 +92,10 @@ then, two of them would spend their iterations resolving conflicts in
 Migration numbers per track are in the table; check the directory immediately
 before rebasing, because another loop may have taken a number since the
 iteration began.
+
+**2026-08-29 — a/b/c are complete.** The Mac's next tracks are **agents-web**
+(A8.4 with the widened writ; web only, needs `cd web && npm ci` and
+`npx playwright install chromium` once) and **agenda-sync** (Rust-first,
+CalDAV; needs the postgres container and `pip3 install caldav` for the
+real-client pass). One clone each, both may run at once — they share only
+`web/src/agenda/**`, and the queues say which files each keeps to.

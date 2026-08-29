@@ -211,7 +211,7 @@ against a real model after each item and quote the answers.
 - [x] A8.3 Goals: a goal record with Ask alo's plan, steps, progress, one
   approval surface and Stop; the Northstar demo across Sales, Billing, Mail
   and Agenda.
-- [!] A8.4 `[web]` The agent on the record in focus in every moved module. *(blocked 2026-08-29: the record-in-focus surfaces are the module detail views in `web/src/billing|crm|inventory|tasks|projects|…` — all outside this track's web writ of `web/src/chat/**` + new `web/src/agents/**`, and the ds loop is live in those very dirs today (its last three commits edited tasks/projects/inventory web files). A component parked in `web/src/agents/**` with no module rendering it would be a stub. Unblocks when the module web dirs are free and the writ is widened — the backend half (origin on records, intents returning it) shipped in A4.5.)*
+- [~] A8.4 *(moved to track agents-web, 2026-08-29 — runs on the Mac with the widened web writ; the block below is history)* `[web]` The agent on the record in focus in every moved module. *(blocked 2026-08-29: the record-in-focus surfaces are the module detail views in `web/src/billing|crm|inventory|tasks|projects|…` — all outside this track's web writ of `web/src/chat/**` + new `web/src/agents/**`, and the ds loop is live in those very dirs today (its last three commits edited tasks/projects/inventory web files). A component parked in `web/src/agents/**` with no module rendering it would be a stub. Unblocks when the module web dirs are free and the writ is widened — the backend half (origin on records, intents returning it) shipped in A4.5.)*
 
 ## Wave A9 — exit
 
