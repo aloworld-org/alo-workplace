@@ -166,3 +166,63 @@ nextest: alo-ai 277, alo-jmap 1464 — all green (counts bumped: registry reads
   `sheet_read`.
 
 Next: AB.4 (Tasks).
+
+## AB.4 — Tasks moves to intents (2026-08-29)
+
+**Shipped.** Tasks is the fifth module of this track on the intent layer:
+
+- `platform/alo-ai/src/tasks_intents.rs` — the `TASKS` `IntentModule`: five
+  reads (`board_tasks` — one board's open work in board order — and
+  `task_lookup` — one task in full, finished work included — new; `my_plate`,
+  `overdue_by_owner`, `thread_actions` kept) and six writes with previews
+  (`complete_task` and `reassign_task` new; `create_task`,
+  `set_task_priority`, `chase_task`, `capture_actions` kept). The old set's
+  rules survive as purpose sentences and tests: the plate includes the
+  undated, the reach is the boards the asker can open, a chase is the asker's
+  own comment, a capture is proposed twice (ADR 0023), a task is named never
+  identified — and the two new writes carry their own: completing is the
+  user's word ("propose it only when the user SAID the work is finished"),
+  a handover changes the owner and nothing else. The hand-written
+  `agent_tasks.rs` tool set is deleted; registration is one row in `MOVED`
+  and one in `alo-jmap`'s `MODULES`, per A4.1c. Every `/tasks` route is a
+  verb's or excluded with its reason (18 exclusions: board management,
+  labels, subtasks, followers, attachments, dependencies, and the
+  accept/reject taps ADR 0023 reserves for the person).
+- `products/mail/alo-jmap/src/tasks_intents.rs` — executors for the four new
+  verbs over the same store paths the board runs (`tasks_in_project`,
+  `move_task` — which sets `completed_at` — and `update_task` carrying every
+  other field across unchanged); the reads answer with the routes' own record
+  views (`tasks::task_json`; `task_lookup` returns the full `GET /tasks/{id}`
+  record through a `task_record` core extracted A4.1b-style, the handler
+  unchanged in behaviour). A colleague for a handover resolves by exact email
+  or by first name **among the people already on the visible boards** — never
+  a directory, so a name that matches nobody says nothing about who exists.
+  Dispatch reaches the six kept executors in `agent_tasks.rs`;
+  `execute_create_task` moved home there from `agent.rs` (same behaviour,
+  `parse_due` now `pub(crate)`). No migration (0430–0449 untouched), no new
+  store function, no new route.
+
+**Verified.** `cargo fmt`; clippy clean on alo-ai + alo-jmap, all targets;
+nextest: alo-ai 282, alo-jmap 1488, alo-store 2533 — all green (counts
+bumped: registry reads 62→64, all tools 109→113). Wire suite
+`tests/agent_tasks_intents_http.rs`, 3/3, adopted into `agents_http_suite`:
+
+- *Read from the record*: "@tasks what is open on the Launch board?" →
+  `board_tasks` → "Two tasks are open: the venue and the invitations [1]."
+  lands in the room; sources contain `boardTasks` with both open tasks and
+  not the finished one; the prompt offers all eleven verbs and no other
+  product's.
+- *Wrong tenant*: a second tenant's "Their secret rollout" and colleague
+  Ben's private "Bens private errand" are seeded and asserted ABSENT from
+  the model's sources; asking for the stranger's board by name gets the same
+  "no board of yours" as a board that does not exist.
+- *Write proposed, not run*: "@tasks the venue is booked — mark it done" →
+  `proposal.tool == "complete_task"`, and the stored task is still not done
+  until a tap. Verb tests over the approval route: the board read is exact
+  and refuses an unknown board; the lookup opens finished work and treats
+  two matches as a question; completing sets `completed_at` through the
+  board's own move and refuses a task already done; a handover by email and
+  then by first name lands on Ben with priority untouched, and "Zelda" is
+  refused with "no colleague on your boards".
+
+Next: AB.5 (Agenda).
