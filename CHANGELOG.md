@@ -1,5 +1,11 @@
 # Changelog
 
+- **Quotation list styles now open as a polished, fully contained gallery.**
+  The chooser stays inside narrow screens, uses clear visual previews instead
+  of clipped browser tooltips or repetitive labels, and marks the selected
+  style with an Alo-accented check. On narrow layouts it opens as a contained
+  viewport sheet; wider layouts keep the compact anchored gallery.
+
 - **Business records now show their agent, on the record.** Open a deal, an
   expense claim (or its row in the approvals queue), a bank statement, a
   project or its timesheet week, a purchase or sales order, a candidate, a
