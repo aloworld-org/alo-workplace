@@ -120,3 +120,49 @@ runs 134/134 with both intents suites inside. Counts bumped with the two new
 verbs: reads 50→51, all tools 93→95.
 
 Next: AB.3 (Sheets).
+
+## AB.3 — Sheets moves to intents (2026-08-29)
+
+**Shipped.** Sheets is the fourth module of this track on the intent layer:
+
+- `platform/alo-ai/src/sheets_intents.rs` — the `SHEETS` `IntentModule`: four
+  reads (`list_spreadsheets` new — recent, and by folder; `sheet_read`,
+  `sheet_answer`, `sheet_formula_explain` kept) and two writes with previews
+  (`sheet_write_formula`, `sheet_clean_column` kept). The hand-written
+  `agent_sheets.rs` tool set is deleted; registration is one row in `MOVED`
+  and one in `alo-jmap`'s `MODULES`, per A4.1c. The old set's five rules
+  survive as purpose sentences and tests: every figure cited to its cell, no
+  arithmetic in the model's head, a formula written and a fact never, tidying
+  about typing not meaning, both writes wait for a tap.
+- **No route is adapted, because there is none**: alo Sheets has no route
+  surface of its own — a workbook is a Drive node of kind `sheet` and the
+  editor saves through Drive's routes. The exclusion list is empty and the
+  coverage test holds the router to registering no `/sheets` route at all, so
+  the empty list stays honest.
+- `products/mail/alo-jmap/src/sheets_intents.rs` — the executor for the one
+  new verb over the store path the resolver already used (`drive_sheets`,
+  `drive_list` + kind filter); dispatch reaching the five kept executors in
+  `agent_sheets.rs` (which stays, its doc now pointing at the intent module).
+  No migration (0430–0449 untouched), no new store function.
+
+**Verified.** `cargo fmt`; clippy clean on alo-ai + alo-jmap, all targets;
+nextest: alo-ai 277, alo-jmap 1464 — all green (counts bumped: registry reads
+57→58, all tools 103→104). Wire suite `tests/agent_sheets_intents_http.rs`,
+3/3, adopted into `agents_http_suite`:
+
+- *Read from the record*: "@sheets which spreadsheets do we have?" →
+  `list_spreadsheets` → "Two spreadsheets: the Q1 figures and the price list
+  [1]." lands in the room; sources contain `sheetsList` with both names; the
+  prompt offers all six verbs and no other product's.
+- *Wrong tenant*: a second tenant's "Their secret figures" and colleague
+  Ben's private "Bens private numbers" are seeded and asserted ABSENT from
+  the model's sources.
+- *Write proposed, not run*: "@sheets add up the amounts column" →
+  `proposal.tool == "sheet_write_formula"`, and the stored workbook blob
+  still holds no formula until a tap. Verb tests over the approval route:
+  the listing holds workbooks only (a `doc` node is asserted absent), a
+  folder narrows it by name, a folder nobody has is refused with the folders
+  that exist, and a listed workbook opens by name through the kept
+  `sheet_read`.
+
+Next: AB.4 (Tasks).
