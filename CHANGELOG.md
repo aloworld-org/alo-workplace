@@ -1,5 +1,8 @@
 # Changelog
 
+- The empty Websites workspace now fills the available screen height, keeping
+  its welcome action centred and leaving only the standard outer gutter.
+
 - **Finance and Billing no longer disagree about the same period.** If your
   workspace raised invoices before alo started keeping your books, those
   documents were never written into the journal — so “how much have we invoiced
