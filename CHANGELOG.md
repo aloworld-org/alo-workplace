@@ -1,5 +1,9 @@
 # Changelog
 
+- Recurring Billing schedules now open from anywhere on their table row, with
+  the same keyboard behavior as quotation and invoice rows. Pause, resume, and
+  delete remain independent actions and never open the editor accidentally.
+
 - Prepared Billing emails now open directly in Mail's full compose editor, so
   users can review and change recipients, subject, message, and attachments
   before sending. Existing drafts also expose Edit alongside quick Send, and
