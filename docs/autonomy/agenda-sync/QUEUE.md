@@ -118,7 +118,7 @@ track's. Its evidence is `phone-agenda-FAILED.png` and the `knownAbsent` entry
 in its walk. **agents-web is finished, so `DayPanel` is no longer reserved and
 this track may edit it.**
 
-- [ ] AS.6 **The meeting in focus, and its agent, at phone width.**
+- [x] AS.6 **The meeting in focus, and its agent, at phone width.**
   `AgendaModule.module.css` hides `.dayPanel` outright below 1100px
   (`@media (max-width: 1100px) { display: none }`), and the day panel is where
   the meeting in focus and its `RecordAgentPanel` live; at 360px an entry opens

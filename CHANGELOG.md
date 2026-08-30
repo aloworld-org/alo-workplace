@@ -1,5 +1,13 @@
 # Changelog
 
+- **A meeting shows its agent on a phone too.** On a wide screen the meeting
+  you put in focus keeps its agent in the day panel beside the calendar; on a
+  narrow one there is no room for that panel, so opening a meeting now carries
+  the same thing inside the editor — where the meeting came from, what @agenda
+  can do with it (prepare for it, move it, cancel it), and a question about it
+  answered in place. As everywhere else, a button only opens the agent's
+  conversation with the words already written.
+
 - **Conversations, meetings, boards, mail, contacts and websites now show
   their agent too.** Open “Who's here” in a room and, under the people, the
   room itself says who opened it and what @chat can do with it — catch me up,

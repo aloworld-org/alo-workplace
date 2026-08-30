@@ -482,3 +482,87 @@ Wave AS closed here, and its `LOOP COMPLETE` was removed by the owner on
 360px and found Agenda the only module with no record-in-focus surface, in
 files that belong to this track. The marker is gone rather than edited around,
 because a wrapper that sees it stops before reading the queue.
+
+## AS.6 — the meeting in focus, and its agent, at phone width (2026-08-30)
+
+**Shipped.** `EventModal` mounts `RecordAgentPanel` — the same component the
+day panel mounts, imported, not reimplemented — under the form, for a saved
+event, and only below the width at which `AgendaModule.module.css` hides
+`.dayPanel`. That threshold is now written once, as `DAY_PANEL_HIDDEN`
+(`"(max-width: 1100px)"`) exported from `DayPanel.tsx` and read through
+`ds/useMediaQuery`, so the stylesheet's rule and the modal's condition cannot
+drift into a screen with two agent panels or none. The panel's props are the
+record the modal already holds (`event.id`, the title as typed, `origin: null`
+— `/calendar/events` still says nothing about where an event came from, the
+same reason the day panel gives), and `onBeforeNavigate={onClose}` so a verb
+that opens the agent's conversation closes the editor behind it.
+
+**The one structural change, and why it was unavoidable.** The panel carries
+its own `<form>` (its one-line ask) and HTML forbids a form inside a form — a
+nested one would have bubbled the ask's submit into the editor and *saved the
+meeting when somebody asked a question*. So the editor's fields moved into a
+named form of their own (`useId`), the modal's outer element became a `<div>`,
+and the footer's submit button points at the form by id — exactly the shape
+Finance's `DialogFrame` settled on for exactly this reason, and the shape its
+`aside` prop documents. No `.module.css` rule was added, changed or removed
+(ADR 0046); nothing under `web/src/agents/**` was touched beyond the import;
+no new i18n key — every string in the panel is one of the 97 `recordAgent*`
+keys that already exist in en/fr/nl/de.
+
+**Verified in a real browser**, not assumed: a throwaway stack per
+`web/e2e/stack.ts` (db `alo_e2e`, jmap :8199, vite :5199 — created, then
+dropped and killed), signed in through the app's own login, one meeting seeded
+through the app itself, then the same meeting opened at two widths. Screenshots
+read one by one in `web/e2e/.artifacts/agenda-agent-as6/` (local, gitignored):
+
+```
+desktop-agenda-editor.png   1280×900  Edit event — title, times, zone, repeat,
+                            reminder, location, meeting, guests, notes, and NO
+                            agent panel (asserted: section[data-record] × 0)
+desktop-agenda-daypanel.png 1280×900  the same meeting in focus in the day
+                            panel: "This record's agent" / "This record doesn't
+                            say where it came from." (× 1)
+phone-agenda-agent.png      360×740   the editor, scrolled to the panel:
+                            "This record's agent  @agenda",
+                            "This record doesn't say where it came from.",
+                            "What @agenda can do here" — Prepare for it /
+                            Move it / Cancel it, and "Ask @agenda about this…"
+                            with its Ask button. Delete / Cancel / Save still
+                            under it; documentElement.scrollWidth − innerWidth
+                            = 0 (no sideways scroll).
+```
+
+The walk's spec (`e2e/agendaAgentAs6.spec.ts`) was deleted after its shots were
+read, as AW.3/AW.4/AW.6's were and for the same reason: the e2e config's
+`testDir` is the whole folder, so a kept file changes what `npm run
+test:responsive` runs.
+
+**The `knownAbsent` entry is corrected.** `docs/autonomy/agents-web/STATE.md`'s
+AW.6 walk recorded Agenda as the one of sixteen pages with no record-in-focus
+surface at 360px, evidenced by `phone-agenda-FAILED.png`. It has one now, and
+the replacement evidence is `phone-agenda-agent.png` above — 16/16 at both
+widths. That journal is another track's file and is not edited from here; this
+entry is the correction, and AS.7 is the wave check that re-walks it.
+
+**Gates.** `npx tsc --noEmit` clean; `npx eslint` clean on the three changed
+files; `npx vitest run src` **1379/1379** (249 files) — four of them new in
+`src/agenda/eventAgent.test.tsx`: the panel is there at 360px with its verbs
+and its origin sentence, absent at 1280px (and nothing is fetched for it),
+absent for an unsaved event, and *the fields still save while the panel is
+mounted beside them* — the test that guards the form-id change. `npm run build`
+clean. No Rust, no migrations, no new routes, no deploy note.
+
+**Cuts/flags.** (1) Nothing cut. (2) Two things the walk saw that are not this
+item's to fix, and are not regressions: at 360px the month grid's last row sits
+under the app's bottom bar, so an event on the 30th could not be clicked there
+(the walk used the Agenda list view, which is how a phone reads a calendar
+anyway) — that is the responsive track's area; and the day panel's agent can be
+screenshotted before its directory read returns, which is why
+`desktop-agenda-daypanel.png` shows the origin sentence without the handle and
+verbs. (3) The e2e teardown dropped `alo_e2e` but left an `alo-jmap` from the
+run before it holding the port; killed here. Worth knowing for whoever runs
+that suite next: check `pgrep -f alo-jmap` before starting, as CLAUDE.md's
+rule says.
+
+**Next:** AS.7 — the wave check (a sixteen-page walk at 360px with no
+`knownAbsent` for Agenda, `interop.md` and `ROADMAP.md` still true).
