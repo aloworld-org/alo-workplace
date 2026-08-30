@@ -689,7 +689,7 @@ into several — the studio keys those splits by on-screen rows, which have no
 server identity, so the page prints one table. Each is a renderer change, not
 a data change: the design already holds the fields.
 
-### Sending an invoice (as built, B1.18)
+### Preparing a customer email (as built, B1.18)
 
 `POST /billing/invoices/{id}/send` **drafts, and never sends.** It renders the
 invoice PDF, composes a short covering note, and saves the message in the
@@ -714,6 +714,21 @@ invoice as a copy for the customer's records is legitimate). A customer with no
 email address is `422`. Sending twice writes two drafts and changes no billing
 record: the invoice has no "sent" state, and the mailbox is the record of what
 was sent.
+
+Quotations follow the same path through
+`POST /billing/quotes/{id}/email-draft`. The lifecycle route `/send` first
+assigns the quotation number and freezes its contents; the email-draft route
+then renders that exact finalized PDF. It accepts open (`sent`) and accepted
+quotations, refuses drafts and closed quotations, and remains tenant-scoped by
+the same account door. Keeping the two operations separate makes mail
+preparation safely retryable without consuming another number.
+
+The Billing editor joins those operations into the normal primary action for a
+new document, then opens the exact generated message in Mail. An already
+numbered document offers **Prepare customer email** directly. A prepared
+`$draft` has a prominent **Send** action in its reading toolbar; that action
+uses Mail's existing submission queue and undo window. The journey is short,
+but the interface never says a message was sent while it is only a draft.
 
 The covering note is its own small string table (`billing_send.rs`), separate
 from the document's: the document's wording is fixed by what it is in law, and
@@ -1340,7 +1355,7 @@ either shipped, or a cut with the reason and where it goes instead.
 | Customer records (address, VAT id, terms, currency, Contacts link) | **Shipped** | B1.02, B1.03, B1.05. VAT id is a **format** check (14 member states also check-digit-verified); a live VIES *existence* lookup is a network call and its own item. |
 | Products/services price list | **Shipped** | B1.04, B1.05. |
 | Quote record with server-side totals, integer cents | **Shipped** | B1.11 on the shared line model and `billing_totals`. |
-| Quote lifecycle draft → sent → accepted/declined/expired; accept → invoice | **Shipped**, one gap | B1.11, B1.12, B1.15. **Gap:** "sent *as PDF via alo Mail*" — a quote's `/send` is the lifecycle transition, not an email. `/print` renders the quote and `/billing/invoices/{id}/send` exists for invoices; the covering-mail route for quotes is a small additive item, not built. |
+| Quote lifecycle draft → sent → accepted/declined/expired; accept → invoice | **Shipped** | B1.11, B1.12, B1.15. Finalizing freezes and numbers the quote; `/email-draft` prepares the localized covering message and attached PDF through alo Mail. |
 | Invoice record (line model, issue/due dates, terms) | **Shipped** | B1.06. |
 | Legal gapless per-tenant numbering, immutable once issued | **Shipped** | B1.08, with the 100-parallel-issue test and a rollback test. **Flagged:** no backdated issuing — the strict reading (numbers and dates ascend together). |
 | Credit notes referencing the original | **Shipped** | B1.09. **Cut:** no over-credit guard (needs B1.19's derived state; the read it would use exists). |

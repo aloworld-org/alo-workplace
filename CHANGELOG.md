@@ -1,5 +1,17 @@
 # Changelog
 
+- **Invoices and quotations now move from Billing to the customer-ready email
+  without a dead end.** Issuing or finalizing prepares the localized covering
+  note and numbered PDF, then opens that exact message in Mail. Numbered
+  documents can prepare another copy directly, and a prepared draft now has a
+  clear Send action backed by Mail's audited, undo-enabled delivery queue.
+
+- **The VAT report now reads like a filing workspace.** An accounting-currency
+  overview surfaces taxable net, VAT due, gross billed and contributing
+  documents before the quieter per-currency detail tables. Responsive cards,
+  deliberate spacing and contained horizontal scrolling keep the report clear
+  on wide and narrow screens without changing any server-calculated figure.
+
 - When an agent cannot answer because the model returned nothing usable, the reason is now recorded for whoever runs the service — the room still sees one plain sentence, and no part of the answer or the question is written to the log.
 
 - **Billing errors now appear as compact, polished popup banners.** List-level
