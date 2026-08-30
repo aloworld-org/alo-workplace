@@ -1,5 +1,7 @@
 # Changelog
 
+- The website page editor now uses a compact command surface, a focused section outline, and a dominant responsive canvas with intentional empty-page onboarding.
+
 - Website workspace navigation now uses the same shared sizing, spacing, and interaction pattern as Billing.
 
 - Website overviews now separate Pages, Publishing, Languages, Collaborators,
