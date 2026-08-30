@@ -1,5 +1,7 @@
 # Changelog
 
+- Sites navigation can now link directly to site pages or page sections, while Site theme owns reusable base and accent brand colours that sections select by role.
+
 - The website page outline now presents navigation as a polished full-width
   header card, with a compact menu summary, quieter hierarchy, and grouped
   actions instead of a small tinted form row floating in unused space.

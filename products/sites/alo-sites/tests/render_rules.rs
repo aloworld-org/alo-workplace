@@ -100,7 +100,7 @@ fn landmarks_wrap_main_in_order_with_skip_link_first() {
     let footer = html.find("<footer class=\"s-footer\">").unwrap();
     assert!(skip < header && header < main && main < footer);
     // The hero lives inside main, not before it.
-    assert!(html.find("<section class=\"s-hero\">").unwrap() > main);
+    assert!(html.find("<section class=\"s-hero\" id=\"hero\">").unwrap() > main);
 }
 
 #[test]
@@ -120,6 +120,32 @@ fn navigation_marks_the_current_page_and_ships_a_complete_mobile_disclosure() {
     assert!(html.contains("event.key === \"Escape\""));
     assert!(html.contains("toggle.focus()"));
     assert!(html.contains("menu.querySelectorAll(\"a\")"));
+}
+
+#[test]
+fn navigation_colours_and_section_destinations_render_as_scoped_accessible_hooks() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [
+            {
+                "type": "nav",
+                "links": [{"label": "Features", "href": "/#features"}],
+                "appearance": {
+                    "background": "accent_2",
+                    "text": "background",
+                    "hover": "accent_5"
+                }
+            },
+            {"type": "features", "items": [{"title": "Fast", "body": "Very fast"}]},
+            {"type": "features", "items": [{"title": "Kind", "body": "Very kind"}]}
+        ]
+    }));
+
+    assert!(html.contains(
+        "style=\"--nav-bg:var(--accent-2);--nav-text:var(--bg);--nav-hover:var(--accent-5)\""
+    ));
+    assert!(html.contains("<section class=\"s-features\" id=\"features\""));
+    assert!(html.contains("<section class=\"s-features\" id=\"features-2\""));
 }
 
 #[test]

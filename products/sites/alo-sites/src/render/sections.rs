@@ -58,13 +58,25 @@ pub(super) struct Marks {
     /// fields.
     pub(super) index: usize,
     editable: bool,
+    anchor: &'static str,
+    occurrence: usize,
 }
 
 impl Marks {
     /// Marks for the section at `index`; `editable` only in the draft preview
     /// the editor renders.
-    pub(super) fn new(index: usize, editable: bool) -> Self {
-        Self { index, editable }
+    pub(super) fn new(
+        index: usize,
+        editable: bool,
+        anchor: &'static str,
+        occurrence: usize,
+    ) -> Self {
+        Self {
+            index,
+            editable,
+            anchor,
+            occurrence,
+        }
     }
 
     /// The same section with nothing editable: what a `custom_code` block
@@ -104,6 +116,14 @@ impl Marks {
         }
         format!(" data-alo-section=\"{}\"", self.index)
     }
+
+    fn anchor(self) -> String {
+        if self.occurrence == 1 {
+            self.anchor.to_owned()
+        } else {
+            format!("{}-{}", self.anchor, self.occurrence)
+        }
+    }
 }
 
 /// Opens a section's root element: `<section class="s-hero">`, plus its
@@ -111,7 +131,12 @@ impl Marks {
 /// through here, so "one element per section, carrying its index" is a
 /// property of the renderer rather than of sixteen remembered call sites.
 pub(super) fn open_section(out: &mut String, tag: &str, class: &str, m: Marks) {
-    out.push_str(&format!("<{tag} class=\"{class}\"{}>\n", m.block()));
+    let anchor = if tag == "section" {
+        format!(" id=\"{}\"", m.anchor())
+    } else {
+        String::new()
+    };
+    out.push_str(&format!("<{tag} class=\"{class}\"{anchor}{}>\n", m.block()));
 }
 
 /// The section's classes with its chosen layout appended — the one place a
@@ -143,7 +168,19 @@ pub(super) fn nav(
     m: Marks,
 ) {
     let menu_id = format!("nav-menu-{}", m.index);
-    open_section(out, "header", "s-nav", m);
+    let style = s.appearance.as_ref().map(|appearance| {
+        format!(
+            " style=\"--nav-bg:var(--{});--nav-text:var(--{});--nav-hover:var(--{})\"",
+            theme_role(appearance.background),
+            theme_role(appearance.text),
+            theme_role(appearance.hover),
+        )
+    });
+    out.push_str(&format!(
+        "<header class=\"s-nav\"{}{}>\n",
+        style.unwrap_or_default(),
+        m.block()
+    ));
     out.push_str(&format!(
         "<nav aria-label=\"{}\">\n",
         esc(site.strings.nav_label)
@@ -175,6 +212,20 @@ pub(super) fn nav(
         out.push_str("</li>\n");
     }
     out.push_str("</ul>\n</nav>\n</header>\n");
+}
+
+fn theme_role(role: alo_store::site_model::ThemeColorRole) -> &'static str {
+    use alo_store::site_model::ThemeColorRole;
+    match role {
+        ThemeColorRole::Background => "bg",
+        ThemeColorRole::Text => "text",
+        ThemeColorRole::Border => "border",
+        ThemeColorRole::Accent1 => "accent-1",
+        ThemeColorRole::Accent2 => "accent-2",
+        ThemeColorRole::Accent3 => "accent-3",
+        ThemeColorRole::Accent4 => "accent-4",
+        ThemeColorRole::Accent5 => "accent-5",
+    }
 }
 
 /// A `footer` section, rendered as a `<footer>` landmark.

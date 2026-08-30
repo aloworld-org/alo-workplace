@@ -249,8 +249,11 @@ fn render_document(
     let mut header = String::new();
     let mut main = String::new();
     let mut footer = String::new();
+    let mut occurrences = std::collections::HashMap::<&'static str, usize>::new();
     for (index, section) in parsed.iter().enumerate() {
-        let marks = sections::Marks::new(index, editable);
+        let occurrence = occurrences.entry(section.kind()).or_default();
+        *occurrence += 1;
+        let marks = sections::Marks::new(index, editable, section.kind(), *occurrence);
         match section {
             Section::Nav(nav) => sections::nav(&mut header, site, page, nav, marks),
             Section::Footer(f) => sections::footer(&mut footer, site, f, marks),

@@ -30,6 +30,36 @@ fn default_stylesheet_matches_golden() {
 }
 
 #[test]
+fn custom_brand_palette_becomes_reusable_css_tokens() {
+    let theme = SiteTheme::from_value(json!({
+        "schema_version": 1,
+        "preset": "north",
+        "colors": {
+            "background": "#fffaf5", "text": "#1f1720", "border": "#decfc4",
+            "accent_1": "#7c2d12", "accent_2": "#0f766e", "accent_3": "#6d28d9",
+            "accent_4": "#be123c", "accent_5": "#334155"
+        }
+    }))
+    .unwrap();
+    let css = stylesheet(&theme);
+    for expected in [
+        "--bg: #fffaf5;",
+        "--surface: #fffaf5;",
+        "--text: #1f1720;",
+        "--muted: #1f1720;",
+        "--border: #decfc4;",
+        "--accent-1: #7c2d12;",
+        "--accent-2: #0f766e;",
+        "--accent-3: #6d28d9;",
+        "--accent-4: #be123c;",
+        "--accent-5: #334155;",
+        "--primary: #7c2d12;",
+    ] {
+        assert!(css.contains(expected), "missing {expected}");
+    }
+}
+
+#[test]
 fn every_preset_sheet_carries_its_tokens_and_stays_in_budget() {
     for preset in THEME_PRESETS {
         let css = stylesheet(&theme_for(preset.id));

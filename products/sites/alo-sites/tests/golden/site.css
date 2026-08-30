@@ -7,6 +7,11 @@
 --primary: #1d4ed8;
 --on-primary: #ffffff;
 --border: #dde3e9;
+--accent-1: #1d4ed8;
+--accent-2: #17212b;
+--accent-3: #4c5866;
+--accent-4: #f2f5f8;
+--accent-5: #ffffff;
 --font-heading: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 --weight-heading: 700;
@@ -109,7 +114,10 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 
 /* Navigation. The toggle only exists for the behavior script: without
    JavaScript (no .js on <html>) the menu is always expanded. */
-.s-nav { border-bottom: 1px solid var(--border); }
+.s-nav {
+  border-bottom: 1px solid var(--border);
+  background: var(--nav-bg, var(--bg));
+}
 .s-nav nav {
   max-width: 70rem;
   margin: 0 auto;
@@ -121,7 +129,7 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 }
 .s-nav .brand {
   margin-right: auto;
-  color: var(--text);
+  color: var(--nav-text, var(--text));
   font-family: var(--font-heading);
   font-weight: var(--weight-heading);
   font-size: 1.25rem;
@@ -141,24 +149,26 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   min-height: 2.75rem;
   display: inline-flex;
   align-items: center;
-  color: var(--text);
+  color: var(--nav-text, var(--text));
   text-decoration: none;
 }
-.s-nav a:hover { text-decoration: underline; }
+.s-nav a:not(.button):hover,
+.s-nav a:not(.button):focus-visible { color: var(--nav-hover, var(--primary)); text-decoration: underline; }
 .s-nav a[aria-current="page"] {
-  color: var(--primary);
+  color: var(--nav-hover, var(--primary));
   font-weight: 600;
   text-decoration: underline;
   text-decoration-thickness: 0.125rem;
   text-underline-offset: 0.35rem;
 }
+.s-nav :focus-visible { outline-color: var(--nav-hover, var(--primary)); }
 .s-nav a.button { color: var(--on-primary); }
 .nav-toggle {
   min-height: 2.75rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--nav-bg, var(--surface));
+  color: var(--nav-text, var(--text));
   padding: 0.4rem 0.8rem;
   font: inherit;
   cursor: pointer;

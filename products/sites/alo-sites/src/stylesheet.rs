@@ -30,7 +30,23 @@ use alo_store::site_theme::SiteTheme;
 pub fn stylesheet(theme: &SiteTheme) -> String {
     let preset = theme.resolved_preset();
     let palette = preset.palette;
+    let custom = theme.colors.as_ref();
     let typography = preset.typography;
+    let background = custom.map_or(palette.background, |colors| colors.background.as_str());
+    let surface = custom.map_or(palette.surface, |colors| colors.background.as_str());
+    let text = custom.map_or(palette.text, |colors| colors.text.as_str());
+    let muted = custom.map_or(palette.muted_text, |colors| colors.text.as_str());
+    let border = custom.map_or(palette.border, |colors| colors.border.as_str());
+    let accent_1 = custom.map_or(palette.primary, |colors| colors.accent_1.as_str());
+    let accent_2 = custom.map_or(palette.text, |colors| colors.accent_2.as_str());
+    let accent_3 = custom.map_or(palette.muted_text, |colors| colors.accent_3.as_str());
+    let accent_4 = custom.map_or(palette.surface, |colors| colors.accent_4.as_str());
+    let accent_5 = custom.map_or(palette.background, |colors| colors.accent_5.as_str());
+    let on_primary = if custom.is_some() {
+        readable_on(accent_1)
+    } else {
+        palette.on_primary
+    };
     format!(
         "/* alo Sites stylesheet — theme preset \"{id}\" */\n\
          :root {{\n\
@@ -41,22 +57,50 @@ pub fn stylesheet(theme: &SiteTheme) -> String {
          --primary: {primary};\n\
          --on-primary: {on_primary};\n\
          --border: {border};\n\
+         --accent-1: {accent_1};\n\
+         --accent-2: {accent_2};\n\
+         --accent-3: {accent_3};\n\
+         --accent-4: {accent_4};\n\
+         --accent-5: {accent_5};\n\
          --font-heading: {heading_family};\n\
          --font-body: {body_family};\n\
          --weight-heading: {heading_weight};\n\
          }}\n{BASE_RULES}",
         id = preset.id,
-        bg = palette.background,
-        surface = palette.surface,
-        text = palette.text,
-        muted = palette.muted_text,
-        primary = palette.primary,
-        on_primary = palette.on_primary,
-        border = palette.border,
+        bg = background,
+        surface = surface,
+        text = text,
+        muted = muted,
+        primary = accent_1,
+        on_primary = on_primary,
+        border = border,
+        accent_1 = accent_1,
+        accent_2 = accent_2,
+        accent_3 = accent_3,
+        accent_4 = accent_4,
+        accent_5 = accent_5,
         heading_family = typography.heading_family,
         body_family = typography.body_family,
         heading_weight = typography.heading_weight,
     )
+}
+
+/// Black or white, whichever gives the stronger contrast on a custom accent.
+fn readable_on(hex: &str) -> &'static str {
+    let channel = |at: usize| {
+        let raw = u8::from_str_radix(&hex[at..at + 2], 16).unwrap_or_default() as f64 / 255.0;
+        if raw <= 0.04045 {
+            raw / 12.92
+        } else {
+            ((raw + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let luminance = 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+    if (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) {
+        "#000000"
+    } else {
+        "#ffffff"
+    }
 }
 
 /// Everything below `:root`: identical for every preset, tokens only via
@@ -161,7 +205,10 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 
 /* Navigation. The toggle only exists for the behavior script: without
    JavaScript (no .js on <html>) the menu is always expanded. */
-.s-nav { border-bottom: 1px solid var(--border); }
+.s-nav {
+  border-bottom: 1px solid var(--border);
+  background: var(--nav-bg, var(--bg));
+}
 .s-nav nav {
   max-width: 70rem;
   margin: 0 auto;
@@ -173,7 +220,7 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 }
 .s-nav .brand {
   margin-right: auto;
-  color: var(--text);
+  color: var(--nav-text, var(--text));
   font-family: var(--font-heading);
   font-weight: var(--weight-heading);
   font-size: 1.25rem;
@@ -193,24 +240,26 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   min-height: 2.75rem;
   display: inline-flex;
   align-items: center;
-  color: var(--text);
+  color: var(--nav-text, var(--text));
   text-decoration: none;
 }
-.s-nav a:hover { text-decoration: underline; }
+.s-nav a:not(.button):hover,
+.s-nav a:not(.button):focus-visible { color: var(--nav-hover, var(--primary)); text-decoration: underline; }
 .s-nav a[aria-current=\"page\"] {
-  color: var(--primary);
+  color: var(--nav-hover, var(--primary));
   font-weight: 600;
   text-decoration: underline;
   text-decoration-thickness: 0.125rem;
   text-underline-offset: 0.35rem;
 }
+.s-nav :focus-visible { outline-color: var(--nav-hover, var(--primary)); }
 .s-nav a.button { color: var(--on-primary); }
 .nav-toggle {
   min-height: 2.75rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--nav-bg, var(--surface));
+  color: var(--nav-text, var(--text));
   padding: 0.4rem 0.8rem;
   font: inherit;
   cursor: pointer;
