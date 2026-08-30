@@ -1,6 +1,12 @@
 # Changelog
 
 - When an agent cannot answer because the model returned nothing usable, the reason is now recorded for whoever runs the service — the room still sees one plain sentence, and no part of the answer or the question is written to the log.
+
+- **Billing errors now appear as compact, polished popup banners.** List-level
+  connection and action failures rise above scrolling content with a clear
+  visual signal and an accessible close control, while editor and dialog
+  validation remains beside the work it explains.
+
 - **A meeting shows its agent on a phone too.** On a wide screen the meeting
   you put in focus keeps its agent in the day panel beside the calendar; on a
   narrow one there is no room for that panel, so opening a meeting now carries
