@@ -126,6 +126,12 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    tab, and a 44px minimum hit height. Increase those values for a calmer
    desktop layout; do not reduce them to fit more items—allow horizontal
    scrolling on narrow screens instead.
+   Billing's module navigation is the canonical implementation of this role.
+   Every sibling module or workspace navigation must use the shared
+   `ModuleNavigation` pattern so its item height, protected inset, icon/label
+   gap, sibling gap, radius, selected state, focus state, and narrow-screen
+   scrolling behave and look the same. A feature must not locally restyle this
+   role.
    _Verify:_ no hardcoded colors/spacings outside tokens; screens pass a
    5-second "what is this page about" glance test. Compare sibling module tabs
    side by side and confirm their active and inactive states are identical.

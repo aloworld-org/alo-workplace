@@ -1,5 +1,7 @@
 # Changelog
 
+- Website workspace navigation now uses the same shared sizing, spacing, and interaction pattern as Billing.
+
 - Website overviews now separate Pages, Publishing, Languages, Collaborators,
   and Site tools into focused navigation instead of stacking every control on
   one long screen. Page rows are fully clickable, the narrower layout keeps
