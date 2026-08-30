@@ -1,5 +1,9 @@
 # Changelog
 
+- The website page outline now presents navigation as a polished full-width
+  header card, with a compact menu summary, quieter hierarchy, and grouped
+  actions instead of a small tinted form row floating in unused space.
+
 - Website navigation now behaves like a real header: it is pinned in the
   builder, can add and reorder existing site pages without typing URLs, keeps
   its primary action separate, marks the current published page, and offers a

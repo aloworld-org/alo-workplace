@@ -49,3 +49,21 @@ the body even though the renderer always emits it before `<main>`.
 No feature flag is required: the wire schema and routes are unchanged. Watch
 the existing Sites section-save failure rate and public render error logs.
 Reverting the navigation UX/render commit is the off-switch.
+
+## Visual refinement
+
+- **Surface:** the section outline now uses one compact heading row and a
+  full-width navigation card. The card shows a restrained header miniature
+  built from the stored menu labels and primary action, so users can recognise
+  its contents before opening the editor. Edit and delete remain grouped at
+  the trailing edge.
+- **Errors:** this is presentation-only; the existing save, delete and loading
+  errors remain unchanged and no content is hidden behind the miniature.
+- **Tenancy:** the miniature renders only the section already returned by the
+  tenant-scoped page read. It performs no additional reads or writes.
+- **Out of scope:** this does not turn the outline into a second live preview;
+  responsive and published rendering remain in the optional Preview panel.
+
+Rejected alternative: adding more badges, borders and instructional copy to
+the existing peach card. That would increase noise without making the stored
+navigation easier to recognise.
