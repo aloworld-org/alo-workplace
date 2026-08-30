@@ -137,6 +137,6 @@ this track may edit it.**
   honest answer is that the panel does not belong at phone width, that is a
   finding: say so with the reasoning and mark the item `[!]` rather than
   shipping a cramped surface.
-- [ ] AS.7 Wave check: the sixteen-page walk at 360px carries no `knownAbsent`
+- [x] AS.7 Wave check: the sixteen-page walk at 360px carries no `knownAbsent`
   for Agenda; `docs/interop.md` and `ROADMAP.md` still read true; then
   `LOOP COMPLETE`.

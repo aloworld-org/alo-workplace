@@ -566,3 +566,97 @@ rule says.
 
 **Next:** AS.7 — the wave check (a sixteen-page walk at 360px with no
 `knownAbsent` for Agenda, `interop.md` and `ROADMAP.md` still true).
+
+## AS.7 — wave check: the sixteen-page walk at 360px (2026-08-30)
+
+**What shipped.** No product code: this item is the check itself. The walk that
+recorded Agenda as the one absent page was re-run at 360px, all sixteen pages
+were read one by one, and the two documents were held against the code.
+
+**The walk. 16/16 at 360px, no `knownAbsent`, nothing scrolls sideways.**
+A throwaway stack per `web/e2e/stack.ts` (db `alo_e2e`, jmap :8199, vite :5199
+— created, then dropped and killed), seeded through the real HTTP surface with
+a real access token taken through the app's own PKCE flow from Node: a task, a
+deal (its pipeline **and** stage read from the tenant), an expense claim, a
+project, a supplier and its purchase order, an opening and a candidate, a Drive
+file, a document, a sheet, a calendar event, a chat room, an ended meeting, a
+board, a contact and an inbox message, and a site. Then sixteen modules opened
+the way a person opens them — a query parameter where the module has one, a tap
+where it does not — each held to one assertion: `section[data-record]` visible,
+scrolled into view, screenshotted, and `documentElement.scrollWidth −
+innerWidth ≤ 1`.
+
+Read one by one in `web/e2e/.artifacts/record-agent-as7/` (local, gitignored;
+`phone-*.png` plus `phone-report.json`). Every panel names its own agent and
+shows its ask box: the task detail **"Created by admin@e2e.test."** with Chase
+it / Set its priority / Mark it done / Hand it over; the deal drawer **"From
+Referral."** with Move its stage / Draft a follow-up; the Edit-claim dialog
+Suggest categories; the project overview Sum up its status / Log time on it;
+the purchase-order editor Receive its delivery; the candidate drawer **"From
+LinkedIn."** with Draft a letter; the Drive details pane Rename it / Move it;
+the document's side column Draft a section / Rewrite a passage; the sheet's
+rail Write a formula / Tidy a column; **the meeting's editor at 360px — the
+page AW.6 could not find one on — "This record's agent @agenda", "This record
+doesn't say where it came from.", Prepare for it / Move it / Cancel it, and
+"Ask @agenda about this…" above Delete / Cancel / Save**; the Who's-here dialog
+**"Created by admin@e2e.test."** with Catch me up / Find something in it; the
+ended meeting What happened in it / Write the minutes; the board Pin a chart to
+it; the message **"Sent by Ilse Vermeer."** with Draft a reply / Catch me up on
+it; the contact What we've said to them / Write to them; the site How it stands
+/ Review it for search engines / Publish it. No verb was pressed and **no model
+was called anywhere in this iteration**.
+
+**The `knownAbsent` entry is gone.** `docs/autonomy/agents-web/STATE.md`'s AW.6
+walk recorded one — `"agenda: TimeoutError: locator.click"`, evidenced by
+`phone-agenda-FAILED.png` — because `AgendaModule.module.css` hides `.dayPanel`
+below 1100px and `EventModal` carried no panel. AS.6 mounted it there; this
+walk's `phone-report.json` reads `"missing": []`, `"sideways": []`,
+`"notSeeded": []`, `"seedFailures": []` with all sixteen in `shown`, and the
+replacement evidence is `phone-agenda.png`. That journal is another track's
+file and is not edited from here; this entry is the correction.
+
+**The documents read true.** `docs/interop.md` § CalDAV was walked against the
+code again: every cut it still claims is still a cut (no `PROPPATCH`/
+`MKCALENDAR`, non-time-range `calendar-query` filters unevaluated, `TRANSP` not
+modelled, `RDATE;VALUE=PERIOD` skipped, floating time read as UTC), and every
+choice AS.1–AS.4b recorded — two-way `RECURRENCE-ID` overrides, the served
+`VTIMEZONE` per zone, the resource collection's read-only `403`, the room's
+ETag-hash sync token, the `409` on a colliding CalDAV PUT — matches what the
+code does. `ROADMAP.md` Phase 2 § Agenda needs no edit: AS.5 brought its four
+rows to what is built, and AS.6/AS.7 changed nothing on the wire or in the
+store. No CHANGELOG line either — nothing user-facing changed in this item.
+
+**Gates.** `npx tsc --noEmit` clean; `npx eslint` clean on the walk's spec;
+`npx vitest run src` **1379/1379** (249 files); `npm run build` clean. No Rust,
+no migrations, no new routes, no deploy note.
+
+**Decisions and flags.** (1) The walk's spec, `web/e2e/recordAgentAs7.spec.ts`,
+was deleted after its shots were read — as AW.3/AW.4/AW.6's and AS.6's were,
+and for the same reason: the e2e config's `testDir` is the whole folder, so a
+kept file changes what `npm run test:responsive` runs. Worth passing on to
+whoever owns `web/e2e/**` (the responsive track — it is not this track's to
+edit): that instrument has now been written from scratch three times, and a
+`testMatch` narrower than the folder would let the next wave keep it.
+(2) Five seeding facts this run paid for, beyond AW.6's three: a deal's stages
+are their own route (`GET /crm/pipelines/{id}/stages` — `pipeline_json` carries
+none); a supplier needs a two-letter ISO 3166-1 `country` or the store answers
+422; `POST /calendar/events` wants RFC 3339, so a bare `T10:00:00` is a 400;
+`/drive/doc/<id>` resolves through a stored slug map, so the way to open an
+editor by id is `/drive?open=<id>`; and a room's people at phone width are
+behind the header's **Members & agents** button, not a "Who's here" control.
+(3) A Playwright fact that cost this walk its first run: a locator with no
+`timeout` of its own inherits the **test's**, so one absent button spends the
+whole budget — every click here is capped at 12 s, and the walk reports the
+stop instead of dying on it. (4) Evidence discipline: mail's first pass
+screenshotted a loading skeleton under a *passing* assertion (the module
+re-rendered between the wait and the shutter). The walk now waits for the
+panel's `@handle` — the directory read — and re-shoots if the panel is not
+still on screen after the shutter, because a screenshot that proves nothing is
+worse than a failure. (5) An `alo-jmap` from somebody else's session is
+listening on **:8080** (started 03:35, not this suite's :8199) and was left
+alone; the e2e stack and its `alo_e2e` database were torn down cleanly.
+
+Wave 2 is closed: AS.6 built the panel and AS.7 walked all sixteen pages
+without a `knownAbsent`. Every item in this queue is `[x]`.
+
+LOOP COMPLETE
