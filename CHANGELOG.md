@@ -10,6 +10,18 @@
   template thumbnails, keeps its actions above the mobile app bar, and only
   enables creation after the current website address is confirmed available.
 
+- **Invoices, quotations and customers now show their agent.** Open a billing
+  document or a customer and the record says where it came from — an invoice
+  raised from an accepted offer says so and links back to the offer, one raised
+  by a recurring arrangement says that, a credit note names the invoice it
+  corrects — and offers what @billing can do with this record: chase an unpaid
+  invoice, record a payment against it, turn an open offer into an invoice, or
+  ask where you stand with a customer, what they owe and what is open with
+  them. Nothing runs from the panel: each is a message opened in the agent's
+  conversation with the words already written, for you to send. A document that
+  is still a draft keeps its origin and its question box and is offered nothing
+  it could not carry out.
+
 - The empty Websites workspace now fills the available screen height, keeping
   its welcome action centred and leaving only the standard outer gutter.
 

@@ -148,7 +148,7 @@ Codex turns back.
 and whatever restructuring the mount honestly needs — nothing else in there.
 `web/src/shell/**` and `web/src/ds/**` stay forbidden, as always.
 
-- [ ] AW.7 **Billing** — *(loan withdrawn 2026-08-30 03:10 when the owner said
+- [x] AW.7 **Billing** — *(loan withdrawn 2026-08-30 03:10 when the owner said
   Codex was in the directory; **reopened 08:30 on the owner's word**, with the
   state that supports it: Codex's last billing commit was 07:58 and it has
   since moved to `web/src/sites/**` (08:12, and its uncommitted work is there

@@ -469,3 +469,144 @@ compared before the push. A guard that always fires teaches people to ignore
 it.
 
 **Next:** AW.7 — Billing's document editor and customer view.
+
+## AW.7 — Billing's document editor and customer view (2026-08-30)
+
+**The Codex check, and its result.** Baseline taken before the first edit:
+`0bb4aea3` (`origin/main` at the top of the iteration). `git log
+0bb4aea3..origin/main -- web/src/billing/` printed **nothing** — Codex's last
+billing commit was `8e8b076f` at 07:58, inside the baseline, and it stayed in
+`web/src/sites/**` throughout. Recorded here even though nothing had moved,
+because a check whose result is never written down is a check nobody can trust.
+**The pre-push half of it could not be run — see the halt at the end of this
+entry — and must be run by whoever pushes this commit.**
+
+**What shipped.** The record's agent on Billing's two record surfaces, as two
+mounts of the existing `RecordAgentPanel` and no second implementation of it.
+
+*The document editor* (`InvoiceEditor`, `QuoteEditor`) mounts the panel in the
+footer it already gives `RecordHistory`, above it: origin first, then what
+@billing can do, then the history — the same order the CRM drawer settled on.
+Nothing in `DocumentEditor.tsx` changed; the footer slot was already the right
+place, and a narrower diff is the point in a directory another editor holds.
+
+*The customer view* is `CustomerDialog`, and it needed the one restructuring
+this item honestly required: the panel carries its own `<form>` for the ask,
+and Billing's `DialogFrame` made the whole dialog a `<form>`, which HTML
+forbids nesting. `DialogFrame` now renders its children in an inner `<form
+id>` inside the dialog's scrolling body, with `{aside}` beside it and the
+footer's submit reaching the form by id — behaviour identical, and the same
+shape Finance's own frame took for the same reason at AW.2.
+
+*The verbs follow the document's state, not its type.* `draft_payment_reminder`
+and `record_payment` name an invoice by its number and are refused on anything
+not owed; `quote_to_invoice` closes an offer that is still open. So the two
+states that carry verbs are their own record kinds — `invoiceOwed` (issued or
+paid, not a credit note — exactly the condition the payments panel above it
+uses) and `quoteOpen` (sent, exactly when the screen offers "accept") — and a
+plain `invoice` or `quote` keeps its origin and its ask while being offered
+nothing it cannot do. A customer gets `customer_lookup`, `unpaid_invoices` and
+`open_quotes`. **Issuing and sending are deliberately absent**: both are one
+button away on the same screen, and a second, slower path to them is a worse
+one.
+
+*The panel was widened, not forked* (the queue's rule, and it is said in the
+file): three origin sentences a billing document needs and nothing else had —
+`recordAgentOriginQuoteUnnamed` ("Raised from an accepted offer.", because an
+invoice carries the offer's **id**, never its number, and a raw id is not a
+citation), `recordAgentOriginSchedule` and `recordAgentOriginCorrection` — plus
+two source links, `quote` → `/billing/quotes/{id}` and `correction` →
+`/billing/invoices/{id}`, beside the `/chat` and `/mail` ones already there. A
+recurring arrangement has no record screen, so that origin is a sentence with
+nothing to open.
+
+*Money is read, never computed.* No total, VAT figure or due date is derived in
+the panel (ADR 0011), and the walk asserts no origin line contains an amount.
+
+**Verified by looking.** A Playwright walk on the suite's own throwaway stack
+(`web/e2e/stack.ts`: ports 5199/8199, database `alo_e2e`) — the developer's
+5173/8080 session belongs to Codex and was never touched. It makes the records
+through the app itself and reads what the panel then says
+(`web/e2e/.artifacts/record-agent-aw7/`, local; four PNGs + `report.json`):
+
+- **customer view** — "Northwind BV …", origin **"This record doesn't say where
+  it came from."**, @billing named, three verbs (Where we are with them / What
+  they owe / What's open with them) and the ask box, all inside the dialog.
+- **document editor, draft quotation** — origin the same sentence, **no verbs**,
+  ask box present.
+- **document editor, sent quotation** — `QUO-2026-00001`, one verb: **"Turn it
+  into an invoice"**.
+- **document editor, the invoice that offer raised** — origin **"Raised from an
+  accepted offer. Open it"**, read off the record's own `quoteId`, not a
+  fixture. This is the origin line the item asked to be checked against a real
+  document, and the path was walked the long way round to get it.
+
+**Cuts, and the reasons.** (1) The walk stops at that draft rather than issuing
+it: issuing is refused by the store with *"this chart of accounts has no active
+account for the role 'ar'; set one on the Accounts screen before booking
+documents"*, and standing up Finance's accounts to photograph one more panel
+state is a Finance walk, not a Billing one. The verbs an owed invoice offers
+are held by `BillingRecordAgent.test.tsx` instead. (2) The walk spec was
+deleted after it was read, as AW.3, AW.4 and AW.6's were: the e2e `testDir` is
+the whole folder, so a kept file changes what `npm run test:responsive` runs.
+
+**Two findings, reported rather than patched.**
+
+1. **The business audit trail is empty for everything the web app does.** This
+   item first cited the person who created a record with no provenance of its
+   own — the pattern the task detail uses — and the walk showed the trail
+   answering `{"entries":[]}` for a customer created seconds earlier. The API is
+   mounted twice (`server.rs`: `jmap.merge(identity_routes).nest("/api",
+   under_api)`) and the browser calls the `/api` copy; the audit layer reads the
+   matched template, sees it begin `/api`, finds no audited module in the first
+   segment and files nothing. Every record's History tab therefore reads
+   "Nothing has happened to this record yet" for acts done in the app — visible
+   in two of the screenshots. That is `alo-jmap`, which this track may not
+   touch, so the creator origin was **removed** rather than shipped as a read
+   that returns nothing: a billing record with no provenance now says it does
+   not know, exactly as the site view does. When the trail is fixed, the
+   creator origin belongs in `documentOrigin`'s file, which says so.
+2. **A sent quotation's totals box reads €0.00.** The same offer showed
+   €302.50 as a draft and the invoice raised from it carries €302.50, so the
+   figures are right and the read-only quote-studio rendering is not. It is in
+   `web/src/billing/**` and unrelated to this item, so it is named here and left
+   alone — the whole point of the loan was to keep this diff small.
+
+**Gates.** `npx tsc --noEmit` clean; `eslint` clean on `src/agents`,
+`src/billing`, `src/i18n`; `vitest` **1398/1398** (254 files); `npm run build`
+clean. New: `BillingRecordAgent.test.tsx`, five cases — the origin derivation
+most-specific-first, an owed invoice citing its offer and offering only the
+verbs the directory also offers, a draft offered none, a credit note linking to
+the invoice it corrects, and a customer with no provenance saying so while
+still offering its verbs and reading nothing but the directory. Two existing
+tests in `BillingModule.test.tsx` were adjusted, not weakened: the customer
+views really do live under a router now (the panel links back to records), and
+the VAT-clearing test finds its `PATCH` by verb instead of by position, because
+the dialog now makes two reads of its own. No Rust, no migrations, no new route
+prefixes, no deploy note. `CHANGELOG.md` carries the user-voice line.
+
+**Strings.** Nine new `recordAgent*` keys in `en`, `fr`, `nl` and `de`, at
+parity — the fr/nl/de wordings were drafted by this loop and carry the same
+native-review flag the rest of this wave's do.
+
+**LOOP HALT: no DNS on this machine — the commit is local and unpushed.**
+Every gate passed and the work is committed. `git fetch`, `git ls-remote` and
+`curl https://github.com` all fail with `Could not resolve host: github.com`
+while `ping 1.1.1.1` succeeds and `scutil --dns` lists no nameserver: the box
+routes but does not resolve. Polled for ~25 minutes across four waits; it did
+not come back, and `networksetup` needs an authorisation this process does not
+have. Nothing is lost — the iteration's work is one commit on `main` in this
+checkout.
+
+**For whoever pushes it:** run AW.7's pre-push check first, because it could
+not be run here —
+
+```
+git fetch origin
+git log --oneline 0bb4aea3..origin/main -- web/src/billing/
+```
+
+Any commit it prints is Codex's, and it means stop rather than rebase over it.
+
+**Next:** AW.8 — the wave check: `AW.5` marked `[x]` with a pointer here, the
+sixteen-page walk re-run, then `LOOP COMPLETE`.
