@@ -29,6 +29,8 @@
   invoices, and recurring schedules has a deterministic customer email. Running
   the idempotent seed command also repairs existing v1 demo records, preventing
   **Prepare customer email** from ending in a missing-address refusal.
+- Drive now starts work in one click: a clearly positioned **New document** action opens a uniquely named document immediately, while sheets, presentations, folders, and uploads live in one calm grouped menu that is reused in the toolbar and empty state.
+
 - **An agent whose model replies with something unusable now simply asks it
   again**, once, instead of giving up — so a multi-step run for “Ask alo”,
   where every step is its own question to the model, finishes instead of
