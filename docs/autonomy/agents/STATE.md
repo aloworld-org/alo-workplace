@@ -5070,4 +5070,136 @@ follow-up `[web]` queue the A3 note promised. (2) A9.1 — falls out of A8.4;
 when A8.4 lands, the full-wire evaluation is the wave's exit gate and
 should run last.
 
+## A9.1 — the full evaluation on the wire, against a real model (2026-08-30)
+
+Run by the owner's session, as this item says it must be: a real model on a
+live tenant's configured provider (OpenAI `gpt-4o-mini`, the tenant's own
+`ai_providers` row), against a local backend built from `4b9220c2`. Everything
+below is what the run actually returned, including what it found wrong.
+
+**The set.** `alo_ai::evaluation::evaluation_set()` reproduced from the
+registry sources: **369 questions over 136 verbs, sixteen agents** — the same
+census the Rust test pins, derived independently so the harness and the crate
+agree by construction rather than by copying.
+
+**The workspace it was asked about.** The eight modules whose tables were
+empty were first given real records through the product's own HTTP doors —
+Agenda (5 events), Sales (3 deals across stages), People (3 colleagues with
+terms of employment, 2 leave requests, an opening and an applicant),
+Inventory (a supplier, three stocked goods ordered, sent and received into the
+warehouse — 40 of each), Docs (3 documents), Sheets (2 workbooks), Meet (a
+meeting held and ended), Sites (a site, unpublished). Asking an agent about an
+empty module only proves it can say "nothing"; every answer below is answered
+against something.
+
+**The run.** 369 cases, one room per agent, **369 answered, 0 refused, 0
+boundary errors**, median 2.1 s. `agent_tool_runs` recorded **161 runs in those
+rooms, every one a read**. Not one write verb executed across **132 write
+cases** — the propose-then-approve rule holds under a real model, which is the
+single most important thing this run had to prove.
+
+**The seventeen standing questions, re-asked one per fresh room** (nothing
+earlier in context to borrow from), with the verb each ran:
+
+| agent | ran | answer |
+|---|---|---|
+| @billing | `open_quotes` | one open quote, QUO-2026-00001, Harbor Logistics NV, 7865.00 EUR |
+| @agenda | `whats_on` | the week's diary, by day |
+| @tasks | `my_plate` | the plate, overdue first |
+| @drive | `recent_files` | the files, with kind, size and date |
+| @sheets | `list_spreadsheets` | both workbooks, with timestamps |
+| @docs | `list_documents` | the documents |
+| @crm | `open_deals` | 3 open deals, by stage |
+| @projects | `active_projects` | 4 active projects |
+| @inventory | `stock_answer` | "Yes, the X100 sensor module is in stock with 40 pieces available." |
+| @hr | `who_is_off` | nobody this month (the leave booked falls in September) |
+| @insights | `billing_totals`, `insight_answer` | 8070.70 EUR invoiced in August 2026 |
+| @meet | `meetings_recent`, `meeting_record` | the meeting found; no decisions recorded in it |
+| @sites | `site_status` | "Alo demo site is currently in draft status and is not published yet" |
+| @mail | — | no contact at axongroup.com (true of this tenant) |
+| @finance | `ledger_summary` | **0.00 EUR invoiced — see the first defect below** |
+| @chat, @alo | — | the model was not reached — see the second defect |
+
+**The six that could not answer on 2026-08-28 now answer from the record:**
+billing, crm, finance, inventory, hr and projects each ran their own verb and
+answered from what the store holds. Finance ran its verb and answered from the
+ledger — the figure is wrong for the reason below, not because the agent could
+not reach its records.
+
+**A standing instruction fires and posts.** Created over the wire
+(`POST /chat/channels/{id}/instructions`, schedule trigger), listed on the
+room's card, made due, and **the scheduler fired it 24 s later**: @tasks posted
+the plate unprompted, overdue items first.
+
+**A channel's memory is read back and forgotten.** "@tasks remember that the
+Northstar handover is owned by Ben and due on 12 September" →
+`GET /chat/channels/{id}/agents/{agent}/memories` holds the fact with
+`learnedFrom: "explicit"`; asked again in the room, the agent answers "owned by
+Ben and is due on 12 September [1]" with the source; `DELETE
+/chat/memories/{id}` → 204 and the fact is gone. **Worth knowing:** the recall
+turn had itself learned a second, narrower fact (`learnedFrom: "turn"`), so
+after forgetting the explicit one the agent still knew "owned by Ben". That is
+the design working (a new turn learns), not a leak — but "forget that" means
+forgetting one fact, not everything a later turn re-derived, and the UI should
+not promise otherwise.
+
+**A delegation is visible in a room — and then does not run. (Defect 1.)**
+@alo plans correctly and says so: "Here's how I'll do that: 1. @billing — what
+did we quote Northstar Foods 2. @billing — has the quote for Northstar Foods
+been sent". Then **step 1 of 2 fails, every time, five attempts across two
+builds**. The room is told "I couldn't reach the model just now", which is
+wrong twice over: the provider is reachable (the planner just used it), and the
+real error is `InferenceError::Empty` — the delegate turn's reply did not parse
+as the decision envelope. The same @billing agent, asked directly in the same
+tenant, answers in 2 s. So Ask alo's orchestration is broken against this real
+model while the scripted-model suites pass, which is exactly the gap this item
+exists to find. Opened as **A10.1**.
+
+**The failure was invisible to an operator.** Both `Err(_)` arms — the
+orchestrated step's in `agent_orchestrate.rs` and the room turn's in
+`chat_agent.rs` — discarded the error and said only `UNREACHABLE`. Nothing was
+logged at any level, so a run that stopped here looked the same whether the
+provider was rate-limiting, timing out, or returning something unparseable.
+Both now `tracing::warn!` the error (never the completion text — law #1), which
+is what made the diagnosis above possible at all. Committed with this entry.
+
+**@finance and @insights contradict each other on the same year. (Defect 2.)**
+@insights says 8070.70 EUR invoiced in August 2026; @finance says 0.00 EUR
+invoiced this year and 0.00 outstanding. Both report honestly from different
+places: `billing_totals` sums issued invoices, `ledger_summary` sums the
+receivables ledger — and ledger posting only began with B7.01 ("the books learn
+about a document in the act that makes it real", 2026-08-29). Invoices issued
+before that were never posted, and nothing backfills them, so a tenant that
+used Billing before the upgrade has a Finance module that reports zero. This is
+a migration gap, not a wrong sum. Opened as **A10.2**.
+
+**Two weaknesses in the evaluation set itself.** (a) **41 of the 369 asks
+contain a literal placeholder** — "what did we quote X", "where are we with the
+X deal", "what is Ben's address" — because the registry's `answers` strings are
+templates. The agents answer them honestly ("I could not find a deal titled
+'X'"), which is correct behaviour but proves nothing about the verb; those
+cases cannot be scored. (b) All of an agent's cases ran in one room, so a later
+question could be answered from an earlier verb's result already in context: 62
+of 81 read verbs executed, and the remainder were either placeholder asks or
+answered from context. The fresh-room pass above is the reliable measurement.
+Both are recorded as **A10.3**.
+
+**Provider behaviour under load.** 29 of the 369 turns (8%) came back with "I
+couldn't reach the model", concentrated in the burst (mail 8, insights 4,
+agenda/chat/sites 3 each). With the new logging these are now distinguishable
+from the delegation defect; there is no retry on an empty or failed completion
+anywhere in the turn path, which is worth its own decision rather than a silent
+one.
+
+**Verified.** `cargo fmt`; `cargo clippy -p alo-jmap --tests -D warnings`
+clean; `cargo test -p alo-jmap --lib` **860 passed**; `--test agents_http_suite`
+**218 passed**. The evaluation harness and its raw results are the owner's
+scratchpad (`a91.py`, `a91c.py`, `a91-full.json`, `a91-claims.json`), not
+repository files — the repository's own copy of this run is this entry.
+
+**Where that leaves the queue.** A9.1 is `[x]`: the evaluation ran, on the
+wire, against a real model, and is quoted here. It did not come back clean, and
+the three things it found are items rather than footnotes — wave A10 below.
+A8.4 remains with the `agents-web` track.
+
 LOOP COMPLETE (with blockers)

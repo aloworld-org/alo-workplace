@@ -215,8 +215,42 @@ against a real model after each item and quote the answers.
 
 ## Wave A9 — exit
 
-- [!] A9.1 *(prerequisite: every other item here and in agents-a/b/c is `[x]` or `[~]`; otherwise `[!]` with the reason)* *(2026-08-29 evening: the A8.4 block is lifted — the item moved to track `agents-web`, which has already landed AW.1 and AW.2, so the prerequisite now reads `[~]`. **This item is the owner's session to run, never a loop's**: it needs a real model against a live tenant's configured provider, which a loop must not spend. It runs when `agents-web` writes `LOOP COMPLETE`.)* *(2026-08-29, AW.6: `agents-web` has written `LOOP COMPLETE` and A8.4 above is `[x]`, so the prerequisite is met and this item is now waiting on the owner, not on a queue.)* The full evaluation on the wire, every agent, against a real model,
+- [x] A9.1 *(prerequisite: every other item here and in agents-a/b/c is `[x]` or `[~]`; otherwise `[!]` with the reason)* *(2026-08-29 evening: the A8.4 block is lifted — the item moved to track `agents-web`, which has already landed AW.1 and AW.2, so the prerequisite now reads `[~]`. **This item is the owner's session to run, never a loop's**: it needs a real model against a live tenant's configured provider, which a loop must not spend. It runs when `agents-web` writes `LOOP COMPLETE`.)* The full evaluation on the wire, every agent, against a real model,
   quoted in STATE.md; the six that said "I could not find it" answer from
   the record; a standing instruction fires and posts; a delegation is visible
   in a room; a channel's memory is read back and forgotten.
 
+## Wave A10 — what the real-model evaluation found (2026-08-30)
+
+The A9.1 run is journaled in `STATE.md`; these are the three things it found.
+The first is a defect in the product, the second a migration gap, the third a
+weakness in the evaluation set itself.
+
+- [ ] A10.1 **A delegated step never runs against a real model.** @alo plans
+  correctly and announces the steps, then step 1 fails with
+  `InferenceError::Empty` — the delegate turn's reply does not parse as the
+  decision envelope — while the same agent asked directly answers in 2 s.
+  Reproduced five times across two builds with `gpt-4o-mini`. Find why the
+  nested turn's reply differs from the direct one (the prompt `delegate_turn`
+  builds, the JSON envelope the parser wants, whether a retry belongs in the
+  turn path at all), fix it, and prove it with a wire run whose transcript is
+  quoted. **The room must also stop saying "I couldn't reach the model" when
+  the model was reached and answered** — an unparseable completion is not an
+  unreachable provider, and the two need different words.
+- [ ] A10.2 **Finance reports zero for invoices raised before the ledger
+  existed.** `ledger_summary` sums the receivables ledger, `billing_totals`
+  sums issued invoices, and ledger posting began with B7.01 — so a tenant who
+  invoiced before that upgrade sees 0.00 in Finance and the true figure in
+  Insights, on the same tenant, in the same minute. Backfill the postings for
+  documents already issued (expand → migrate → contract; the backfill is
+  idempotent and states what it posted), or make the reading account for a
+  document that predates its own posting. Whichever is chosen, the two agents
+  must agree afterwards, and a test must hold them to it.
+- [ ] A10.3 **The evaluation set cannot score 41 of its own questions.** The
+  registry's `answers` strings are templates: "what did we quote X", "where are
+  we with the X deal". Give every intent at least one `answers` entry that
+  names nothing (or names something the seeded workspace holds), so a case is
+  answerable from records rather than needing a name only the asker knows; keep
+  the templates for the prompt if they read better there. While in the file:
+  the run should ask each verb in its own room, since a shared room lets a
+  later question be answered from an earlier verb's result in context.

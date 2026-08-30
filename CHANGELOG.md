@@ -1,5 +1,6 @@
 # Changelog
 
+- When an agent cannot answer because the model returned nothing usable, the reason is now recorded for whoever runs the service — the room still sees one plain sentence, and no part of the answer or the question is written to the log.
 - **A meeting shows its agent on a phone too.** On a wide screen the meeting
   you put in focus keeps its agent in the day panel beside the calendar; on a
   narrow one there is no room for that panel, so opening a meeting now carries
