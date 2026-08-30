@@ -103,7 +103,13 @@ No migrations.
   becomes `[x]` with a pointer to this journal, and a note that `A9.1` (the
   full real-model evaluation) is the owner's to run. Then `LOOP COMPLETE`.
 
-## Wave 2 — Billing, released by the owner (2026-08-30)
+## Wave 2 — Billing: loaned and withdrawn the same night (2026-08-30)
+
+**This wave is closed before it began.** The owner released `web/src/billing/**`
+to this track, then confirmed minutes later that Codex is working in it. Both
+items are `[~]`. The reasoning below stands as written — it is what the wave
+would be if the directory were free — and the rule it opens with is the reason
+nothing was lost: the loop was stopped before its first edit.
 
 AW.5 was deferred because `web/src/billing/**` belongs to **Codex, a separate
 editor with its own checkout** — the one directory this track was told never to
@@ -124,7 +130,14 @@ brings in any billing change: halt, do not merge.
 and whatever restructuring the mount honestly needs — nothing else in there.
 `web/src/shell/**` and `web/src/ds/**` stay forbidden, as always.
 
-- [ ] AW.7 **Billing** — the same panel, the same way, in the two surfaces the
+- [~] AW.7 **Billing** — *(the loan is withdrawn. The owner confirmed on
+  2026-08-30, minutes after this wave opened, that **Codex is working in
+  `web/src/billing/**` right now**, so no loop may enter it: the check this
+  item was built around is answered in advance, and the answer is no. The loop
+  was stopped before its first edit — it never touched the directory. This
+  becomes `[ ]` again only when the owner says Codex is out, and the Tracks
+  table row must be restored in the same commit that reopens it.)*
+  The work, when it is someone's to do: the same panel, in the two surfaces the
   original item named: the **document editor** (an invoice or quotation in
   focus: where it came from — drafted by a person, raised by a schedule, an
   import — its verbs, and an ask) and the **customer view** (the customer as
@@ -142,6 +155,7 @@ and whatever restructuring the mount honestly needs — nothing else in there.
   `.module.css` (ADR 0046); the Codex check above run and its result written in
   STATE.md **even when nothing had moved** — a check whose result is never
   recorded is a check nobody can trust.
-- [ ] AW.8 Wave check: `web/src/billing/**` shows the panel in both surfaces;
+- [~] AW.8 *(deferred with AW.7 — there is nothing to check until it runs.)*
+  Wave check: `web/src/billing/**` shows the panel in both surfaces;
   `AW.5` is marked `[x]` with a pointer to AW.7; the sixteen-page walk still
   passes; then `LOOP COMPLETE`.

@@ -444,4 +444,21 @@ panel's mounts only, under the Codex check the queue spells out. A wrapper that
 sees a completion marker stops before reading the queue, so the line is gone
 rather than edited around.
 
-**Next:** AW.7 — Billing's document editor and customer view.
+**The Billing loan, opened and closed the same night (2026-08-30).** Wave 2
+released `web/src/billing/**` to this track for AW.7's panel mounts. Minutes
+after the loop started, the owner said Codex is working in that directory now,
+so the loan was withdrawn and the loop stopped — before its first edit, with
+nothing modified in the tree and nothing pushed. AW.7 and AW.8 are `[~]`; the
+Tracks table forbids the directory again and records that reopening it takes an
+owner's word in the commit that does it.
+
+Worth keeping, because it is the case the rule was written for: the item's
+first instruction was to check `git log` for billing commits and halt rather
+than collide. That check never had to run — the owner answered it out of band,
+which is faster and more reliable than any heuristic a loop can apply to a
+directory a person is holding. A queue can encode caution; only the owner knows
+where the other editor is.
+
+**Next:** nothing here — this track is idle until Codex is out of Billing.
+
+LOOP COMPLETE
