@@ -5,6 +5,10 @@
   its primary action separate, marks the current published page, and offers a
   keyboard-friendly mobile menu.
 
+- Drive document creation now opens one clear chooser from the full primary
+  action, with Alo document, spreadsheet, Word, slides, folder, and upload
+  presented as explicit destinations instead of creating a file immediately.
+
 - The website section picker is now a focused popup with category navigation,
   balanced block cards, a spacious real-content preview, and a clear insertion
   position instead of expanding into another page inside the editor.
