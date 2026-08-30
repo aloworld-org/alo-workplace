@@ -14,7 +14,10 @@
   proposal live behind one navigation action, and remain intact while its
   dialog is closed. When a page has no sections, its outline uses the remaining
   editor height so the workspace ends on the standard viewport gutter instead
-  of leaving an accidental blank region below a content-height card.
+  of leaving an accidental blank region below a content-height card. Its
+  section picker is a focused popup library: category navigation shortens the
+  scan across eighteen block types, while visual blocks, insertion position,
+  and the selected real-content preview remain visible together.
 - **Errors:** existing server reasons and recovery paths remain unchanged and
   visible beside the operation that failed.
 - **Tenancy:** no API or persistence contract changes; every request continues
@@ -38,6 +41,11 @@ outline and permanently reduced the space available for building.
 For the empty outline, the rejected alternative was a larger fixed minimum
 height. Fixed values still leave arbitrary blank space on tall displays and
 can overflow shorter ones; the shared flex workspace follows the viewport.
+
+For the section library, the rejected alternative was expanding it inside the
+page outline. Even at full width it behaved like a second page, pushed the
+builder out of view, and mixed choosing a block with editing the page. Exact
+placement now uses the visible insertion control inside the popup.
 
 ## Interaction references
 

@@ -1,5 +1,9 @@
 # Changelog
 
+- The website section picker is now a focused popup with category navigation,
+  balanced block cards, a spacious real-content preview, and a clear insertion
+  position instead of expanding into another page inside the editor.
+
 - Empty website page outlines now fill the remaining editor viewport, matching
   other workspace empty states without leaving a large blank region below the
   card.
