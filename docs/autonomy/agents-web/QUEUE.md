@@ -103,13 +103,18 @@ No migrations.
   becomes `[x]` with a pointer to this journal, and a note that `A9.1` (the
   full real-model evaluation) is the owner's to run. Then `LOOP COMPLETE`.
 
-## Wave 2 — Billing: loaned and withdrawn the same night (2026-08-30)
+## Wave 2 — Billing, on loan from Codex (2026-08-30)
 
-**This wave is closed before it began.** The owner released `web/src/billing/**`
-to this track, then confirmed minutes later that Codex is working in it. Both
-items are `[~]`. The reasoning below stands as written — it is what the wave
-would be if the directory were free — and the rule it opens with is the reason
-nothing was lost: the loop was stopped before its first edit.
+**Loaned at 03:05, withdrawn at 03:10, reopened at 08:30 — all on the owner's
+word, which is the only signal that can settle it.** A loop can read `git log`;
+it cannot see the person at the other keyboard, and at 03:05 the log said the
+directory had been quiet for five hours while Codex was in fact about to work
+there. Both times the loop was stopped before its first edit and the directory
+was never touched.
+
+It is reopened because Codex finished in Billing (last commit 07:58) and moved
+to `web/src/sites/**`. **It has not left the checkout** — so the rule below is
+live, not ceremonial.
 
 AW.5 was deferred because `web/src/billing/**` belongs to **Codex, a separate
 editor with its own checkout** — the one directory this track was told never to
@@ -117,27 +122,41 @@ enter. The owner has released it for this item only. That release is a loan,
 not a transfer, and it comes with the only rule that matters when two editors
 share a directory:
 
-**Before the first edit, and again before the commit, check that Codex has not
-moved.** `git log origin/main --since='6 hours ago' -- web/src/billing/` — if a
-commit appears there that this iteration did not make, **stop**: mark AW.7
+**Before the first edit, record the baseline; before the push, compare against
+it.** A wall-clock window is the wrong instrument — "the last six hours" would
+flag Codex's 07:58 commit forever, and a loop that always halts is a loop
+nobody reads. Use the commit the iteration started from:
+
+```
+BASE=$(git rev-parse origin/main)                       # before the first edit
+git fetch -q origin
+git log --oneline "$BASE"..origin/main -- web/src/billing/   # before the push
+```
+
+**Any commit that command prints is Codex's, and it means stop.** Mark AW.7
 `[!]` with the commit named in STATE.md and write `LOOP HALT`. Do not rebase
-over it and carry on, do not resolve a conflict in a billing file by choosing a
+over it and carry on; do not resolve a conflict in a billing file by choosing a
 side. A collision here costs a person's uncommitted work, which no amount of
-this track's progress is worth. The same applies if the rebase before the push
-brings in any billing change: halt, do not merge.
+this track's progress is worth. The same applies to any billing change the
+pre-push rebase brings in: halt, do not merge.
+
+Keep the item small for the same reason — two mounts, no restructuring beyond
+what they need. The narrower this diff, the less there is to collide with if
+Codex turns back.
 
 **Writ for this item only:** `web/src/billing/**` for the panel's mount points
 and whatever restructuring the mount honestly needs — nothing else in there.
 `web/src/shell/**` and `web/src/ds/**` stay forbidden, as always.
 
-- [~] AW.7 **Billing** — *(the loan is withdrawn. The owner confirmed on
-  2026-08-30, minutes after this wave opened, that **Codex is working in
-  `web/src/billing/**` right now**, so no loop may enter it: the check this
-  item was built around is answered in advance, and the answer is no. The loop
-  was stopped before its first edit — it never touched the directory. This
-  becomes `[ ]` again only when the owner says Codex is out, and the Tracks
-  table row must be restored in the same commit that reopens it.)*
-  The work, when it is someone's to do: the same panel, in the two surfaces the
+- [ ] AW.7 **Billing** — *(loan withdrawn 2026-08-30 03:10 when the owner said
+  Codex was in the directory; **reopened 08:30 on the owner's word**, with the
+  state that supports it: Codex's last billing commit was 07:58 and it has
+  since moved to `web/src/sites/**` (08:12, and its uncommitted work is there
+  and in `CHANGELOG.md`). Twice loaned, never entered — the loop was stopped
+  before its first edit both times. **Codex is still working in this checkout,
+  just elsewhere in it**, so the check below is not a formality: it is the
+  thing that keeps a person's work safe if they turn back.)*
+  The work: the same panel, in the two surfaces the
   original item named: the **document editor** (an invoice or quotation in
   focus: where it came from — drafted by a person, raised by a schedule, an
   import — its verbs, and an ask) and the **customer view** (the customer as
@@ -155,7 +174,6 @@ and whatever restructuring the mount honestly needs — nothing else in there.
   `.module.css` (ADR 0046); the Codex check above run and its result written in
   STATE.md **even when nothing had moved** — a check whose result is never
   recorded is a check nobody can trust.
-- [~] AW.8 *(deferred with AW.7 — there is nothing to check until it runs.)*
-  Wave check: `web/src/billing/**` shows the panel in both surfaces;
+- [ ] AW.8 Wave check: `web/src/billing/**` shows the panel in both surfaces;
   `AW.5` is marked `[x]` with a pointer to AW.7; the sixteen-page walk still
   passes; then `LOOP COMPLETE`.

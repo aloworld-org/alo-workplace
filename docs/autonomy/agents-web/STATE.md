@@ -459,6 +459,13 @@ which is faster and more reliable than any heuristic a loop can apply to a
 directory a person is holding. A queue can encode caution; only the owner knows
 where the other editor is.
 
-**Next:** nothing here — this track is idle until Codex is out of Billing.
+**Reopened 2026-08-30 08:30, on the owner's word.** Codex's last Billing commit
+was 07:58; it then moved to `web/src/sites/**` (08:12), where its uncommitted
+work now sits. It has **not** left the checkout, so AW.7's check is live rather
+than ceremonial — and the check itself was corrected in the same commit: a
+six-hour wall-clock window would flag that 07:58 commit forever and halt every
+iteration, so the rule is now a baseline SHA taken before the first edit and
+compared before the push. A guard that always fires teaches people to ignore
+it.
 
-LOOP COMPLETE
+**Next:** AW.7 — Billing's document editor and customer view.
