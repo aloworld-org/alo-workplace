@@ -428,6 +428,20 @@ and a panel below the fold of a scrolling dialog is "visible" to the
 assertion but absent from the screenshot — the walk scrolls it into view, so
 the evidence shows what the assertion checked.
 
-**LOOP COMPLETE** — every item in `docs/autonomy/agents-web/QUEUE.md` is `[x]`
-or `[~]`. The record in focus shows its agent in all sixteen moved modules;
-Billing's mount and the full real-model evaluation (`A9.1`) are the owner's.
+Wave A8.4 closed here — every item was `[x]` or `[~]`, and the record in focus
+showed its agent in all sixteen moved modules. Two notes on the marker that
+stood at this line:
+
+It was written **`**LOOP COMPLETE**`**, in bold, and the wrapper's pattern
+matched only a plain or heading-prefixed marker — so it restarted this finished
+track sixteen times, each restart spending a model call to be told there was no
+work. Fixed in `scripts/run-loop.sh` (`6371bd90`); the pattern now reads the
+emphasis these markers are naturally written with.
+
+The marker itself was then removed by the owner on 2026-08-30, when wave 2
+(AW.7, AW.8) released Billing to this track — `web/src/billing/**` for the
+panel's mounts only, under the Codex check the queue spells out. A wrapper that
+sees a completion marker stops before reading the queue, so the line is gone
+rather than edited around.
+
+**Next:** AW.7 — Billing's document editor and customer view.

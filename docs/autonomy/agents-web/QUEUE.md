@@ -95,11 +95,53 @@ No migrations.
   meeting's record), **Insights** (a board/chart), **Mail** (a message's view
   — origin of a draft an agent wrote), **Contacts**, **Sites** (a site's
   record). Six screenshots.
-- [~] AW.5 **Billing** — *(owner's item: `web/src/billing/**` is Codex's
-  directory; the owner mounts the panel in the document editor and customer
-  view when it is free)*.
+- [~] AW.5 **Billing** — *(was the owner's item while `web/src/billing/**` was
+  Codex's; released to this track as AW.7 on 2026-08-30 — see the wave below)*.
 - [x] AW.6 Wave review: every moved module's record shows its agent, one
   browser walk at desktop and phone width with screenshots in STATE.md; the
   strings are in every language file; `A8.4` in `docs/autonomy/agents/QUEUE.md`
   becomes `[x]` with a pointer to this journal, and a note that `A9.1` (the
   full real-model evaluation) is the owner's to run. Then `LOOP COMPLETE`.
+
+## Wave 2 — Billing, released by the owner (2026-08-30)
+
+AW.5 was deferred because `web/src/billing/**` belongs to **Codex, a separate
+editor with its own checkout** — the one directory this track was told never to
+enter. The owner has released it for this item only. That release is a loan,
+not a transfer, and it comes with the only rule that matters when two editors
+share a directory:
+
+**Before the first edit, and again before the commit, check that Codex has not
+moved.** `git log origin/main --since='6 hours ago' -- web/src/billing/` — if a
+commit appears there that this iteration did not make, **stop**: mark AW.7
+`[!]` with the commit named in STATE.md and write `LOOP HALT`. Do not rebase
+over it and carry on, do not resolve a conflict in a billing file by choosing a
+side. A collision here costs a person's uncommitted work, which no amount of
+this track's progress is worth. The same applies if the rebase before the push
+brings in any billing change: halt, do not merge.
+
+**Writ for this item only:** `web/src/billing/**` for the panel's mount points
+and whatever restructuring the mount honestly needs — nothing else in there.
+`web/src/shell/**` and `web/src/ds/**` stay forbidden, as always.
+
+- [ ] AW.7 **Billing** — the same panel, the same way, in the two surfaces the
+  original item named: the **document editor** (an invoice or quotation in
+  focus: where it came from — drafted by a person, raised by a schedule, an
+  import — its verbs, and an ask) and the **customer view** (the customer as
+  the record). Mount `RecordAgentPanel`; do not reimplement it, do not fork it
+  for Billing's layout — if it genuinely cannot express what these two screens
+  need, widen the component in `web/src/agents/` and say so in its file, which
+  is the rule every other module in this queue followed. Billing's money is
+  read, never computed here: no total, no VAT, no due date is recalculated in
+  the panel — it shows what the record already says (ADR 0011: money is the
+  ledger's, not a view's).
+  **Done when:** one screenshot of each surface with the panel open, read and
+  reported; the origin line says a true thing about a real document (checked
+  against the record, not the fixture); every string an i18n key in every
+  language file; `npx vitest run src` green; `npx tsc --noEmit` clean; no new
+  `.module.css` (ADR 0046); the Codex check above run and its result written in
+  STATE.md **even when nothing had moved** — a check whose result is never
+  recorded is a check nobody can trust.
+- [ ] AW.8 Wave check: `web/src/billing/**` shows the panel in both surfaces;
+  `AW.5` is marked `[x]` with a pointer to AW.7; the sixteen-page walk still
+  passes; then `LOOP COMPLETE`.

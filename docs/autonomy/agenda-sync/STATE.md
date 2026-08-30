@@ -475,6 +475,10 @@ the biggest database on the box at 158 MB); run so, it reported 4072 tenants and
 removed none — all of them are younger than its 2-hour cutoff, i.e. another
 track's suites, so nothing was stale rather than nothing was found.
 
-**Next:** none — the queue is finished.
+**Next:** AS.6 — the meeting in focus, and its agent, at phone width.
 
-LOOP COMPLETE
+Wave AS closed here, and its `LOOP COMPLETE` was removed by the owner on
+2026-08-30 when wave 2 was added: the agents-web review walked sixteen pages at
+360px and found Agenda the only module with no record-in-focus surface, in
+files that belong to this track. The marker is gone rather than edited around,
+because a wrapper that sees it stops before reading the queue.

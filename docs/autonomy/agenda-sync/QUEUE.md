@@ -108,3 +108,35 @@ directory immediately before rebasing.
   for AS.1, AS.2 and the resource collection, quoted in STATE.md; `ROADMAP.md`
   Phase 2 § Agenda rows updated to what is actually built; then
   `LOOP COMPLETE`.
+
+## Wave 2 — the gap the agents-web review found (2026-08-30, owner)
+
+The agents-web track finished A8.4 and walked all sixteen pages at phone
+width. Fifteen show the record in focus and its agent; Agenda does not, and
+that track reported it rather than patching it, because the files are this
+track's. Its evidence is `phone-agenda-FAILED.png` and the `knownAbsent` entry
+in its walk. **agents-web is finished, so `DayPanel` is no longer reserved and
+this track may edit it.**
+
+- [ ] AS.6 **The meeting in focus, and its agent, at phone width.**
+  `AgendaModule.module.css` hides `.dayPanel` outright below 1100px
+  (`@media (max-width: 1100px) { display: none }`), and the day panel is where
+  the meeting in focus and its `RecordAgentPanel` live; at 360px an entry opens
+  `EventModal`, which carries no panel. Close it the way that suits the screen
+  rather than the way that is quickest: either the day panel earns a phone
+  form, or `EventModal` mounts the same panel. Read
+  `web/src/agents/RecordAgentPanel.tsx` first and **mount it — do not
+  reimplement it**; a second copy of that panel is the defect this item exists
+  to avoid, and its props come from the record the modal already holds.
+  **Done when:** a 360px screenshot of a meeting shows its origin, its verbs
+  and its ask — opened and read, not assumed; the 1280px view is unchanged from
+  today; `npx vitest run src` green; `npx tsc --noEmit` clean; no new
+  `.module.css` rule (ADR 0046 — Tailwind utilities from the tokens); nothing
+  under `web/src/agents/**` edited beyond an import; and the `knownAbsent` walk
+  entry is corrected in this journal with the new screenshot named. If the
+  honest answer is that the panel does not belong at phone width, that is a
+  finding: say so with the reasoning and mark the item `[!]` rather than
+  shipping a cramped surface.
+- [ ] AS.7 Wave check: the sixteen-page walk at 360px carries no `knownAbsent`
+  for Agenda; `docs/interop.md` and `ROADMAP.md` still read true; then
+  `LOOP COMPLETE`.
