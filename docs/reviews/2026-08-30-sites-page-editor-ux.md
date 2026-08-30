@@ -7,7 +7,9 @@
   theme, and page protection. Their presentation is reorganised into one
   command surface and one section outline. Preview is an explicit one-click
   view, starts closed to preserve the building workspace, and can be resized
-  against the section outline with a pointer or keyboard on desktop.
+  against the section outline with a pointer or keyboard on desktop. Page
+  access is a command-surface action that keeps its status loaded and opens a
+  focused dialog instead of permanently occupying a full-width row.
 - **Errors:** existing server reasons and recovery paths remain unchanged and
   visible beside the operation that failed.
 - **Tenancy:** no API or persistence contract changes; every request continues
@@ -19,6 +21,10 @@
 The rejected alternative was keeping Preview permanently visible and only
 making the divider draggable. That would still spend half the workspace on a
 view the user may not need while assembling sections.
+
+For page access, the rejected alternative was a collapsible row beneath the
+toolbar. It would still make a page-level setting look like part of the page's
+section content and add height whenever it was used.
 
 ## Interaction references
 

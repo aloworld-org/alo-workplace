@@ -421,6 +421,7 @@ contracts.
 ## Unreleased
 
 - The website page editor now opens Preview only when requested and lets users resize the Sections and Preview panels by dragging or with the keyboard.
+- Page access now lives with the website editor's page-level navigation and opens in a focused dialog instead of occupying a permanent row.
 
 - The Billing agent now answers from the record: which quotes are open, what
   was quoted to a customer, a customer's standing, unpaid and overdue
