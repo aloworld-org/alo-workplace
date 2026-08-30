@@ -93,7 +93,12 @@ Migration numbers per track are in the table; check the directory immediately
 before rebasing, because another loop may have taken a number since the
 iteration began.
 
-**2026-08-30 — agents-web and agenda-sync are complete too.** The Mac's next
+**2026-08-30 (later the same day) — there is no track to start.** The
+owner closed the agent programme; `verbs-a` and `verbs-b` below were
+parked before either ran, and every other queue is finished. Do not start
+a loop on this machine until a queue is opened and named here.
+
+~~**2026-08-30 — agents-web and agenda-sync are complete too.**~~ The Mac's next
 tracks are **verbs-a** (Billing's twenty deferred exclusions) and **verbs-b**
 (the other twenty-seven across eight modules). Both are Rust-first, need the
 postgres container, and touch disjoint files by design — `verbs-a` is only in

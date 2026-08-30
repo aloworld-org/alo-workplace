@@ -1,5 +1,14 @@
 # The rest of the apps their agents cannot reach — everything but Billing
 
+> **PARKED 2026-08-30, before this track ran an iteration.** The owner closed
+> the agent programme: sixteen product agents and Ask alo are built, verified
+> against a real model, and the three defects that run found are fixed. The
+> coverage measured there — 136 verbs against 347 excluded routes, 47 of them
+> excused as "a later intent set" — is recorded rather than closed, and this
+> queue is the record of what closing it would mean. **No loop takes an item
+> from here.** If the work is picked up later, nothing needs rewriting: the
+> items below still name the exact routes and the rule that decides each one.
+
 The A9.1 evaluation (`docs/autonomy/agents/STATE.md`, 2026-08-30) measured what
 the sixteen agents actually cover: **136 verbs against 347 excluded routes**, and
 **47 of those exclusions say in their own words "a later intent set"** — not
@@ -51,45 +60,45 @@ for anything user-visible.
 
 ## Wave VB — the twenty-seven
 
-- [ ] VB.1 **Drive: alo Base.** Seven routes (`/drive/base`, `/drive/base/{node}`,
+- [~] VB.1 **Drive: alo Base.** Seven routes (`/drive/base`, `/drive/base/{node}`,
   `/drive/base/{node}/tables`, `/drive/base-tables/{table}/{fields,records,views}`,
   `/drive/base-records/{record}`). ADR 0032 says structured tables are their own
   surface — so the honest first question is whether Base gets **reads** ("which
   tables are in the customer base", "what is in the orders table") and permanent
   exclusions for the schema editing, or a fuller set. Decide it in the journal
   against the ADR, then do exactly that.
-- [ ] VB.2 **Drive: the file's own history.** `/drive/nodes/{id}/copy` and
+- [~] VB.2 **Drive: the file's own history.** `/drive/nodes/{id}/copy` and
   `/drive/nodes/{id}/versions`. Reads: "what versions does this file have",
   "who changed it last". Write: copy, previewed with the destination.
-- [ ] VB.3 **Sales: the won-deal handoff.** `/crm/deals/{id}/quote` and
+- [~] VB.3 **Sales: the won-deal handoff.** `/crm/deals/{id}/quote` and
   `/crm/deals/{id}/invoice` raise a Billing draft from a won deal. The
   exclusion says offers are Billing's to propose — which is exactly what
   delegation is for (A5), so the likely shape is a CRM verb that hands off to
   @billing rather than a second invoice-raiser. Prove it end to end in a room.
-- [ ] VB.4 **Sales: the conversation on the deal.** `/crm/deals/{id}/threads`,
+- [~] VB.4 **Sales: the conversation on the deal.** `/crm/deals/{id}/threads`,
   `/crm/deals/{id}/threads/{threadId}`, `/crm/deals/{id}/thread-suggestions`.
   A read for the suggestions ("which conversations look like they belong to the
   Northstar deal") and a proposed link; unlinking may well be permanent.
-- [ ] VB.5 **Finance: the bank line.** `/finance/bank/suggestions`,
+- [~] VB.5 **Finance: the bank line.** `/finance/bank/suggestions`,
   `/finance/bank/lines/{id}/match`, `/finance/bank/lines/{id}/unmatch`.
   Reconciliation is decided line by line — so the read is the value here
   ("which bank lines look like they match an invoice"), and a match may be
   proposed with the document named in the preview. Unmatch is likely permanent.
-- [ ] VB.6 **Finance: the statements.** `/finance/reports/pl` and
+- [~] VB.6 **Finance: the statements.** `/finance/reports/pl` and
   `/finance/reports/balance`. Reads only, answered as figures with the period
   stated, never as a screenshot of a screen.
-- [ ] VB.7 **Tasks: the checklist and the labels.** `/tasks/{id}/subtasks`,
+- [~] VB.7 **Tasks: the checklist and the labels.** `/tasks/{id}/subtasks`,
   `/tasks/{id}/subtasks/{sid}`, `/tasks/{id}/labels`, `/tasks/{id}/labels/{lid}`.
   Reading a task's checklist is plainly a verb; **ticking somebody's item is
   plainly not** — write both conclusions permanently rather than deferring them
   a second time.
-- [ ] VB.8 **The four singles.** `/chat/channels/{id}/join` (the asker's own
+- [~] VB.8 **The four singles.** `/chat/channels/{id}/join` (the asker's own
   step — probably permanent), `/hr/openings` (no verb reads an opening at all:
   "which roles are we hiring for" is an obvious read), `/projects/unbilled`
   ("which hours are ready to invoice" — a read that feeds @billing, and a
   delegation worth proving), `/sites/{id}/schedule` (scheduling a publish
   beside the clock it obeys).
-- [ ] VB.9 Wave review: no module in this track's areas keeps a "later intent
+- [~] VB.9 Wave review: no module in this track's areas keeps a "later intent
   set" exclusion; the before/after verb and exclusion counts per module are in
   the journal; the standing evaluation question for each touched agent still
   answers from the record in a fresh room, quoted; `CHANGELOG.md` has a

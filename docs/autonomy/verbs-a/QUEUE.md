@@ -1,5 +1,14 @@
 # alo Billing — the rest of the app its agent cannot reach
 
+> **PARKED 2026-08-30, before this track ran an iteration.** The owner closed
+> the agent programme: sixteen product agents and Ask alo are built, verified
+> against a real model, and the three defects that run found are fixed. The
+> coverage measured there — 136 verbs against 347 excluded routes, 47 of them
+> excused as "a later intent set" — is recorded rather than closed, and this
+> queue is the record of what closing it would mean. **No loop takes an item
+> from here.** If the work is picked up later, nothing needs rewriting: the
+> items below still name the exact routes and the rule that decides each one.
+
 The A9.1 evaluation (`docs/autonomy/agents/STATE.md`, 2026-08-30) measured what
 the sixteen agents actually cover: **136 verbs against 347 excluded routes**, and
 **47 of those exclusions say in their own words "a later intent set"** — they
@@ -64,40 +73,40 @@ rows, which already exist.
 
 ## Wave VA — Billing's twenty
 
-- [ ] VA.1 **The offer's own end.** `/billing/quotes/{id}/decline` and
+- [~] VA.1 **The offer's own end.** `/billing/quotes/{id}/decline` and
   `/billing/quotes/{id}/expire` — an offer closes as declined or lapsed.
   Reads first: "which offers were declined this month", "which offers have
   lapsed". Then the two writes, previewed, with the record view back.
-- [ ] VA.2 **Sending an invoice.** `/billing/invoices/{id}/send` composes the
+- [~] VA.2 **Sending an invoice.** `/billing/invoices/{id}/send` composes the
   mail with the PDF. `draft_payment_reminder` already chases; this is the first
   send. It proposes a draft the asker approves — never a silent send — and the
   preview names the recipient and the document.
-- [ ] VA.3 **Corrections.** `/billing/invoices/{id}/void` and
+- [~] VA.3 **Corrections.** `/billing/invoices/{id}/void` and
   `/billing/invoices/{id}/credit-note`. Money moves and the books follow, so
   the preview must be exact and the undo must be honest (a credit note is not
   undone by deleting it). If the conclusion is that an agent must never do
   these, rewrite both exclusions with that reason and say so in the journal —
   that is a valid outcome for this item and only this item.
-- [ ] VA.4 **The price list.** `/billing/products` (list, create, update) and
+- [~] VA.4 **The price list.** `/billing/products` (list, create, update) and
   `/billing/products/{id}/archive`. Reads: "what do we charge for X", "which
   products are stocked", "what is our day rate". Writes: raise a product,
   change a price, archive one — each previewed against the current price.
-- [ ] VA.5 **The customer list's end.** `/billing/customers/{id}/archive`, with
+- [~] VA.5 **The customer list's end.** `/billing/customers/{id}/archive`, with
   the read that makes it safe ("which customers have no open documents").
-- [ ] VA.6 **Supplier bills.** `/billing/bills` (list, one, approve, reject) —
+- [~] VA.6 **Supplier bills.** `/billing/bills` (list, one, approve, reject) —
   four routes, the purchase side of the same ledger. Reads: "which bills are
   waiting for approval", "what do we owe suppliers this month". Writes:
   approve, reject, each previewed with the supplier and the amount.
-- [ ] VA.7 **Recurring billing.** `/billing/schedules` (list, one, pause,
+- [~] VA.7 **Recurring billing.** `/billing/schedules` (list, one, pause,
   resume, run). Reads: "what recurring billing runs this month", "which
   schedules are paused". Writes: pause, resume — and `run` only if the
   conclusion is that an agent may raise a scheduled batch at all; if not,
   rewrite that one exclusion permanently.
-- [ ] VA.8 **Catalogue connections.** `/billing/price-connections` and
+- [~] VA.8 **Catalogue connections.** `/billing/price-connections` and
   `/billing/price-connections/{id}`. Most likely outcome: a read ("which
   catalogue connections are healthy") plus permanent exclusions for the
   configuration itself. Whichever way, no route keeps "a later intent set".
-- [ ] VA.9 Wave review: the coverage test lists Billing's routes as verbs and
+- [~] VA.9 Wave review: the coverage test lists Billing's routes as verbs and
   permanent exclusions with **no "later intent set" left**; the count of verbs
   and exclusions before and after is in the journal; the standing evaluation
   questions for Billing still answer from the record in a fresh room, quoted;
