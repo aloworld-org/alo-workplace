@@ -93,6 +93,16 @@ Migration numbers per track are in the table; check the directory immediately
 before rebasing, because another loop may have taken a number since the
 iteration began.
 
+**2026-08-30 — agents-web and agenda-sync are complete too.** The Mac's next
+tracks are **verbs-a** (Billing's twenty deferred exclusions) and **verbs-b**
+(the other twenty-seven across eight modules). Both are Rust-first, need the
+postgres container, and touch disjoint files by design — `verbs-a` is only in
+`billing_intents.rs`, `verbs-b` is in every other module's. The Windows PC is
+running track `agents` (wave A10, the three defects the evaluation found);
+A10.1 fixes Ask alo's delegation, which `verbs-b`'s VB.3 and VB.8 depend on —
+if a delegation still fails there, say so in the journal and carry on rather
+than fixing the orchestrator from this track.
+
 **2026-08-29 — a/b/c are complete.** The Mac's next tracks are **agents-web**
 (A8.4 with the widened writ; web only, needs `cd web && npm ci` and
 `npx playwright install chromium` once) and **agenda-sync** (Rust-first,

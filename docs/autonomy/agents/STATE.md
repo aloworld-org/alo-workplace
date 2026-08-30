@@ -5204,4 +5204,11 @@ A8.4 landed on the `agents-web` track while this run was being written up — th
 record's agent is now on every moved module's detail view — so this queue is
 closed except for wave A10.
 
-LOOP COMPLETE (with blockers)
+The loop stopped here on 2026-08-29 with two blockers; both are gone (A8.4
+landed on `agents-web`, A9.1 ran on 2026-08-30). That marker is reworded below
+rather than deleted, because an anchored `LOOP COMPLETE` at column 0 stops the
+runner on its first iteration whatever the queue says.
+
+**Finished then — reopened 2026-08-30 for wave A10**, the three defects the
+real-model evaluation found. The loop runs again from A10.1.
+
