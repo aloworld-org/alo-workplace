@@ -1,5 +1,9 @@
 # Changelog
 
+- Empty website page outlines now fill the remaining editor viewport, matching
+  other workspace empty states without leaving a large blank region below the
+  card.
+
 - Assisted website page changes now open from the editor navigation in a
   focused review dialog, leaving the section outline dedicated to the page
   structure while preserving prepared changes between opens.

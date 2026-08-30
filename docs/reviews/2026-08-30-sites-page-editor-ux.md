@@ -12,7 +12,9 @@
   focused dialog instead of permanently occupying a full-width row. Assisted
   page changes follow the same pattern: the instruction and its reviewable
   proposal live behind one navigation action, and remain intact while its
-  dialog is closed.
+  dialog is closed. When a page has no sections, its outline uses the remaining
+  editor height so the workspace ends on the standard viewport gutter instead
+  of leaving an accidental blank region below a content-height card.
 - **Errors:** existing server reasons and recovery paths remain unchanged and
   visible beside the operation that failed.
 - **Tenancy:** no API or persistence contract changes; every request continues
@@ -32,6 +34,10 @@ section content and add height whenever it was used.
 For assisted page changes, the rejected alternative was keeping the composer
 above the section list. It mixed a page-level command into the document
 outline and permanently reduced the space available for building.
+
+For the empty outline, the rejected alternative was a larger fixed minimum
+height. Fixed values still leave arbitrary blank space on tall displays and
+can overflow shorter ones; the shared flex workspace follows the viewport.
 
 ## Interaction references
 
