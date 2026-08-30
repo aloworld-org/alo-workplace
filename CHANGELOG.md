@@ -1,5 +1,11 @@
 # Changelog
 
+- Website overviews now put pages immediately after publish status, make each
+  page row clickable, and group publishing, collaborators, languages, tools,
+  and the site agent beneath a quieter management heading. The narrower,
+  responsive layout keeps the website name, address, status, and primary
+  actions readable without competing panels.
+
 - Website creation now presents compact visual starting paths and visual
   template thumbnails, keeps its actions above the mobile app bar, and only
   enables creation after the current website address is confirmed available.
