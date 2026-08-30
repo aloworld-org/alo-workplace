@@ -47,8 +47,15 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
   # open. Anchored to the start of a line ((?m) makes ^ mean that), because the
   # journal is prose and quotes its own markers -- an unanchored match found
   # "- **Next:** `LOOP COMPLETE`" mid-file and stopped with 58 items open.
-  if ($state -cmatch "(?m)^#{0,6} *LOOP COMPLETE") { Write-Host "[loop] queue complete - stopping."; break }
-  if ($state -cmatch "(?m)^#{0,6} *LOOP HALT")     { Write-Host "[loop] halted by the agent - fix the reason in STATE.md, remove the marker, restart."; break }
+  #
+  # Bold is the third spelling, and run-loop.sh learned it on 2026-08-29 after
+  # sixteen no-op iterations over a finished agents-web queue whose marker read
+  # "**LOOP COMPLETE** - every item ... is [x]". This wrapper did not learn it
+  # with its twin, so the same journal would have spun here; the two patterns
+  # are now the same pattern. Prose is still excluded by the anchor -- the
+  # journal's own references sit behind a bullet or a backtick.
+  if ($state -cmatch "(?m)^#{0,6} *\*{0,2}LOOP COMPLETE") { Write-Host "[loop] queue complete - stopping."; break }
+  if ($state -cmatch "(?m)^#{0,6} *\*{0,2}LOOP HALT")     { Write-Host "[loop] halted by the agent - fix the reason in STATE.md, remove the marker, restart."; break }
 
   # One iteration, with an IDLE-based hang guard: a truly hung worker goes
   # silent (its session transcript stops growing), while an honest long item

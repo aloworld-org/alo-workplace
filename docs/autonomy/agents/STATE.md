@@ -5522,3 +5522,50 @@ substitute a real record into.
   owner rather than half-built.
 
 **Next:** the queue's last item is `[x]`; every other item is `[x]` or `[~]`.
+
+
+## LOOP COMPLETE — wave A10 closed, and the queue with it (2026-08-30)
+
+**Nothing was open to take.** Every item in `docs/autonomy/agents/QUEUE.md` is
+`[x]` or `[~]`: waves A1–A3 (20 shipped, A2.2b dropped with its reasoning),
+A4–A8 (A4.2–A4.4 moved to agents-a/b/c, A8.4 landed on agents-web), A9.1 run by
+the owner against a real model on 2026-08-30, and the three defects that run
+found — A10.1 the delegated step that never reached the model, A10.2 Finance and
+Billing disagreeing about the same period, A10.3 the evaluation set's 41
+unscoreable questions — all `[x]` and pushed (`88a0dfa5`, `1d42ca18`,
+`9dca2e99`). The tree was clean at this iteration's pull; no item's work was
+left behind.
+
+**One fix, because the marker had to be able to stop this machine.**
+`scripts/run-loop.sh` learned on 2026-08-29 that a journal ends `**LOOP
+COMPLETE**` in bold — sixteen no-op iterations over a finished agents-web queue
+bought that lesson. `scripts/run-loop.ps1`, which is the wrapper that actually
+runs on this Windows box, never learned it: its pattern was `(?m)^#{0,6} *LOOP
+COMPLETE`, so the four bold markers already in this journal (lines 158, 3472,
+3631, 3672) were invisible to it and a bold close-out written here would have
+spun the same way its twin did. The two patterns are now identical
+(`\*{0,2}` before the word). Checked before making it: of the fifteen track
+journals only this one carries bold-only markers, and its queue has zero open
+items — the three live queues (agents-web, verbs-a, verbs-b) carry no marker of
+either spelling, so nothing that should still be running is stopped by the
+change. This entry's own marker is written as a heading, which both wrappers
+have always seen.
+
+**What the track leaves behind.** An agent per product, product-scoped tools
+refused at the execution boundary rather than in the prompt, reads that answer
+and writes that propose, intents as the one path a route and an agent share,
+delegation with a retry and honest words when a completion is unusable, memory
+scoped to its channel, standing instructions, the action record and undo, and an
+evaluation set of 373 questions that can be scored against a workspace's own
+records.
+
+**Two things are flagged for the owner rather than built here**, both recorded
+in the entries above: the evaluation set still cannot substitute a record the
+tenant under test actually holds (it needs a per-product record picker), and
+there is no retry policy anywhere in the turn path beyond the single one A10.1
+added — worth a decision rather than a silent default.
+
+**Next:** nothing. A new wave means a new item in QUEUE.md and this marker
+reworded, not deleted — an anchored `LOOP COMPLETE` at column 0 is what stops
+the runner, and deleting the record of why it stopped is how a queue gets
+relitigated.
