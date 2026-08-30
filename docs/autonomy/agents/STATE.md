@@ -5200,6 +5200,8 @@ repository files — the repository's own copy of this run is this entry.
 **Where that leaves the queue.** A9.1 is `[x]`: the evaluation ran, on the
 wire, against a real model, and is quoted here. It did not come back clean, and
 the three things it found are items rather than footnotes — wave A10 below.
-A8.4 remains with the `agents-web` track.
+A8.4 landed on the `agents-web` track while this run was being written up — the
+record's agent is now on every moved module's detail view — so this queue is
+closed except for wave A10.
 
 LOOP COMPLETE (with blockers)
