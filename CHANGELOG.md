@@ -1,5 +1,9 @@
 # Changelog
 
+- Assisted website page changes now open from the editor navigation in a
+  focused review dialog, leaving the section outline dedicated to the page
+  structure while preserving prepared changes between opens.
+
 - The website page editor now uses a compact command surface, a focused section outline, and a dominant responsive canvas with intentional empty-page onboarding.
 
 - Website workspace navigation now uses the same shared sizing, spacing, and interaction pattern as Billing.

@@ -9,7 +9,10 @@
   view, starts closed to preserve the building workspace, and can be resized
   against the section outline with a pointer or keyboard on desktop. Page
   access is a command-surface action that keeps its status loaded and opens a
-  focused dialog instead of permanently occupying a full-width row.
+  focused dialog instead of permanently occupying a full-width row. Assisted
+  page changes follow the same pattern: the instruction and its reviewable
+  proposal live behind one navigation action, and remain intact while its
+  dialog is closed.
 - **Errors:** existing server reasons and recovery paths remain unchanged and
   visible beside the operation that failed.
 - **Tenancy:** no API or persistence contract changes; every request continues
@@ -25,6 +28,10 @@ view the user may not need while assembling sections.
 For page access, the rejected alternative was a collapsible row beneath the
 toolbar. It would still make a page-level setting look like part of the page's
 section content and add height whenever it was used.
+
+For assisted page changes, the rejected alternative was keeping the composer
+above the section list. It mixed a page-level command into the document
+outline and permanently reduced the space available for building.
 
 ## Interaction references
 
