@@ -119,3 +119,9 @@ not match. The response contains no tenant, account, or credential data.
 
 Vite uses strict port binding. An occupied 5173 is an error; it never silently
 moves the frontend to another port.
+
+The operator control plane is not part of the ordinary local stack. Vite does
+not proxy or probe `/control` unless its separate origin is explicitly supplied
+as `VITE_DEV_CONTROL_API`. This keeps normal local sessions free of expected
+`/control/me` 404 responses while preserving operator-console development when
+that service is running.

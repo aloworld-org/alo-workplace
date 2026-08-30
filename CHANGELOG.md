@@ -1,5 +1,10 @@
 # Changelog
 
+- Prepared Billing emails now open directly in Mail's full compose editor, so
+  users can review and change recipients, subject, message, and attachments
+  before sending. Existing drafts also expose Edit alongside quick Send, and
+  ordinary local development no longer emits a misleading `/control/me` 404.
+
 - Fixed seeded quotation PDFs so the reusable demo illustration is embedded
   from a small repository-owned raster instead of leaving an empty image frame.
   The database still stores only the short asset path.
