@@ -12,6 +12,10 @@
   closed, or in a currency with no rate on it — is named with the reason instead
   of being booked on a guess.
 
+- The Websites landing page now follows the shared alo workspace hierarchy,
+  with a branded module header, full-width content, responsive spacing, and one
+  clear creation action when the workspace is empty.
+
 - Recurring Billing schedules now open from anywhere on their table row, with
   the same keyboard behavior as quotation and invoice rows. Pause, resume, and
   delete remain independent actions and never open the editor accidentally.
