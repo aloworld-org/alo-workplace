@@ -104,6 +104,25 @@ fn landmarks_wrap_main_in_order_with_skip_link_first() {
 }
 
 #[test]
+fn navigation_marks_the_current_page_and_ships_a_complete_mobile_disclosure() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [{
+            "type": "nav",
+            "links": [
+                {"label": "Home", "href": "/"},
+                {"label": "About", "href": "/about"}
+            ]
+        }]
+    }));
+
+    assert!(html.contains("<a href=\"/about\" aria-current=\"page\">About</a>"));
+    assert!(html.contains("event.key === \"Escape\""));
+    assert!(html.contains("toggle.focus()"));
+    assert!(html.contains("menu.querySelectorAll(\"a\")"));
+}
+
+#[test]
 fn unknown_sections_and_newer_versions_render_best_effort() {
     let stored = json!({
         "schema_version": 2,

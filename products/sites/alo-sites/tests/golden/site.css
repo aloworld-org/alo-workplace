@@ -137,10 +137,24 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   flex-wrap: wrap;
   gap: 1rem;
 }
-.s-nav a { color: var(--text); text-decoration: none; }
+.s-nav a {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
+  text-decoration: none;
+}
 .s-nav a:hover { text-decoration: underline; }
+.s-nav a[aria-current="page"] {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 0.125rem;
+  text-underline-offset: 0.35rem;
+}
 .s-nav a.button { color: var(--on-primary); }
 .nav-toggle {
+  min-height: 2.75rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   background: var(--surface);

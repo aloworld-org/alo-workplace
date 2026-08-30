@@ -106,6 +106,7 @@ fn contract_selectors_are_styled() {
         ".skip-link:focus",
         ".hp",
         ".s-nav",
+        ".s-nav a[aria-current=\"page\"]",
         ".js .nav-toggle",
         ".js .s-nav .nav-toggle[aria-expanded=\"true\"] + ul",
         ".s-hero",

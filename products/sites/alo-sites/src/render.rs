@@ -252,7 +252,7 @@ fn render_document(
     for (index, section) in parsed.iter().enumerate() {
         let marks = sections::Marks::new(index, editable);
         match section {
-            Section::Nav(nav) => sections::nav(&mut header, site, nav, marks),
+            Section::Nav(nav) => sections::nav(&mut header, site, page, nav, marks),
             Section::Footer(f) => sections::footer(&mut footer, site, f, marks),
             other => sections::body_section(&mut main, site, page, other, marks),
         }

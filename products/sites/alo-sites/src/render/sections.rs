@@ -135,7 +135,13 @@ fn columns_class(columns: Option<GridColumns>) -> Option<&'static str> {
 /// the theme logo when one is set, the site name otherwise; the toggle
 /// button is wired by the behavior script and hidden (menu expanded) when
 /// JavaScript is unavailable.
-pub(super) fn nav(out: &mut String, site: &SiteRenderContext<'_>, s: &NavSection, m: Marks) {
+pub(super) fn nav(
+    out: &mut String,
+    site: &SiteRenderContext<'_>,
+    page: &PageRenderContext<'_>,
+    s: &NavSection,
+    m: Marks,
+) {
     let menu_id = format!("nav-menu-{}", m.index);
     open_section(out, "header", "s-nav", m);
     out.push_str(&format!(
@@ -160,12 +166,12 @@ pub(super) fn nav(out: &mut String, site: &SiteRenderContext<'_>, s: &NavSection
     out.push_str(&format!("<ul id=\"{menu_id}\">\n"));
     for link in &s.links {
         out.push_str("<li>");
-        push_link(out, link, "");
+        push_nav_link(out, link, "", page.path);
         out.push_str("</li>\n");
     }
     if let Some(cta) = &s.cta {
         out.push_str("<li>");
-        push_link(out, cta, "button");
+        push_nav_link(out, cta, "button", page.path);
         out.push_str("</li>\n");
     }
     out.push_str("</ul>\n</nav>\n</header>\n");
@@ -203,7 +209,7 @@ pub(super) fn body_section(
     m: Marks,
 ) {
     match section {
-        Section::Nav(s) => nav(out, site, s, m),
+        Section::Nav(s) => nav(out, site, page, s, m),
         Section::Footer(s) => footer(out, site, s, m),
         Section::Hero(s) => hero(out, site, s, m),
         Section::Features(s) => features(out, s, m),
@@ -1016,6 +1022,28 @@ fn push_link(out: &mut String, link: &Link, class: &str) {
         out.push_str(&format!(
             "<a class=\"{class}\" href=\"{}\">{}</a>",
             safe_href(&link.href),
+            esc(&link.label)
+        ));
+    }
+}
+
+/// A header link with its page relationship exposed to sighted and assistive
+/// technology users. Only exact site-relative paths are current; anchors,
+/// external URLs and actions remain ordinary links.
+fn push_nav_link(out: &mut String, link: &Link, class: &str, page_path: &str) {
+    let current = (link.href == page_path).then_some(" aria-current=\"page\"");
+    if class.is_empty() {
+        out.push_str(&format!(
+            "<a href=\"{}\"{}>{}</a>",
+            safe_href(&link.href),
+            current.unwrap_or_default(),
+            esc(&link.label)
+        ));
+    } else {
+        out.push_str(&format!(
+            "<a class=\"{class}\" href=\"{}\"{}>{}</a>",
+            safe_href(&link.href),
+            current.unwrap_or_default(),
             esc(&link.label)
         ));
     }

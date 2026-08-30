@@ -1,5 +1,10 @@
 # Changelog
 
+- Website navigation now behaves like a real header: it is pinned in the
+  builder, can add and reorder existing site pages without typing URLs, keeps
+  its primary action separate, marks the current published page, and offers a
+  keyboard-friendly mobile menu.
+
 - The website section picker is now a focused popup with category navigation,
   balanced block cards, a spacious real-content preview, and a clear insertion
   position instead of expanding into another page inside the editor.

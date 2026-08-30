@@ -1,4 +1,4 @@
-//! The two scripts of a rendered page: the behavior script (menu toggle +
+//! The two scripts of a rendered page: the behavior script (accessible menu disclosure +
 //! form submit) and the analytics beacon.
 //!
 //! Together these are the **entire** JavaScript budget of a published site
@@ -34,10 +34,25 @@ pub(super) const BEHAVIOR_SCRIPT: &str = r#"<script>(function () {
   "use strict";
   document.documentElement.classList.add("js");
   document.querySelectorAll(".nav-toggle").forEach(function (toggle) {
+    var menu = document.getElementById(toggle.getAttribute("aria-controls"));
+    function closeMenu(restoreFocus) {
+      toggle.setAttribute("aria-expanded", "false");
+      if (restoreFocus) { toggle.focus(); }
+    }
     toggle.addEventListener("click", function () {
       var expanded = toggle.getAttribute("aria-expanded") === "true";
       toggle.setAttribute("aria-expanded", expanded ? "false" : "true");
     });
+    toggle.closest("nav").addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") {
+        closeMenu(true);
+      }
+    });
+    if (menu) {
+      menu.querySelectorAll("a").forEach(function (link) {
+        link.addEventListener("click", function () { closeMenu(false); });
+      });
+    }
   });
   document.querySelectorAll('form[action^="/f/"]').forEach(function (form) {
     form.addEventListener("submit", function (event) {
