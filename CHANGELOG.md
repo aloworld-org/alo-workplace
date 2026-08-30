@@ -3,6 +3,16 @@
 - The empty Websites workspace now fills the available screen height, keeping
   its welcome action centred and leaving only the standard outer gutter.
 
+- **The example questions each agent advertises no longer name a stranger.**
+  Every verb in the workspace lists the questions it is the answer to — the
+  agent quotes them in its own description, and “Ask alo” routes your request by
+  them. Dozens of those examples named a customer, a colleague or a document
+  number picked out of thin air (“what did we quote X”, “what is Ben's
+  address”), which read as though your workspace held them. They now name the
+  thing you would supply — “what did we quote {customer}” — and every verb also
+  advertises at least one question that names nothing at all and is answered
+  from your own records.
+
 - **Finance and Billing no longer disagree about the same period.** If your
   workspace raised invoices before alo started keeping your books, those
   documents were never written into the journal — so “how much have we invoiced

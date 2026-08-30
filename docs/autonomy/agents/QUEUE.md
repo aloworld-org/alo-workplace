@@ -246,7 +246,7 @@ weakness in the evaluation set itself.
   idempotent and states what it posted), or make the reading account for a
   document that predates its own posting. Whichever is chosen, the two agents
   must agree afterwards, and a test must hold them to it.
-- [ ] A10.3 **The evaluation set cannot score 41 of its own questions.** The
+- [x] A10.3 **The evaluation set cannot score 41 of its own questions.** The
   registry's `answers` strings are templates: "what did we quote X", "where are
   we with the X deal". Give every intent at least one `answers` entry that
   names nothing (or names something the seeded workspace holds), so a case is

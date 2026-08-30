@@ -5424,3 +5424,101 @@ tenants, 147 MB, nothing to remove).
 **Next:** A10.3 — the evaluation set cannot score 41 of its own questions,
 because the registry's `answers` strings are templates naming a customer only the
 asker knows.
+
+## A10.3 — a question the run can actually put (2026-08-30)
+
+**What the run could not score.** The evaluation set grows from the registry:
+every verb, asked as one of its own `answers` questions. Forty-one of those
+questions named a record out of thin air — "what did we quote X", "where are we
+with the X deal", "what is Ben's address" — so the agent answered honestly ("I
+could not find a customer called X") and the verb was proved by nothing. The
+same run also asked all of an agent's questions in ONE room, where a later
+question can be answered from an earlier verb's result still in context: 62 of
+81 reads executed, and the rest were either placeholder asks or answered from
+what had already been said.
+
+**The rule, now in the registry.** An ask names no record. Whatever the asker
+supplies is a `{arg}` hole over one of the intent's own arguments — the same
+convention `preview` has always used, read by the new `intent::holes`. Eighty-
+three asks across all sixteen modules were rewritten: `"what did we quote X"` →
+`"what did we quote {customer}"`, `"is Ben free tomorrow at two"` → `"is
+{person} free tomorrow at two"`, `"how many X100 do we have left"` → `"how many
+{product} do we have left"`. Where the named thing was not an argument at all,
+the ask was the misleading half and it went: `who_is_off` takes no person, so
+"is Amara around tomorrow" is now "is anyone off tomorrow"; `who_i_emailed`
+takes no correspondent, so the ask about "ABC Supplies" is now "who have I been
+in touch with this month".
+
+**Three tests hold it, and one of them is mechanical.**
+
+- `every_hole_names_an_argument_of_its_own_intent` — a hole the verb does not
+  take is a question nothing can fill.
+- `every_verb_has_a_question_a_run_can_put` — every verb has an *askable*
+  question: no holes, or holes only over arguments it cannot run without. A
+  hole over an OPTIONAL argument is a narrowing the asker could have left out,
+  so the intent owes the set the unnarrowed question too. Three lookups have no
+  unnarrowed question at all — `quote_lookup`, `invoice_lookup`, `deal_lookup`,
+  each identifying ONE record through arguments that are optional only because
+  either of them identifies it — and they are named in `NEEDS_A_SUBJECT` with
+  that reason. The test asserts askable XOR excepted, so the list cannot shelter
+  a verb that merely forgot its plain question, and that an excepted verb has no
+  required argument it could have holed instead.
+- `no_ask_names_a_record` — every one of the 41 carried a capital letter (`X`,
+  `INV-2026-00042`, `Ben`, `ABC Supplies`), so a capitalised word outside a
+  small allowlist (weekdays, months, "I", "VAT", "French") is refused. It cannot
+  tell "the launch dinner" from a record a tenant holds — a lowercase
+  descriptive subject reads as a real user's words and an empty resolution is a
+  legitimate answer — but the regression the run found is now impossible.
+
+**The run asks each verb in its own room.** `one_per_verb(product)` picks, per
+verb, the askable question rather than whichever the module listed first, and
+the suite creates a channel per verb instead of one per agent. `EvalCase::asked`
+fills what holes remain with the same placeholders the tool call carries, so the
+question and the call name the same thing ("@billing invoice Northstar for the
+work we did" → `create_invoice_draft{customer:"Northstar"}`), and the suite
+asserts no `{` survives into a question. The owner's real-model run substitutes
+records its own tenant holds — which is the point: the set now says *which*
+argument to substitute instead of leaving a literal `X` to be guessed at.
+
+**How verified.** `cargo fmt`; `cargo clippy -p alo-ai -p alo-jmap
+--all-targets` clean; `cargo nextest run -p alo-ai` **303 passed** (299 before,
+four new tests); `cargo nextest run -p alo-jmap` **1599 of 1599 green**,
+including all sixteen `agent_evaluation_http` walks over the reshaped set. Test
+database pruned first (`alo_scratch`, 2 179 tenants → 2, 148 MB). The
+transcripts the suite writes show the change plainly:
+
+```
+@agenda when are we all free for an hour this week
+  find_a_time → {"complete":true,"couldNotCheck":[],"slots":[{"end":"2026-08-28T…
+@agenda what do I need for Northstar
+  meeting_prep → this lookup did not run: no meeting of yours in the diary is called Northstar
+@billing what did we quote Northstar
+  quote_lookup → this lookup did not run: name the quote by its number or by the customer
+```
+
+The first is what the fix buys: `find_a_time`'s only question used to name Ben
+and reached nothing; its unnarrowed question now returns real slots. The other
+two are the honest residue — a lookup asked about a record this empty workspace
+does not hold, refusing by name, which is the answer the owner's run will
+substitute a real record into.
+
+**Cuts and flags.**
+- **The census moved 372 → 373**, and the pin in
+  `every_verb_contributes_at_least_one_question` with it: one ask added
+  (`find_a_time`'s unnarrowed question), the rest rewritten in place.
+- **The planner's roster and every agent's tool line now quote holes** — "Ask
+  it for: \"what did we quote {customer}\"". That is the same string the model
+  always read, minus the invented name, and the argument it holes is listed on
+  the same line. `agent_plan`'s roster test was updated to assert the holed
+  form.
+- **`STANDING`, the owner's seventeen, is deliberately untouched**: those name
+  Northstar Foods and axongroup.com because the owner's own tenant holds them,
+  and they are the 2026-08-28 baseline quoted verbatim. The new test walks
+  `evaluation_set()` only.
+- **A subject a run could resolve from the workspace is not built here.** The
+  set now says which argument needs a record; picking one out of the tenant
+  under test (so a lookup verb scores against a record that exists) would need a
+  per-product record picker and is a bigger item than this one. Flagged for the
+  owner rather than half-built.
+
+**Next:** the queue's last item is `[x]`; every other item is `[x]` or `[~]`.
