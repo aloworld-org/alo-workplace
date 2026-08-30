@@ -1,5 +1,9 @@
 # Changelog
 
+- Fixed seeded quotation PDFs so the reusable demo illustration is embedded
+  from a small repository-owned raster instead of leaving an empty image frame.
+  The database still stores only the short asset path.
+
 - Fixed the Billing demo corpus so every customer connected to quotations,
   invoices, and recurring schedules has a deterministic customer email. Running
   the idempotent seed command also repairs existing v1 demo records, preventing
