@@ -1,5 +1,13 @@
 # Changelog
 
+- **An agent whose model replies with something unusable now simply asks it
+  again**, once, instead of giving up — so a multi-step run for “Ask alo”,
+  where every step is its own question to the model, finishes instead of
+  stopping at step one. And when it still cannot be answered, the room is told
+  what actually happened: “I reached the model, but what came back wasn't
+  something I could act on” is a different sentence from “I couldn't reach the
+  model”, and only one of them is ever true at a time.
+
 - **Invoices and quotations now move from Billing to the customer-ready email
   without a dead end.** Issuing or finalizing prepares the localized covering
   note and numbered PDF, then opens that exact message in Mail. Numbered

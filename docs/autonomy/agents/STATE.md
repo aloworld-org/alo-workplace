@@ -5212,3 +5212,102 @@ runner on its first iteration whatever the queue says.
 **Finished then — reopened 2026-08-30 for wave A10**, the three defects the
 real-model evaluation found. The loop runs again from A10.1.
 
+
+## A10.1 — a delegated step that answers (2026-08-30)
+
+**What was actually wrong.** Not the prompt. The first hypothesis was that
+`delegate_turn` builds a different prompt from a room turn, so the model behaved
+differently inside a plan; that is now measured rather than argued
+(`a_delegated_step_is_shown_the_same_prompt_as_the_question_asked_directly`):
+the same question asked directly and asked as a step of a plan shows the model a
+**byte-identical system prompt** and a user turn identical down to the sources
+and the handoff offer, differing only in the request line — the direct ask
+carries the `@billing` the person typed.
+
+What is different is **how many times a run asks**, and **how little it
+tolerated**. A single question is one model call. Ask alo spends one on the plan
+and one on every step, plus one after each reading tool — and until this item,
+**any** reply that was not the decision envelope ended the whole run, marked the
+goal failed, and said "I couldn't reach the model" in the room. So the same
+provider flakiness the evaluation measured at 8% of single turns was met several
+times per run and was fatal every time.
+
+**Three changes.**
+
+1. **One retry, in the turn path** (`alo_ai::agent::decide`). A reply that is
+   not a decision is asked again, once, with the contract restated and *nothing
+   quoted back* — the failed reply may hold a whole answer, and an answer is
+   somebody's records (law #1). Only for an unusable reply: a provider that is
+   switched off or unreachable will be just as unreachable a second later, and a
+   model that ignored the contract twice is not going to be talked round by a
+   third ask. It costs nothing on the happy path — every existing suite's exact
+   call counts are unchanged.
+2. **The two failures are now different errors** (`alo_ai::DecisionError`).
+   `InferenceError::Empty` covered a body that would not parse, a completion with
+   no text, and a reply that was not the envelope, while `Transport`/`Backend`
+   meant nobody answered — and everything upstream collapsed the lot into one
+   sentence. The split is drawn where it can be observed: the HTTP call either
+   produced text or it did not. `Provider(_)` → "I couldn't reach the model";
+   `Unusable` → **"I reached the model, but what came back wasn't something I
+   could act on."** The goal record carries the same distinction in its `note`,
+   a handoff folds in the right sentence for the asking model, and both are
+   logged. The enum was left alone deliberately: adding a variant to
+   `InferenceError` would have meant editing the sites track's match arms.
+3. **A `"content": null` completion is no longer a broken body.** OpenAI-shaped
+   providers send an explicit null whenever the assistant message carries
+   something else instead — a refusal, a filtered completion, tool calls — and
+   `#[serde(default)] content: String` rejects a *present* null, so the whole
+   response failed to deserialize. It is an empty completion, and now reads as
+   one.
+
+**The wire.** Scripted-model suite (`agent_unusable_reply_http.rs`, five tests,
+real HTTP to a local socket, the real router and store; no live provider, per
+the queue's rule). The recovering run, transcript as recorded:
+
+```
+call 0 user turn: Request: @alo what did we quote Northstar Foods?
+        reply:    {"kind":"plan","steps":[{"agent":"billing","ask":"what did we quote Northstar Foods?"}]}
+call 1 user turn: Request: what did we quote Northstar Foods? | Sources:
+        reply:    Sure — I can look that up for you. Which customer did you mean?   (prose: unusable)
+call 2 user turn: Request: what did we quote Northstar Foods? | Sources: |  |
+                  Your previous reply could not be used: it was not a single JSON object of one of
+                  the shapes described above. Do not apologise and do not explain — send that JSON
+                  object now, and nothing else: no prose before it, no code fence around it.
+        reply:    {"kind":"answer","answer":"We quoted Northstar Foods 7,865.00 EUR on QUO-2026-00001 [1]."}
+--- room ---
+user  : @alo what did we quote Northstar Foods?
+agent : Here's how I'll do that:\n1. @billing — what did we quote Northstar Foods?
+agent : We quoted Northstar Foods 7,865.00 EUR on QUO-2026-00001 [1].
+```
+
+Before this item that run ended after call 1 with "I couldn't reach the model
+just now" and a goal marked failed. The other four tests hold: a direct turn
+recovering the same way; two unusable replies ending with the *reached* sentence
+and exactly two calls (one retry, not a loop); a step that never answers ending
+the run with `note: "the model's reply could not be used"` and step two not
+running; and the prompt-identity measurement above.
+
+**Cut, and recorded rather than done quietly.** The command palette
+(`POST /ai/agent`) still answers `reason: "unreachable"` for both failures. That
+field is a wire contract the palette's client reads
+(`web/src/jmap/types.ts`: `"unconfigured" | "unreachable" | null`) and a third
+value needs both ends changed in one go — `web/src/shell/**` belongs to another
+agent. The distinction is logged there instead, and the room, which is where the
+evaluation found the lie, says the true sentence.
+
+**Not claimed.** This is not proof that gpt-4o-mini's nested-turn replies were
+unparseable prose — a loop may not call a paid provider, so the real-model
+half of the proof is the owner's to run (A9.1's shape). What is proved is that
+the symptom the evaluation recorded — a step whose reply is not the envelope —
+no longer ends the run, and that the room no longer blames the connection for
+it. If the next real-model run still fails at step one, the new log line and the
+new sentence say which of the two it is, which the old ones could not.
+
+**Verified.** `cargo fmt`; `cargo clippy -p alo-ai -p alo-jmap --all-targets`
+clean; `cargo nextest run -p alo-ai` **299 passed**; `cargo nextest run -p
+alo-jmap` **1588 passed** (223 of them the agents suite); `cargo check
+--workspace --all-targets` clean. Test database pruned first (5 482 → 257
+tenants, 156 MB).
+
+**Next:** A10.2 — Finance and Insights disagree on the same year because ledger
+posting began at B7.01 and nothing backfilled the documents issued before it.

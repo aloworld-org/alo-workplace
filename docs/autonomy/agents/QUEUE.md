@@ -226,7 +226,7 @@ The A9.1 run is journaled in `STATE.md`; these are the three things it found.
 The first is a defect in the product, the second a migration gap, the third a
 weakness in the evaluation set itself.
 
-- [ ] A10.1 **A delegated step never runs against a real model.** @alo plans
+- [x] A10.1 **A delegated step never runs against a real model.** @alo plans
   correctly and announces the steps, then step 1 fails with
   `InferenceError::Empty` — the delegate turn's reply does not parse as the
   decision envelope — while the same agent asked directly answers in 2 s.
