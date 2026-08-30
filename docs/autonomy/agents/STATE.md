@@ -5311,3 +5311,116 @@ tenants, 156 MB).
 
 **Next:** A10.2 — Finance and Insights disagree on the same year because ledger
 posting began at B7.01 and nothing backfilled the documents issued before it.
+
+## A10.2 — the books catch up with the documents (2026-08-30)
+
+**Both halves of the queue's "or", because neither alone is the fix.** The item
+offered a backfill *or* a reading that accounts for a document predating its own
+posting. A backfill alone leaves the reading silent until somebody runs it — and
+nobody runs a repair they were never told they needed, which is precisely how the
+evaluation found this: two agents contradicting each other with no third sentence
+anywhere saying why. A reading alone leaves the P&L, the balance sheet and every
+`/finance/reports/*` screen still short. So: the reading names the difference,
+and a verb closes it.
+
+**One file knows the difference** (`alo-jmap`'s new `agent_finance_books.rs`), so
+the reading and the repair cannot drift:
+
+1. **`ledger_summary` carries a `documents` block.** The figures stay the books'
+   — that is what the verb is for — and beside them the reply says how many
+   issued documents of the period the journal does not hold, what they come to in
+   the accounting currency, and names up to twelve of them. The note is present
+   only when something is missing, and says what puts it right. **It costs no
+   extra journal query:** the booked set is read off the receivables ledger lines
+   the summary already fetched (`source.kind == Invoice && event == Issue`), and
+   an issue entry always carries its document's own issue date, so a document
+   issued inside the period has its entry inside the same page. That exactness is
+   also why a **truncated** ledger read reports `compared: false` instead of
+   naming documents — an absence in a cut-short page means "I stopped looking".
+   The only new cost is the two list statements `billing_totals` already makes.
+2. **`post_missing_documents`, a Finance write.** It walks the issued documents
+   (invoices and credit notes, settled ones included), asks the journal whether
+   each is in the books, and puts the ones that are not through the store's own
+   `post_invoice_issue` / `post_credit_note_issue`, then every unposted payment
+   through `post_payment_settle`. Credit notes are walked last: a credit note's
+   entry names the entry it corrects, so the original has to be in first.
+   **It invents no accounting** — no argument for an amount, an account or a date
+   to book on; every posting is `fin_rules`' own, resolved by role against the
+   tenant's chart, exactly as an issue made today. Idempotency is the journal's
+   `UNIQUE (tenant_id, source_kind, source_id, source_event)`, not a flag this
+   path keeps.
+
+**Not one line of `alo-store` changed.** The posting doors B7.01 left public as
+"the explicit backfill" had, until now, no caller outside the store's own tests.
+This is that caller. `fin_rules::sales_entry` already accepts a `paid` document
+"because a backfill meets documents that have since been settled" — the store was
+written for this and was waiting for it.
+
+**How verified.** New wire suite `agent_finance_books_http.rs` — five tests,
+real router, real store, documents raised through the `/billing/` routes and the
+verbs run over `POST /ai/agent/execute`. The pre-wiring state is manufactured by
+emptying the tenant's journal (`fin_postings`, `fin_entries`), because no route
+can produce it any more. The walk:
+
+```
+two invoices (242.00, 605.00), one payment (100.00), one credit note (-242.00)
+journal emptied
+ledger_summary   → invoicedCents 0, entryCount 0
+                   documents: 3 issued, 3 unposted, 605.00 EUR
+                   note: "3 of these documents are not in the books … 605.00 EUR
+                          … post_missing_documents puts them in"
+billing_totals   → invoicedGrossCents 84 700          ← the disagreement, measured
+post_missing_documents → 3 documents, 1 settlement, postedCents 60 500, refused 0
+ledger_summary   → invoicedCents 84 700 == billing_totals.invoicedGrossCents
+                   paidCents 10 000 == billing_totals.paidCents
+                   creditNotedCents 24 200 == -billing_totals.creditNotesGrossCents
+                   documents.unpostedCount 0, note absent
+post_missing_documents again → posted 0, alreadyInTheBooks 3, refused 0
+```
+
+The other three: a closed period refuses all three documents with the store's own
+sentence, posts nothing and burns nothing — reopened, the same call goes through;
+one tenant's repair counts and posts three documents and not six, and the other
+tenant's books stay empty until they run it themselves (the wrong-tenant proof
+for a path whose job is writing a journal); and a member who is neither admin nor
+accountant gets `403` before a document is read.
+
+Also three unit tests in the new module over the pure parts — the booked set is
+issue entries and only those (a settlement on the same account is not its
+invoice being booked); the gap's figures and its sentence; and a foreign document
+with no rate counted in `unpostedCount` and `unpostedUnconvertedCount` with its
+gross in neither sum, which is exactly the document `booking_rate` refuses.
+
+`cargo fmt`; `cargo clippy -p alo-ai -p alo-jmap --all-targets` clean; `cargo
+nextest run -p alo-ai` **299 passed**; `cargo nextest run -p alo-jmap` **1596 of
+1598**, and the two reds are pre-existing polling flakes in other tracks'
+suites (`agent_tasks_http::a_conversation_becomes_proposed_tasks_the_user_still_accepts`,
+`site_schedule_http::a_due_schedule_publishes_and_a_refusal_is_kept_for_the_owner`)
+— both pass on re-run in isolation, neither touches this item's code. `cargo
+check --workspace --all-targets` clean. Test database pruned first (1 341
+tenants, 147 MB, nothing to remove).
+
+**Cuts and flags.**
+- **The verb stands behind no route**, like `ledger_summary`, `flag_anomalies`
+  and `categorise_transactions` before it — named in the module's `ROUTELESS`
+  exception list. A `/finance/` route for it would be a new top-level surface in
+  Finance's own route file, which is not this track's to add; the repair is
+  reachable from the room where the discrepancy is noticed, which is where the
+  evaluation found it. **If Finance wants a button for it, that is a Finance
+  queue item and the executor is already there to call.**
+- The **command palette and the `/finance/reports/*` screens are unchanged.**
+  They will simply be right once a tenant has run the repair — which is the
+  point of repairing the books rather than papering over the reading.
+- `billing_totals.creditNotesGrossCents` is negative where
+  `ledger_summary.creditNotedCents` is positive: the same credit note, signed as
+  each surface signs it. Pinned in the agreement test rather than changed —
+  `creditNotesGrossCents` is a wire contract of Billing's verb and not this
+  track's to flip.
+- Two small tidyings in the same files: `optional_period_day` lifted out of
+  `execute_account_balance`, which had the parse inline, and
+  `billing_intents::money` made `pub(crate)` so the note renders money the one
+  way everything else does.
+
+**Next:** A10.3 — the evaluation set cannot score 41 of its own questions,
+because the registry's `answers` strings are templates naming a customer only the
+asker knows.

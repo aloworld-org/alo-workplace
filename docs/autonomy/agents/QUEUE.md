@@ -237,7 +237,7 @@ weakness in the evaluation set itself.
   quoted. **The room must also stop saying "I couldn't reach the model" when
   the model was reached and answered** — an unparseable completion is not an
   unreachable provider, and the two need different words.
-- [ ] A10.2 **Finance reports zero for invoices raised before the ledger
+- [x] A10.2 **Finance reports zero for invoices raised before the ledger
   existed.** `ledger_summary` sums the receivables ledger, `billing_totals`
   sums issued invoices, and ledger posting began with B7.01 — so a tenant who
   invoiced before that upgrade sees 0.00 in Finance and the true figure in

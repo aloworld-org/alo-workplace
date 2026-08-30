@@ -1,5 +1,17 @@
 # Changelog
 
+- **Finance and Billing no longer disagree about the same period.** If your
+  workspace raised invoices before alo started keeping your books, those
+  documents were never written into the journal — so “how much have we invoiced
+  this year?” came back as 0.00 from Finance while Billing showed the real
+  figure. Ask Finance now and the answer says what the books hold *and* how many
+  issued documents are missing from them, what they come to, and offers to put
+  them in. It posts each one at its own date, by exactly the rules a document
+  issued today follows, together with the payments recorded against it; running
+  it again changes nothing. A document it cannot post — one in a period you have
+  closed, or in a currency with no rate on it — is named with the reason instead
+  of being booked on a guess.
+
 - Recurring Billing schedules now open from anywhere on their table row, with
   the same keyboard behavior as quotation and invoice rows. Pause, resume, and
   delete remain independent actions and never open the editor accidentally.
@@ -17,7 +29,6 @@
   invoices, and recurring schedules has a deterministic customer email. Running
   the idempotent seed command also repairs existing v1 demo records, preventing
   **Prepare customer email** from ending in a missing-address refusal.
-
 - **An agent whose model replies with something unusable now simply asks it
   again**, once, instead of giving up — so a multi-step run for “Ask alo”,
   where every step is its own question to the model, finishes instead of
