@@ -5,17 +5,20 @@
 - **Surface:** the existing page editor keeps its section operations, reviewed
   AI changes, inline text editing, responsive preview, translations, SEO,
   theme, and page protection. Their presentation is reorganised into one
-  command surface, one section outline, and one dominant canvas.
+  command surface and one section outline. Preview is an explicit one-click
+  view, starts closed to preserve the building workspace, and can be resized
+  against the section outline with a pointer or keyboard on desktop.
 - **Errors:** existing server reasons and recovery paths remain unchanged and
   visible beside the operation that failed.
 - **Tenancy:** no API or persistence contract changes; every request continues
   through the existing tenant-scoped Sites client.
 - **Out of scope:** this pass does not add freeform canvas positioning, new
-  section types, publishing behaviour, or persistence.
+  section types, publishing behaviour, or cross-device persistence of the
+  editor's temporary panel width.
 
-The rejected alternative was another visual restyle of the existing card
-stack. It would retain the duplicated actions, long instructional paragraph,
-and blank preview hierarchy that made the editor difficult to scan.
+The rejected alternative was keeping Preview permanently visible and only
+making the divider draggable. That would still spend half the workspace on a
+view the user may not need while assembling sections.
 
 ## Interaction references
 

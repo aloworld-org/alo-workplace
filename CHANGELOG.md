@@ -420,6 +420,8 @@ contracts.
 
 ## Unreleased
 
+- The website page editor now opens Preview only when requested and lets users resize the Sections and Preview panels by dragging or with the keyboard.
+
 - The Billing agent now answers from the record: which quotes are open, what
   was quoted to a customer, a customer's standing, unpaid and overdue
   invoices, one invoice in full, and what was invoiced, paid and outstanding
