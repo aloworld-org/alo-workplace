@@ -8,6 +8,13 @@
   answered in place. As everywhere else, a button only opens the agent's
   conversation with the words already written.
 
+- **Quotation editing now feels like one calm document instead of a stack of
+  outlined panels.** Content blocks use spacing and quiet surfaces for their
+  hierarchy, revealing an editing boundary only on hover or focus. Compact
+  visual insertion buttons replace the repeated full-width rules between
+  blocks, while tables, fields and customer-facing quotation styling remain
+  unchanged.
+
 - **Conversations, meetings, boards, mail, contacts and websites now show
   their agent too.** Open “Who's here” in a room and, under the people, the
   room itself says who opened it and what @chat can do with it — catch me up,
