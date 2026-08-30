@@ -1,5 +1,10 @@
 # Changelog
 
+- Fixed the Billing demo corpus so every customer connected to quotations,
+  invoices, and recurring schedules has a deterministic customer email. Running
+  the idempotent seed command also repairs existing v1 demo records, preventing
+  **Prepare customer email** from ending in a missing-address refusal.
+
 - **An agent whose model replies with something unusable now simply asks it
   again**, once, instead of giving up — so a multi-step run for “Ask alo”,
   where every step is its own question to the model, finishes instead of
