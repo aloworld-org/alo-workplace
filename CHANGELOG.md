@@ -1,5 +1,9 @@
 # Changelog
 
+- Website creation now presents compact visual starting paths and visual
+  template thumbnails, keeps its actions above the mobile app bar, and only
+  enables creation after the current website address is confirmed available.
+
 - The empty Websites workspace now fills the available screen height, keeping
   its welcome action centred and leaving only the standard outer gutter.
 
