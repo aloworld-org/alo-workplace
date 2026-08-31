@@ -1,5 +1,7 @@
 # Changelog
 
+- When an agent answers, the sources behind it come with the answer. It has always had to answer only from what it was given and to mark each claim with a number — "Ben owns the rollout [2]" — but the room showed the number and never the list, so there was nothing to check it against. Under each answer there is now a quiet "Answered from 3 sources" that opens to the numbered list: the email, the calendar entry, the thing you told it to remember.
+
 - An agent that names the right tool the wrong way round no longer loses the answer: asked "what did we quote Northstar Foods?", it would sometimes reply with the lookup's name in the wrong place and the whole turn was thrown away with "what came back wasn't something I could act on". That reply is now read as the lookup it plainly is. A change still has to describe itself before it can be proposed — what you approve is that sentence.
 
 - Sites navigation can now link directly to site pages or page sections, while Site theme owns reusable base and accent brand colours that sections select by role.

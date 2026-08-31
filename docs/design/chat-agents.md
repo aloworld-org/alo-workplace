@@ -245,6 +245,42 @@ an agent has no account door of its own to widen.
   turns on the process that receives it. Acceptable while a turn is a single
   call of a few seconds; the thing to revisit before turns run long.
 
+## The citation, and the footnote behind it
+
+An agent may answer only from a numbered list of sources it was handed for that
+turn, and must cite each claim by its number — "Ben owns the rollout [2]". That
+rule is what makes "never invent files, people, or facts" checkable rather than
+promised, and it is why an agent with nothing to cite says it could not find the
+answer instead of writing something plausible.
+
+Until 2026-08-31 the room was shown the citation and never the list. The sources
+existed inside the turn, were numbered, were cited, and were then thrown away, so
+a reader met `[2]` with nothing to resolve it against. That is worse than no
+citation at all: it looks like a broken link, and it invites trust ("it cited
+something") while withholding the one thing a citation exists to allow — the
+check.
+
+**Surface.** `chat_messages.sources` (JSONB, nullable, migration `0912`) holds
+`[{n, kind, title}]` in citation order. `post_as_agent_cited` writes it;
+`post_as_agent` stays exactly as it was and writes none, because most of what an
+agent says — a plan, a refusal, the sentence describing a proposal — cites
+nothing and the answer path is the only one holding the list. Every chat message
+in the API carries a `sources` array, empty where there are none, so no client
+has to guard a sometimes-absent field. The room shows a collapsed
+"Answered from N sources" under the answer, opening to the numbered list.
+
+**What travels, and what does not.** The number, the kind and the title. Not
+`detail` — that is body text a source was summarised from, and the room is
+showing a footnote, not republishing the record. Nothing new is readable either:
+the list is the asker's own grounding, already theirs to see, stored on their own
+message in their own room.
+
+**Out of scope, deliberately.** A source does not link to its record yet — the
+grounding carries `(kind, id, title)` internally, but wiring each kind to the
+screen that opens it is per-module work. A proposal's sentence cites nothing, so
+it has no list. Messages written before the column have none and are not
+backfilled: there is nothing to backfill from.
+
 ## Alternatives rejected
 
 - **An agent as an ordinary `users` row.** Tempting — everything would just
