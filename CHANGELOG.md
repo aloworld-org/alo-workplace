@@ -1,5 +1,7 @@
 # Changelog
 
+- Agents pass a question around less. One asked another the same thing three times over and ran out of turns without answering; a run now refuses to put a question it has already asked to the same agent again, and every agent is told plainly to use its own tools before handing anything on. Asking "where are we with a customer" now comes back with the invoice instead of an apology.
+
 - When an agent answers, the sources behind it come with the answer. It has always had to answer only from what it was given and to mark each claim with a number — "Ben owns the rollout [2]" — but the room showed the number and never the list, so there was nothing to check it against. Under each answer there is now a quiet "Answered from 3 sources" that opens to the numbered list: the email, the calendar entry, the thing you told it to remember.
 - Invoice drafts now use the same document studio as quotations. Their layout,
   brand colours, typography, and content blocks are tenant-scoped, copied when
