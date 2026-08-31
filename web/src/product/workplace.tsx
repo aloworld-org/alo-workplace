@@ -21,6 +21,7 @@ import {
   MessagesSquare,
   Receipt,
   Sigma,
+  SwatchBook,
   Users,
   Video,
 } from "lucide-react";
@@ -50,6 +51,7 @@ const InsightsModule = lazy(() => import("../insights").then((m) => ({ default: 
 const InventoryModule = lazy(() => import("../inventory").then((m) => ({ default: m.InventoryModule })));
 const ProjectsModule = lazy(() => import("../projects").then((m) => ({ default: m.ProjectsModule })));
 const SitesModule = lazy(() => import("../sites").then((m) => ({ default: m.SitesModule })));
+const BrandingModule = lazy(() => import("../branding").then((m) => ({ default: m.BrandingModule })));
 const CampaignsModule = lazy(() =>
   import("../campaigns").then((m) => ({ default: m.CampaignsModule })),
 );
@@ -209,6 +211,14 @@ const suiteModules: ProductModule[] = [
   },
   // Sites is a workspace module only (ADR 0036): the public website a business
   // publishes belongs to the suite, not to the standalone mail app.
+  {
+    id: "branding",
+    path: "/branding",
+    label: strings.moduleBranding,
+    Icon: SwatchBook,
+    enabled: true,
+    element: deferred(BrandingModule),
+  },
   {
     id: "sites",
     path: "/sites",
