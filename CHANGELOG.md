@@ -1,6 +1,16 @@
 # Changelog
 
 - When an agent answers, the sources behind it come with the answer. It has always had to answer only from what it was given and to mark each claim with a number — "Ben owns the rollout [2]" — but the room showed the number and never the list, so there was nothing to check it against. Under each answer there is now a quiet "Answered from 3 sources" that opens to the numbered list: the email, the calendar entry, the thing you told it to remember.
+- Invoice drafts now use the same document studio as quotations. Their layout,
+  brand colours, typography, and content blocks are tenant-scoped, copied when
+  a service quotation becomes an invoice, frozen on issue, and used by both
+  print and PDF output. Drafts now have matching edit, customize, preview, and
+  PDF actions, while converted quotations and invoices link to each other from
+  their primary action bars.
+
+- Branding is now a structured workspace with brand foundation, visual identity,
+  realistic cross-app previews, and printable generated guidelines instead of a
+  single colour-editing screen.
 
 - An agent that names the right tool the wrong way round no longer loses the answer: asked "what did we quote Northstar Foods?", it would sometimes reply with the lookup's name in the wrong place and the whole turn was thrown away with "what came back wasn't something I could act on". That reply is now read as the lookup it plainly is. A change still has to describe itself before it can be proposed — what you approve is that sentence.
 

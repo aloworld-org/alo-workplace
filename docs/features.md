@@ -482,6 +482,14 @@ Same rule as above: nothing gets built that isn't listed, nothing listed
 without a wave. AI lines follow ADR 0034: propose-then-approve, access-scoped,
 EU models, suggest-only where the EU AI Act calls a use high-risk.
 
+### [B1] Branding — one identity across the workspace
+
+- [B1] Brand foundation: name, tagline, purpose, audience, positioning, personality, and voice in one reusable profile
+- [B1] Visual identity: logo, accessible colour roles, and heading/body typography without app-specific copies
+- [B1] Brand applications: live website, quotation, campaign, and document previews driven by the shared identity
+- [B1] Guidelines: a generated, printable reference that explains the saved foundation and visual rules
+- [B+] Governance: approval workflows, role-based publishing, audit history, historical version recovery, and external partner portals
+
 ### [B1] Billing — Quotes & Invoices (the wedge: EU e-invoicing mandates)
 
 > Wave B1 is built. `docs/design/billing.md` § "What B1 promised, and what
@@ -498,7 +506,7 @@ EU models, suggest-only where the EU AI Act calls a use high-risk.
 - [B1] Invoice record: same line model + issue date, due date, payment terms
 - [B1] Legal sequential numbering: per-tenant, gapless, assigned at issue (drafts unnumbered), immutable once issued
 - [B1] Credit notes: negative-total invoice referencing the original — the only legal way to "undo" an issued invoice
-- [B1] PDF rendering: clean invoice/quote PDF with tenant branding (logo, footer, bank details)
+- [B1] PDF rendering: clean invoice/quote PDF with tenant branding (logo, footer, bank details). Invoice drafts now share the quotation document studio; accepted service quotations copy their design transactionally, and issue freezes the invoice design used by print and PDF.
 - [B1] ★ **EN 16931 e-invoice**: Factur-X (PDF with embedded XML) + XRechnung/UBL output — the format German/French law requires; validated against the official schematrons
 - [B1] ★ Peppol sending/receiving via an access point (integrate a certified AP first; own membership is an open decision)
 - [B1] E-invoice **receiving**: inbound Factur-X/XRechnung parsed into a bill record (DE already mandates being able to receive)
