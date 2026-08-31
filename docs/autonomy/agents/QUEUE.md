@@ -254,3 +254,21 @@ weakness in the evaluation set itself.
   the templates for the prompt if they read better there. While in the file:
   the run should ask each verb in its own room, since a shared room lets a
   later question be answered from an earlier verb's result in context.
+
+## Wave A11 — the suite's own timing (2026-08-31)
+
+- [ ] A11.1 **The agents wire suite fails a different pair on every run.**
+  `ask_in_room` polls twenty seconds for the agent to speak, because a room
+  turn deliberately runs off-request. On a loaded machine — Docker, a
+  per-test database each, a build alongside — the turn lands after the poll
+  gives up, so a proposal test sees a message with no proposal and fails on
+  "a write is proposed, never run". It cost an afternoon on 2026-08-31:
+  three separate runs failed three disjoint sets, every one of them passed
+  alone, and one single-trial failure was briefly mistaken for a real
+  regression in the change under test.
+  Make the wait a property of the harness rather than a guess — wait on the
+  turn actually finishing (the agent's message arriving is already
+  observable) instead of a wall-clock deadline, or raise and centralise the
+  deadline so one constant governs every `ask_in_room` copy. There are
+  several copies; they should be one. A test that is red under load and
+  green alone teaches people to ignore red.
