@@ -653,6 +653,21 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   .s-features.features-list .grid li { grid-template-columns: 1fr; gap: .25rem; }
 }
 .s-gallery img { border-radius: 0.75rem; }
+.s-text-image.text-image-overlap { align-items: center; }
+.s-text-image.text-image-overlap > figure { z-index: 1; }
+.s-text-image.text-image-overlap > .text { z-index: 2; margin-inline-start: -4rem; padding: clamp(1.5rem,4vw,3rem); border-radius: 1rem; background: var(--section-bg, var(--bg)); box-shadow: 0 1rem 3rem color-mix(in srgb, var(--text) 12%, transparent); }
+.s-text-image.text-image-overlap.image-right > .text { margin-inline: 0 -4rem; }
+.s-text-image.text-image-framed > figure { padding: .75rem; border: 1px solid var(--border); border-radius: 1.25rem; background: var(--surface); }
+.s-text-image.text-image-editorial > .text { align-self: center; max-width: 36rem; }
+.s-text-image.text-image-editorial > .text h2 { font-size: clamp(2rem,5vw,4rem); }
+.s-text-image.text-image-full-bleed { max-width: 90rem; padding-inline: 0; gap: 0; }
+.s-text-image.text-image-full-bleed > figure img { min-height: 32rem; width: 100%; object-fit: cover; border-radius: 0; }
+.s-text-image.text-image-full-bleed > .text { align-self: center; padding: clamp(2rem,6vw,5rem); }
+@media (max-width: 42rem) {
+  .s-text-image.text-image-overlap > .text,
+  .s-text-image.text-image-overlap.image-right > .text { margin: -2rem 1rem 0; }
+  .s-text-image.text-image-full-bleed > figure img { min-height: 20rem; }
+}
 
 /* Base-backed collection cards. */
 .collection-grid {

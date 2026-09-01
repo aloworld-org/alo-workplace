@@ -1067,10 +1067,20 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
         ImageSide::Left => "image-left",
         ImageSide::Right => "image-right",
     };
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::TextImageLayout::Split)
+    {
+        alo_store::site_model::TextImageLayout::Split => "text-image-split",
+        alo_store::site_model::TextImageLayout::Overlap => "text-image-overlap",
+        alo_store::site_model::TextImageLayout::Framed => "text-image-framed",
+        alo_store::site_model::TextImageLayout::Editorial => "text-image-editorial",
+        alo_store::site_model::TextImageLayout::FullBleed => "text-image-full-bleed",
+    };
     open_presented_section(
         out,
         &with_layout(
-            &format!("s-text-image {side}"),
+            &format!("s-text-image {side} {layout}"),
             s.split.map(alo_store::site_layout::ColumnSplit::class),
         ),
         s.presentation.as_ref(),

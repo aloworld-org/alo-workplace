@@ -95,6 +95,7 @@ fn full_sections() -> Vec<Section> {
             image: image.clone(),
             image_side: ImageSide::Left,
             split: None,
+            layout: Some(alo_store::site_model::TextImageLayout::Overlap),
             presentation: None,
         }),
         Section::Gallery(GallerySection {
