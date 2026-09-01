@@ -1,5 +1,10 @@
 # Changelog
 
+- Won Sales handoffs can now be completed from the linked Project with an
+  explicit, reviewable setup for shared Drive files, a Chat room, starter tasks,
+  and an optional kickoff. Nothing is created before confirmation, retries are
+  true no-ops, and every resource remains directly accessible from the project.
+
 - Sales now keeps explicit provenance for every quote or invoice raised from an
   opportunity and shows those live Billing documents in the deal drawer. The
   list never guesses from a shared customer and remains tenant-isolated.
