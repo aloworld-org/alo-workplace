@@ -1,5 +1,9 @@
 # Changelog
 
+- Mail conversations can now become reviewed Sales opportunities without
+  retyping the customer context. Confirmation creates the opportunity and
+  conversation link atomically, with tenant-safe rollback on unreadable mail.
+
 - Sales: won opportunities can now be reviewed and converted into one linked delivery project, with safe retries, bidirectional navigation, tenant isolation, and preserved provenance.
 
 - Sales now opens with a focused pipeline pulse: open, closing-soon, overdue,
