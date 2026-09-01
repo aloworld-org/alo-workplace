@@ -22,6 +22,8 @@ without copying or guessing data between apps.
 - `project_setup` stores the canonical Drive, Chat, Agenda, and Task IDs against
   the project. A repeated identical request is a no-op: it neither duplicates
   resources nor changes `updatedAt`.
+- A tenant/project-scoped transaction lock serializes simultaneous confirmations,
+  so a double click or duplicated network request cannot create parallel resources.
 - Starter tasks carry `source_kind = project_setup` and the project ID, allowing
   an interrupted attempt to recover their IDs on retry.
 
@@ -37,4 +39,3 @@ invent attendees while Projects has no explicit membership model.
 The confirmed mutation resolves to the `projects.project.setup` audit action.
 Real-database and real-router tests cover tenancy, empty confirmation, creation,
 read-back, and retry behavior.
-
