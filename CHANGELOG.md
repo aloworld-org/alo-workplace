@@ -1,5 +1,9 @@
 # Changelog
 
+- Sales now keeps explicit provenance for every quote or invoice raised from an
+  opportunity and shows those live Billing documents in the deal drawer. The
+  list never guesses from a shared customer and remains tenant-isolated.
+
 - Delivery projects created from won Sales opportunities now show their exact
   originating opportunity and link back to its Sales drawer; the relationship
   is visibly navigable in both directions.
