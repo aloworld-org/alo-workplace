@@ -16,6 +16,7 @@
 - Mail conversations can now become reviewed Sales opportunities without
   retyping the customer context. Confirmation creates the opportunity and
   conversation link atomically, with tenant-safe rollback on unreadable mail.
+- An agent can now ask another to check its figure, and says so in the room. When a number will be reported, invoiced against, or put in front of a board, and another product keeps its own record of the same money, the agent turns to that product's agent — the room reads "I'm checking with @finance:" rather than "I'm asking" — and the reply comes back marked as a second opinion rather than as one more fact. If the two disagree, the answer has to name both numbers and say plainly that they do not agree, instead of quietly picking one.
 
 - Sales: won opportunities can now be reviewed and converted into one linked delivery project, with safe retries, bidirectional navigation, tenant isolation, and preserved provenance.
 
