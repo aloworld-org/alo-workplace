@@ -1094,9 +1094,22 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
 }
 
 fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m: Marks) {
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::GalleryLayout::Grid)
+    {
+        alo_store::site_model::GalleryLayout::Grid => "gallery-grid",
+        alo_store::site_model::GalleryLayout::Masonry => "gallery-masonry",
+        alo_store::site_model::GalleryLayout::Collage => "gallery-collage",
+        alo_store::site_model::GalleryLayout::Filmstrip => "gallery-filmstrip",
+        alo_store::site_model::GalleryLayout::Spotlight => "gallery-spotlight",
+    };
     open_presented_section(
         out,
-        &with_layout("s-gallery", columns_class(s.columns)),
+        &format!(
+            "{} {layout}",
+            with_layout("s-gallery", columns_class(s.columns))
+        ),
         s.presentation.as_ref(),
         m,
     );

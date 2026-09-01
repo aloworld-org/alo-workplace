@@ -105,6 +105,7 @@ fn full_sections() -> Vec<Section> {
             // derivative rather than the unframed original.
             images: vec![image.clone(), cropped_image()],
             columns: None,
+            layout: Some(alo_store::site_model::GalleryLayout::Collage),
             presentation: None,
         }),
         Section::Testimonials(TestimonialsSection {
