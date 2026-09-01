@@ -783,6 +783,22 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
     if let Some(width) = s.content_width {
         classes.push(width.class());
     }
+    let mut animated = false;
+    if let Some(class) = s.text_animation.and_then(|animation| animation.class()) {
+        classes.push(class);
+        animated = true;
+    }
+    if let Some(class) = s.media_animation.and_then(|animation| animation.class()) {
+        classes.push(class);
+        animated = true;
+    }
+    if animated {
+        classes.push(
+            s.animation_speed
+                .unwrap_or(alo_store::site_model::HeroAnimationSpeed::Smooth)
+                .class(),
+        );
+    }
     if s.image.is_some()
         && matches!(
             s.layout,
@@ -793,11 +809,29 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
         classes.push("hero-has-image");
     }
     open_section(out, "section", &classes.join(" "), m);
-    out.push_str(&format!(
-        "<h1{}>{}</h1>\n",
-        m.at("/heading"),
-        esc(&s.heading)
-    ));
+    if matches!(
+        s.text_animation,
+        Some(alo_store::site_model::HeroTextAnimation::WordReveal)
+    ) {
+        out.push_str(&format!("<h1{}>", m.at("/heading")));
+        for (index, word) in s.heading.split_whitespace().enumerate() {
+            if index > 0 {
+                out.push(' ');
+            }
+            out.push_str(&format!(
+                "<span class=\"hero-word\" style=\"--hero-word-delay:{}ms\">{}</span>",
+                index * 70,
+                esc(word)
+            ));
+        }
+        out.push_str("</h1>\n");
+    } else {
+        out.push_str(&format!(
+            "<h1{}>{}</h1>\n",
+            m.at("/heading"),
+            esc(&s.heading)
+        ));
+    }
     if let Some(subheading) = &s.subheading {
         out.push_str(&format!(
             "<p class=\"subheading\"{}>{}</p>\n",

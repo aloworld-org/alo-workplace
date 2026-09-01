@@ -78,6 +78,36 @@ fn hero_design_choices_become_stable_responsive_classes() {
 }
 
 #[test]
+fn hero_motion_staggers_words_animates_media_and_respects_reduced_motion() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [{
+            "type": "hero",
+            "heading": "Coffee made carefully",
+            "image": {"blob_id": "9hK3vQ2mR8pT1xWz4bC5dg", "alt": "The drum"},
+            "text_animation": "word_reveal",
+            "media_animation": "slow_zoom",
+            "animation_speed": "relaxed"
+        }]
+    }));
+    assert!(html.contains(
+        "class=\"s-hero hero-text-word-reveal hero-media-slow-zoom hero-motion-relaxed\""
+    ));
+    assert!(
+        html.contains("<span class=\"hero-word\" style=\"--hero-word-delay:0ms\">Coffee</span>")
+    );
+    assert!(
+        html.contains(
+            "<span class=\"hero-word\" style=\"--hero-word-delay:140ms\">carefully</span>"
+        )
+    );
+    let css = stylesheet(&SiteTheme::new());
+    assert!(css.contains("@keyframes hero-word-reveal"));
+    assert!(css.contains("@keyframes hero-media-slow-zoom"));
+    assert!(css.contains("@media (prefers-reduced-motion: reduce)"));
+}
+
+#[test]
 fn video_hero_is_muted_looping_and_keeps_an_image_fallback() {
     let html = render(&json!({
         "schema_version": 1,

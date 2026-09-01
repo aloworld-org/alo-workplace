@@ -451,6 +451,37 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 .s-hero.hero-editorial > .subheading { max-width: 42rem; }
 .s-hero.hero-editorial figure { max-width: 70%; margin-left: auto; }
 
+/* Hero motion: authored presets with one shared pace. Motion is enhancement,
+   never meaning, and the reduced-motion branch below removes every effect. */
+.s-hero.hero-motion-quick { --hero-motion-duration: 450ms; --hero-zoom-duration: 8s; }
+.s-hero.hero-motion-smooth { --hero-motion-duration: 700ms; --hero-zoom-duration: 12s; }
+.s-hero.hero-motion-relaxed { --hero-motion-duration: 1000ms; --hero-zoom-duration: 18s; }
+.s-hero.hero-text-fade-up > h1,
+.s-hero.hero-text-fade-up > .subheading,
+.s-hero.hero-text-fade-up > .actions { opacity: 0; animation: hero-fade-up var(--hero-motion-duration) cubic-bezier(.22, 1, .36, 1) both; }
+.s-hero.hero-text-slide-in > h1,
+.s-hero.hero-text-slide-in > .subheading,
+.s-hero.hero-text-slide-in > .actions { opacity: 0; animation: hero-slide-in var(--hero-motion-duration) cubic-bezier(.22, 1, .36, 1) both; }
+.s-hero.hero-text-fade-up > .subheading,
+.s-hero.hero-text-slide-in > .subheading { animation-delay: 120ms; }
+.s-hero.hero-text-fade-up > .actions,
+.s-hero.hero-text-slide-in > .actions { animation-delay: 220ms; }
+.s-hero.hero-text-word-reveal .hero-word { display: inline-block; opacity: 0; animation: hero-word-reveal var(--hero-motion-duration) cubic-bezier(.22, 1, .36, 1) both; animation-delay: var(--hero-word-delay); }
+.s-hero.hero-text-word-reveal > .subheading,
+.s-hero.hero-text-word-reveal > .actions { opacity: 0; animation: hero-fade-up var(--hero-motion-duration) cubic-bezier(.22, 1, .36, 1) both; animation-delay: 240ms; }
+.s-hero.hero-media-fade-in > figure,
+.s-hero.hero-media-fade-in > .hero-video { opacity: 0; animation: hero-media-fade-in var(--hero-motion-duration) ease-out both; }
+.s-hero.hero-media-slide-up > figure,
+.s-hero.hero-media-slide-up > .hero-video { opacity: 0; animation: hero-media-slide-up var(--hero-motion-duration) cubic-bezier(.22, 1, .36, 1) both; }
+.s-hero.hero-media-slow-zoom > figure img,
+.s-hero.hero-media-slow-zoom > .hero-video { animation: hero-media-slow-zoom var(--hero-zoom-duration) ease-in-out infinite alternate; }
+@keyframes hero-fade-up { from { opacity: 0; transform: translateY(1.25rem); } to { opacity: 1; transform: none; } }
+@keyframes hero-slide-in { from { opacity: 0; transform: translateX(-1.75rem); } to { opacity: 1; transform: none; } }
+@keyframes hero-word-reveal { from { opacity: 0; transform: translateY(.8em); } to { opacity: 1; transform: none; } }
+@keyframes hero-media-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hero-media-slide-up { from { opacity: 0; transform: translateY(2rem); } to { opacity: 1; transform: none; } }
+@keyframes hero-media-slow-zoom { from { transform: scale(1); } to { transform: scale(1.06); } }
+
 @media (max-width: 47.99rem) {
   .s-hero.hero-split-right.hero-has-image,
   .s-hero.hero-split-left.hero-has-image { display: block; }
@@ -460,6 +491,13 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .s-hero.hero-video-background > .hero-video { display: none; }
+  .s-hero[class*=\"hero-text-\"] > h1,
+  .s-hero[class*=\"hero-text-\"] > .subheading,
+  .s-hero[class*=\"hero-text-\"] > .actions,
+  .s-hero[class*=\"hero-media-\"] > figure,
+  .s-hero[class*=\"hero-media-\"] > figure img,
+  .s-hero[class*=\"hero-media-\"] > .hero-video,
+  .s-hero.hero-text-word-reveal .hero-word { opacity: 1; transform: none; animation: none; }
 }
 
 /* Shared card grid (features, gallery, team). */
