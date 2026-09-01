@@ -35,6 +35,22 @@ pub(crate) fn safe_href(href: &str) -> String {
     }
 }
 
+/// Attribute-ready source for a decorative background video. Unlike links,
+/// video accepts HTTPS only: an HTTP source on a published HTTPS site would be
+/// blocked as mixed content, and no other URI scheme belongs in media chrome.
+pub(crate) fn safe_video_src(src: &str) -> Option<String> {
+    let allowed = src.len() > "https://".len()
+        && src.to_ascii_lowercase().starts_with("https://")
+        && !src.chars().any(char::is_whitespace)
+        && !src.chars().any(char::is_control);
+    if allowed {
+        Some(esc(src))
+    } else {
+        tracing::warn!("stored video URL failed the render-side allowlist; omitting video");
+        None
+    }
+}
+
 /// The same allowlist as the write gate (`alo_store::site_model`): a stored
 /// href is safe in an `href` attribute iff it is a site path, a fragment, or
 /// an http(s)/mailto/tel URL.

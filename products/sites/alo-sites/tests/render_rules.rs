@@ -78,6 +78,30 @@ fn hero_design_choices_become_stable_responsive_classes() {
 }
 
 #[test]
+fn video_hero_is_muted_looping_and_keeps_an_image_fallback() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [{
+            "type": "hero",
+            "heading": "Hello",
+            "image": {"blob_id": "9hK3vQ2mR8pT1xWz4bC5dg", "alt": ""},
+            "video_url": "https://media.example/hero.webm?version=1&quality=high",
+            "layout": "video_background"
+        }]
+    }));
+    assert!(html.contains("class=\"s-hero hero-video-background\""));
+    assert!(html.contains(
+        "<video class=\"hero-video\" autoplay muted loop playsinline preload=\"metadata\" aria-hidden=\"true\" tabindex=\"-1\" poster=\"/assets/img/9hK3vQ2mR8pT1xWz4bC5dg\">"
+    ));
+    assert!(
+        html.contains(
+            "<source src=\"https://media.example/hero.webm?version=1&amp;quality=high\">"
+        )
+    );
+    assert!(html.contains("<figure><img"));
+}
+
+#[test]
 fn head_carries_title_description_canonical_and_og() {
     let html = render_with(
         &SiteTheme::new(),

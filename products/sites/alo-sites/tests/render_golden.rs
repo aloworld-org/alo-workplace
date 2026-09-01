@@ -49,6 +49,7 @@ fn full_sections() -> Vec<Section> {
             heading: "Coffee roasted the morning it ships".to_owned(),
             subheading: Some("Small-batch roastery on the harbour".to_owned()),
             image: Some(image.clone()),
+            video_url: None,
             primary_cta: Some(link("Shop roasts", "/shop")),
             secondary_cta: Some(link("Our story", "/about")),
             layout: None,

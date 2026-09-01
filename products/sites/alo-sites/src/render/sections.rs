@@ -19,7 +19,7 @@ use alo_store::{
 
 use crate::images::ImageSlot;
 
-use super::html::{esc, safe_href};
+use super::html::{esc, safe_href, safe_video_src};
 use super::money::format_price;
 use super::{PageRenderContext, SiteRenderContext};
 
@@ -814,6 +814,18 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
             push_link(out, link, "button secondary");
         }
         out.push_str("</p>\n");
+    }
+    if matches!(
+        s.layout,
+        Some(alo_store::site_model::HeroLayout::VideoBackground)
+    ) && let Some(src) = s.video_url.as_deref().and_then(safe_video_src)
+    {
+        let poster = s.image.as_ref().map_or_else(String::new, |image| {
+            format!(" poster=\"{}\"", site.images.src(image.blob_id.as_str()))
+        });
+        out.push_str(&format!(
+            "<video class=\"hero-video\" autoplay muted loop playsinline preload=\"metadata\" aria-hidden=\"true\" tabindex=\"-1\"{poster}><source src=\"{src}\"></video>\n"
+        ));
     }
     if let Some(image) = &s.image {
         push_figure(out, site, image, ImageSlot::Banner);

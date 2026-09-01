@@ -419,7 +419,8 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 .s-hero.hero-split-left.hero-has-image > figure { grid-row: 1 / span 4; margin-top: 0; }
 .s-hero.hero-split-right.hero-has-image img,
 .s-hero.hero-split-left.hero-has-image img { width: 100%; max-height: 38rem; object-fit: cover; }
-.s-hero.hero-background {
+.s-hero.hero-background,
+.s-hero.hero-video-background {
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -428,7 +429,8 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   color: var(--on-primary);
   background: var(--primary);
 }
-.s-hero.hero-background::before {
+.s-hero.hero-background::before,
+.s-hero.hero-video-background::before {
   position: absolute;
   z-index: -1;
   inset: 0;
@@ -437,8 +439,13 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 }
 .s-hero.hero-background > figure { position: absolute; z-index: -2; inset: 0; margin: 0; }
 .s-hero.hero-background > figure img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
-.s-hero.hero-background .subheading { color: inherit; }
-.s-hero.hero-background a:not(.button) { color: inherit; }
+.s-hero.hero-video-background > figure { position: absolute; z-index: -3; inset: 0; margin: 0; }
+.s-hero.hero-video-background > figure img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
+.s-hero.hero-video-background > .hero-video { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.s-hero.hero-background .subheading,
+.s-hero.hero-video-background .subheading { color: inherit; }
+.s-hero.hero-background a:not(.button),
+.s-hero.hero-video-background a:not(.button) { color: inherit; }
 .s-hero.hero-editorial { border-left: 0.35rem solid var(--primary); padding-left: clamp(1.5rem, 5vw, 5rem); }
 .s-hero.hero-editorial > h1 { font-size: clamp(2.75rem, 7vw, 5.5rem); max-width: 14ch; }
 .s-hero.hero-editorial > .subheading { max-width: 42rem; }
@@ -450,6 +457,9 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   .s-hero.hero-split-right.hero-has-image > figure,
   .s-hero.hero-split-left.hero-has-image > figure { margin-top: 2rem; }
   .s-hero.hero-editorial figure { max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s-hero.hero-video-background > .hero-video { display: none; }
 }
 
 /* Shared card grid (features, gallery, team). */
