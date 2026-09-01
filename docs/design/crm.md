@@ -915,6 +915,38 @@ so this note stays one file with one reason to change:
   own note when it was built — `docs/design/audit-trail.md` — rather
   than a section inside a module note.
 
+## Daily focus workspace (2026-09-01)
+
+**Surface.** The board route derives a daily focus from the complete deal list
+already returned for the selected pipeline. It counts open opportunities,
+those expected to close in the next fourteen days, those past their expected
+close, and those unchanged for fourteen days. Overdue records take precedence
+over quiet records in the attention queue. Selecting a record opens the
+existing deal drawer; drag, edit, Billing handoff, Tasks, Mail links, and audit
+history keep their existing contracts.
+
+**Errors.** This layer makes no additional request and therefore introduces no
+new wire failure. If the board read fails, the existing CRM error banner remains
+the only error surface. Missing or malformed optional dates are ignored rather
+than presented as urgency.
+
+**Tenancy.** The focus reads only the selected pipeline's deal response, which
+is already tenant-scoped by the account store. It persists nothing and accepts
+no tenant or record ids from outside that response.
+
+**Out of scope.** This is deterministic workflow focus, not lead scoring,
+probability, currency conversion, forecasting, email tracking, or an automated
+send. Pipeline money remains in the server-computed Report because the browser
+must never combine currencies or create a second financial truth.
+
+The rejected alternative was a decorative dashboard with locally summed deal
+value and an opaque health score; it looked richer but would have contradicted
+the CRM's money contract and the product's AI-act posture. The interaction
+direction follows the official product patterns that remain useful without
+their complexity: Pipedrive's activity-first pipeline and stale-deal cues,
+Attio's configurable kanban and time-in-stage focus, HubSpot's prospecting
+queue, and Salesforce Pipeline Inspection's consolidated review surface.
+
 ## Out of scope for B2
 
 Deliberate cuts, each a decision rather than an omission:
