@@ -415,6 +415,7 @@ fn wants_script(sections: &[Section]) -> bool {
     sections.iter().any(|section| match section {
         Section::Nav(_) => true,
         Section::ContactForm(form) => form.form_id.is_some(),
+        Section::Transition(_) => true,
         _ => false,
     })
 }

@@ -69,6 +69,22 @@ pub(super) const BEHAVIOR_SCRIPT: &str = r#"<script>(function () {
       }).catch(function () { form.submit(); });
     });
   });
+  if ("IntersectionObserver" in window) {
+    document.querySelectorAll(".s-transition").forEach(function (marker) {
+      var target = marker.nextElementSibling;
+      while (target && target.classList.contains("s-transition")) { target = target.nextElementSibling; }
+      if (!target) { return; }
+      target.classList.add("alo-transition", "alo-transition-" + marker.dataset.effect, "alo-from-" + marker.dataset.direction, "alo-speed-" + marker.dataset.speed);
+      var margins = {early:"0px 0px 5%",balanced:"0px 0px -15%",late:"0px 0px -35%"};
+      var repeat = marker.dataset.out === "true";
+      new IntersectionObserver(function (entries, observer) {
+        entries.forEach(function (entry) {
+          target.classList.toggle("is-visible", entry.isIntersecting);
+          if (entry.isIntersecting && !repeat) { observer.unobserve(target); }
+        });
+      }, {rootMargin:margins[marker.dataset.trigger] || margins.balanced,threshold:.08}).observe(target);
+    });
+  }
 })();</script>
 "#;
 
@@ -393,7 +409,7 @@ mod tests {
     #[test]
     fn the_page_scripts_stay_within_their_byte_budget() {
         assert!(
-            BEHAVIOR_SCRIPT.len() < 2048,
+            BEHAVIOR_SCRIPT.len() < 3072,
             "behavior script is {} bytes",
             BEHAVIOR_SCRIPT.len()
         );

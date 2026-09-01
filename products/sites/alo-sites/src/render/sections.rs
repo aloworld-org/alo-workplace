@@ -12,6 +12,7 @@ use alo_store::site_model::{
     BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqSection,
     FeaturesSection, FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection,
     PricingSection, Section, SiteImage, TeamSection, TestimonialsSection, TextImageSection,
+    TransitionDirection, TransitionEffect, TransitionSection, TransitionSpeed, TransitionTrigger,
 };
 use alo_store::{
     SiteBookingSnapshot, SiteCatalogSnapshot, SiteCatalogSnapshotItem, SiteCollectionSnapshot,
@@ -305,8 +306,39 @@ pub(super) fn body_section(
         Section::Booking(s) => booking(out, site, s, page.bookings, m),
         Section::Tickets(s) => tickets(out, site, s, m),
         Section::Shop(s) => shop(out, site, s, m),
+        Section::Transition(s) => transition(out, s, m),
         Section::CustomCode(s) => custom_code(out, site, s, m),
     }
+}
+
+fn transition(out: &mut String, s: &TransitionSection, m: Marks) {
+    let effect = match s.effect {
+        TransitionEffect::Fade => "fade",
+        TransitionEffect::Slide => "slide",
+        TransitionEffect::Scale => "scale",
+        TransitionEffect::Reveal => "reveal",
+    };
+    let direction = match s.direction {
+        TransitionDirection::Up => "up",
+        TransitionDirection::Down => "down",
+        TransitionDirection::Left => "left",
+        TransitionDirection::Right => "right",
+    };
+    let speed = match s.speed {
+        TransitionSpeed::Quick => "quick",
+        TransitionSpeed::Smooth => "smooth",
+        TransitionSpeed::Relaxed => "relaxed",
+    };
+    let trigger = match s.trigger {
+        TransitionTrigger::Early => "early",
+        TransitionTrigger::Balanced => "balanced",
+        TransitionTrigger::Late => "late",
+    };
+    out.push_str(&format!(
+        "<div class=\"s-transition\" data-effect=\"{effect}\" data-direction=\"{direction}\" data-speed=\"{speed}\" data-trigger=\"{trigger}\" data-out=\"{}\" aria-hidden=\"true\"{}></div>\n",
+        s.animate_out,
+        m.block(),
+    ));
 }
 
 /// A `tickets` section: the door to the site's live ticket shop.

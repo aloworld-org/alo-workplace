@@ -548,6 +548,27 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   .s-hero.hero-text-word-reveal .hero-word { opacity: 1; transform: none; animation: none; }
 }
 
+/* A transition marker is authoring metadata; the following section is the visual. */
+.s-transition { display: none; }
+.js .alo-transition {
+  --alo-transition-duration: 700ms;
+  opacity: 0;
+  transition: opacity var(--alo-transition-duration) cubic-bezier(.22,1,.36,1), transform var(--alo-transition-duration) cubic-bezier(.22,1,.36,1), clip-path var(--alo-transition-duration) cubic-bezier(.22,1,.36,1), filter var(--alo-transition-duration) ease-out;
+  will-change: opacity, transform;
+}
+.js .alo-transition.alo-speed-quick { --alo-transition-duration: 420ms; }
+.js .alo-transition.alo-speed-relaxed { --alo-transition-duration: 1050ms; }
+.js .alo-transition-slide.alo-from-up { transform: translateY(2.5rem); }
+.js .alo-transition-slide.alo-from-down { transform: translateY(-2.5rem); }
+.js .alo-transition-slide.alo-from-left { transform: translateX(2.5rem); }
+.js .alo-transition-slide.alo-from-right { transform: translateX(-2.5rem); }
+.js .alo-transition-scale { transform: scale(.965); }
+.js .alo-transition-reveal { clip-path: inset(0 0 22% 0); filter: blur(3px); }
+.js .alo-transition.is-visible { opacity: 1; transform: none; clip-path: inset(0); filter: none; }
+@media (prefers-reduced-motion: reduce) {
+  .js .alo-transition { opacity: 1; transform: none; clip-path: none; filter: none; transition: none; }
+}
+
 /* Shared card grid (features, gallery, team). */
 .grid {
   list-style: none;

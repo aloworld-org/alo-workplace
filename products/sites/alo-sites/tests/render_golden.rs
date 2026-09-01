@@ -17,6 +17,7 @@ use alo_store::site_model::{
     ImageCrop, ImageFocalPoint, ImageSide, Link, NavSection, PricingSection, PricingTier,
     SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, ShopSection, SiteImage, TeamMember,
     TeamSection, Testimonial, TestimonialsSection, TextImageSection, TicketsSection,
+    TransitionDirection, TransitionEffect, TransitionSection, TransitionSpeed, TransitionTrigger,
 };
 use alo_store::site_theme::SiteTheme;
 use alo_store::{
@@ -151,6 +152,13 @@ fn full_sections() -> Vec<Section> {
         Section::Shop(ShopSection {
             heading: Some("The roastery shop".to_owned()),
             body: Some("Beans and brew gear, shipped from the roastery.".to_owned()),
+        }),
+        Section::Transition(TransitionSection {
+            effect: TransitionEffect::Slide,
+            direction: TransitionDirection::Up,
+            speed: TransitionSpeed::Smooth,
+            trigger: TransitionTrigger::Balanced,
+            animate_out: true,
         }),
         Section::CustomCode(custom_code_block()),
         Section::Footer(FooterSection {
@@ -339,7 +347,11 @@ fn assert_golden(name: &str, actual: &str) {
 #[test]
 fn one_golden_per_section_type() {
     let sections = full_sections();
-    assert_eq!(sections.len(), 17, "corpus must cover every variant");
+    assert_eq!(
+        sections.len(),
+        18,
+        "corpus must cover every rendered body variant"
+    );
     for section in sections {
         let kind = section.kind();
         let html = render_default(vec![section]);
