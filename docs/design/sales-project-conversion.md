@@ -5,8 +5,11 @@
 `GET /crm/deals/{dealId}/project` reads the delivery relationship and `POST`
 to the same URL confirms conversion of a won deal with `name`, optional
 `color`, and optional `customerId`. `GET /projects/{projectId}/deal` provides
-the reverse read. The Sales drawer is the first caller: it asks for review in a
-dialog, creates only after confirmation, and then opens the linked project.
+the reverse read, including the current opportunity title. The Sales drawer
+asks for review, creates only after confirmation, and then opens the linked
+project. Every linked Project workspace shows the originating opportunity and
+opens its exact Sales drawer, making the relationship navigable in both
+directions rather than merely present in storage.
 
 ## Errors
 

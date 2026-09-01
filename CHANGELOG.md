@@ -1,5 +1,9 @@
 # Changelog
 
+- Delivery projects created from won Sales opportunities now show their exact
+  originating opportunity and link back to its Sales drawer; the relationship
+  is visibly navigable in both directions.
+
 - Mail conversations can now become reviewed Sales opportunities without
   retyping the customer context. Confirmation creates the opportunity and
   conversation link atomically, with tenant-safe rollback on unreadable mail.
