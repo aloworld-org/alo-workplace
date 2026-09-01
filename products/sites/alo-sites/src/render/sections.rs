@@ -1161,7 +1161,22 @@ fn testimonials(out: &mut String, s: &TestimonialsSection, m: Marks) {
 }
 
 fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
-    open_presented_section(out, "s-pricing", s.presentation.as_ref(), m);
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::PricingLayout::Cards)
+    {
+        alo_store::site_model::PricingLayout::Cards => "pricing-cards",
+        alo_store::site_model::PricingLayout::Comparison => "pricing-comparison",
+        alo_store::site_model::PricingLayout::Featured => "pricing-featured",
+        alo_store::site_model::PricingLayout::Compact => "pricing-compact",
+        alo_store::site_model::PricingLayout::Editorial => "pricing-editorial",
+    };
+    open_presented_section(
+        out,
+        &format!("s-pricing {layout}"),
+        s.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(intro) = &s.intro {
         out.push_str(&format!(

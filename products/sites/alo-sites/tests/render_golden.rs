@@ -130,6 +130,7 @@ fn full_sections() -> Vec<Section> {
                 cta: Some(link("Start weekly", "/subscribe/weekly")),
                 highlighted: true,
             }],
+            layout: Some(alo_store::site_model::PricingLayout::Featured),
             presentation: None,
         }),
         Section::Team(TeamSection {

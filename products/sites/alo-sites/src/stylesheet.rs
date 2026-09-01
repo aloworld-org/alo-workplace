@@ -968,6 +968,23 @@ figure.shape-tall img { aspect-ratio: 3 / 4; }
 .description { color: var(--muted); }
 .tier-features { list-style: none; margin: 0 0 1.5rem; padding: 0; }
 .tier-features li { padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.s-pricing.pricing-comparison .tiers { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0; }
+.s-pricing.pricing-comparison .tier { border-radius: 0; }
+.s-pricing.pricing-comparison .tier:first-child { border-radius: .75rem 0 0 .75rem; }
+.s-pricing.pricing-comparison .tier:last-child { border-radius: 0 .75rem .75rem 0; }
+.s-pricing.pricing-featured .tier.highlighted { transform: translateY(-.75rem); box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--text) 12%, transparent); }
+.s-pricing.pricing-compact .tiers { grid-template-columns: 1fr; }
+.s-pricing.pricing-compact .tier { display: grid; grid-template-columns: minmax(8rem, .7fr) minmax(9rem, .6fr) minmax(12rem, 1fr) auto; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; }
+.s-pricing.pricing-compact .tier > * { margin-block: 0; }
+.s-pricing.pricing-editorial .tier { border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; padding-inline: 0; }
+.s-pricing.pricing-editorial .price { font-size: clamp(2rem, 4vw, 3.5rem); }
+@media (max-width: 52rem) {
+  .s-pricing.pricing-comparison .tiers { gap: 1rem; }
+  .s-pricing.pricing-comparison .tier,
+  .s-pricing.pricing-comparison .tier:first-child,
+  .s-pricing.pricing-comparison .tier:last-child { border-radius: .75rem; }
+  .s-pricing.pricing-compact .tier { grid-template-columns: 1fr; gap: .75rem; }
+}
 
 /* Team. */
 .s-team .grid li { text-align: center; }
