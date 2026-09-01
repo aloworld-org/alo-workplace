@@ -636,6 +636,22 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   border-radius: 0.75rem;
   padding: 1.5rem;
 }
+.s-features.features-list .grid { grid-template-columns: 1fr; max-width: 52rem; }
+.s-features.features-list .grid li { display: grid; grid-template-columns: minmax(10rem, .45fr) 1fr; gap: 1.5rem; align-items: baseline; }
+.s-features.features-steps .grid { counter-reset: feature-step; }
+.s-features.features-steps .grid li { counter-increment: feature-step; position: relative; padding-top: 3.25rem; }
+.s-features.features-steps .grid li::before { content: counter(feature-step, decimal-leading-zero); position: absolute; top: 1rem; left: 1.5rem; color: var(--primary); font-weight: 700; letter-spacing: .08em; }
+.s-features.features-bento .grid,
+.s-features.features-spotlight .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.s-features.features-bento .grid li:first-child,
+.s-features.features-spotlight .grid li:first-child { grid-column: 1 / -1; padding-block: 2.5rem; }
+.s-features.features-bento .grid li:nth-child(4n+2) { grid-row: span 2; }
+.s-features.features-spotlight .grid li:first-child h3 { font-size: clamp(1.5rem, 3vw, 2.25rem); }
+@media (max-width: 42rem) {
+  .s-features.features-bento .grid,
+  .s-features.features-spotlight .grid { grid-template-columns: 1fr; }
+  .s-features.features-list .grid li { grid-template-columns: 1fr; gap: .25rem; }
+}
 .s-gallery img { border-radius: 0.75rem; }
 
 /* Base-backed collection cards. */

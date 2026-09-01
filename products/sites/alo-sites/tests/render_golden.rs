@@ -18,8 +18,8 @@ use alo_store::site_model::{
     SECTIONS_SCHEMA_VERSION, Section, SectionAlignment, SectionEntrance, SectionLayoutStyle,
     SectionPresentation, SectionSpacing, SectionWidth, SectionsEnvelope, ShopSection, SiteImage,
     TeamMember, TeamSection, Testimonial, TestimonialsSection, TextImageSection, ThemeColorRole,
-    TicketsSection,
-    TransitionDirection, TransitionEffect, TransitionSection, TransitionSpeed, TransitionTrigger,
+    TicketsSection, TransitionDirection, TransitionEffect, TransitionSection, TransitionSpeed,
+    TransitionTrigger,
 };
 use alo_store::site_theme::SiteTheme;
 use alo_store::{
@@ -73,6 +73,7 @@ fn full_sections() -> Vec<Section> {
                 icon: Some("flame".to_owned()),
             }],
             columns: None,
+            layout: Some(alo_store::site_model::FeaturesLayout::Bento),
             presentation: Some(SectionPresentation {
                 layout: SectionLayoutStyle::Cards,
                 spacing: SectionSpacing::Generous,

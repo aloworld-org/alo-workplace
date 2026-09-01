@@ -1022,9 +1022,22 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
 }
 
 fn features(out: &mut String, s: &FeaturesSection, m: Marks) {
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::FeaturesLayout::Grid)
+    {
+        alo_store::site_model::FeaturesLayout::Grid => "features-grid",
+        alo_store::site_model::FeaturesLayout::Bento => "features-bento",
+        alo_store::site_model::FeaturesLayout::List => "features-list",
+        alo_store::site_model::FeaturesLayout::Steps => "features-steps",
+        alo_store::site_model::FeaturesLayout::Spotlight => "features-spotlight",
+    };
     open_presented_section(
         out,
-        &with_layout("s-features", columns_class(s.columns)),
+        &format!(
+            "{} {layout}",
+            with_layout("s-features", columns_class(s.columns))
+        ),
         s.presentation.as_ref(),
         m,
     );

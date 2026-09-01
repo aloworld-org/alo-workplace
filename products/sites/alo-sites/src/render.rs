@@ -413,9 +413,9 @@ pub fn render_password_challenge(
 /// JavaScript.
 fn wants_script(sections: &[Section]) -> bool {
     let moves = |presentation: &Option<alo_store::site_model::SectionPresentation>| {
-        presentation.as_ref().is_some_and(|p| {
-            p.entrance != alo_store::site_model::SectionEntrance::None
-        })
+        presentation
+            .as_ref()
+            .is_some_and(|p| p.entrance != alo_store::site_model::SectionEntrance::None)
     };
     sections.iter().any(|section| match section {
         Section::Nav(_) => true,
