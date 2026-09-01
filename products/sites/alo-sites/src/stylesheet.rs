@@ -47,6 +47,14 @@ pub fn stylesheet(theme: &SiteTheme) -> String {
     } else {
         palette.on_primary
     };
+    let on_bg = readable_on(background);
+    let on_text = readable_on(text);
+    let on_border = readable_on(border);
+    let on_accent_1 = readable_on(accent_1);
+    let on_accent_2 = readable_on(accent_2);
+    let on_accent_3 = readable_on(accent_3);
+    let on_accent_4 = readable_on(accent_4);
+    let on_accent_5 = readable_on(accent_5);
     format!(
         "/* alo Sites stylesheet — theme preset \"{id}\" */\n\
          :root {{\n\
@@ -62,6 +70,14 @@ pub fn stylesheet(theme: &SiteTheme) -> String {
          --accent-3: {accent_3};\n\
          --accent-4: {accent_4};\n\
          --accent-5: {accent_5};\n\
+         --on-bg: {on_bg};\n\
+         --on-text: {on_text};\n\
+         --on-border: {on_border};\n\
+         --on-accent-1: {on_accent_1};\n\
+         --on-accent-2: {on_accent_2};\n\
+         --on-accent-3: {on_accent_3};\n\
+         --on-accent-4: {on_accent_4};\n\
+         --on-accent-5: {on_accent_5};\n\
          --font-heading: {heading_family};\n\
          --font-body: {body_family};\n\
          --weight-heading: {heading_weight};\n\
@@ -79,6 +95,14 @@ pub fn stylesheet(theme: &SiteTheme) -> String {
         accent_3 = accent_3,
         accent_4 = accent_4,
         accent_5 = accent_5,
+        on_bg = on_bg,
+        on_text = on_text,
+        on_border = on_border,
+        on_accent_1 = on_accent_1,
+        on_accent_2 = on_accent_2,
+        on_accent_3 = on_accent_3,
+        on_accent_4 = on_accent_4,
+        on_accent_5 = on_accent_5,
         heading_family = typography.heading_family,
         body_family = typography.body_family,
         heading_weight = typography.heading_weight,
@@ -198,7 +222,7 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   font-weight: 600;
   text-decoration: none;
 }
-.button:hover { text-decoration: underline; }
+.button:hover { text-decoration: none; }
 .button.secondary { background: transparent; color: var(--primary); }
 .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .intro { color: var(--muted); max-width: 45rem; }
@@ -446,6 +470,30 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 .s-hero.hero-video-background .subheading { color: inherit; }
 .s-hero.hero-background a:not(.button),
 .s-hero.hero-video-background a:not(.button) { color: inherit; }
+.s-hero.hero-custom-appearance { background: var(--hero-bg); color: var(--hero-text); }
+.s-hero.hero-custom-appearance .subheading { color: inherit; }
+.s-hero.hero-custom-appearance .button {
+  background: var(--hero-primary);
+  border-color: var(--hero-primary);
+  color: var(--hero-primary-text);
+}
+.s-hero.hero-custom-appearance .button:hover,
+.s-hero.hero-custom-appearance .button:focus-visible {
+  background: var(--hero-primary-hover);
+  border-color: var(--hero-primary-hover);
+  color: var(--hero-primary-hover-text);
+}
+.s-hero.hero-custom-appearance .button.secondary {
+  background: var(--hero-secondary);
+  border-color: var(--hero-secondary);
+  color: var(--hero-secondary-text);
+}
+.s-hero.hero-custom-appearance .button.secondary:hover,
+.s-hero.hero-custom-appearance .button.secondary:focus-visible {
+  background: var(--hero-secondary-hover);
+  border-color: var(--hero-secondary-hover);
+  color: var(--hero-secondary-hover-text);
+}
 .s-hero.hero-editorial { border-left: 0.35rem solid var(--primary); padding-left: clamp(1.5rem, 5vw, 5rem); }
 .s-hero.hero-editorial > h1 { font-size: clamp(2.75rem, 7vw, 5.5rem); max-width: 14ch; }
 .s-hero.hero-editorial > .subheading { max-width: 42rem; }

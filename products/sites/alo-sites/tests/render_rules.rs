@@ -78,6 +78,40 @@ fn hero_design_choices_become_stable_responsive_classes() {
 }
 
 #[test]
+fn hero_color_roles_scope_button_and_hover_states_with_readable_defaults() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [{
+            "type": "hero",
+            "heading": "Hello",
+            "primary_cta": {"label": "Start", "href": "/start"},
+            "secondary_cta": {"label": "Learn", "href": "/learn"},
+            "appearance": {
+                "background": "accent_3",
+                "primary_button": "accent_1",
+                "primary_button_text": "background",
+                "primary_button_hover": "accent_2",
+                "primary_button_hover_text": "text",
+                "secondary_button": "accent_4",
+                "secondary_button_text": "accent_4",
+                "secondary_button_hover": "accent_5"
+            }
+        }]
+    }));
+    assert!(html.contains("class=\"s-hero hero-custom-appearance\""));
+    assert!(html.contains("--hero-bg:var(--accent-3)"));
+    assert!(html.contains("--hero-primary-text:var(--bg)"));
+    assert!(html.contains("--hero-primary-hover-text:var(--text)"));
+    assert!(html.contains("--hero-secondary-text:var(--accent-4)"));
+    assert!(html.contains("--hero-secondary-hover-text:var(--on-accent-5)"));
+
+    let css = stylesheet(&SiteTheme::new());
+    assert!(css.contains("--on-accent-5:"));
+    assert!(css.contains(".s-hero.hero-custom-appearance .button:hover"));
+    assert!(css.contains(".s-hero.hero-custom-appearance .button.secondary:hover"));
+}
+
+#[test]
 fn hero_motion_staggers_words_animates_media_and_respects_reduced_motion() {
     let html = render(&json!({
         "schema_version": 1,

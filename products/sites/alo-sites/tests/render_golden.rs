@@ -52,6 +52,7 @@ fn full_sections() -> Vec<Section> {
             video_url: None,
             primary_cta: Some(link("Shop roasts", "/shop")),
             secondary_cta: Some(link("Our story", "/about")),
+            appearance: None,
             layout: None,
             height: None,
             alignment: None,

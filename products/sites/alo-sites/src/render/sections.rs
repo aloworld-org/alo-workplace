@@ -131,12 +131,26 @@ impl Marks {
 /// through here, so "one element per section, carrying its index" is a
 /// property of the renderer rather than of sixteen remembered call sites.
 pub(super) fn open_section(out: &mut String, tag: &str, class: &str, m: Marks) {
+    open_section_with_style(out, tag, class, None, m);
+}
+
+fn open_section_with_style(
+    out: &mut String,
+    tag: &str,
+    class: &str,
+    style: Option<&str>,
+    m: Marks,
+) {
     let anchor = if tag == "section" {
         format!(" id=\"{}\"", m.anchor())
     } else {
         String::new()
     };
-    out.push_str(&format!("<{tag} class=\"{class}\"{anchor}{}>\n", m.block()));
+    let style = style.map_or_else(String::new, |value| format!(" style=\"{value}\""));
+    out.push_str(&format!(
+        "<{tag} class=\"{class}\"{anchor}{style}{}>\n",
+        m.block()
+    ));
 }
 
 /// The section's classes with its chosen layout appended — the one place a
@@ -225,6 +239,20 @@ fn theme_role(role: alo_store::site_model::ThemeColorRole) -> &'static str {
         ThemeColorRole::Accent3 => "accent-3",
         ThemeColorRole::Accent4 => "accent-4",
         ThemeColorRole::Accent5 => "accent-5",
+    }
+}
+
+fn theme_on_role(role: alo_store::site_model::ThemeColorRole) -> &'static str {
+    use alo_store::site_model::ThemeColorRole;
+    match role {
+        ThemeColorRole::Background => "on-bg",
+        ThemeColorRole::Text => "on-text",
+        ThemeColorRole::Border => "on-border",
+        ThemeColorRole::Accent1 => "on-accent-1",
+        ThemeColorRole::Accent2 => "on-accent-2",
+        ThemeColorRole::Accent3 => "on-accent-3",
+        ThemeColorRole::Accent4 => "on-accent-4",
+        ThemeColorRole::Accent5 => "on-accent-5",
     }
 }
 
@@ -808,7 +836,37 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
     {
         classes.push("hero-has-image");
     }
-    open_section(out, "section", &classes.join(" "), m);
+    let appearance = s.appearance.as_ref().map(|appearance| {
+        classes.push("hero-custom-appearance");
+        format!(
+            "--hero-bg:var(--{});--hero-text:var(--{});\
+             --hero-primary:var(--{});--hero-primary-text:var(--{});\
+             --hero-primary-hover:var(--{});--hero-primary-hover-text:var(--{});\
+             --hero-secondary:var(--{});--hero-secondary-text:var(--{});\
+             --hero-secondary-hover:var(--{});--hero-secondary-hover-text:var(--{})",
+            theme_role(appearance.background),
+            theme_on_role(appearance.background),
+            theme_role(appearance.primary_button),
+            appearance
+                .primary_button_text
+                .map_or_else(|| theme_on_role(appearance.primary_button), theme_role),
+            theme_role(appearance.primary_button_hover),
+            appearance.primary_button_hover_text.map_or_else(
+                || theme_on_role(appearance.primary_button_hover),
+                theme_role,
+            ),
+            theme_role(appearance.secondary_button),
+            appearance
+                .secondary_button_text
+                .map_or_else(|| theme_on_role(appearance.secondary_button), theme_role,),
+            theme_role(appearance.secondary_button_hover),
+            appearance.secondary_button_hover_text.map_or_else(
+                || theme_on_role(appearance.secondary_button_hover),
+                theme_role,
+            ),
+        )
+    });
+    open_section_with_style(out, "section", &classes.join(" "), appearance.as_deref(), m);
     if matches!(
         s.text_animation,
         Some(alo_store::site_model::HeroTextAnimation::WordReveal)
