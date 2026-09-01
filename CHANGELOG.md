@@ -1,5 +1,9 @@
 # Changelog
 
+- Finance now uses the branded, accessible calendar everywhere a financial date
+  is selected, with a denser workspace shell and consistent premium empty-state
+  surfaces across expenses, approvals, bank matching, accounts, and reports.
+
 - Won Sales handoffs can now be completed from the linked Project with an
   explicit, reviewable setup for shared Drive files, a Chat room, starter tasks,
   and an optional kickoff. Nothing is created before confirmation, retries are
