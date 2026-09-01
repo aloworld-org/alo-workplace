@@ -70,6 +70,11 @@ pub(super) const BEHAVIOR_SCRIPT: &str = r#"<script>(function () {
     });
   });
   if ("IntersectionObserver" in window) {
+    document.querySelectorAll(".section-motion").forEach(function (target) {
+      new IntersectionObserver(function (entries, observer) {
+        if (entries[0].isIntersecting) { target.classList.add("is-visible"); observer.unobserve(target); }
+      }, {rootMargin:"0px 0px -12%",threshold:.08}).observe(target);
+    });
     document.querySelectorAll(".s-transition").forEach(function (marker) {
       var target = marker.nextElementSibling;
       while (target && target.classList.contains("s-transition")) { target = target.nextElementSibling; }
@@ -409,7 +414,7 @@ mod tests {
     #[test]
     fn the_page_scripts_stay_within_their_byte_budget() {
         assert!(
-            BEHAVIOR_SCRIPT.len() < 3072,
+            BEHAVIOR_SCRIPT.len() < 4096,
             "behavior script is {} bytes",
             BEHAVIOR_SCRIPT.len()
         );

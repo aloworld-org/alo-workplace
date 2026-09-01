@@ -441,6 +441,79 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   .s-hero.hero-text-word-reveal .hero-word { opacity: 1; transform: none; animation: none; }
 }
 
+/* A transition marker is authoring metadata; the following section is the visual. */
+.section-presented {
+  background: var(--section-bg);
+  color: var(--section-text);
+}
+.section-presented.section-spacing-compact { padding-top: 2rem; padding-bottom: 2rem; }
+.section-presented.section-spacing-standard { padding-top: 3rem; padding-bottom: 3rem; }
+.section-presented.section-spacing-generous { padding-top: 5rem; padding-bottom: 5rem; }
+.section-presented.section-width-narrow { max-width: 48rem; }
+.section-presented.section-width-balanced { max-width: 70rem; }
+.section-presented.section-width-wide { max-width: 90rem; }
+.section-presented.section-align-center { text-align: center; }
+.section-presented.section-align-center > .grid,
+.section-presented.section-align-center > .tiers,
+.section-presented.section-align-center > ul { text-align: left; }
+.section-presented .button,
+.section-presented button[type="submit"] {
+  background: var(--section-button);
+  border-color: var(--section-button);
+  color: var(--section-button-text);
+}
+.section-presented .button:hover,
+.section-presented .button:focus-visible,
+.section-presented button[type="submit"]:hover,
+.section-presented button[type="submit"]:focus-visible {
+  background: var(--section-button-hover);
+  border-color: var(--section-button-hover);
+  color: var(--section-button-hover-text);
+}
+.section-presented.section-cards > .grid > li,
+.section-presented.section-cards > .tiers > li,
+.section-presented.section-cards > ul > li,
+.section-presented.section-cards > details {
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--section-text) 14%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--section-bg) 92%, var(--section-text));
+}
+.section-presented.section-minimal > .grid > li,
+.section-presented.section-minimal > .tiers > li,
+.section-presented.section-minimal > ul > li { border: 0; box-shadow: none; background: transparent; }
+.section-presented.section-editorial { border-left: .3rem solid var(--section-button); padding-left: clamp(1.5rem,5vw,4rem); }
+.section-presented { --section-enter-duration: 700ms; }
+.section-presented.section-speed-quick { --section-enter-duration: 420ms; }
+.section-presented.section-speed-relaxed { --section-enter-duration: 1050ms; }
+.js .section-motion { opacity: 0; transition: opacity var(--section-enter-duration) cubic-bezier(.22,1,.36,1), transform var(--section-enter-duration) cubic-bezier(.22,1,.36,1), clip-path var(--section-enter-duration) cubic-bezier(.22,1,.36,1), filter var(--section-enter-duration) ease-out; }
+.js .section-enter-fade-up { transform: translateY(1.5rem); }
+.js .section-enter-slide-in { transform: translateX(-2rem); }
+.js .section-enter-scale-in { transform: scale(.965); }
+.js .section-enter-reveal { clip-path: inset(0 0 25% 0); filter: blur(3px); }
+.js .section-motion.is-visible { opacity: 1; transform: none; clip-path: inset(0); filter: none; }
+
+.s-transition { display: none; }
+.js .alo-transition {
+  --alo-transition-duration: 700ms;
+  opacity: 0;
+  transition: opacity var(--alo-transition-duration) cubic-bezier(.22,1,.36,1), transform var(--alo-transition-duration) cubic-bezier(.22,1,.36,1), clip-path var(--alo-transition-duration) cubic-bezier(.22,1,.36,1), filter var(--alo-transition-duration) ease-out;
+  will-change: opacity, transform;
+}
+.js .alo-transition.alo-speed-quick { --alo-transition-duration: 420ms; }
+.js .alo-transition.alo-speed-relaxed { --alo-transition-duration: 1050ms; }
+.js .alo-transition-slide.alo-from-up { transform: translateY(2.5rem); }
+.js .alo-transition-slide.alo-from-down { transform: translateY(-2.5rem); }
+.js .alo-transition-slide.alo-from-left { transform: translateX(2.5rem); }
+.js .alo-transition-slide.alo-from-right { transform: translateX(-2.5rem); }
+.js .alo-transition-scale { transform: scale(.965); }
+.js .alo-transition-reveal { clip-path: inset(0 0 22% 0); filter: blur(3px); }
+.js .alo-transition.is-visible { opacity: 1; transform: none; clip-path: inset(0); filter: none; }
+@media (prefers-reduced-motion: reduce) {
+  .section-presented[class*="section-enter-"] { opacity: 1; transform: none; clip-path: none; filter: none; transition: none; }
+  .js .alo-transition { opacity: 1; transform: none; clip-path: none; filter: none; transition: none; }
+}
+
 /* Shared card grid (features, gallery, team). */
 .grid {
   list-style: none;

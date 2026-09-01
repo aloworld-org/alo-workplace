@@ -35,7 +35,7 @@
 <p class="actions"><a class="button" href="/shop">Shop roasts</a><a class="button secondary" href="/about">Our story</a></p>
 <figure><img src="/assets/img/9hK3vQ2mR8pT1xWz4bC5dg" srcset="/assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w480 480w, /assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w960 960w, /assets/img/9hK3vQ2mR8pT1xWz4bC5dg/w1440 1440w" sizes="(min-width: 70rem) 67.5rem, 100vw" alt="Roasting drum mid-batch"></figure>
 </section>
-<section class="s-features" id="features">
+<section class="s-features section-presented section-cards section-spacing-generous section-width-wide section-align-center section-speed-relaxed section-motion section-enter-fade-up" id="features" style="--section-bg:var(--accent-3);--section-text:var(--text);--section-button:var(--accent-1);--section-button-text:var(--on-accent-1);--section-button-hover:var(--accent-2);--section-button-hover-text:var(--bg)">
 <h2>Why Nordwind</h2>
 <p class="intro">Three promises on every bag.</p>
 <ul class="grid">
@@ -181,6 +181,7 @@
 <p>Beans and brew gear, shipped from the roastery.</p>
 <p class="actions"><a class="button" href="/shop">Visit the shop</a></p>
 </section>
+<div class="s-transition" data-effect="slide" data-direction="up" data-speed="smooth" data-trigger="balanced" data-out="true" aria-hidden="true"></div>
 <section class="s-custom-code" id="custom_code">
 <h2>Roast timer</h2>
 <iframe class="custom-frame" title="A timer counting down the current roast" sandbox="allow-scripts" loading="lazy" style="height:220px" srcdoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &amp;#39;none&amp;#39;; base-uri &amp;#39;none&amp;#39;; form-action &amp;#39;none&amp;#39;; style-src &amp;#39;unsafe-inline&amp;#39;; script-src &amp;#39;unsafe-inline&amp;#39;&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;&lt;style&gt;html,body{margin:0;font-family:inherit}#left { font-size: 3rem; }&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;p id=&quot;left&quot;&gt;12:00&lt;/p&gt;&lt;button type=&quot;button&quot; id=&quot;go&quot;&gt;Start&lt;/button&gt;&lt;script&gt;document.getElementById(&#39;go&#39;).addEventListener(&#39;click&#39;, () =&gt; {});&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;"></iframe>
@@ -234,6 +235,27 @@
       }).catch(function () { form.submit(); });
     });
   });
+  if ("IntersectionObserver" in window) {
+    document.querySelectorAll(".section-motion").forEach(function (target) {
+      new IntersectionObserver(function (entries, observer) {
+        if (entries[0].isIntersecting) { target.classList.add("is-visible"); observer.unobserve(target); }
+      }, {rootMargin:"0px 0px -12%",threshold:.08}).observe(target);
+    });
+    document.querySelectorAll(".s-transition").forEach(function (marker) {
+      var target = marker.nextElementSibling;
+      while (target && target.classList.contains("s-transition")) { target = target.nextElementSibling; }
+      if (!target) { return; }
+      target.classList.add("alo-transition", "alo-transition-" + marker.dataset.effect, "alo-from-" + marker.dataset.direction, "alo-speed-" + marker.dataset.speed);
+      var margins = {early:"0px 0px 5%",balanced:"0px 0px -15%",late:"0px 0px -35%"};
+      var repeat = marker.dataset.out === "true";
+      new IntersectionObserver(function (entries, observer) {
+        entries.forEach(function (entry) {
+          target.classList.toggle("is-visible", entry.isIntersecting);
+          if (entry.isIntersecting && !repeat) { observer.unobserve(target); }
+        });
+      }, {rootMargin:margins[marker.dataset.trigger] || margins.balanced,threshold:.08}).observe(target);
+    });
+  }
 })();</script>
 <script>(function () {
   "use strict";

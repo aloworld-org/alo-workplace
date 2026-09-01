@@ -11,8 +11,9 @@ use alo_store::site_layout::GridColumns;
 use alo_store::site_model::{
     BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqSection,
     FeaturesSection, FooterSection, GallerySection, HeroSection, ImageSide, Link, NavSection,
-    PricingSection, Section, SiteImage, TeamSection, TestimonialsSection, TextImageSection,
-    TransitionDirection, TransitionEffect, TransitionSection, TransitionSpeed, TransitionTrigger,
+    PricingSection, Section, SectionPresentation, SiteImage, TeamSection, TestimonialsSection,
+    TextImageSection, TransitionDirection, TransitionEffect, TransitionSection, TransitionSpeed,
+    TransitionTrigger,
 };
 use alo_store::{
     SiteBookingSnapshot, SiteCatalogSnapshot, SiteCatalogSnapshotItem, SiteCollectionSnapshot,
@@ -257,6 +258,69 @@ fn theme_on_role(role: alo_store::site_model::ThemeColorRole) -> &'static str {
     }
 }
 
+fn open_presented_section(
+    out: &mut String,
+    class: &str,
+    presentation: Option<&SectionPresentation>,
+    m: Marks,
+) {
+    let Some(p) = presentation else {
+        open_section(out, "section", class, m);
+        return;
+    };
+    let layout = match p.layout {
+        alo_store::site_model::SectionLayoutStyle::Clean => "section-clean",
+        alo_store::site_model::SectionLayoutStyle::Cards => "section-cards",
+        alo_store::site_model::SectionLayoutStyle::Minimal => "section-minimal",
+        alo_store::site_model::SectionLayoutStyle::Editorial => "section-editorial",
+    };
+    let spacing = match p.spacing {
+        alo_store::site_model::SectionSpacing::Compact => "section-spacing-compact",
+        alo_store::site_model::SectionSpacing::Standard => "section-spacing-standard",
+        alo_store::site_model::SectionSpacing::Generous => "section-spacing-generous",
+    };
+    let width = match p.width {
+        alo_store::site_model::SectionWidth::Narrow => "section-width-narrow",
+        alo_store::site_model::SectionWidth::Balanced => "section-width-balanced",
+        alo_store::site_model::SectionWidth::Wide => "section-width-wide",
+    };
+    let alignment = match p.alignment {
+        alo_store::site_model::SectionAlignment::Left => "section-align-left",
+        alo_store::site_model::SectionAlignment::Center => "section-align-center",
+    };
+    let entrance = match p.entrance {
+        alo_store::site_model::SectionEntrance::None => "",
+        alo_store::site_model::SectionEntrance::FadeUp => " section-motion section-enter-fade-up",
+        alo_store::site_model::SectionEntrance::SlideIn => " section-motion section-enter-slide-in",
+        alo_store::site_model::SectionEntrance::ScaleIn => " section-motion section-enter-scale-in",
+        alo_store::site_model::SectionEntrance::Reveal => " section-motion section-enter-reveal",
+    };
+    let speed = match p.speed {
+        TransitionSpeed::Quick => "section-speed-quick",
+        TransitionSpeed::Smooth => "section-speed-smooth",
+        TransitionSpeed::Relaxed => "section-speed-relaxed",
+    };
+    let button_text = p
+        .button_text
+        .map_or_else(|| theme_on_role(p.button), theme_role);
+    let hover_text = p
+        .button_hover_text
+        .map_or_else(|| theme_on_role(p.button_hover), theme_role);
+    let classes = format!(
+        "{class} section-presented {layout} {spacing} {width} {alignment} {speed}{entrance}"
+    );
+    let style = format!(
+        "--section-bg:var(--{});--section-text:var(--{});--section-button:var(--{});--section-button-text:var(--{});--section-button-hover:var(--{});--section-button-hover-text:var(--{})",
+        theme_role(p.background),
+        theme_role(p.text),
+        theme_role(p.button),
+        button_text,
+        theme_role(p.button_hover),
+        hover_text,
+    );
+    open_section_with_style(out, "section", &classes, Some(&style), m);
+}
+
 /// A `footer` section, rendered as a `<footer>` landmark.
 pub(super) fn footer(out: &mut String, site: &SiteRenderContext<'_>, s: &FooterSection, m: Marks) {
     open_section(out, "footer", "s-footer", m);
@@ -355,7 +419,7 @@ fn tickets(
     section: &alo_store::site_model::TicketsSection,
     m: Marks,
 ) {
-    open_section(out, "section", "s-tickets", m);
+    open_presented_section(out, "s-tickets", section.presentation.as_ref(), m);
     push_opt_heading(out, section.heading.as_deref(), m);
     if let Some(body) = &section.body {
         out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));
@@ -379,7 +443,7 @@ fn shop(
     section: &alo_store::site_model::ShopSection,
     m: Marks,
 ) {
-    open_section(out, "section", "s-shop", m);
+    open_presented_section(out, "s-shop", section.presentation.as_ref(), m);
     push_opt_heading(out, section.heading.as_deref(), m);
     if let Some(body) = &section.body {
         out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));
@@ -490,7 +554,7 @@ fn catalog(
     snapshots: &std::collections::HashMap<String, SiteCatalogSnapshot>,
     m: Marks,
 ) {
-    open_section(out, "section", "s-catalog", m);
+    open_presented_section(out, "s-catalog", section.presentation.as_ref(), m);
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.catalog_id.as_str()) else {
         tracing::warn!(
@@ -701,7 +765,7 @@ fn booking(
     m: Marks,
 ) {
     let t = site.strings;
-    open_section(out, "section", "s-booking", m);
+    open_presented_section(out, "s-booking", section.presentation.as_ref(), m);
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.booking_id.as_str()) else {
         tracing::warn!(
@@ -764,7 +828,7 @@ fn collection(
     snapshots: &std::collections::HashMap<String, SiteCollectionSnapshot>,
     m: Marks,
 ) {
-    open_section(out, "section", "s-collection", m);
+    open_presented_section(out, "s-collection", section.presentation.as_ref(), m);
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.collection_id.as_str()) else {
         tracing::warn!(
@@ -958,10 +1022,10 @@ fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Mark
 }
 
 fn features(out: &mut String, s: &FeaturesSection, m: Marks) {
-    open_section(
+    open_presented_section(
         out,
-        "section",
         &with_layout("s-features", columns_class(s.columns)),
+        s.presentation.as_ref(),
         m,
     );
     push_opt_heading(out, s.heading.as_deref(), m);
@@ -990,13 +1054,13 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
         ImageSide::Left => "image-left",
         ImageSide::Right => "image-right",
     };
-    open_section(
+    open_presented_section(
         out,
-        "section",
         &with_layout(
             &format!("s-text-image {side}"),
             s.split.map(alo_store::site_layout::ColumnSplit::class),
         ),
+        s.presentation.as_ref(),
         m,
     );
     push_figure(out, site, &s.image, ImageSlot::Half);
@@ -1007,10 +1071,10 @@ fn text_image(out: &mut String, site: &SiteRenderContext<'_>, s: &TextImageSecti
 }
 
 fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m: Marks) {
-    open_section(
+    open_presented_section(
         out,
-        "section",
         &with_layout("s-gallery", columns_class(s.columns)),
+        s.presentation.as_ref(),
         m,
     );
     push_opt_heading(out, s.heading.as_deref(), m);
@@ -1024,7 +1088,7 @@ fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m
 }
 
 fn testimonials(out: &mut String, s: &TestimonialsSection, m: Marks) {
-    open_section(out, "section", "s-testimonials", m);
+    open_presented_section(out, "s-testimonials", s.presentation.as_ref(), m);
     push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul>\n");
     for (i, item) in s.items.iter().enumerate() {
@@ -1046,7 +1110,7 @@ fn testimonials(out: &mut String, s: &TestimonialsSection, m: Marks) {
 }
 
 fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
-    open_section(out, "section", "s-pricing", m);
+    open_presented_section(out, "s-pricing", s.presentation.as_ref(), m);
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(intro) = &s.intro {
         out.push_str(&format!(
@@ -1102,10 +1166,10 @@ fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
 }
 
 fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Marks) {
-    open_section(
+    open_presented_section(
         out,
-        "section",
         &with_layout("s-team", columns_class(s.columns)),
+        s.presentation.as_ref(),
         m,
     );
     push_opt_heading(out, s.heading.as_deref(), m);
@@ -1140,7 +1204,7 @@ fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Mark
 }
 
 fn faq(out: &mut String, s: &FaqSection, m: Marks) {
-    open_section(out, "section", "s-faq", m);
+    open_presented_section(out, "s-faq", s.presentation.as_ref(), m);
     push_opt_heading(out, s.heading.as_deref(), m);
     for (i, item) in s.items.iter().enumerate() {
         // <details>/<summary> is a native, scriptless accordion.
@@ -1156,7 +1220,7 @@ fn faq(out: &mut String, s: &FaqSection, m: Marks) {
 }
 
 fn cta(out: &mut String, s: &CtaSection, m: Marks) {
-    open_section(out, "section", "s-cta", m);
+    open_presented_section(out, "s-cta", s.presentation.as_ref(), m);
     out.push_str(&format!(
         "<h2{}>{}</h2>\n",
         m.at("/heading"),
@@ -1177,7 +1241,7 @@ fn cta(out: &mut String, s: &CtaSection, m: Marks) {
 /// filling it is bot traffic, silently dropped by the forms backend).
 fn contact_form(out: &mut String, site: &SiteRenderContext<'_>, s: &ContactFormSection, m: Marks) {
     let index = m.index;
-    open_section(out, "section", "s-contact-form", m);
+    open_presented_section(out, "s-contact-form", s.presentation.as_ref(), m);
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(body) = &s.body {
         out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));

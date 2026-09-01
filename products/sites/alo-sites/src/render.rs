@@ -412,9 +412,27 @@ pub fn render_password_challenge(
 /// toggle) or a form with a working submit. A page without either ships zero
 /// JavaScript.
 fn wants_script(sections: &[Section]) -> bool {
+    let moves = |presentation: &Option<alo_store::site_model::SectionPresentation>| {
+        presentation.as_ref().is_some_and(|p| {
+            p.entrance != alo_store::site_model::SectionEntrance::None
+        })
+    };
     sections.iter().any(|section| match section {
         Section::Nav(_) => true,
-        Section::ContactForm(form) => form.form_id.is_some(),
+        Section::Features(s) => moves(&s.presentation),
+        Section::TextImage(s) => moves(&s.presentation),
+        Section::Gallery(s) => moves(&s.presentation),
+        Section::Testimonials(s) => moves(&s.presentation),
+        Section::Pricing(s) => moves(&s.presentation),
+        Section::Team(s) => moves(&s.presentation),
+        Section::Faq(s) => moves(&s.presentation),
+        Section::Cta(s) => moves(&s.presentation),
+        Section::ContactForm(s) => s.form_id.is_some() || moves(&s.presentation),
+        Section::Collection(s) => moves(&s.presentation),
+        Section::Catalog(s) => moves(&s.presentation),
+        Section::Booking(s) => moves(&s.presentation),
+        Section::Tickets(s) => moves(&s.presentation),
+        Section::Shop(s) => moves(&s.presentation),
         Section::Transition(_) => true,
         _ => false,
     })

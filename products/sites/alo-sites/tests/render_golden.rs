@@ -15,8 +15,10 @@ use alo_store::site_model::{
     BookingSection, CatalogSection, CollectionSection, ContactFormSection, CtaSection, FaqItem,
     FaqSection, FeatureItem, FeaturesSection, FooterSection, GallerySection, HeroSection,
     ImageCrop, ImageFocalPoint, ImageSide, Link, NavSection, PricingSection, PricingTier,
-    SECTIONS_SCHEMA_VERSION, Section, SectionsEnvelope, ShopSection, SiteImage, TeamMember,
-    TeamSection, Testimonial, TestimonialsSection, TextImageSection, TicketsSection,
+    SECTIONS_SCHEMA_VERSION, Section, SectionAlignment, SectionEntrance, SectionLayoutStyle,
+    SectionPresentation, SectionSpacing, SectionWidth, SectionsEnvelope, ShopSection, SiteImage,
+    TeamMember, TeamSection, Testimonial, TestimonialsSection, TextImageSection, ThemeColorRole,
+    TicketsSection,
     TransitionDirection, TransitionEffect, TransitionSection, TransitionSpeed, TransitionTrigger,
 };
 use alo_store::site_theme::SiteTheme;
@@ -71,6 +73,20 @@ fn full_sections() -> Vec<Section> {
                 icon: Some("flame".to_owned()),
             }],
             columns: None,
+            presentation: Some(SectionPresentation {
+                layout: SectionLayoutStyle::Cards,
+                spacing: SectionSpacing::Generous,
+                width: SectionWidth::Wide,
+                alignment: SectionAlignment::Center,
+                background: ThemeColorRole::Accent3,
+                text: ThemeColorRole::Text,
+                button: ThemeColorRole::Accent1,
+                button_text: None,
+                button_hover: ThemeColorRole::Accent2,
+                button_hover_text: Some(ThemeColorRole::Background),
+                entrance: SectionEntrance::FadeUp,
+                speed: TransitionSpeed::Relaxed,
+            }),
         }),
         Section::TextImage(TextImageSection {
             heading: Some("The roastery".to_owned()),
@@ -78,6 +94,7 @@ fn full_sections() -> Vec<Section> {
             image: image.clone(),
             image_side: ImageSide::Left,
             split: None,
+            presentation: None,
         }),
         Section::Gallery(GallerySection {
             heading: Some("Inside the roastery".to_owned()),
@@ -86,6 +103,7 @@ fn full_sections() -> Vec<Section> {
             // derivative rather than the unframed original.
             images: vec![image.clone(), cropped_image()],
             columns: None,
+            presentation: None,
         }),
         Section::Testimonials(TestimonialsSection {
             heading: Some("What cafés say".to_owned()),
@@ -94,6 +112,7 @@ fn full_sections() -> Vec<Section> {
                 author: "Mara Lindqvist".to_owned(),
                 role: Some("Head barista, Kaffebaren".to_owned()),
             }],
+            presentation: None,
         }),
         Section::Pricing(PricingSection {
             heading: Some("Subscriptions".to_owned()),
@@ -107,6 +126,7 @@ fn full_sections() -> Vec<Section> {
                 cta: Some(link("Start weekly", "/subscribe/weekly")),
                 highlighted: true,
             }],
+            presentation: None,
         }),
         Section::Team(TeamSection {
             heading: Some("The roasters".to_owned()),
@@ -117,6 +137,7 @@ fn full_sections() -> Vec<Section> {
                 bio: Some("Twenty years at the drum.".to_owned()),
             }],
             columns: None,
+            presentation: None,
         }),
         Section::Faq(FaqSection {
             heading: Some("Questions".to_owned()),
@@ -124,34 +145,41 @@ fn full_sections() -> Vec<Section> {
                 question: "How fresh is the coffee?".to_owned(),
                 answer: "It ships the day it is roasted.".to_owned(),
             }],
+            presentation: None,
         }),
         Section::Cta(CtaSection {
             heading: "Taste the difference".to_owned(),
             body: Some("First bag ships free.".to_owned()),
             button: link("Order now", "/order"),
+            presentation: None,
         }),
         Section::ContactForm(ContactFormSection {
             heading: Some("Wholesale enquiries".to_owned()),
             body: Some("We answer within one business day.".to_owned()),
             form_id: Some("f4K9sL2wN7qR5tYx8vB1cA".to_owned()),
             success_message: Some("Thanks — talk soon.".to_owned()),
+            presentation: None,
         }),
         Section::Collection(CollectionSection {
             collection_id: SiteCollectionId::new("seasonal-roasts"),
             heading: Some("Seasonal roasts".to_owned()),
+            presentation: None,
         }),
         Section::Catalog(CatalogSection {
             catalog_id: SiteCatalogId::new("harbour-menu"),
             heading: Some("On the counter".to_owned()),
             category: None,
+            presentation: None,
         }),
         Section::Tickets(TicketsSection {
             heading: Some("Cupping evenings".to_owned()),
             body: Some("Six seats around the roaster, once a month.".to_owned()),
+            presentation: None,
         }),
         Section::Shop(ShopSection {
             heading: Some("The roastery shop".to_owned()),
             body: Some("Beans and brew gear, shipped from the roastery.".to_owned()),
+            presentation: None,
         }),
         Section::Transition(TransitionSection {
             effect: TransitionEffect::Slide,
@@ -365,6 +393,7 @@ fn empty_collection_has_a_stable_public_golden() {
     let value = envelope_value(vec![Section::Collection(CollectionSection {
         collection_id: SiteCollectionId::new("seasonal-roasts"),
         heading: Some("Seasonal roasts".to_owned()),
+        presentation: None,
     })]);
     let site = SiteRenderContext {
         name: SITE_NAME,
@@ -402,6 +431,7 @@ fn booking_section_has_a_stable_public_golden() {
     let value = envelope_value(vec![Section::Booking(BookingSection {
         booking_id: SiteBookingId::new("studio-consultation"),
         heading: Some("Come and talk to us".to_owned()),
+        presentation: None,
     })]);
     let site = SiteRenderContext {
         name: SITE_NAME,
@@ -467,6 +497,7 @@ fn empty_catalog_has_a_stable_public_golden() {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         heading: Some("On the counter".to_owned()),
         category: None,
+        presentation: None,
     })]);
     let site = SiteRenderContext {
         name: SITE_NAME,
@@ -510,6 +541,7 @@ fn an_orderable_catalog_renders_a_scriptless_order_form() {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         heading: Some("Order for Saturday".to_owned()),
         category: None,
+        presentation: None,
     })]);
     let site = SiteRenderContext {
         name: SITE_NAME,
@@ -562,6 +594,7 @@ fn a_catalog_section_can_show_one_category() {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         heading: Some("Beans to take home".to_owned()),
         category: Some("beans".to_owned()),
+        presentation: None,
     })]);
     let site = SiteRenderContext {
         name: SITE_NAME,

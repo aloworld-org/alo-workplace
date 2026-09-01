@@ -56,6 +56,11 @@
     });
   });
   if ("IntersectionObserver" in window) {
+    document.querySelectorAll(".section-motion").forEach(function (target) {
+      new IntersectionObserver(function (entries, observer) {
+        if (entries[0].isIntersecting) { target.classList.add("is-visible"); observer.unobserve(target); }
+      }, {rootMargin:"0px 0px -12%",threshold:.08}).observe(target);
+    });
     document.querySelectorAll(".s-transition").forEach(function (marker) {
       var target = marker.nextElementSibling;
       while (target && target.classList.contains("s-transition")) { target = target.nextElementSibling; }
