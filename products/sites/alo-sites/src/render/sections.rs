@@ -1124,7 +1124,22 @@ fn gallery(out: &mut String, site: &SiteRenderContext<'_>, s: &GallerySection, m
 }
 
 fn testimonials(out: &mut String, s: &TestimonialsSection, m: Marks) {
-    open_presented_section(out, "s-testimonials", s.presentation.as_ref(), m);
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::TestimonialsLayout::Cards)
+    {
+        alo_store::site_model::TestimonialsLayout::Cards => "testimonials-cards",
+        alo_store::site_model::TestimonialsLayout::Featured => "testimonials-featured",
+        alo_store::site_model::TestimonialsLayout::Editorial => "testimonials-editorial",
+        alo_store::site_model::TestimonialsLayout::Stacked => "testimonials-stacked",
+        alo_store::site_model::TestimonialsLayout::Carousel => "testimonials-carousel",
+    };
+    open_presented_section(
+        out,
+        &format!("s-testimonials {layout}"),
+        s.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, s.heading.as_deref(), m);
     out.push_str("<ul>\n");
     for (i, item) in s.items.iter().enumerate() {

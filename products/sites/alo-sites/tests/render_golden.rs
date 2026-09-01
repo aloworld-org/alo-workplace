@@ -115,6 +115,7 @@ fn full_sections() -> Vec<Section> {
                 author: "Mara Lindqvist".to_owned(),
                 role: Some("Head barista, Kaffebaren".to_owned()),
             }],
+            layout: Some(alo_store::site_model::TestimonialsLayout::Featured),
             presentation: None,
         }),
         Section::Pricing(PricingSection {
