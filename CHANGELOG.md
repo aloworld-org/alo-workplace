@@ -1,5 +1,7 @@
 # Changelog
 
+- Sales: won opportunities can now be reviewed and converted into one linked delivery project, with safe retries, bidirectional navigation, tenant isolation, and preserved provenance.
+
 - Sales now opens with a focused pipeline pulse: open, closing-soon, overdue,
   and quiet opportunities are immediately visible, the three records needing
   attention most can be opened directly, and board cards show overdue, quiet,
