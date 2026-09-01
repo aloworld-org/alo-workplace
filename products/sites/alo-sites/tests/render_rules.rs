@@ -59,6 +59,25 @@ fn hero_page() -> serde_json::Value {
 }
 
 #[test]
+fn hero_design_choices_become_stable_responsive_classes() {
+    let html = render(&json!({
+        "schema_version": 1,
+        "sections": [{
+            "type": "hero",
+            "heading": "Hello",
+            "image": {"blob_id": "9hK3vQ2mR8pT1xWz4bC5dg", "alt": "The drum"},
+            "layout": "split_right",
+            "height": "tall",
+            "alignment": "left",
+            "content_width": "narrow"
+        }]
+    }));
+    assert!(html.contains(
+        "class=\"s-hero hero-split-right hero-height-tall hero-align-left hero-width-narrow hero-has-image\""
+    ));
+}
+
+#[test]
 fn head_carries_title_description_canonical_and_og() {
     let html = render_with(
         &SiteTheme::new(),

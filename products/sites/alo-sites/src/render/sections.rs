@@ -770,7 +770,29 @@ fn collection(
 }
 
 fn hero(out: &mut String, site: &SiteRenderContext<'_>, s: &HeroSection, m: Marks) {
-    open_section(out, "section", "s-hero", m);
+    let mut classes = vec!["s-hero"];
+    if let Some(layout) = s.layout {
+        classes.push(layout.class());
+    }
+    if let Some(height) = s.height {
+        classes.push(height.class());
+    }
+    if let Some(alignment) = s.alignment {
+        classes.push(alignment.class());
+    }
+    if let Some(width) = s.content_width {
+        classes.push(width.class());
+    }
+    if s.image.is_some()
+        && matches!(
+            s.layout,
+            Some(alo_store::site_model::HeroLayout::SplitRight)
+                | Some(alo_store::site_model::HeroLayout::SplitLeft)
+        )
+    {
+        classes.push("hero-has-image");
+    }
+    open_section(out, "section", &classes.join(" "), m);
     out.push_str(&format!(
         "<h1{}>{}</h1>\n",
         m.at("/heading"),

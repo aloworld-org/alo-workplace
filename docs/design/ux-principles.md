@@ -116,7 +116,8 @@ required knowing-in-advance is filed as a defect, like S1.30b/c were.
    other tab row are one shared visual role and use one state system
    everywhere: inactive tabs are neutral secondary text on a transparent
    surface; only the selected tab receives the soft brand-orange background,
-   orange text/icon, semibold weight, and orange bottom indicator. Nested tabs
+   orange text/icon, and semibold weight. Selected tabs do not add a bottom
+   underline or indicator. Nested tabs
    do not invent a quieter or stronger active colour; hierarchy comes from
    placement and labels, not a different state treatment.
    Global link color must never leak into inactive navigation items.
@@ -238,7 +239,8 @@ value may be born. The principles that govern the scale:
 - **Navigation has deliberate separation.** Sibling navigation actions keep at
   least `space-2` (8px) between their interactive bounds, use a minimum 44px
   target height, and keep `space-2` between icon and label. The active item uses
-  the soft brand surface, Terracotta text, and a brand indicator; inactive items
+  the soft brand surface and Terracotta text with no underline or bottom
+  indicator; inactive items
   remain neutral and gain only a quiet neutral hover surface. Navigation labels
   are never underlined. On narrow screens, the row scrolls horizontally instead
   of shrinking labels or removing their protected padding.
@@ -347,6 +349,15 @@ primary work, secondary work, then help/onboarding. Never put onboarding
 before the user's active work. Page padding is 24px, rising to 32px on large
 screens and 40px only where the shared shell permits it; cards never touch
 browser edges.
+
+Sibling screens within one module or workspace use the same centered content
+container, maximum width, and responsive gutters. Opening a record, editor,
+settings view, or sibling tab must not make the page edges jump inward or
+outward. A deeper screen may use a narrower readable measure for text inside
+that shared container, but it must not widen or replace the workspace shell.
+_Verify:_ move between every sibling tab and its common detail/editor routes;
+the outer left and right content edges remain aligned at desktop, tablet, and
+mobile widths.
 
 Search/filter rows order controls as search, filters, view options, then the
 primary action at the far edge. Search takes remaining width. Tabs sit directly

@@ -7,7 +7,7 @@ import type { FormEvent } from "react";
 import { X } from "lucide-react";
 
 import { strings } from "../i18n";
-import { Button, Spinner } from "../ds";
+import { Button, MODAL_BACKDROP_CLASS, Spinner } from "../ds";
 import { useJmapClient } from "../jmap";
 import type { ControlDomain, ControlTenant } from "../jmap";
 import styles from "../admin/admin.module.css";
@@ -45,7 +45,7 @@ export function RegisterDomainModal({ tenants, onClose, onRegistered }: Props) {
   }
 
   return (
-    <div className={styles.overlay} onMouseDown={onClose}>
+    <div className={`${styles.overlay} ${MODAL_BACKDROP_CLASS}`} onMouseDown={onClose}>
       <div
         className={styles.modal}
         role="dialog"

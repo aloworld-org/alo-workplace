@@ -51,6 +51,10 @@ fn full_sections() -> Vec<Section> {
             image: Some(image.clone()),
             primary_cta: Some(link("Shop roasts", "/shop")),
             secondary_cta: Some(link("Our story", "/about")),
+            layout: None,
+            height: None,
+            alignment: None,
+            content_width: None,
         }),
         Section::Features(FeaturesSection {
             heading: Some("Why Nordwind".to_owned()),
