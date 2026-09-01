@@ -990,6 +990,19 @@ figure.shape-tall img { aspect-ratio: 3 / 4; }
 .s-team .grid li { text-align: center; }
 .s-team img { border-radius: 0.75rem; margin: 0 auto 1rem; }
 .s-team .role { display: block; margin-bottom: 0.5rem; }
+.s-team.team-cards .grid li { padding: 1.25rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); }
+.s-team.team-roster .grid { grid-template-columns: 1fr; max-width: 52rem; margin-inline: auto; }
+.s-team.team-roster .grid li { display: grid; grid-template-columns: 7rem 1fr; gap: 1.5rem; text-align: left; align-items: center; }
+.s-team.team-roster img { margin: 0; }
+.s-team.team-spotlight .grid li:first-child { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(12rem, .7fr) 1fr; gap: clamp(1.5rem, 5vw, 4rem); text-align: left; align-items: center; }
+.s-team.team-compact .grid li { display: grid; grid-template-columns: 4rem 1fr; gap: 1rem; text-align: left; align-items: center; }
+.s-team.team-compact img { margin: 0; border-radius: 50%; }
+.s-team.team-compact .bio { display: none; }
+@media (max-width: 42rem) {
+  .s-team.team-spotlight .grid li:first-child,
+  .s-team.team-roster .grid li { grid-template-columns: 1fr; text-align: center; }
+  .s-team.team-roster img { margin-inline: auto; }
+}
 
 /* FAQ: native <details> accordion. */
 .s-faq details {

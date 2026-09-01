@@ -142,6 +142,7 @@ fn full_sections() -> Vec<Section> {
                 bio: Some("Twenty years at the drum.".to_owned()),
             }],
             columns: None,
+            layout: Some(alo_store::site_model::TeamLayout::Spotlight),
             presentation: None,
         }),
         Section::Faq(FaqSection {

@@ -1232,9 +1232,22 @@ fn pricing(out: &mut String, s: &PricingSection, m: Marks) {
 }
 
 fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Marks) {
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::TeamLayout::Portraits)
+    {
+        alo_store::site_model::TeamLayout::Portraits => "team-portraits",
+        alo_store::site_model::TeamLayout::Cards => "team-cards",
+        alo_store::site_model::TeamLayout::Roster => "team-roster",
+        alo_store::site_model::TeamLayout::Spotlight => "team-spotlight",
+        alo_store::site_model::TeamLayout::Compact => "team-compact",
+    };
     open_presented_section(
         out,
-        &with_layout("s-team", columns_class(s.columns)),
+        &format!(
+            "{} {layout}",
+            with_layout("s-team", columns_class(s.columns))
+        ),
         s.presentation.as_ref(),
         m,
     );
