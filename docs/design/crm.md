@@ -130,9 +130,11 @@ and the order within a column is the same fractional `position`
 happens only where it stays clean, on the same judgement the billing
 line model was shared under.
 
-A deal opens in a drawer, not a page: value and stage at the top,
-activities and linked conversations below, with an *open in mail* that
-hands off to the mail module rather than rendering a message inside CRM.
+A deal opens in a centred workspace dialog, not a page: value and stage at the
+top, activities and linked conversations below, with an *open in mail* that
+hands off to the mail module rather than rendering a message inside CRM. The
+pipeline remains visible behind a calm overlay, while the detail receives the
+width and focus needed for editing, related records, and longer activity.
 
 *As built (B2.07) — seven things the note left open, decided in code.*
 
@@ -151,7 +153,7 @@ hands off to the mail module rather than rendering a message inside CRM.
   the user's experience of it.
 - **The open deal lives in `?deal=`**, not in component state, so a link
   to a deal is a link a colleague can be sent. It survives a reload and
-  a tab switch, and the drawer **re-reads the deal** rather than
+  a tab switch, and the dialog **re-reads the deal** rather than
   rendering the row the board is holding.
 - **The list's filters are the server's; the search box is not, and says
   so.** Column, owner and state go into the query (the strictness above
