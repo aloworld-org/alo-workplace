@@ -444,6 +444,7 @@ fn booking_section_has_a_stable_public_golden() {
     let value = envelope_value(vec![Section::Booking(BookingSection {
         booking_id: SiteBookingId::new("studio-consultation"),
         heading: Some("Come and talk to us".to_owned()),
+        layout: Some(alo_store::site_model::BookingLayout::Split),
         presentation: None,
     })]);
     let site = SiteRenderContext {

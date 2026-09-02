@@ -858,6 +858,16 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   font-weight: 600;
   cursor: pointer;
 }
+.s-booking.booking-layout-split { max-width: 62rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 4rem; }
+.s-booking.booking-layout-split .booking-day { grid-column: 2; grid-row: 1 / span 5; align-self: center; }
+.s-booking.booking-layout-centered { margin-inline: auto; text-align: center; }
+.s-booking.booking-layout-panel { max-width: 52rem; padding: clamp(2rem, 5vw, 4rem); background: var(--section-bg, var(--bg)); border-width: 2px; }
+.s-booking.booking-layout-compact { max-width: 62rem; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .5rem 2rem; padding-block: 1rem; }
+.s-booking.booking-layout-compact .booking-day { grid-column: 2; grid-row: 1 / span 5; }
+@media (max-width: 42rem) {
+  .s-booking.booking-layout-split,
+  .s-booking.booking-layout-compact { display: block; }
+}
 
 /* The door to the ticket shop. The section is a short offer and one link;
    the shop itself (prices, seats) is live state on /tix, styled by the same

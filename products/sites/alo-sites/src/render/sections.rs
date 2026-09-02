@@ -780,7 +780,22 @@ fn booking(
     m: Marks,
 ) {
     let t = site.strings;
-    open_presented_section(out, "s-booking", section.presentation.as_ref(), m);
+    let layout = match section
+        .layout
+        .unwrap_or(alo_store::site_model::BookingLayout::Card)
+    {
+        alo_store::site_model::BookingLayout::Card => "booking-layout-card",
+        alo_store::site_model::BookingLayout::Split => "booking-layout-split",
+        alo_store::site_model::BookingLayout::Centered => "booking-layout-centered",
+        alo_store::site_model::BookingLayout::Panel => "booking-layout-panel",
+        alo_store::site_model::BookingLayout::Compact => "booking-layout-compact",
+    };
+    open_presented_section(
+        out,
+        &format!("s-booking {layout}"),
+        section.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.booking_id.as_str()) else {
         tracing::warn!(
