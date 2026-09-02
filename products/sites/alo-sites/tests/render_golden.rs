@@ -180,6 +180,7 @@ fn full_sections() -> Vec<Section> {
             catalog_id: SiteCatalogId::new("harbour-menu"),
             heading: Some("On the counter".to_owned()),
             category: None,
+            layout: Some(alo_store::site_model::CatalogLayout::Menu),
             presentation: None,
         }),
         Section::Tickets(TicketsSection {
@@ -509,6 +510,7 @@ fn empty_catalog_has_a_stable_public_golden() {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         heading: Some("On the counter".to_owned()),
         category: None,
+        layout: None,
         presentation: None,
     })]);
     let site = SiteRenderContext {
@@ -553,6 +555,7 @@ fn an_orderable_catalog_renders_a_scriptless_order_form() {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         heading: Some("Order for Saturday".to_owned()),
         category: None,
+        layout: None,
         presentation: None,
     })]);
     let site = SiteRenderContext {
@@ -606,6 +609,7 @@ fn a_catalog_section_can_show_one_category() {
         catalog_id: SiteCatalogId::new("harbour-menu"),
         heading: Some("Beans to take home".to_owned()),
         category: Some("beans".to_owned()),
+        layout: None,
         presentation: None,
     })]);
     let site = SiteRenderContext {

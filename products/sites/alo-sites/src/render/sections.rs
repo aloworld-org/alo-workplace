@@ -554,7 +554,22 @@ fn catalog(
     snapshots: &std::collections::HashMap<String, SiteCatalogSnapshot>,
     m: Marks,
 ) {
-    open_presented_section(out, "s-catalog", section.presentation.as_ref(), m);
+    let layout = match section
+        .layout
+        .unwrap_or(alo_store::site_model::CatalogLayout::Grid)
+    {
+        alo_store::site_model::CatalogLayout::Grid => "catalog-layout-grid",
+        alo_store::site_model::CatalogLayout::Menu => "catalog-layout-menu",
+        alo_store::site_model::CatalogLayout::List => "catalog-layout-list",
+        alo_store::site_model::CatalogLayout::Featured => "catalog-layout-featured",
+        alo_store::site_model::CatalogLayout::Compact => "catalog-layout-compact",
+    };
+    open_presented_section(
+        out,
+        &format!("s-catalog {layout}"),
+        section.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.catalog_id.as_str()) else {
         tracing::warn!(
