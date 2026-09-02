@@ -192,6 +192,7 @@ fn full_sections() -> Vec<Section> {
         Section::Shop(ShopSection {
             heading: Some("The roastery shop".to_owned()),
             body: Some("Beans and brew gear, shipped from the roastery.".to_owned()),
+            layout: Some(alo_store::site_model::ShopLayout::Storefront),
             presentation: None,
         }),
         Section::Transition(TransitionSection {

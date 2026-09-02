@@ -458,7 +458,22 @@ fn shop(
     section: &alo_store::site_model::ShopSection,
     m: Marks,
 ) {
-    open_presented_section(out, "s-shop", section.presentation.as_ref(), m);
+    let layout = match section
+        .layout
+        .unwrap_or(alo_store::site_model::ShopLayout::Storefront)
+    {
+        alo_store::site_model::ShopLayout::Storefront => "shop-layout-storefront",
+        alo_store::site_model::ShopLayout::Centered => "shop-layout-centered",
+        alo_store::site_model::ShopLayout::Split => "shop-layout-split",
+        alo_store::site_model::ShopLayout::Banner => "shop-layout-banner",
+        alo_store::site_model::ShopLayout::Compact => "shop-layout-compact",
+    };
+    open_presented_section(
+        out,
+        &format!("s-shop {layout}"),
+        section.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, section.heading.as_deref(), m);
     if let Some(body) = &section.body {
         out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));

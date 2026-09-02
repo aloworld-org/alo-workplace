@@ -901,6 +901,14 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 }
 .s-shop p { color: var(--muted); }
 .s-shop .actions { margin-top: 1rem; }
+.s-shop.shop-layout-storefront { max-width: 52rem; padding: clamp(2rem, 5vw, 4rem); box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--text) 10%, transparent); }
+.s-shop.shop-layout-centered { margin-inline: auto; text-align: center; }
+.s-shop.shop-layout-split { max-width: 62rem; display: grid; grid-template-columns: 1fr auto; gap: .5rem 3rem; align-items: center; }
+.s-shop.shop-layout-split .actions { grid-column: 2; grid-row: 1 / span 2; }
+.s-shop.shop-layout-banner { max-width: none; border-radius: 0; padding: clamp(2rem, 5vw, 4rem); text-align: center; }
+.s-shop.shop-layout-compact { max-width: 62rem; display: flex; align-items: center; gap: 1rem 2rem; padding-block: 1rem; }
+.s-shop.shop-layout-compact .actions { margin: 0 0 0 auto; }
+@media (max-width: 42rem) { .s-shop.shop-layout-split, .s-shop.shop-layout-compact { display: block; text-align: center; } .s-shop.shop-layout-compact .actions { margin-top: 1rem; } }
 
 /* A custom-code block. The page styles the box around the frame and nothing
    inside it: the frame is another document, and the site's tokens deliberately
