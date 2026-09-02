@@ -158,6 +158,8 @@ fn full_sections() -> Vec<Section> {
             heading: "Taste the difference".to_owned(),
             body: Some("First bag ships free.".to_owned()),
             button: link("Order now", "/order"),
+            secondary_button: Some(link("See subscriptions", "/subscriptions")),
+            layout: Some(alo_store::site_model::CtaLayout::TwoActions),
             presentation: None,
         }),
         Section::ContactForm(ContactFormSection {

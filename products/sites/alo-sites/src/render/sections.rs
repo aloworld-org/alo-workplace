@@ -1309,7 +1309,17 @@ fn faq(out: &mut String, s: &FaqSection, m: Marks) {
 }
 
 fn cta(out: &mut String, s: &CtaSection, m: Marks) {
-    open_presented_section(out, "s-cta", s.presentation.as_ref(), m);
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::CtaLayout::Centered)
+    {
+        alo_store::site_model::CtaLayout::Centered => "cta-centered",
+        alo_store::site_model::CtaLayout::Split => "cta-split",
+        alo_store::site_model::CtaLayout::Banner => "cta-banner",
+        alo_store::site_model::CtaLayout::Card => "cta-card",
+        alo_store::site_model::CtaLayout::TwoActions => "cta-two-actions",
+    };
+    open_presented_section(out, &format!("s-cta {layout}"), s.presentation.as_ref(), m);
     out.push_str(&format!(
         "<h2{}>{}</h2>\n",
         m.at("/heading"),
@@ -1320,6 +1330,11 @@ fn cta(out: &mut String, s: &CtaSection, m: Marks) {
     }
     out.push_str("<p class=\"actions\">");
     push_link(out, &s.button, "button");
+    if matches!(s.layout, Some(alo_store::site_model::CtaLayout::TwoActions)) {
+        if let Some(link) = &s.secondary_button {
+            push_link(out, link, "button secondary");
+        }
+    }
     out.push_str("</p>\n</section>\n");
 }
 

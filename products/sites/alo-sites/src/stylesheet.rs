@@ -1035,6 +1035,15 @@ main > .s-cta {
 }
 .s-cta .actions { justify-content: center; }
 .s-cta .button { background: var(--on-primary); color: var(--primary); border-color: var(--on-primary); }
+.s-cta.cta-split { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem 3rem; text-align: left; }
+.s-cta.cta-split .actions { grid-column: 2; grid-row: 1 / span 2; }
+.s-cta.cta-banner { max-width: none; border-radius: 0; }
+.s-cta.cta-card { max-width: 52rem; box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--text) 12%, transparent); }
+.s-cta.cta-two-actions .actions { gap: .75rem; }
+.s-cta.cta-two-actions .button.secondary { background: transparent; color: var(--on-primary); }
+@media (max-width: 42rem) {
+  .s-cta.cta-split { display: block; text-align: center; }
+}
 
 /* Contact form. */
 .s-contact-form form { max-width: 36rem; }
