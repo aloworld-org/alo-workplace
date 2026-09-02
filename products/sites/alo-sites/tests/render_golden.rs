@@ -224,6 +224,20 @@ fn custom_code_block() -> CustomCodeSection {
             inline_images: false,
         },
         height_px: 220,
+        presentation: Some(SectionPresentation {
+            layout: SectionLayoutStyle::Editorial,
+            spacing: SectionSpacing::Standard,
+            width: SectionWidth::Wide,
+            alignment: SectionAlignment::Left,
+            background: ThemeColorRole::Background,
+            text: ThemeColorRole::Text,
+            button: ThemeColorRole::Accent1,
+            button_text: None,
+            button_hover: ThemeColorRole::Accent2,
+            button_hover_text: None,
+            entrance: SectionEntrance::FadeUp,
+            speed: TransitionSpeed::Smooth,
+        }),
     }
 }
 

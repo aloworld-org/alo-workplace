@@ -507,7 +507,7 @@ fn custom_code(
     section: &CustomCodeSection,
     m: Marks,
 ) {
-    open_section(out, "section", "s-custom-code", m);
+    open_presented_section(out, "s-custom-code", section.presentation.as_ref(), m);
     push_opt_heading(out, section.heading.as_deref(), m.sealed());
     out.push_str(&format!(
         "<iframe class=\"custom-frame\" title=\"{}\" sandbox=\"{}\" loading=\"lazy\" \
