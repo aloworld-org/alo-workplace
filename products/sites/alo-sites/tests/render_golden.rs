@@ -186,6 +186,7 @@ fn full_sections() -> Vec<Section> {
         Section::Tickets(TicketsSection {
             heading: Some("Cupping evenings".to_owned()),
             body: Some("Six seats around the roaster, once a month.".to_owned()),
+            layout: Some(alo_store::site_model::TicketsLayout::Banner),
             presentation: None,
         }),
         Section::Shop(ShopSection {

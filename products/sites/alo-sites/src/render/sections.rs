@@ -419,7 +419,22 @@ fn tickets(
     section: &alo_store::site_model::TicketsSection,
     m: Marks,
 ) {
-    open_presented_section(out, "s-tickets", section.presentation.as_ref(), m);
+    let layout = match section
+        .layout
+        .unwrap_or(alo_store::site_model::TicketsLayout::Card)
+    {
+        alo_store::site_model::TicketsLayout::Card => "tickets-layout-card",
+        alo_store::site_model::TicketsLayout::Centered => "tickets-layout-centered",
+        alo_store::site_model::TicketsLayout::Split => "tickets-layout-split",
+        alo_store::site_model::TicketsLayout::Banner => "tickets-layout-banner",
+        alo_store::site_model::TicketsLayout::Compact => "tickets-layout-compact",
+    };
+    open_presented_section(
+        out,
+        &format!("s-tickets {layout}"),
+        section.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, section.heading.as_deref(), m);
     if let Some(body) = &section.body {
         out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));

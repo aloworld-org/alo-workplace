@@ -774,6 +774,13 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 }
 .s-tickets p { color: var(--muted); }
 .s-tickets .actions { margin-top: 1rem; }
+.s-tickets.tickets-layout-centered { margin-inline: auto; text-align: center; }
+.s-tickets.tickets-layout-split { max-width: 62rem; display: grid; grid-template-columns: 1fr auto; gap: .5rem 3rem; align-items: center; }
+.s-tickets.tickets-layout-split .actions { grid-column: 2; grid-row: 1 / span 2; }
+.s-tickets.tickets-layout-banner { max-width: none; border-radius: 0; padding: clamp(2rem, 5vw, 4rem); text-align: center; }
+.s-tickets.tickets-layout-compact { max-width: 62rem; display: flex; align-items: center; gap: 1rem 2rem; padding-block: 1rem; }
+.s-tickets.tickets-layout-compact .actions { margin: 0 0 0 auto; }
+@media (max-width: 42rem) { .s-tickets.tickets-layout-split, .s-tickets.tickets-layout-compact { display: block; text-align: center; } .s-tickets.tickets-layout-compact .actions { margin-top: 1rem; } }
 
 /* The door to the stock shop: the same short-offer card as the tickets door,
    for the same reason — goods, prices and shelf counts are live state on
