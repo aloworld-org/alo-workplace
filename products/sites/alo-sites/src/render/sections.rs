@@ -264,8 +264,18 @@ fn open_presented_section(
     presentation: Option<&SectionPresentation>,
     m: Marks,
 ) {
+    open_presented_element(out, "section", class, presentation, m);
+}
+
+fn open_presented_element(
+    out: &mut String,
+    tag: &str,
+    class: &str,
+    presentation: Option<&SectionPresentation>,
+    m: Marks,
+) {
     let Some(p) = presentation else {
-        open_section(out, "section", class, m);
+        open_section(out, tag, class, m);
         return;
     };
     let layout = match p.layout {
@@ -318,12 +328,28 @@ fn open_presented_section(
         theme_role(p.button_hover),
         hover_text,
     );
-    open_section_with_style(out, "section", &classes, Some(&style), m);
+    open_section_with_style(out, tag, &classes, Some(&style), m);
 }
 
 /// A `footer` section, rendered as a `<footer>` landmark.
 pub(super) fn footer(out: &mut String, site: &SiteRenderContext<'_>, s: &FooterSection, m: Marks) {
-    open_section(out, "footer", "s-footer", m);
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::FooterLayout::Simple)
+    {
+        alo_store::site_model::FooterLayout::Simple => "footer-layout-simple",
+        alo_store::site_model::FooterLayout::Centered => "footer-layout-centered",
+        alo_store::site_model::FooterLayout::Split => "footer-layout-split",
+        alo_store::site_model::FooterLayout::Stacked => "footer-layout-stacked",
+        alo_store::site_model::FooterLayout::Minimal => "footer-layout-minimal",
+    };
+    open_presented_element(
+        out,
+        "footer",
+        &format!("s-footer {layout}"),
+        s.presentation.as_ref(),
+        m,
+    );
     if !s.links.is_empty() {
         out.push_str(&format!(
             "<nav aria-label=\"{}\">\n<ul>\n",

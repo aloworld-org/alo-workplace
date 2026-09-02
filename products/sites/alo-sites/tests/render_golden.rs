@@ -206,6 +206,21 @@ fn full_sections() -> Vec<Section> {
         Section::Footer(FooterSection {
             text: Some("© Nordwind Coffee Roasters".to_owned()),
             links: vec![link("Imprint", "/imprint"), link("Privacy", "/privacy")],
+            layout: Some(alo_store::site_model::FooterLayout::Split),
+            presentation: Some(SectionPresentation {
+                layout: SectionLayoutStyle::Clean,
+                spacing: SectionSpacing::Standard,
+                width: SectionWidth::Wide,
+                alignment: SectionAlignment::Left,
+                background: ThemeColorRole::Text,
+                text: ThemeColorRole::Background,
+                button: ThemeColorRole::Accent1,
+                button_text: None,
+                button_hover: ThemeColorRole::Accent2,
+                button_hover_text: None,
+                entrance: SectionEntrance::FadeUp,
+                speed: TransitionSpeed::Smooth,
+            }),
         }),
     ]
 }

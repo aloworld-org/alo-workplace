@@ -434,6 +434,7 @@ fn wants_script(sections: &[Section]) -> bool {
         Section::Tickets(s) => moves(&s.presentation),
         Section::Shop(s) => moves(&s.presentation),
         Section::CustomCode(s) => moves(&s.presentation),
+        Section::Footer(s) => moves(&s.presentation),
         Section::Transition(_) => true,
         _ => false,
     })
