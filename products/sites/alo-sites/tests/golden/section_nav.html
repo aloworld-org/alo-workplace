@@ -13,7 +13,7 @@
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
-<header class="s-nav">
+<header class="s-nav nav-layout-wide nav-behavior-sticky">
 <nav aria-label="Main">
 <a class="brand" href="/">Nordwind Coffee Roasters</a>
 <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-menu-0">Menu</button>
@@ -49,6 +49,15 @@
         link.addEventListener("click", function () { closeMenu(false); });
       });
     }
+  });
+  document.querySelectorAll(".nav-behavior-auto-hide").forEach(function (nav) {
+    var previous = window.scrollY;
+    window.addEventListener("scroll", function () {
+      var current = window.scrollY;
+      var menuOpen = nav.querySelector('.nav-toggle[aria-expanded="true"]');
+      nav.classList.toggle("is-nav-hidden", !menuOpen && current > previous && current > nav.offsetHeight * 2);
+      previous = current;
+    }, {passive:true});
   });
   document.querySelectorAll('form[action^="/f/"]').forEach(function (form) {
     form.addEventListener("submit", function (event) {

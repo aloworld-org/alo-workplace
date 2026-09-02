@@ -49,6 +49,15 @@
       });
     }
   });
+  document.querySelectorAll(".nav-behavior-auto-hide").forEach(function (nav) {
+    var previous = window.scrollY;
+    window.addEventListener("scroll", function () {
+      var current = window.scrollY;
+      var menuOpen = nav.querySelector('.nav-toggle[aria-expanded="true"]');
+      nav.classList.toggle("is-nav-hidden", !menuOpen && current > previous && current > nav.offsetHeight * 2);
+      previous = current;
+    }, {passive:true});
+  });
   document.querySelectorAll('form[action^="/f/"]').forEach(function (form) {
     form.addEventListener("submit", function (event) {
       event.preventDefault();

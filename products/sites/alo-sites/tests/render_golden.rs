@@ -47,6 +47,8 @@ fn full_sections() -> Vec<Section> {
             links: vec![link("Home", "/"), link("Pricing", "/pricing")],
             cta: Some(link("Order beans", "/order")),
             appearance: None,
+            layout: Some(alo_store::site_model::NavLayout::Wide),
+            behavior: Some(alo_store::site_model::NavBehavior::Sticky),
         }),
         Section::Hero(HeroSection {
             heading: "Coffee roasted the morning it ships".to_owned(),

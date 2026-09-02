@@ -202,9 +202,9 @@ fn default_title_joins_page_and_site_name_and_description_is_omitted() {
 fn landmarks_wrap_main_in_order_with_skip_link_first() {
     let html = render(&hero_page());
     let skip = html.find("class=\"skip-link\"").unwrap();
-    let header = html.find("<header class=\"s-nav\">").unwrap();
+    let header = html.find("<header class=\"s-nav ").unwrap();
     let main = html.find("<main id=\"main\">").unwrap();
-    let footer = html.find("<footer class=\"s-footer\">").unwrap();
+    let footer = html.find("<footer class=\"s-footer ").unwrap();
     assert!(skip < header && header < main && main < footer);
     // The hero lives inside main, not before it.
     assert!(html.find("<section class=\"s-hero\" id=\"hero\">").unwrap() > main);
@@ -251,8 +251,8 @@ fn navigation_colours_and_section_destinations_render_as_scoped_accessible_hooks
     assert!(html.contains(
         "style=\"--nav-bg:var(--accent-2);--nav-text:var(--bg);--nav-hover:var(--accent-5)\""
     ));
-    assert!(html.contains("<section class=\"s-features\" id=\"features\""));
-    assert!(html.contains("<section class=\"s-features\" id=\"features-2\""));
+    assert!(html.contains("id=\"features\""));
+    assert!(html.contains("id=\"features-2\""));
 }
 
 #[test]

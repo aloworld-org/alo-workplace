@@ -126,6 +126,16 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   border-bottom: 1px solid var(--border);
   background: var(--nav-bg, var(--bg));
 }
+.s-nav.nav-behavior-sticky,
+.s-nav.nav-behavior-auto-hide { position: sticky; top: 0; z-index: 20; }
+.s-nav.nav-behavior-auto-hide { transition: transform 240ms cubic-bezier(.22,1,.36,1); }
+.s-nav.nav-behavior-auto-hide.is-nav-hidden { transform: translateY(-100%); }
+.s-nav.nav-layout-wide nav { max-width: 90rem; }
+.s-nav.nav-layout-compact nav { max-width: 58rem; padding-block: .5rem; }
+.s-nav.nav-layout-centered nav { justify-content: center; }
+.s-nav.nav-layout-centered .brand { width: 100%; margin-right: 0; justify-content: center; }
+.s-nav.nav-layout-centered ul { justify-content: center; }
+.s-nav.nav-layout-minimal { border-bottom: 0; }
 .s-nav nav {
   max-width: 70rem;
   margin: 0 auto;
@@ -161,13 +171,11 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
   text-decoration: none;
 }
 .s-nav a:not(.button):hover,
-.s-nav a:not(.button):focus-visible { color: var(--nav-hover, var(--primary)); text-decoration: underline; }
+.s-nav a:not(.button):focus-visible { color: var(--nav-hover, var(--primary)); }
 .s-nav a[aria-current="page"] {
   color: var(--nav-hover, var(--primary));
   font-weight: 600;
-  text-decoration: underline;
-  text-decoration-thickness: 0.125rem;
-  text-underline-offset: 0.35rem;
+  text-decoration: none;
 }
 .s-nav :focus-visible { outline-color: var(--nav-hover, var(--primary)); }
 .s-nav a.button { color: var(--on-primary); }
@@ -510,6 +518,7 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 .js .alo-transition-reveal { clip-path: inset(0 0 22% 0); filter: blur(3px); }
 .js .alo-transition.is-visible { opacity: 1; transform: none; clip-path: inset(0); filter: none; }
 @media (prefers-reduced-motion: reduce) {
+  .s-nav.nav-behavior-auto-hide { transform: none !important; transition: none; }
   .section-presented[class*="section-enter-"] { opacity: 1; transform: none; clip-path: none; filter: none; transition: none; }
   .js .alo-transition { opacity: 1; transform: none; clip-path: none; filter: none; transition: none; }
 }

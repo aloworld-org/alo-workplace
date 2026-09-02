@@ -192,8 +192,26 @@ pub(super) fn nav(
             theme_role(appearance.hover),
         )
     });
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::NavLayout::Standard)
+    {
+        alo_store::site_model::NavLayout::Standard => "nav-layout-standard",
+        alo_store::site_model::NavLayout::Centered => "nav-layout-centered",
+        alo_store::site_model::NavLayout::Wide => "nav-layout-wide",
+        alo_store::site_model::NavLayout::Compact => "nav-layout-compact",
+        alo_store::site_model::NavLayout::Minimal => "nav-layout-minimal",
+    };
+    let behavior = match s
+        .behavior
+        .unwrap_or(alo_store::site_model::NavBehavior::Static)
+    {
+        alo_store::site_model::NavBehavior::Static => "nav-behavior-static",
+        alo_store::site_model::NavBehavior::Sticky => "nav-behavior-sticky",
+        alo_store::site_model::NavBehavior::AutoHide => "nav-behavior-auto-hide",
+    };
     out.push_str(&format!(
-        "<header class=\"s-nav\"{}{}>\n",
+        "<header class=\"s-nav {layout} {behavior}\"{}{}>\n",
         style.unwrap_or_default(),
         m.block()
     ));

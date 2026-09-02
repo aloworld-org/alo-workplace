@@ -16,6 +16,8 @@
 //! - **Menu toggle** — adds `js` to `<html>` (the stylesheet only collapses
 //!   the mobile menu under that class, so no-JS visitors always see the
 //!   expanded menu) and flips `aria-expanded` on `.nav-toggle` clicks.
+//! - **Auto-hiding navigation** — hides an opted-in header while scrolling
+//!   down and restores it while scrolling up, without trapping an open menu.
 //! - **Form submit** — intercepts site-form submissions (`action^="/f/"`),
 //!   posts them urlencoded via `fetch`, and on success replaces the form
 //!   with its `data-success` message (via `textContent` — never HTML). Any
@@ -53,6 +55,15 @@ pub(super) const BEHAVIOR_SCRIPT: &str = r#"<script>(function () {
         link.addEventListener("click", function () { closeMenu(false); });
       });
     }
+  });
+  document.querySelectorAll(".nav-behavior-auto-hide").forEach(function (nav) {
+    var previous = window.scrollY;
+    window.addEventListener("scroll", function () {
+      var current = window.scrollY;
+      var menuOpen = nav.querySelector('.nav-toggle[aria-expanded="true"]');
+      nav.classList.toggle("is-nav-hidden", !menuOpen && current > previous && current > nav.offsetHeight * 2);
+      previous = current;
+    }, {passive:true});
   });
   document.querySelectorAll('form[action^="/f/"]').forEach(function (form) {
     form.addEventListener("submit", function (event) {
