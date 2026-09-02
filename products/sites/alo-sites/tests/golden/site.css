@@ -940,6 +940,14 @@ main > .s-cta {
 
 /* Contact form. */
 .s-contact-form form { max-width: 36rem; }
+.s-contact-form.contact-split { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(2rem, 6vw, 5rem); align-items: start; }
+.s-contact-form.contact-split form { grid-column: 2; grid-row: 1 / span 3; }
+.s-contact-form.contact-card form { padding: clamp(1.25rem, 4vw, 2.5rem); border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--text) 9%, transparent); }
+.s-contact-form.contact-panel { max-width: 52rem; padding: clamp(2rem, 5vw, 4rem); border-radius: .75rem; background: var(--surface); }
+.s-contact-form.contact-panel form { max-width: none; }
+.s-contact-form.contact-minimal input,
+.s-contact-form.contact-minimal textarea { border-width: 0 0 1px; border-radius: 0; background: transparent; padding-inline: 0; }
+@media (max-width: 42rem) { .s-contact-form.contact-split { display: block; } }
 .s-contact-form label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
 .s-contact-form input,
 .s-contact-form textarea {

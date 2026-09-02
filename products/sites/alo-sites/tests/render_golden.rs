@@ -167,6 +167,7 @@ fn full_sections() -> Vec<Section> {
             body: Some("We answer within one business day.".to_owned()),
             form_id: Some("f4K9sL2wN7qR5tYx8vB1cA".to_owned()),
             success_message: Some("Thanks — talk soon.".to_owned()),
+            layout: Some(alo_store::site_model::ContactFormLayout::Split),
             presentation: None,
         }),
         Section::Collection(CollectionSection {

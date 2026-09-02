@@ -1345,7 +1345,22 @@ fn cta(out: &mut String, s: &CtaSection, m: Marks) {
 /// filling it is bot traffic, silently dropped by the forms backend).
 fn contact_form(out: &mut String, site: &SiteRenderContext<'_>, s: &ContactFormSection, m: Marks) {
     let index = m.index;
-    open_presented_section(out, "s-contact-form", s.presentation.as_ref(), m);
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::ContactFormLayout::Simple)
+    {
+        alo_store::site_model::ContactFormLayout::Simple => "contact-simple",
+        alo_store::site_model::ContactFormLayout::Split => "contact-split",
+        alo_store::site_model::ContactFormLayout::Card => "contact-card",
+        alo_store::site_model::ContactFormLayout::Panel => "contact-panel",
+        alo_store::site_model::ContactFormLayout::Minimal => "contact-minimal",
+    };
+    open_presented_section(
+        out,
+        &format!("s-contact-form {layout}"),
+        s.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, s.heading.as_deref(), m);
     if let Some(body) = &s.body {
         out.push_str(&format!("<p{}>{}</p>\n", m.at("/body"), esc(body)));
