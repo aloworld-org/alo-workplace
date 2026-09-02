@@ -1283,7 +1283,17 @@ fn team(out: &mut String, site: &SiteRenderContext<'_>, s: &TeamSection, m: Mark
 }
 
 fn faq(out: &mut String, s: &FaqSection, m: Marks) {
-    open_presented_section(out, "s-faq", s.presentation.as_ref(), m);
+    let layout = match s
+        .layout
+        .unwrap_or(alo_store::site_model::FaqLayout::Accordion)
+    {
+        alo_store::site_model::FaqLayout::Accordion => "faq-accordion",
+        alo_store::site_model::FaqLayout::Divided => "faq-divided",
+        alo_store::site_model::FaqLayout::Cards => "faq-cards",
+        alo_store::site_model::FaqLayout::TwoColumn => "faq-two-column",
+        alo_store::site_model::FaqLayout::Editorial => "faq-editorial",
+    };
+    open_presented_section(out, &format!("s-faq {layout}"), s.presentation.as_ref(), m);
     push_opt_heading(out, s.heading.as_deref(), m);
     for (i, item) in s.items.iter().enumerate() {
         // <details>/<summary> is a native, scriptless accordion.

@@ -151,6 +151,7 @@ fn full_sections() -> Vec<Section> {
                 question: "How fresh is the coffee?".to_owned(),
                 answer: "It ships the day it is roasted.".to_owned(),
             }],
+            layout: Some(alo_store::site_model::FaqLayout::TwoColumn),
             presentation: None,
         }),
         Section::Cta(CtaSection {

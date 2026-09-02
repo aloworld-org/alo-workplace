@@ -1014,6 +1014,16 @@ figure.shape-tall img { aspect-ratio: 3 / 4; }
 }
 .s-faq summary { cursor: pointer; font-weight: 600; }
 .s-faq details p { margin: 0.75rem 0 0; }
+.s-faq.faq-divided details { border-width: 1px 0 0; border-radius: 0; background: transparent; }
+.s-faq.faq-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.s-faq.faq-cards > h2 { grid-column: 1 / -1; }
+.s-faq.faq-cards details { margin: 0; }
+.s-faq.faq-two-column { columns: 2 20rem; column-gap: 1rem; }
+.s-faq.faq-two-column > h2 { column-span: all; }
+.s-faq.faq-two-column details { break-inside: avoid; }
+.s-faq.faq-editorial details { border: 0; border-radius: 0; background: transparent; padding-inline: 0; }
+.s-faq.faq-editorial summary { font-family: var(--font-heading); font-size: clamp(1.15rem, 2vw, 1.5rem); }
+@media (max-width: 42rem) { .s-faq.faq-cards { grid-template-columns: 1fr; } }
 
 /* Call to action: the one primary-filled band. */
 main > .s-cta {
