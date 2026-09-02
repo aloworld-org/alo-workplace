@@ -828,7 +828,22 @@ fn collection(
     snapshots: &std::collections::HashMap<String, SiteCollectionSnapshot>,
     m: Marks,
 ) {
-    open_presented_section(out, "s-collection", section.presentation.as_ref(), m);
+    let layout = match section
+        .layout
+        .unwrap_or(alo_store::site_model::CollectionLayout::Grid)
+    {
+        alo_store::site_model::CollectionLayout::Grid => "collection-layout-grid",
+        alo_store::site_model::CollectionLayout::Masonry => "collection-layout-masonry",
+        alo_store::site_model::CollectionLayout::List => "collection-layout-list",
+        alo_store::site_model::CollectionLayout::Editorial => "collection-layout-editorial",
+        alo_store::site_model::CollectionLayout::Carousel => "collection-layout-carousel",
+    };
+    open_presented_section(
+        out,
+        &format!("s-collection {layout}"),
+        section.presentation.as_ref(),
+        m,
+    );
     push_opt_heading(out, section.heading.as_deref(), m);
     let Some(snapshot) = snapshots.get(section.collection_id.as_str()) else {
         tracing::warn!(

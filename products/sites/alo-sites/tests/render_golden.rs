@@ -173,6 +173,7 @@ fn full_sections() -> Vec<Section> {
         Section::Collection(CollectionSection {
             collection_id: SiteCollectionId::new("seasonal-roasts"),
             heading: Some("Seasonal roasts".to_owned()),
+            layout: Some(alo_store::site_model::CollectionLayout::Editorial),
             presentation: None,
         }),
         Section::Catalog(CatalogSection {
@@ -403,6 +404,7 @@ fn empty_collection_has_a_stable_public_golden() {
     let value = envelope_value(vec![Section::Collection(CollectionSection {
         collection_id: SiteCollectionId::new("seasonal-roasts"),
         heading: Some("Seasonal roasts".to_owned()),
+        layout: None,
         presentation: None,
     })]);
     let site = SiteRenderContext {

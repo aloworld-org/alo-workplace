@@ -713,6 +713,15 @@ main > section { max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; }
 .collection-card h3 a { color: inherit; }
 .collection-summary { color: var(--muted); }
 .collection-card time { color: var(--muted); font-size: 0.9375rem; }
+.s-collection.collection-layout-masonry .collection-grid { display: block; columns: 3 16rem; column-gap: 1.25rem; }
+.s-collection.collection-layout-masonry .collection-card { break-inside: avoid; margin-bottom: 1.25rem; }
+.s-collection.collection-layout-list .collection-grid { grid-template-columns: 1fr; }
+.s-collection.collection-layout-list .collection-card { display: grid; grid-template-columns: minmax(8rem, .45fr) 1fr; gap: 1.5rem; align-items: center; }
+.s-collection.collection-layout-editorial .collection-card { border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; padding-inline: 0; }
+.s-collection.collection-layout-editorial .collection-card h3 { font-size: clamp(1.25rem, 2.5vw, 2rem); }
+.s-collection.collection-layout-carousel .collection-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: .75rem; }
+.s-collection.collection-layout-carousel .collection-card { flex: 0 0 min(82vw, 26rem); scroll-snap-align: start; }
+@media (max-width: 42rem) { .s-collection.collection-layout-list .collection-card { grid-template-columns: 1fr; } }
 .collection-empty {
   max-width: 38rem;
   padding: 1.5rem;
