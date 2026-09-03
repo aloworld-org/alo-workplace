@@ -7,15 +7,34 @@
 //!
 //! Environment: see [`alo_sites::serve::config`].
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::ExitCode;
 
-use alo_sites::serve::config::BLOB_MAX_BYTES;
+use alo_sites::serve::config::{BLOB_MAX_BYTES, DEFAULT_ADDR};
 use alo_sites::serve::{AppState, ServeConfig, app};
 use alo_store::{BlobStore, SitePublicStore};
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    // `--healthcheck` TCP-probes the bind address over loopback and exits, so
+    // a container runtime can ask whether this process is listening without a
+    // shell, a client or a certificate in the image.
+    //
+    // It reads the address and nothing else. A probe that also parsed the
+    // database URL and the analytics secret would report the process unhealthy
+    // for reasons that have nothing to do with whether it is serving — and a
+    // healthcheck that fails for the wrong reason gets a working container
+    // restarted in a loop.
+    if std::env::args().nth(1).as_deref() == Some("--healthcheck") {
+        return match healthcheck().await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("alo-sites: {error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -65,5 +84,36 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         app(state).into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await?;
+    Ok(())
+}
+
+/// Probe the address this service binds, over loopback, and say whether
+/// something is listening there.
+///
+/// `ALO_SITES_ADDR` is read the same way [`ServeConfig::from_env`] reads it, so
+/// the probe follows the address the service was actually told to use rather
+/// than assuming the default.
+async fn healthcheck() -> Result<(), Box<dyn std::error::Error>> {
+    let addr = std::env::var("ALO_SITES_ADDR")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| DEFAULT_ADDR.to_owned());
+    let addr: SocketAddr = addr
+        .parse()
+        .map_err(|_| format!("healthcheck: `{addr}` is not a host:port address"))?;
+    // A service bound to 0.0.0.0 is not reachable at that address from inside
+    // its own container; probe the loopback interface on the same port.
+    let probe = if addr.ip().is_unspecified() {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), addr.port())
+    } else {
+        addr
+    };
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::net::TcpStream::connect(probe),
+    )
+    .await
+    .map_err(|_| "healthcheck: connection timed out")?
+    .map_err(|error| format!("healthcheck: {error}"))?;
     Ok(())
 }
