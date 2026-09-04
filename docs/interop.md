@@ -4,6 +4,27 @@ Client quirks and RFC deviations. Format per entry: date · client+version · qu
 
 (no client-forced entries yet — and every entry added here is a debugging session nobody repeats)
 
+## Outbound DANE (alo-smtp)
+
+- 2026-09-04 · **Microsoft 365 (`*.mail.protection.outlook.com`)** · a TLSA query
+  for `_25._tcp.<mx>` answers **SERVFAIL**, not NXDOMAIN — even though the zone
+  is **unsigned** (no DS records, AD flag clear), where the correct answer is a
+  plain "no such record". Reproduced against two independent validating
+  resolvers (netcup and Quad9), so it is the authoritative side, not ours ·
+  **Our response:** a failed TLSA lookup now skips the MX host **only when the
+  host's zone is DNSSEC-signed**. In an unsigned zone there is no DANE to strip,
+  so delivery continues with opportunistic TLS. The signed case is unchanged and
+  still refuses. `products/mail/alo-smtp/src/resolver.rs`,
+  `classify_tlsa_failure` · RFC 7672 §2.1.1, §2.2.1
+
+  **What it cost, so nobody re-derives it.** Skipping unconditionally made mail
+  to *every* Microsoft 365 domain undeliverable. Nothing looked broken: the send
+  succeeded in the UI, the queue reported `deferred=1` rather than an error, and
+  the message sat in the spool retrying with a growing backoff. The only symptom
+  a person sees is mail that never arrives, and the only line that names the
+  cause is `TLSA lookup failed; skipping this MX host` — which reads like a
+  security control working, not a delivery bug.
+
 ## Standing policies (deliberate strictness/tolerance choices, not client-forced)
 
 - 2026-07-25 · **Bare LF / stray CR rejected everywhere** · RFC 5321 §2.3.8 requires
