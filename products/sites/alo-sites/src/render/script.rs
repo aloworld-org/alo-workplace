@@ -216,7 +216,7 @@ pub(crate) const BEACON_SCRIPT: &str = r#"<script>(function () {
 /// would become the containing block of any absolutely positioned descendant,
 /// and a preview that lays a page out differently from the published one is a
 /// preview that lies.
-pub(super) const EDIT_STYLE: &str = r#"<style>[data-alo-text]{outline:1px dashed color-mix(in srgb,currentColor 40%,transparent);outline-offset:3px;border-radius:2px}[data-alo-text]:hover{outline-style:solid}[data-alo-text]:focus{outline:2px solid currentColor;outline-offset:3px}[data-alo-text]:focus-visible{outline:2px solid currentColor}main>[data-alo-section]{cursor:grab}main>[data-alo-section]:hover{outline:1px dashed color-mix(in srgb,currentColor 30%,transparent);outline-offset:6px}main>[data-alo-section]:focus{outline:2px solid currentColor;outline-offset:6px}main>[data-alo-section].alo-moving{opacity:.55;cursor:grabbing}</style>
+pub(super) const EDIT_STYLE: &str = r#"<style>[data-alo-text]{outline:1px dashed color-mix(in srgb,currentColor 40%,transparent);outline-offset:3px;border-radius:2px}[data-alo-text]:hover{outline-style:solid}[data-alo-text]:focus{outline:2px solid currentColor;outline-offset:3px}[data-alo-text]:focus-visible{outline:2px solid currentColor}main>[data-alo-section]{cursor:grab}main>[data-alo-section]:hover{outline:1px dashed color-mix(in srgb,currentColor 30%,transparent);outline-offset:6px}main>[data-alo-section]:focus{outline:2px solid currentColor;outline-offset:6px}main>[data-alo-section].alo-moving{opacity:.55;cursor:grabbing}.alo-canvas-selected{outline:2px solid #e76f51!important;outline-offset:-2px}.alo-canvas-media{cursor:move!important;outline:2px solid #e76f51;outline-offset:4px}.alo-canvas-tools{position:fixed;z-index:999;display:flex;align-items:center;gap:12px;max-width:calc(100% - 24px);padding:10px 12px;border:1px solid #e8e3dc;border-radius:16px;background:#fffdfc;color:#102a43;box-shadow:0 12px 32px rgba(16,42,67,.16);font:14px/1.2 system-ui,sans-serif}.alo-tool-group{display:grid;gap:6px}.alo-tool-name{font-size:11px;font-weight:600;color:#746c62}.alo-tool-buttons{display:flex;align-items:center;gap:6px}.alo-canvas-tools button{min-width:40px;height:40px;padding:0 12px;border:1px solid transparent;border-radius:10px;background:transparent;color:#102a43;font:600 13px/1 system-ui,sans-serif;cursor:pointer}.alo-canvas-tools button:hover,.alo-canvas-tools button:focus-visible{border-color:#e8e3dc;background:#fce9e3;color:#c9573d;outline:none}.alo-canvas-tools .alo-swatch{width:36px;min-width:36px;height:36px;padding:0;border:2px solid #fffdfc;border-radius:50%;box-shadow:0 0 0 1px #e8e3dc}.alo-canvas-tools .alo-close{border-color:#e8e3dc;background:#f1eee8}.av{display:flex;width:30px;height:22px;flex-direction:column;justify-content:center;gap:3px}.av i{display:block;height:3px;border-radius:3px;background:currentColor;opacity:.8}.av i:first-child{width:100%}.av i:nth-child(2){width:72%}.av i:last-child{width:86%}.al{align-items:flex-start}.ac{align-items:center}.ar{align-items:flex-end}.wn{width:18px}.wb{width:26px}.ww{width:34px}</style>
 "#;
 
 /// Direct manipulation, the page's half (ADR 0042): every element the renderer
@@ -306,10 +306,25 @@ pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
     }, "*");
   }
   fields.forEach(function (node) {
-    try { node.contentEditable = "plaintext-only"; } catch (ignored) { /* older engines */ }
-    if (node.contentEditable !== "plaintext-only") { node.contentEditable = "true"; }
+    node.contentEditable = "true";
     node.spellcheck = true;
-    node.addEventListener("focus", function () { original = value(node); });
+    node.addEventListener("focus", function () {
+      original = value(node);
+      var section = node.closest("[data-alo-section]");
+      if (section && section.classList.contains("s-hero")) {
+        var target = node.getAttribute("data-alo-text").indexOf("/heading") > -1 ? "heading" : "description";
+        openCanvasTools(section, target);
+        parent.postMessage({ alo: "site-section-quick-edit", index: at(section), target: target }, "*");
+      }
+    });
+    node.addEventListener("mouseup", function () {
+      var selection = window.getSelection();
+      if (!selection || selection.isCollapsed) { return; }
+      var section = node.closest("[data-alo-section]");
+      if (section && section.classList.contains("s-hero")) {
+        openCanvasTools(section, node.getAttribute("data-alo-text").indexOf("/heading") > -1 ? "heading" : "description");
+      }
+    });
     node.addEventListener("blur", function () { commit(node); original = null; });
     node.addEventListener("paste", function (event) {
       event.preventDefault();
@@ -334,6 +349,187 @@ pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
 
   var main = document.querySelector("main");
   var moving = null;
+  var canvasLabels = {};
+  var canvasState = {};
+  var activeText = null;
+  var selectionFrame = 0;
+  function closeCanvasTools() {
+    document.querySelectorAll(".alo-canvas-tools").forEach(function (tool) { tool.remove(); });
+    document.querySelectorAll(".alo-canvas-selected").forEach(function (item) { item.classList.remove("alo-canvas-selected"); });
+    document.querySelectorAll(".alo-canvas-media").forEach(function (item) { item.classList.remove("alo-canvas-media"); });
+  }
+  function canvasGroup(toolbar, label) {
+    var group = document.createElement("div"); group.className = "alo-tool-group";
+    group.style.gap = "7px";
+    var name = document.createElement("span"); name.className = "alo-tool-name"; name.textContent = label;
+    name.style.fontSize = "12px";
+    var buttons = document.createElement("div"); buttons.className = "alo-tool-buttons";
+    group.appendChild(name); group.appendChild(buttons); toolbar.appendChild(group); return buttons;
+  }
+  function canvasButton(toolbar, index, action, glyph, label, visibleLabel) {
+    var button = document.createElement("button");
+    button.type = "button"; button.textContent = visibleLabel ? (glyph ? glyph + "  " + label : label) : glyph;
+    button.setAttribute("aria-label", label || action); button.title = label || action;
+    if (action === "align_" + canvasState.alignment || action === "width_" + canvasState.width || action === "background_" + canvasState.background) {
+      button.classList.add("alo-active"); button.setAttribute("aria-pressed", "true");
+      button.style.borderColor = "rgb(239,182,167)"; button.style.background = "rgb(252,233,227)"; button.style.color = "rgb(185,75,52)";
+    }
+    button.addEventListener("click", function (event) {
+      event.preventDefault(); event.stopPropagation();
+      if (action === "done") {
+        closeCanvasTools();
+        parent.postMessage({ alo: "site-canvas-close" }, "*");
+        return;
+      }
+      var media = document.querySelector(".alo-canvas-media");
+      if (media) {
+        if (action === "zoom_in") { media.style.transform = "scale(1.06)"; }
+        if (action === "zoom_out") { media.style.transform = "scale(.94)"; }
+        if (action.indexOf("move_") === 0) {
+          var x = action === "move_left" ? -12 : action === "move_right" ? 12 : 0;
+          var y = action === "move_up" ? -12 : action === "move_down" ? 12 : 0;
+          media.style.transform = "translate(" + x + "px," + y + "px)";
+        }
+      }
+      parent.postMessage({ alo: "site-hero-canvas-edit", index: index, action: action }, "*");
+    });
+    toolbar.appendChild(button);
+    return button;
+  }
+  function textVisualButton(toolbar, index, action, label, visualClass) {
+    var button = canvasButton(toolbar,index,action,"",label);
+    var visual = document.createElement("span");
+    visual.className = "av " + visualClass;
+    visual.setAttribute("aria-hidden", "true");
+    visual.appendChild(document.createElement("i"));
+    visual.appendChild(document.createElement("i"));
+    visual.appendChild(document.createElement("i"));
+    button.appendChild(visual);
+    return button;
+  }
+  function textButton(toolbar, command, glyph, label, value) {
+    var button = document.createElement("button"); button.type = "button"; button.textContent = glyph;
+    button.setAttribute("aria-label", label); button.title = label;
+    button.addEventListener("pointerdown", function (event) { event.preventDefault(); event.stopPropagation(); });
+    button.addEventListener("click", function (event) {
+      event.preventDefault(); event.stopPropagation();
+      if (activeText === null) { return; }
+      activeText.focus(); document.execCommand("styleWithCSS", false, true);
+      document.execCommand(command, false, value || null);
+    });
+    toolbar.appendChild(button); return button;
+  }
+  function textColorPicker(toolbar) {
+    var picker = document.createElement("input"); picker.type = "color";
+    picker.value = String.fromCharCode(35) + "102a43"; picker.setAttribute("aria-label", canvasLabels.customColor); picker.title = canvasLabels.customColor;
+    picker.style.width = "40px"; picker.style.height = "40px"; picker.style.padding = "3px"; picker.style.border = "1px solid rgb(232,227,220)"; picker.style.borderRadius = "50%"; picker.style.background = "transparent"; picker.style.cursor = "pointer";
+    var savedRange = null;
+    picker.addEventListener("pointerdown", function () {
+      var selection = window.getSelection(); savedRange = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+    });
+    picker.addEventListener("input", function () {
+      if (activeText === null || savedRange === null) { return; }
+      activeText.focus(); var selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(savedRange);
+      document.execCommand("styleWithCSS", false, true); document.execCommand("foreColor", false, picker.value);
+    });
+    toolbar.appendChild(picker);
+  }
+  function openCanvasTools(node, target) {
+    closeCanvasTools(); node.classList.add("alo-canvas-selected");
+    var toolbar = document.createElement("div"); toolbar.className = "alo-canvas-tools";
+    var box = node.getBoundingClientRect();
+    toolbar.style.top = Math.max(12, box.top + 12) + "px"; toolbar.style.right = "12px";
+    toolbar.style.padding = "10px 12px"; toolbar.style.borderRadius = "16px";
+    toolbar.style.flexWrap = "nowrap"; toolbar.style.alignItems = "flex-end"; toolbar.style.gap = "12px";
+    toolbar.addEventListener("pointerdown", function (event) { event.stopPropagation(); });
+    var index = at(node);
+    toolbar.dataset.index = String(index); toolbar.dataset.target = target;
+    if (target === "media") {
+      toolbar.style.flexDirection = "column"; toolbar.style.alignItems = "stretch"; toolbar.style.paddingRight = "64px";
+      var media = node.querySelector("figure,img,video");
+      if (media) {
+        media.classList.add("alo-canvas-media");
+        media.onpointerdown = function (event) {
+          event.preventDefault(); event.stopPropagation();
+          var sx = event.clientX, sy = event.clientY;
+          media.setPointerCapture(event.pointerId);
+          media.onpointermove = function (move) {
+            media.style.transform = "translate(" + (move.clientX - sx) + "px," + (move.clientY - sy) + "px)";
+          };
+          media.onpointerup = function (up) {
+            media.onpointermove = null;
+            var dx = up.clientX - sx, dy = up.clientY - sy;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) { return; }
+            var action = Math.abs(dx) > Math.abs(dy)
+              ? (dx < 0 ? "move_left" : "move_right")
+              : (dy < 0 ? "move_up" : "move_down");
+            parent.postMessage({ alo: "site-hero-canvas-edit", index: index, action: action }, "*");
+          };
+        };
+      }
+      var position = canvasGroup(toolbar, canvasLabels.position);
+      position.parentElement.style.gridTemplateColumns = "104px auto"; position.parentElement.style.alignItems = "center";
+      canvasButton(position,index,"move_left","←",canvasLabels.moveLeft);
+      canvasButton(position,index,"move_up","↑",canvasLabels.moveUp);
+      canvasButton(position,index,"move_down","↓",canvasLabels.moveDown);
+      canvasButton(position,index,"move_right","→",canvasLabels.moveRight);
+      var size = canvasGroup(toolbar, canvasLabels.size);
+      size.parentElement.style.gridTemplateColumns = "104px auto"; size.parentElement.style.alignItems = "center";
+      canvasButton(size,index,"zoom_out","−",canvasLabels.zoomOut);
+      canvasButton(size,index,"zoom_in","+",canvasLabels.zoomIn);
+    } else if (target === "heading" || target === "description") {
+      activeText = node.querySelector(target === "heading" ? '[data-alo-text*="/heading"]' : '[data-alo-text*="/subheading"]');
+      var selection = window.getSelection();
+      if (selection && !selection.isCollapsed && activeText && activeText.contains(selection.anchorNode) && activeText.contains(selection.focusNode)) {
+        toolbar.dataset.mode = "selection";
+        var formatting = canvasGroup(toolbar, canvasLabels.formatting);
+        textButton(formatting,"bold","B",canvasLabels.bold).style.fontWeight = "800";
+        textButton(formatting,"italic","I",canvasLabels.italic).style.fontStyle = "italic";
+        textButton(formatting,"underline","U",canvasLabels.underline).style.textDecoration = "underline";
+        var textColors = canvasGroup(toolbar, canvasLabels.textColor);
+        [["var(--text)",canvasLabels.dark],["var(--accent)",canvasLabels.accent],["var(--muted)",canvasLabels.surface]].forEach(function (choice) {
+          var color = getComputedStyle(document.documentElement).getPropertyValue(choice[0].slice(4,-1)).trim();
+          var swatch = textButton(textColors,"foreColor","",choice[1],color); swatch.classList.add("alo-swatch"); swatch.style.background = color;
+        });
+        textColorPicker(textColors);
+      } else {
+        toolbar.dataset.mode = "layout";
+        var textAlignment = canvasGroup(toolbar, target === "heading" ? canvasLabels.heading : canvasLabels.description);
+        textVisualButton(textAlignment,index,"align_left",canvasLabels.alignLeft,"al");
+        textVisualButton(textAlignment,index,"align_center",canvasLabels.alignCenter,"ac");
+        textVisualButton(textAlignment,index,"align_right",canvasLabels.alignRight,"ar");
+        var width = canvasGroup(toolbar, canvasLabels.textWidth);
+        textVisualButton(width,index,"width_narrow",canvasLabels.narrow,"ac wn");
+        textVisualButton(width,index,"width_balanced",canvasLabels.balanced,"ac wb");
+        textVisualButton(width,index,"width_wide",canvasLabels.wide,"ac ww");
+      }
+    } else {
+      var alignment = canvasGroup(toolbar, canvasLabels.alignment);
+      canvasButton(alignment,index,"align_left","",canvasLabels.alignLeft,true);
+      canvasButton(alignment,index,"align_center","",canvasLabels.alignCenter,true);
+      canvasButton(alignment,index,"align_right","",canvasLabels.alignRight,true);
+      var colors = canvasGroup(toolbar, canvasLabels.colors);
+      [["background_background","var(--background)",canvasLabels.background],["background_accent_3","var(--accent-3)",canvasLabels.surface],["background_accent_1","var(--accent)",canvasLabels.accent],["background_text","var(--text)",canvasLabels.dark]].forEach(function (choice) {
+        var swatch = canvasButton(colors,index,choice[0],"",choice[2]);
+        swatch.classList.add("alo-swatch"); swatch.style.background = choice[1];
+      });
+    }
+    var close = canvasButton(toolbar,index,"done","✓",canvasLabels.done); close.classList.add("alo-close");
+    if (target === "media") { close.style.position = "absolute"; close.style.top = "12px"; close.style.right = "12px"; }
+    document.body.appendChild(toolbar);
+  }
+  document.addEventListener("selectionchange", function () {
+    cancelAnimationFrame(selectionFrame);
+    selectionFrame = requestAnimationFrame(function () {
+      var selection = window.getSelection();
+      if (!selection || selection.isCollapsed || activeText === null || !activeText.contains(selection.anchorNode) || !activeText.contains(selection.focusNode)) { return; }
+      var section = activeText.closest("[data-alo-section]"); if (!section) { return; }
+      var target = activeText.getAttribute("data-alo-text").indexOf("/heading") > -1 ? "heading" : "description";
+      var shown = document.querySelector('.alo-canvas-tools[data-mode="selection"]');
+      if (shown && shown.dataset.index === String(at(section)) && shown.dataset.target === target) { return; }
+      openCanvasTools(section, target);
+    });
+  });
   function blocks() {
     if (main === null) { return []; }
     return Array.prototype.filter.call(main.children, function (node) {
@@ -350,9 +546,24 @@ pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
   }
   blocks().forEach(function (node) {
     node.tabIndex = 0;
+    node.addEventListener("dblclick", function (event) {
+      if (event.target.closest &&
+          event.target.closest("[data-alo-text],a,button,input,textarea,select,iframe")) {
+        return;
+      }
+      event.preventDefault();
+      openCanvasTools(node, event.target.closest && event.target.closest("figure,img,video") ? "media" : "section");
+      parent.postMessage({
+        alo: "site-section-quick-edit",
+        index: at(node),
+        target: event.target.closest && event.target.closest("figure,img,video")
+          ? "media"
+          : "section"
+      }, "*");
+    });
     node.addEventListener("mousedown", function (event) {
       node.draggable = !(event.target.closest &&
-        event.target.closest("[data-alo-text],a,button,input,textarea,select,iframe"));
+        event.target.closest("[data-alo-text],a,button,input,textarea,select,iframe,.alo-canvas-media,.alo-canvas-tools"));
     });
     node.addEventListener("dragstart", function (event) {
       moving = node;
@@ -403,6 +614,8 @@ pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
   window.addEventListener("message", function (event) {
     var data = event.data;
     if (event.source !== parent || !data || data.alo !== "site-edit-chrome") { return; }
+    canvasLabels = data.canvas || {};
+    canvasState = data.canvasState || {};
     blocks().forEach(function (node) {
       var label = data.labels ? data.labels[at(node)] : null;
       if (typeof label === "string") { node.setAttribute("aria-label", label); }
@@ -411,6 +624,10 @@ pub(super) const EDIT_SCRIPT: &str = r#"<script>(function () {
       ? main.querySelector('[data-alo-section="' + data.focus + '"]')
       : null;
     if (wanted !== null) { wanted.focus(); }
+    var selected = typeof data.canvasSelection === "object" && data.canvasSelection !== null
+      ? main.querySelector('[data-alo-section="' + data.canvasSelection.index + '"]')
+      : null;
+    if (selected !== null) { openCanvasTools(selected, data.canvasSelection.target); }
   });
 })();</script>
 "#;
@@ -438,13 +655,15 @@ mod tests {
 
     /// The edit script is not part of that budget — no visitor ever downloads
     /// it — but it is still inlined into a document, so it gets a ceiling of
-    /// its own rather than none at all. Raised from 4 KB to 8 KB when moving a
-    /// section joined typing on it (S3.01b): a ceiling is only honest while it
-    /// is the number the thing actually needs.
+    /// its own rather than none at all. Raised to 20 KB when image framing and
+    /// Hero styling moved onto the canvas with labeled, grouped controls and
+    /// visible selected states, plus selection-preserving text and colour controls;
+    /// visitor script budgets remain unchanged. A ceiling is only honest while
+    /// it is measured.
     #[test]
     fn the_edit_script_stays_small_and_never_ships_to_a_visitor() {
         assert!(
-            EDIT_SCRIPT.len() + EDIT_STYLE.len() < 8192,
+            EDIT_SCRIPT.len() + EDIT_STYLE.len() < 20_480,
             "edit mode is {} bytes",
             EDIT_SCRIPT.len() + EDIT_STYLE.len()
         );

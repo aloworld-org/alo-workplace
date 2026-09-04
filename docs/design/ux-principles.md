@@ -313,9 +313,11 @@ above text only in empty states, onboarding, and heroes.
 
 Actions never appear randomly between content blocks. A card exposes at most
 one primary button and normally one or two secondary actions. A single state
-has one obvious path: do not show both an empty-state `Create your first…`
-button and a duplicate `New…` action in the header. Form and modal actions
-end with `Cancel` then the primary action, with the primary rightmost.
+has one obvious path: when the primary collection is empty, place its creation
+button directly below the empty-state explanation and remove the duplicate
+header action. Once records exist, move that action to the page header. Form
+and modal actions end with `Cancel` then the primary action, with the primary
+rightmost.
 
 Use a footer only when it carries metadata, ownership, status, or a relevant
 secondary action. Separate it from the body with a quiet divider and 16px top
@@ -334,6 +336,11 @@ padding; never add a footer as decoration.
 - **Profile/entity:** identity, primary contact details, then one quiet action.
 - **Modal/form:** title and close action, description, fields at 16px rhythm,
   optional advanced section, divider, then `Cancel` and primary action.
+- **Field guidance:** keep short instructions visible only when they are needed
+  to complete the field. Put supplementary explanations behind a labelled
+  information icon beside the field name; keep validation errors visible and
+  announced. Tooltips must work with pointer, keyboard, and assistive
+  technology, not hover alone.
 - **Nested sections:** subsections use 24px separation; fields inside a
   subsection use 12–16px. The subsection gap must exceed the field gap.
 

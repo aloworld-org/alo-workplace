@@ -1,5 +1,30 @@
 # Changelog
 
+- Website logos and favicons now support drag-and-drop and are automatically
+  retained in each website's source-linked Drive Identity folder.
+
+- The website page editor now presents each page title once, with a quieter
+  back action and without redundant slug and home-status breadcrumb fragments.
+
+- The workspace palette is now lighter and calmer, with warm porcelain page
+  backgrounds, soft ivory cards and headers, quieter coral accents, and a
+  unified warm border and muted-surface scale.
+
+- Site Theme now previews uploaded and saved logos and favicons directly in
+  their asset cards, using authenticated Drive downloads and temporary browser
+  URLs that are released when the dialog closes.
+
+- Website page management now uses recognizable page icons, quieter status and
+  menu controls, and the same circular structural-add control used by Sections
+  and the quotation builder.
+
+- Website list rows now give their leading site icon and trailing navigation
+  icon more horizontal breathing room inside the card.
+
+- Finance Expenses now has a focused page header, stable New claim action,
+  grouped branded date range, compact status filtering, and a calmer empty
+  state while preserving the existing claim workflow.
+
 - Finance now uses the branded, accessible calendar everywhere a financial date
   is selected, with a denser workspace shell and consistent premium empty-state
   surfaces across expenses, approvals, bank matching, accounts, and reports.

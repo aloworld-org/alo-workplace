@@ -96,7 +96,12 @@ impl ImageSources<'_> {
                     (!srcset.is_empty()).then_some(srcset),
                 )
             }
-            ImageSources::Inline(_) => (self.src(image.blob_id.as_str()), None),
+            ImageSources::Inline(map) => (
+                map.get(&crate::images::preview_key(image))
+                    .or_else(|| map.get(image.blob_id.as_str()))
+                    .map_or_else(|| img_src(image.blob_id.as_str()), |uri| esc(uri)),
+                None,
+            ),
         }
     }
 }

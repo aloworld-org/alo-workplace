@@ -146,6 +146,20 @@ pub fn variant_path(blob_id: &str, crop: ImageCrop, width: u32) -> String {
     format!("{IMAGE_PATH_PREFIX}{}", variant_key(blob_id, crop, width))
 }
 
+/// Stable lookup key for one image framing inside a self-contained preview.
+#[must_use]
+pub fn preview_key(image: &SiteImage) -> String {
+    let crop = image.crop_or_full();
+    format!(
+        "{}#c{}-{}-{}-{}",
+        image.blob_id.as_str(),
+        crop.x_bp,
+        crop.y_bp,
+        crop.width_bp,
+        crop.height_bp
+    )
+}
+
 /// One derivative's key: the part after [`IMAGE_PATH_PREFIX`].
 fn variant_key(blob_id: &str, crop: ImageCrop, width: u32) -> String {
     if crop == ImageCrop::full() {
