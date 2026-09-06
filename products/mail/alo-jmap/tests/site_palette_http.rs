@@ -131,7 +131,7 @@ async fn the_palette_offers_every_type_seeded_from_the_callers_own_website() {
     // invents.
     let (status, body) = get(&h.app, &h.token, &palette).await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body["items"].as_array().unwrap().len(), 18);
+    assert_eq!(body["items"].as_array().unwrap().len(), 19);
     assert_eq!(tile(&body, "hero")["ready"], json!(true));
     assert_eq!(
         tile(&body, "hero")["section"]["heading"],
@@ -153,6 +153,11 @@ async fn the_palette_offers_every_type_seeded_from_the_callers_own_website() {
     assert_eq!(tile(&body, "tickets")["section"]["type"], json!("tickets"));
     assert_eq!(tile(&body, "shop")["ready"], json!(true));
     assert_eq!(tile(&body, "shop")["section"]["type"], json!("shop"));
+    assert_eq!(tile(&body, "transition")["ready"], json!(true));
+    assert_eq!(
+        tile(&body, "transition")["section"]["type"],
+        json!("transition")
+    );
     // A tile that is not ready carries no section for the editor to drop.
     assert_eq!(tile(&body, "catalog")["section"], Value::Null);
 

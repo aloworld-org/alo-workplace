@@ -173,7 +173,11 @@ pub const FINANCE_INTENTS: &[IntentSpec] = &[
         ],
         preview: None,
         undo: None,
-        routes: &["/finance/accounts", "/finance/accounts/{id}"],
+        routes: &[
+            "/finance/accounts",
+            "/finance/accounts/{id}",
+            "/finance/accounts/{id}/ledger",
+        ],
     },
     // ---- writes: propose, then the asker approves ------------------------
     IntentSpec {
@@ -357,6 +361,10 @@ pub const FINANCE_EXCLUDED: &[Excluded] = &[
         why: "Reopening a period unlocks the books; the accountant's own act in the app.",
     },
     Excluded {
+        route: "/finance/close-readiness",
+        why: "The accountant reviews the complete blocker and warning checklist in the app before locking the books.",
+    },
+    Excluded {
         route: "/finance/forecast",
         why: "An interactive scenario with timing assumptions chosen and compared by a person in the app.",
     },
@@ -391,6 +399,14 @@ pub const FINANCE_EXCLUDED: &[Excluded] = &[
     Excluded {
         route: "/finance/reports/vat.csv",
         why: "Produces a file; vat_summary answers the question.",
+    },
+    Excluded {
+        route: "/finance/report-schedules",
+        why: "Scheduled report delivery is tenant configuration chosen by a finance administrator in the app.",
+    },
+    Excluded {
+        route: "/finance/report-schedules/{id}",
+        why: "Changing or removing scheduled report delivery is a finance administrator's act in the app.",
     },
 ];
 

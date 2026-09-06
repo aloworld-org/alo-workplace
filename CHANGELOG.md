@@ -1,5 +1,11 @@
 # Changelog
 
+- Restored Theme and server-declared layout controls in the website page
+  editor, completed the new Finance closing and reporting copy in French,
+  Dutch and German, made background instruction claims concurrency-safe, and
+  updated the Docs editor dependencies to remove every moderate production
+  advisory.
+
 - Website logos and favicons now support drag-and-drop and are automatically
   retained in each website's source-linked Drive Identity folder.
 

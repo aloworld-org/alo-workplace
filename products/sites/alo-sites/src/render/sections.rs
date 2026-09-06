@@ -1449,10 +1449,10 @@ fn cta(out: &mut String, s: &CtaSection, m: Marks) {
     }
     out.push_str("<p class=\"actions\">");
     push_link(out, &s.button, "button");
-    if matches!(s.layout, Some(alo_store::site_model::CtaLayout::TwoActions)) {
-        if let Some(link) = &s.secondary_button {
-            push_link(out, link, "button secondary");
-        }
+    if matches!(s.layout, Some(alo_store::site_model::CtaLayout::TwoActions))
+        && let Some(link) = &s.secondary_button
+    {
+        push_link(out, link, "button secondary");
     }
     out.push_str("</p>\n</section>\n");
 }

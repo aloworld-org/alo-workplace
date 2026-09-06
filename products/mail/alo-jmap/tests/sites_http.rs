@@ -3245,7 +3245,7 @@ async fn a_section_resizes_only_to_the_values_the_server_declares() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert!(
-        html.contains("s-text-image image-left split-wide-text"),
+        html.contains("s-text-image image-left text-image-split split-wide-text"),
         "{html}"
     );
     assert!(html.contains("site-section-layout"));

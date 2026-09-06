@@ -84,6 +84,25 @@ async fn record(store: &Store, domain: &str, ip: &str, disposition: &str, n: usi
     }
 }
 
+/// Wait for the store's whole-second reporting boundary instead of assuming a
+/// loaded parallel test runner wakes a fixed sleep on the expected side of it.
+async fn wait_until_reportable(store: &Store, domain: &str) {
+    for _ in 0..80 {
+        let cutoff = jiff::Timestamp::now().as_second();
+        if store
+            .dmarc_report_domains(cutoff, 1000)
+            .await
+            .unwrap()
+            .iter()
+            .any(|candidate| candidate == domain)
+        {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("DMARC event did not cross the reporting boundary");
+}
+
 #[tokio::test]
 async fn sweep_enqueues_a_valid_report_and_consumes_the_window() {
     let Some(store) = test_store().await else {
@@ -104,8 +123,7 @@ async fn sweep_enqueues_a_valid_report_and_consumes_the_window() {
     let spool = Spool::new(dir.path()).unwrap();
     let auth = AuthMail::disabled("mx.alo.test");
 
-    // The cutoff is whole-second; let same-second inserts age past it.
-    tokio::time::sleep(Duration::from_millis(1500)).await;
+    wait_until_reportable(&store, &domain).await;
     dmarc_reporter::run_once(&store, &spool, &dns, &auth, &config()).await;
 
     // Exactly one report, addressed per the published rua.
@@ -175,7 +193,7 @@ async fn unauthorized_external_rua_sends_nothing_and_drops_the_window() {
     let spool = Spool::new(dir.path()).unwrap();
     let auth = AuthMail::disabled("mx.alo.test");
 
-    tokio::time::sleep(Duration::from_millis(1500)).await;
+    wait_until_reportable(&store, &domain).await;
     dmarc_reporter::run_once(&store, &spool, &dns, &auth, &config()).await;
 
     assert!(
@@ -242,7 +260,7 @@ async fn dns_temperror_keeps_the_window_for_retry() {
     let dir = tempfile::tempdir().unwrap();
     let spool = Spool::new(dir.path()).unwrap();
     let auth = AuthMail::disabled("mx.alo.test");
-    tokio::time::sleep(Duration::from_millis(1500)).await;
+    wait_until_reportable(&store, &domain).await;
     dmarc_reporter::run_once(&store, &spool, &TempFail, &auth, &config()).await;
 
     assert!(

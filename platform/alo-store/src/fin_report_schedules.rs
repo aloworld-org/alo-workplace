@@ -104,7 +104,7 @@ mod tests {
     use super::*;
     #[test]
     fn report_and_cadence_are_closed_sets() {
-        assert_eq!(choice("report", "pl", &["pl", "vat"]).unwrap(), "pl");
+        assert!(matches!(choice("report", "pl", &["pl", "vat"]), Ok("pl")));
         assert!(choice("report", "payroll", &["pl", "vat"]).is_err());
     }
 }

@@ -3,7 +3,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { NewProjectDialog } from "./NewProjectDialog";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("the new project journey", () => {
   test("creates internal work without making the user choose a customer", async () => {
@@ -75,6 +78,11 @@ describe("the new project journey", () => {
   });
 
   test("creates a fully configured project in one journey", async () => {
+    // The date picker opens on the current month. Pin Date only so this test
+    // keeps asserting the intended August-to-September journey year-round;
+    // promise and DOM timers remain real for Testing Library.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-01T12:00:00Z"));
     const create = vi.fn().mockResolvedValue(undefined);
     render(
       <NewProjectDialog

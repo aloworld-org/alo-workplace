@@ -497,7 +497,7 @@ impl Store {
                  WHERE i2.trigger_kind = 'schedule' AND i2.paused_at IS NULL \
                    AND i2.next_run <= now() \
                    {CLAIM_GUARDS} \
-                 ORDER BY i2.next_run LIMIT $1) \
+                 ORDER BY i2.next_run FOR UPDATE OF i2 SKIP LOCKED LIMIT $1) \
               RETURNING i.tenant_id, i.id, i.agent_id, i.channel_id, i.author_id, i.text"
         ))
         .bind(limit)
@@ -517,7 +517,7 @@ impl Store {
                                 WHERE e.tenant_id = i2.tenant_id AND e.kind = i2.event_kind \
                                   AND e.created_at > COALESCE(i2.last_fired_at, i2.created_at)) \
                    {CLAIM_GUARDS} \
-                 LIMIT $1) \
+                 FOR UPDATE OF i2 SKIP LOCKED LIMIT $1) \
               RETURNING i.tenant_id, i.id, i.agent_id, i.channel_id, i.author_id, i.text"
         ))
         .bind(limit)
@@ -535,7 +535,7 @@ impl Store {
                  WHERE i2.trigger_kind = 'once' AND i2.paused_at IS NULL \
                    AND i2.next_run <= now() \
                    {CLAIM_GUARDS} \
-                 ORDER BY i2.next_run LIMIT $1) \
+                 ORDER BY i2.next_run FOR UPDATE OF i2 SKIP LOCKED LIMIT $1) \
               RETURNING i.tenant_id, i.id, i.agent_id, i.channel_id, i.author_id, i.text"
         ))
         .bind(limit)

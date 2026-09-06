@@ -4838,6 +4838,83 @@ export const nl: Partial<Catalog> = {
     `Goedkeuring ${count} van ${required} vastgelegd. Een andere goedkeurder moet afronden.`,
   financeApprovalProgress: (count: number, required: number) =>
     `${count} van ${required} goedkeuringen`,
+  financeTabClose: "Afsluiten",
+  financeCloseEyebrow: "Boekhoudcontroles",
+  financeCloseTitle: "Periodeafsluiting",
+  financeCloseSubtitle:
+    "Los uitzonderingen op, sluit verslagperioden af en behoud een duidelijk controlespoor.",
+  financeCloseLoadFailed: "De gereedheid voor afsluiting kon niet worden geladen.",
+  financeCloseCreateFailed: "De verslagperiode kon niet worden aangemaakt.",
+  financeCloseActionFailed: "De periode kon niet worden bijgewerkt.",
+  financeLockedThrough: (date: string) => `Boeken vergrendeld tot en met ${date}`,
+  financeBooksOpen: "De boeken zijn open",
+  financeReadyToClose: "Klaar om af te sluiten",
+  financeCloseNeedsAttention: "Los blokkades op vóór het afsluiten",
+  financeCloseAsOf: (date: string) => `Servercontroles tot en met ${date}`,
+  financeBlockers: (count: number) =>
+    `${count} ${count === 1 ? "blokkade" : "blokkades"}`,
+  financeWarnings: (count: number) =>
+    `${count} ${count === 1 ? "waarschuwing" : "waarschuwingen"}`,
+  financeCloseBank: "Bankafstemming",
+  financeCloseExpenses: "Goedkeuring van declaraties",
+  financeCloseBalance: "Balans",
+  financeCloseReceivableFx: "Valutaverschillen op vorderingen",
+  financeClosePayableFx: "Valutaverschillen op schulden",
+  financeCheckPassed: "Controle geslaagd",
+  financeItems: (count: number) => `${count} ${count === 1 ? "item" : "items"}`,
+  financePeriods: "Verslagperioden",
+  financePeriodsHint:
+    "Een periode afsluiten vergrendelt alle boekingen tot en met de einddatum.",
+  financeAddPeriod: "Periode toevoegen",
+  financeNoPeriods: "Er zijn nog geen verslagperioden gedefinieerd.",
+  financeClosed: "Afgesloten",
+  financeOpen: "Open",
+  financeClosedAt: (date: string) => `Afgesloten op ${date}`,
+  financeClosePeriod: "Periode afsluiten",
+  financeReopenPeriod: "Heropenen",
+  financeCloseConfirmTitle: "Deze periode afsluiten?",
+  financeCloseConfirmMessage: (date: string) =>
+    `Boekingen met een datum op of vóór ${date} worden vergrendeld. Deze actie wordt vastgelegd in het controlespoor.`,
+  financeReopenReason:
+    "Waarom moet deze periode worden heropend? Deze reden wordt vastgelegd in het controlespoor.",
+  financeReportAutomation: "Geautomatiseerde exports",
+  financeReportSchedules: "Geplande rapporten",
+  financeReportSchedulesHint:
+    "Lever consistente CSV-rapporten volgens een beheerste frequentie.",
+  financeReportSchedulesLoadFailed: "Geplande rapporten konden niet worden geladen.",
+  financeReportSchedulesCreateFailed: "De rapportplanning kon niet worden aangemaakt.",
+  financeReportScheduleDeleteFailed: "De rapportplanning kon niet worden verwijderd.",
+  financeReportScheduleDeleteTitle: "Deze planning verwijderen?",
+  financeReportScheduleDeleteMessage:
+    "Toekomstige rapportleveringen uit deze planning worden stopgezet.",
+  financeReport: "Rapport",
+  financeCadence: "Frequentie",
+  financeRecipient: "Ontvanger",
+  financeNextDelivery: "Eerste levering",
+  financeAddSchedule: "Planning toevoegen",
+  financeNoSchedules: "Geen geplande rapporten",
+  financeNoSchedulesHint:
+    "Maak een terugkerende export voor de mensen die de boeken controleren.",
+  financeReportKind: (value: string) =>
+    ({
+      pl: "Winst-en-verliesrekening",
+      balance: "Balans",
+      aged_receivable: "Ouderdomsanalyse debiteuren",
+      aged_payable: "Ouderdomsanalyse crediteuren",
+      vat: "Btw-aangifte",
+    })[value] ?? value,
+  financeCadenceKind: (value: string) =>
+    ({ weekly: "Wekelijks", monthly: "Maandelijks", quarterly: "Driemaandelijks" })[
+      value
+    ] ?? value,
+  financeNextRun: (date: string) => `Volgende levering ${date}`,
+  financeLedgerTitle: (name: string) => `Grootboek — ${name}`,
+  financeLedgerLoadFailed: "Het grootboek van de rekening kon niet worden geladen.",
+  financeDate: "Datum",
+  financeRunningBalance: "Lopend saldo",
+  financeOpeningBalance: "Beginsaldo",
+  financeLedgerTruncated:
+    "Alleen de eerste 2.000 boekingen worden getoond. Verklein de verslagperiode om het volledige lopende saldo te zien.",
   financeTabExpenses: "Declaraties",
   financeTabApprovals: "Goedkeuringen",
   financeClaimsTable: "Uw declaraties",

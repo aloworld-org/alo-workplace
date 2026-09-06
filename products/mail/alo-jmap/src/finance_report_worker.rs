@@ -91,8 +91,14 @@ mod tests {
 
     #[test]
     fn scheduled_delivery_is_a_csv_attachment_without_raw_csv_in_headers() {
-        let from = Date::from_calendar_date(2026, Month::August, 1).unwrap();
-        let to = Date::from_calendar_date(2026, Month::August, 31).unwrap();
+        let from = match Date::from_calendar_date(2026, Month::August, 1) {
+            Ok(date) => date,
+            Err(error) => panic!("valid fixture date: {error}"),
+        };
+        let to = match Date::from_calendar_date(2026, Month::August, 31) {
+            Ok(date) => date,
+            Err(error) => panic!("valid fixture date: {error}"),
+        };
         let wire = message(
             "finance@example.test",
             "profit-and-loss",

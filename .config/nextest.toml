@@ -74,3 +74,12 @@ test-group = 'serial'
 # other suites being weakened into inexact assertions.
 filter = 'test(/^sites_final_arc::/)'
 test-group = 'serial'
+
+[[profile.default.overrides]]
+# DMARC reporting is deliberately host-global: every reporter pass enumerates
+# every due From-domain and consumes each reported window. Nextest runs each
+# test in a separate process, so the integration suite's in-process mutex only
+# protects the `cargo test` fallback; parallel nextest processes otherwise
+# consume one another's unique-domain fixtures before their own assertions.
+filter = 'binary(=dmarc_report)'
+test-group = 'serial'

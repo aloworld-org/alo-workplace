@@ -4889,6 +4889,83 @@ export const fr: Partial<Catalog> = {
     `Approbation ${count} sur ${required} enregistrée. Une autre personne doit terminer.`,
   financeApprovalProgress: (count: number, required: number) =>
     `${count} approbations sur ${required}`,
+  financeTabClose: "Clôture",
+  financeCloseEyebrow: "Contrôles comptables",
+  financeCloseTitle: "Clôture de période",
+  financeCloseSubtitle:
+    "Résolvez les exceptions, clôturez les périodes comptables et conservez une piste d’audit claire.",
+  financeCloseLoadFailed: "L’état de préparation à la clôture n’a pas pu être chargé.",
+  financeCloseCreateFailed: "La période comptable n’a pas pu être créée.",
+  financeCloseActionFailed: "La période n’a pas pu être mise à jour.",
+  financeLockedThrough: (date: string) => `Comptes verrouillés jusqu’au ${date}`,
+  financeBooksOpen: "Les comptes sont ouverts",
+  financeReadyToClose: "Prêt à clôturer",
+  financeCloseNeedsAttention: "Résolvez les blocages avant la clôture",
+  financeCloseAsOf: (date: string) => `Contrôles du serveur jusqu’au ${date}`,
+  financeBlockers: (count: number) =>
+    `${count} ${count === 1 ? "blocage" : "blocages"}`,
+  financeWarnings: (count: number) =>
+    `${count} ${count === 1 ? "avertissement" : "avertissements"}`,
+  financeCloseBank: "Rapprochement bancaire",
+  financeCloseExpenses: "Approbation des notes de frais",
+  financeCloseBalance: "Bilan",
+  financeCloseReceivableFx: "Écarts de change sur créances",
+  financeClosePayableFx: "Écarts de change sur dettes",
+  financeCheckPassed: "Contrôle réussi",
+  financeItems: (count: number) => `${count} ${count === 1 ? "élément" : "éléments"}`,
+  financePeriods: "Périodes comptables",
+  financePeriodsHint:
+    "Clôturer une période verrouille toutes les écritures jusqu’à sa date de fin.",
+  financeAddPeriod: "Ajouter une période",
+  financeNoPeriods: "Aucune période comptable n’a encore été définie.",
+  financeClosed: "Clôturée",
+  financeOpen: "Ouverte",
+  financeClosedAt: (date: string) => `Clôturée le ${date}`,
+  financeClosePeriod: "Clôturer la période",
+  financeReopenPeriod: "Rouvrir",
+  financeCloseConfirmTitle: "Clôturer cette période ?",
+  financeCloseConfirmMessage: (date: string) =>
+    `Les écritures datées du ${date} ou antérieures seront verrouillées. Cette action sera consignée dans la piste d’audit.`,
+  financeReopenReason:
+    "Pourquoi cette période doit-elle être rouverte ? Ce motif sera consigné dans la piste d’audit.",
+  financeReportAutomation: "Exports automatisés",
+  financeReportSchedules: "Rapports planifiés",
+  financeReportSchedulesHint:
+    "Envoyez des rapports CSV cohérents selon une fréquence maîtrisée.",
+  financeReportSchedulesLoadFailed: "Les rapports planifiés n’ont pas pu être chargés.",
+  financeReportSchedulesCreateFailed: "La planification du rapport n’a pas pu être créée.",
+  financeReportScheduleDeleteFailed: "La planification du rapport n’a pas pu être supprimée.",
+  financeReportScheduleDeleteTitle: "Supprimer cette planification ?",
+  financeReportScheduleDeleteMessage:
+    "Les prochains envois de rapports associés à cette planification seront interrompus.",
+  financeReport: "Rapport",
+  financeCadence: "Fréquence",
+  financeRecipient: "Destinataire",
+  financeNextDelivery: "Premier envoi",
+  financeAddSchedule: "Ajouter une planification",
+  financeNoSchedules: "Aucun rapport planifié",
+  financeNoSchedulesHint:
+    "Créez un export récurrent pour les personnes qui contrôlent les comptes.",
+  financeReportKind: (value: string) =>
+    ({
+      pl: "Compte de résultat",
+      balance: "Bilan",
+      aged_receivable: "Balance âgée clients",
+      aged_payable: "Balance âgée fournisseurs",
+      vat: "Déclaration de TVA",
+    })[value] ?? value,
+  financeCadenceKind: (value: string) =>
+    ({ weekly: "Hebdomadaire", monthly: "Mensuelle", quarterly: "Trimestrielle" })[
+      value
+    ] ?? value,
+  financeNextRun: (date: string) => `Prochain envoi le ${date}`,
+  financeLedgerTitle: (name: string) => `Grand livre — ${name}`,
+  financeLedgerLoadFailed: "Le grand livre du compte n’a pas pu être chargé.",
+  financeDate: "Date",
+  financeRunningBalance: "Solde cumulé",
+  financeOpeningBalance: "Solde d’ouverture",
+  financeLedgerTruncated:
+    "Seules les 2 000 premières écritures sont affichées. Réduisez la période pour voir l’intégralité du solde cumulé.",
   financeTabExpenses: "Notes de frais",
   financeTabApprovals: "Approbations",
   financeClaimsTable: "Vos notes de frais",

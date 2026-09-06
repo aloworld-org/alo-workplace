@@ -110,7 +110,6 @@ pub struct SpendPolicy {
     pub updated_at: Option<OffsetDateTime>,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct ExpenseApprovalOutcome {
     pub expense: Expense,

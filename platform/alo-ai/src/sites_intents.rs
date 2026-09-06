@@ -312,6 +312,10 @@ pub const SITES_EXCLUDED: &[Excluded] = &[
         why: "Serves an image file to the editor; an agent neither uploads nor claims assets.",
     },
     Excluded {
+        route: "/sites/{id}/identity/images",
+        why: "Uploads a logo or other identity image chosen by the owner on the visual identity screen.",
+    },
+    Excluded {
         route: "/sites/{id}/passwords",
         why: "Protecting pages with passwords is an access decision the owner takes on the site's own settings, and a password must never pass through a model turn.",
     },
@@ -339,6 +343,10 @@ pub const SITES_EXCLUDED: &[Excluded] = &[
     Excluded {
         route: "/sites/{id}/pages/{pid}/preview",
         why: "Renders the draft page for the editor's preview pane; a rendering is for eyes.",
+    },
+    Excluded {
+        route: "/sites/{id}/pages/{pid}/images",
+        why: "Uploads an image the owner chose while looking at the page; an agent neither uploads nor claims assets.",
     },
     Excluded {
         route: "/sites/{id}/pages/{pid}/password",

@@ -38,6 +38,7 @@ import {
   LayoutGrid,
   Lock,
   Monitor,
+  Palette,
   Pencil,
   Plus,
   Redo2,
@@ -62,6 +63,7 @@ import { kindLabel, layoutValueLabel, sectionSummary } from "./sectionInfo";
 import { SectionFormDialog } from "./SectionForm";
 import { SectionPalette } from "./SectionPalette";
 import { SectionInsertControl } from "./SectionInsertControl";
+import { ThemeDialog } from "./ThemeDialog";
 import { PageSeoDialog } from "./PageSeoDialog";
 import { PageAiEditPanel } from "./PageAiEditPanel";
 import { PagePassword } from "./PagePassword";
@@ -98,6 +100,7 @@ import {
   steppedValue,
   type SectionLayouts,
 } from "./sectionLayout";
+import { SectionLayoutControls } from "./SectionLayoutControls";
 import { ErrorBanner } from "./parts";
 import { insertionIndex, type PaletteTile } from "./palette";
 import { heroAfterCanvasAction } from "./heroCanvas";
@@ -187,6 +190,7 @@ export function PageEditorView() {
   const [previewVersion, setPreviewVersion] = useState<"before" | "after">(
     "before",
   );
+  const [themeOpen, setThemeOpen] = useState(false);
   const [seoOpen, setSeoOpen] = useState(false);
   // Whether visitors meet an unlock screen before this page (S2.06b). Owned
   // by the password panel and mirrored here for one reason: a preview that
@@ -1083,6 +1087,14 @@ export function PageEditorView() {
                   {strings.sitesSeoAction}
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Palette size={14} />}
+                onClick={() => setThemeOpen(true)}
+              >
+                {strings.sitesTheme}
+              </Button>
               {locale === null && (
                 <PageAiEditPanel
                   navigation
@@ -1431,6 +1443,17 @@ export function PageEditorView() {
                                 {summary}
                               </span>
                             )}
+                            {locale === null && (
+                              <SectionLayoutControls
+                                section={section}
+                                index={i}
+                                layouts={layouts}
+                                disabled={working || translationBusy}
+                                onChoose={(at, key, value) => {
+                                  void applyLayout(at, key, value);
+                                }}
+                              />
+                            )}
                           </div>
                           <div className={styles.cardActions}>
                             <IconButton
@@ -1666,6 +1689,16 @@ export function PageEditorView() {
         </>
       )}
 
+      {themeOpen && (
+        <ThemeDialog
+          siteId={siteId}
+          onClose={() => setThemeOpen(false)}
+          onApplied={() => {
+            setThemeOpen(false);
+            setPreviewEpoch((epoch) => epoch + 1);
+          }}
+        />
+      )}
 
       {seoOpen && page !== null && (
         <PageSeoDialog

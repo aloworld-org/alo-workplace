@@ -204,6 +204,83 @@ export const de: Partial<Catalog> = {
     `Freigabe ${count} von ${required} erfasst. Eine andere Person muss abschließen.`,
   financeApprovalProgress: (count: number, required: number) =>
     `${count} von ${required} Freigaben`,
+  financeTabClose: "Abschluss",
+  financeCloseEyebrow: "Buchhaltungskontrollen",
+  financeCloseTitle: "Periodenabschluss",
+  financeCloseSubtitle:
+    "Klären Sie Ausnahmen, schließen Sie Berichtszeiträume ab und bewahren Sie eine klare Prüfspur.",
+  financeCloseLoadFailed: "Die Abschlussbereitschaft konnte nicht geladen werden.",
+  financeCloseCreateFailed: "Der Berichtszeitraum konnte nicht angelegt werden.",
+  financeCloseActionFailed: "Der Zeitraum konnte nicht aktualisiert werden.",
+  financeLockedThrough: (date: string) => `Bücher gesperrt bis einschließlich ${date}`,
+  financeBooksOpen: "Die Bücher sind offen",
+  financeReadyToClose: "Bereit zum Abschluss",
+  financeCloseNeedsAttention: "Blockaden vor dem Abschluss beheben",
+  financeCloseAsOf: (date: string) => `Serverprüfungen bis einschließlich ${date}`,
+  financeBlockers: (count: number) =>
+    `${count} ${count === 1 ? "Blockade" : "Blockaden"}`,
+  financeWarnings: (count: number) =>
+    `${count} ${count === 1 ? "Warnung" : "Warnungen"}`,
+  financeCloseBank: "Bankabstimmung",
+  financeCloseExpenses: "Spesenfreigaben",
+  financeCloseBalance: "Bilanz",
+  financeCloseReceivableFx: "Währungsdifferenzen aus Forderungen",
+  financeClosePayableFx: "Währungsdifferenzen aus Verbindlichkeiten",
+  financeCheckPassed: "Prüfung bestanden",
+  financeItems: (count: number) => `${count} ${count === 1 ? "Eintrag" : "Einträge"}`,
+  financePeriods: "Berichtszeiträume",
+  financePeriodsHint:
+    "Der Abschluss eines Zeitraums sperrt alle Buchungen bis zu seinem Enddatum.",
+  financeAddPeriod: "Zeitraum hinzufügen",
+  financeNoPeriods: "Es wurden noch keine Berichtszeiträume festgelegt.",
+  financeClosed: "Abgeschlossen",
+  financeOpen: "Offen",
+  financeClosedAt: (date: string) => `Abgeschlossen am ${date}`,
+  financeClosePeriod: "Zeitraum abschließen",
+  financeReopenPeriod: "Wieder öffnen",
+  financeCloseConfirmTitle: "Diesen Zeitraum abschließen?",
+  financeCloseConfirmMessage: (date: string) =>
+    `Buchungen mit Datum bis einschließlich ${date} werden gesperrt. Diese Aktion wird in der Prüfspur festgehalten.`,
+  financeReopenReason:
+    "Warum muss dieser Zeitraum wieder geöffnet werden? Der Grund wird in der Prüfspur festgehalten.",
+  financeReportAutomation: "Automatisierte Exporte",
+  financeReportSchedules: "Geplante Berichte",
+  financeReportSchedulesHint:
+    "Stellen Sie konsistente CSV-Berichte in einem kontrollierten Rhythmus bereit.",
+  financeReportSchedulesLoadFailed: "Geplante Berichte konnten nicht geladen werden.",
+  financeReportSchedulesCreateFailed: "Der Berichtsplan konnte nicht angelegt werden.",
+  financeReportScheduleDeleteFailed: "Der Berichtsplan konnte nicht gelöscht werden.",
+  financeReportScheduleDeleteTitle: "Diesen Berichtsplan löschen?",
+  financeReportScheduleDeleteMessage:
+    "Künftige Berichtslieferungen aus diesem Plan werden eingestellt.",
+  financeReport: "Bericht",
+  financeCadence: "Rhythmus",
+  financeRecipient: "Empfänger",
+  financeNextDelivery: "Erste Lieferung",
+  financeAddSchedule: "Berichtsplan hinzufügen",
+  financeNoSchedules: "Keine geplanten Berichte",
+  financeNoSchedulesHint:
+    "Erstellen Sie einen wiederkehrenden Export für die Personen, die die Bücher prüfen.",
+  financeReportKind: (value: string) =>
+    ({
+      pl: "Gewinn- und Verlustrechnung",
+      balance: "Bilanz",
+      aged_receivable: "Fälligkeitsanalyse Forderungen",
+      aged_payable: "Fälligkeitsanalyse Verbindlichkeiten",
+      vat: "Umsatzsteuervoranmeldung",
+    })[value] ?? value,
+  financeCadenceKind: (value: string) =>
+    ({ weekly: "Wöchentlich", monthly: "Monatlich", quarterly: "Vierteljährlich" })[
+      value
+    ] ?? value,
+  financeNextRun: (date: string) => `Nächste Lieferung ${date}`,
+  financeLedgerTitle: (name: string) => `Kontenblatt — ${name}`,
+  financeLedgerLoadFailed: "Das Kontenblatt konnte nicht geladen werden.",
+  financeDate: "Datum",
+  financeRunningBalance: "Laufender Saldo",
+  financeOpeningBalance: "Anfangssaldo",
+  financeLedgerTruncated:
+    "Nur die ersten 2.000 Buchungen werden angezeigt. Grenzen Sie den Berichtszeitraum ein, um den vollständigen laufenden Saldo zu sehen.",
   moduleInventory: "Lager",
   moduleHr: "Personen",
   moduleCampaigns: "Kampagnen",

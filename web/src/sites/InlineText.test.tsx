@@ -378,11 +378,11 @@ describe("the page editor applies what the preview reports", () => {
     postFromPreview("0/heading", "Injected", false);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(edits()).toHaveLength(0);
+    // History controls appear only after there is history. An event from an
+    // unrelated window must not create even a disabled affordance.
     expect(
-      screen.getByRole<HTMLButtonElement>("button", {
-        name: strings.sitesUndoEdit,
-      }).disabled,
-    ).toBe(true);
+      screen.queryByRole("button", { name: strings.sitesUndoEdit }),
+    ).toBeNull();
   });
 
   test("text that did not change is not a write", async () => {

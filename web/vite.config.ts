@@ -140,6 +140,24 @@ export default defineConfig(({ command }) => ({
     strictPort: true,
     proxy: devProxy,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // These two foundational modules intentionally refer to one another:
+        // record agents execute through the JMAP client, while JMAP DTOs carry
+        // agent-origin data. Keep their barrels and implementations in one
+        // stable chunk so route-level lazy chunks cannot create an execution-
+        // order cycle through re-exports.
+        manualChunks(id) {
+          const path = id.replaceAll("\\", "/");
+          if (path.includes("/src/jmap/") || path.includes("/src/agents/")) {
+            return "alo-record-platform";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     // The Playwright suite in e2e/ matches vitest's default spec glob but
