@@ -1,5 +1,7 @@
 # Changelog
 
+- Redesigned the webmail conversation view with a responsive message timeline, accessible expand/collapse controls, and clearer thread actions.
+
 User- and operator-visible changes, written when the knowledge is
 fresh (release skill). Versions follow SemVer against public
 contracts.
